@@ -202,14 +202,51 @@
                         "x": 0.4681777358055115,
                         "y": 0.4681777358055115
                     },
-                    "time_per_frame": 0.1761581301689148,
-                    "animation": "elderfly_flying"
+                    "time_per_frame": 0.0,
+                    "ticks_per_frame": 3,
+                    "start_frame": 0,
+                    "animation": "elderfly_flying",
+                    "variation": {
+                        "scale": {
+                            "random": {
+                                "min": {
+                                    "x": 0.3,
+                                    "y": 0.3
+                                },
+                                "max": {
+                                    "x": 0.5,
+                                    "y": 0.5
+                                },
+                                "seed": 100
+                            }
+                        },
+                        "ticks_per_frame": {
+                            "cycle": [
+                                2,
+                                3,
+                                4,
+                                5
+                            ]
+                        },
+                        "start_frame": {
+                            "sequence": {
+                                "start": 0,
+                                "step": 1,
+                                "wrap": 12
+                            }
+                        }
+                    }
                 },
                 "groups": [
                     "small_flies"
                 ]
             },
-            "count": 499
+            "count": 499,
+            "placement": {
+                "type": "circle",
+                "radius": 80.0,
+                "start_angle": 0.0
+            }
         }
     ],
     "assets": {

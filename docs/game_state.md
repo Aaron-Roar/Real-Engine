@@ -31,6 +31,31 @@ component prototype. The first copy keeps the base name and later copies use
 `_1`, `_2`, and so on. If a generated name already exists, the loader advances
 the numeric suffix until it finds a unique name.
 
+Counted prototypes overlap at their component `position` by default. An
+optional `placement` object can generate initial positions from that position:
+
+```json
+"placement": {
+  "type": "grid",
+  "columns": 25,
+  "spacing": {"x": 8, "y": 8},
+  "centered": true
+}
+```
+
+Supported placement types are:
+
+- `point`: keep every copy at the prototype position; this is the default when
+  `placement` is omitted
+- `line`: requires a `{ "x", "y" }` `step`; `centered` is optional
+- `grid`: requires positive `columns` and `{ "x", "y" }` `spacing`;
+  `centered` is optional
+- `circle`: requires a non-negative `radius`; optional `start_angle` is in
+  radians
+
+Placement requires the prototype to contain a `position`, except for `point`.
+It only determines initial transforms and does not change physics behavior.
+
 Generic groups are declared once at the document root and referenced by name
 from entity components:
 
@@ -40,6 +65,12 @@ from entity components:
   "entities": [{
     "name": "small_fly",
     "count": 499,
+    "placement": {
+      "type": "grid",
+      "columns": 25,
+      "spacing": {"x": 8, "y": 8},
+      "centered": true
+    },
     "components": {
       "groups": ["small_flies"]
     }
@@ -70,7 +101,7 @@ Supported value keys are:
 - `joint`: named `a` and `b` entities, `type` (`distance`, `weld`, or `pin`),
   anchors, rest values, stiffness, damping, and angular settings
 - `animated_sprite`: a named `animation`, per-entity `scale`, and
-  `time_per_frame`
+  `time_per_frame`, `ticks_per_frame`, and `start_frame`
 - `groups`: an array of named generic groups
 
 Animations are named once in the top-level asset catalog. State loading must
@@ -90,6 +121,48 @@ the engine creates SDL textures while connecting the state.
   }]
 }
 ```
+
+Counted prototypes can vary sprite values deterministically by instance:
+
+```json
+"animated_sprite": {
+  "animation": "elderfly_flying",
+  "scale": {"x": 0.4, "y": 0.4},
+  "time_per_frame": 0,
+  "ticks_per_frame": 3,
+  "start_frame": 0,
+  "variation": {
+    "scale": {
+      "random": {
+        "min": {"x": 0.3, "y": 0.3},
+        "max": {"x": 0.5, "y": 0.5},
+        "seed": 100
+      }
+    },
+    "ticks_per_frame": {
+      "cycle": [2, 3, 4, 5]
+    },
+    "start_frame": {
+      "sequence": {"start": 0, "step": 1, "wrap": 12}
+    }
+  }
+}
+```
+
+Variation supports `scale`, `time_per_frame`, `ticks_per_frame`, and
+`start_frame`. Scalar fields support:
+
+- `cycle`: choose array entries by instance index
+- `sequence`: `start + step * instance`, with optional positive `wrap`
+- `linear`: interpolate from `from` to `to` across the collection
+- `random`: choose between `min` and `max` using an explicit unsigned `seed`
+
+Scale supports the same generators with vector values, except vector
+`sequence` does not use `wrap`. Random generation is derived independently from
+the seed, field, vector axis, and instance index, so another varied field does
+not perturb existing results. Generated scale values must be positive. Tick
+rates and starting frames must resolve to non-negative integers, and starting
+frames must exist in the referenced animation.
 
 Saving includes named entities only. Collision reports, broad-phase grid state,
 and generic groups are runtime-derived or not yet represented by schema version

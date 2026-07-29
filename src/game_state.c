@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <math.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -25,6 +27,8 @@ typedef struct StateDocument {
 typedef struct StateLoadedEntity {
     Entity entity;
     yyjson_val *description;
+    uint64_t instance;
+    uint64_t instance_count;
 } StateLoadedEntity;
 
 typedef struct StateAnimation {
@@ -39,6 +43,8 @@ typedef struct StateSpriteReference {
     char animation[STATE_ASSET_NAME_MAX];
     Scale scale;
     Time time_per_frame;
+    Tick ticks_per_frame;
+    int start_frame;
 } StateSpriteReference;
 
 static StateAnimation state_animations[STATE_MAX_ANIMATIONS] = {0};
@@ -170,6 +176,140 @@ static bool state_vec2(yyjson_val *object, Vec2D *value) {
     return true;
 }
 
+static bool state_optional_boolean(
+        yyjson_val *object,
+        const char *key,
+        bool default_value,
+        bool *value
+) {
+    yyjson_val *item;
+
+    if(!yyjson_is_obj(object) || value == NULL) return false;
+    item = yyjson_obj_get(object, key);
+    if(item == NULL) {
+        *value = default_value;
+        return true;
+    }
+    if(!yyjson_is_bool(item)) return false;
+    *value = yyjson_get_bool(item);
+    return true;
+}
+
+static EngineResult state_apply_placement(
+        const StateLoadedEntity *loaded
+) {
+    yyjson_val *placement;
+    yyjson_val *type;
+    EntityIndex index;
+    Position origin;
+    Position generated;
+
+    if(loaded == NULL) {
+        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
+    placement = yyjson_obj_get(loaded->description, "placement");
+    if(placement == NULL) return error_result_value(true);
+    type = yyjson_obj_get(placement, "type");
+    if(!yyjson_is_obj(placement) || !yyjson_is_str(type)) {
+        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
+    if(strcmp(yyjson_get_str(type), "point") == 0) {
+        return error_result_value(true);
+    }
+    if(!entity_get_index(loaded->entity, &index)
+            || index >= positions_pool.capacity
+            || positions_pool.used[index] == 0) {
+        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
+    origin = positions[index];
+    generated = origin;
+
+    if(strcmp(yyjson_get_str(type), "line") == 0) {
+        Vec2D step;
+        bool centered;
+        double offset;
+        if(!state_vec2(yyjson_obj_get(placement, "step"), &step)
+                || !state_optional_boolean(
+                    placement,
+                    "centered",
+                    false,
+                    &centered
+                )) {
+            return error_result_error(ERROR_ENGINE_STATE_INVALID);
+        }
+        offset = centered
+            ? (double)loaded->instance
+                - ((double)loaded->instance_count - 1.0) * 0.5
+            : (double)loaded->instance;
+        generated.x += step.x * (float)offset;
+        generated.y += step.y * (float)offset;
+    }
+    else if(strcmp(yyjson_get_str(type), "grid") == 0) {
+        yyjson_val *columns_value = yyjson_obj_get(placement, "columns");
+        Vec2D spacing;
+        uint64_t columns;
+        uint64_t rows;
+        uint64_t column;
+        uint64_t row;
+        bool centered;
+        double column_offset;
+        double row_offset;
+        if(!yyjson_is_uint(columns_value)
+                || yyjson_get_uint(columns_value) == 0
+                || yyjson_get_uint(columns_value) > MAX_ENTITIES
+                || !state_vec2(yyjson_obj_get(placement, "spacing"), &spacing)
+                || !state_optional_boolean(
+                    placement,
+                    "centered",
+                    false,
+                    &centered
+                )) {
+            return error_result_error(ERROR_ENGINE_STATE_INVALID);
+        }
+        columns = yyjson_get_uint(columns_value);
+        rows = (loaded->instance_count + columns - 1) / columns;
+        column = loaded->instance % columns;
+        row = loaded->instance / columns;
+        column_offset = centered
+            ? (double)column
+                - ((double)(columns < loaded->instance_count
+                    ? columns
+                    : loaded->instance_count) - 1.0) * 0.5
+            : (double)column;
+        row_offset = centered
+            ? (double)row - ((double)rows - 1.0) * 0.5
+            : (double)row;
+        generated.x += spacing.x * (float)column_offset;
+        generated.y += spacing.y * (float)row_offset;
+    }
+    else if(strcmp(yyjson_get_str(type), "circle") == 0) {
+        double radius;
+        double start_angle = 0.0;
+        double angle;
+        yyjson_val *start_angle_value = yyjson_obj_get(
+            placement,
+            "start_angle"
+        );
+        if(!state_number(placement, "radius", &radius) || radius < 0.0) {
+            return error_result_error(ERROR_ENGINE_STATE_INVALID);
+        }
+        if(start_angle_value != NULL
+                && !state_number(placement, "start_angle", &start_angle)) {
+            return error_result_error(ERROR_ENGINE_STATE_INVALID);
+        }
+        angle = start_angle
+            + 2.0 * (double)PI_F
+                * (double)loaded->instance
+                / (double)loaded->instance_count;
+        generated.x += (float)(cos(angle) * radius);
+        generated.y += (float)(sin(angle) * radius);
+    }
+    else {
+        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
+    return physics_set_position(loaded->entity, generated);
+}
+
 static EngineResult state_resolve_name(yyjson_val *value, Entity *entity) {
     EntityResult result;
 
@@ -235,6 +375,191 @@ static EngineResult state_make_entity_name(
     }
 }
 
+static uint64_t state_variation_hash(uint64_t value) {
+    value += UINT64_C(0x9e3779b97f4a7c15);
+    value = (value ^ (value >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
+    value = (value ^ (value >> 27)) * UINT64_C(0x94d049bb133111eb);
+    return value ^ (value >> 31);
+}
+
+static double state_variation_random_unit(
+        uint64_t seed,
+        uint64_t instance,
+        uint64_t salt
+) {
+    uint64_t bits = state_variation_hash(
+        seed ^ state_variation_hash(instance) ^ salt
+    );
+    return (double)(bits >> 11) * (1.0 / 9007199254740992.0);
+}
+
+static bool state_variation_scalar(
+        yyjson_val *specification,
+        uint64_t instance,
+        uint64_t instance_count,
+        uint64_t salt,
+        double *value
+) {
+    yyjson_val *generator;
+
+    if(!yyjson_is_obj(specification) || value == NULL) return false;
+    generator = yyjson_obj_get(specification, "random");
+    if(generator != NULL) {
+        yyjson_val *seed_value = yyjson_obj_get(generator, "seed");
+        double min;
+        double max;
+        double unit;
+        if(!yyjson_is_obj(generator)
+                || !yyjson_is_uint(seed_value)
+                || !state_number(generator, "min", &min)
+                || !state_number(generator, "max", &max)
+                || max < min) {
+            return false;
+        }
+        unit = state_variation_random_unit(
+            yyjson_get_uint(seed_value),
+            instance,
+            salt
+        );
+        *value = min + (max - min) * unit;
+        return true;
+    }
+
+    generator = yyjson_obj_get(specification, "cycle");
+    if(generator != NULL) {
+        yyjson_val *item;
+        size_t count;
+        if(!yyjson_is_arr(generator)) return false;
+        count = yyjson_arr_size(generator);
+        if(count == 0) return false;
+        item = yyjson_arr_get(generator, (size_t)(instance % count));
+        if(!yyjson_is_num(item)) return false;
+        *value = yyjson_get_num(item);
+        return true;
+    }
+
+    generator = yyjson_obj_get(specification, "sequence");
+    if(generator != NULL) {
+        yyjson_val *wrap_value;
+        double start;
+        double step;
+        if(!yyjson_is_obj(generator)
+                || !state_number(generator, "start", &start)
+                || !state_number(generator, "step", &step)) {
+            return false;
+        }
+        *value = start + step * (double)instance;
+        wrap_value = yyjson_obj_get(generator, "wrap");
+        if(wrap_value != NULL) {
+            double wrap;
+            if(!yyjson_is_num(wrap_value)
+                    || (wrap = yyjson_get_num(wrap_value)) <= 0.0) {
+                return false;
+            }
+            *value = fmod(*value, wrap);
+            if(*value < 0.0) *value += wrap;
+        }
+        return true;
+    }
+
+    generator = yyjson_obj_get(specification, "linear");
+    if(generator != NULL) {
+        double from;
+        double to;
+        double amount = instance_count > 1
+            ? (double)instance / ((double)instance_count - 1.0)
+            : 0.0;
+        if(!yyjson_is_obj(generator)
+                || !state_number(generator, "from", &from)
+                || !state_number(generator, "to", &to)) {
+            return false;
+        }
+        *value = from + (to - from) * amount;
+        return true;
+    }
+    return false;
+}
+
+static bool state_variation_vec2(
+        yyjson_val *specification,
+        uint64_t instance,
+        uint64_t instance_count,
+        uint64_t salt,
+        Vec2D *value
+) {
+    yyjson_val *generator;
+
+    if(!yyjson_is_obj(specification) || value == NULL) return false;
+    generator = yyjson_obj_get(specification, "random");
+    if(generator != NULL) {
+        yyjson_val *seed_value = yyjson_obj_get(generator, "seed");
+        Vec2D min;
+        Vec2D max;
+        if(!yyjson_is_obj(generator)
+                || !yyjson_is_uint(seed_value)
+                || !state_vec2(yyjson_obj_get(generator, "min"), &min)
+                || !state_vec2(yyjson_obj_get(generator, "max"), &max)
+                || max.x < min.x
+                || max.y < min.y) {
+            return false;
+        }
+        value->x = min.x + (max.x - min.x) * (float)state_variation_random_unit(
+            yyjson_get_uint(seed_value),
+            instance,
+            salt
+        );
+        value->y = min.y + (max.y - min.y) * (float)state_variation_random_unit(
+            yyjson_get_uint(seed_value),
+            instance,
+            salt ^ UINT64_C(0xa5a5a5a5a5a5a5a5)
+        );
+        return true;
+    }
+
+    generator = yyjson_obj_get(specification, "cycle");
+    if(generator != NULL) {
+        yyjson_val *item;
+        size_t count;
+        if(!yyjson_is_arr(generator)) return false;
+        count = yyjson_arr_size(generator);
+        if(count == 0) return false;
+        item = yyjson_arr_get(generator, (size_t)(instance % count));
+        return state_vec2(item, value);
+    }
+
+    generator = yyjson_obj_get(specification, "sequence");
+    if(generator != NULL) {
+        Vec2D start;
+        Vec2D step;
+        if(!yyjson_is_obj(generator)
+                || !state_vec2(yyjson_obj_get(generator, "start"), &start)
+                || !state_vec2(yyjson_obj_get(generator, "step"), &step)) {
+            return false;
+        }
+        value->x = start.x + step.x * (float)instance;
+        value->y = start.y + step.y * (float)instance;
+        return true;
+    }
+
+    generator = yyjson_obj_get(specification, "linear");
+    if(generator != NULL) {
+        Vec2D from;
+        Vec2D to;
+        float amount = instance_count > 1
+            ? (float)instance / (float)(instance_count - 1)
+            : 0.0f;
+        if(!yyjson_is_obj(generator)
+                || !state_vec2(yyjson_obj_get(generator, "from"), &from)
+                || !state_vec2(yyjson_obj_get(generator, "to"), &to)) {
+            return false;
+        }
+        value->x = from.x + (to.x - from.x) * amount;
+        value->y = from.y + (to.y - from.y) * amount;
+        return true;
+    }
+    return false;
+}
+
 static CMask state_flag_mask(const char *flag) {
     if(strcmp(flag, "static") == 0) return STATIC;
     if(strcmp(flag, "dynamic") == 0) return DYNAMIC;
@@ -271,7 +596,12 @@ static EngineResult state_load_shape(EntityIndex index, yyjson_val *value) {
     return error_result_value(true);
 }
 
-static EngineResult state_load_components(Entity entity, yyjson_val *components) {
+static EngineResult state_load_components(
+        Entity entity,
+        yyjson_val *components,
+        uint64_t instance,
+        uint64_t instance_count
+) {
     EntityIndex index;
     yyjson_val *value;
     yyjson_val *flag;
@@ -457,32 +787,138 @@ static EngineResult state_load_components(Entity entity, yyjson_val *components)
     value = yyjson_obj_get(components, "animated_sprite");
     if(value != NULL) {
         yyjson_val *animation_name = yyjson_obj_get(value, "animation");
+        yyjson_val *variation = yyjson_obj_get(value, "variation");
+        yyjson_val *field;
+        yyjson_val *base_value;
         StateAnimation *animation;
         Scale scale;
         Vec2D scale_value;
         AnimatedSprite sprite;
         double time_per_frame;
+        double generated_value;
+        Tick ticks_per_frame;
+        int start_frame;
         if(!yyjson_is_obj(value)
                 || !yyjson_is_str(animation_name)
                 || yyjson_get_len(animation_name) == 0
                 || yyjson_get_len(animation_name) >= STATE_ASSET_NAME_MAX
                 || !state_vec2(yyjson_obj_get(value, "scale"), &scale_value)
-                || !state_number(value, "time_per_frame", &time_per_frame)) {
+                || (variation != NULL && !yyjson_is_obj(variation))) {
             return error_result_error(ERROR_ENGINE_STATE_INVALID);
         }
         animation = state_find_animation(yyjson_get_str(animation_name));
         if(animation == NULL) {
             return error_result_error(ERROR_ENGINE_STATE_REFERENCE_NOT_FOUND);
         }
+        base_value = yyjson_obj_get(value, "time_per_frame");
+        if(base_value != NULL) {
+            if(!yyjson_is_num(base_value)) {
+                return error_result_error(ERROR_ENGINE_STATE_INVALID);
+            }
+            time_per_frame = yyjson_get_num(base_value);
+        } else {
+            time_per_frame = animation->asset.time_per_frame;
+        }
+        base_value = yyjson_obj_get(value, "ticks_per_frame");
+        if(base_value != NULL) {
+            if(!yyjson_is_uint(base_value)) {
+                return error_result_error(ERROR_ENGINE_STATE_INVALID);
+            }
+            ticks_per_frame = yyjson_get_uint(base_value);
+        } else {
+            ticks_per_frame = animation->asset.ticks_per_frame;
+        }
+        base_value = yyjson_obj_get(value, "start_frame");
+        if(base_value != NULL) {
+            if(!yyjson_is_uint(base_value)
+                    || yyjson_get_uint(base_value) > INT_MAX) {
+                return error_result_error(ERROR_ENGINE_STATE_INVALID);
+            }
+            start_frame = (int)yyjson_get_uint(base_value);
+        } else {
+            start_frame = 0;
+        }
+        if(variation != NULL) {
+            field = yyjson_obj_get(variation, "scale");
+            if(field != NULL && !state_variation_vec2(
+                    field,
+                    instance,
+                    instance_count,
+                    UINT64_C(0x7363616c65),
+                    &scale_value
+                )) {
+                return error_result_error(ERROR_ENGINE_STATE_INVALID);
+            }
+            field = yyjson_obj_get(variation, "time_per_frame");
+            if(field != NULL) {
+                if(!state_variation_scalar(
+                        field,
+                        instance,
+                        instance_count,
+                        UINT64_C(0x74696d655f726174),
+                        &time_per_frame
+                    )) {
+                    return error_result_error(ERROR_ENGINE_STATE_INVALID);
+                }
+            }
+            field = yyjson_obj_get(variation, "ticks_per_frame");
+            if(field != NULL) {
+                if(!state_variation_scalar(
+                        field,
+                        instance,
+                        instance_count,
+                        UINT64_C(0x7469636b5f726174),
+                        &generated_value
+                    )
+                        || !isfinite(generated_value)
+                        || generated_value < 0.0
+                        || generated_value > (double)UINT64_MAX
+                        || floor(generated_value) != generated_value) {
+                    return error_result_error(ERROR_ENGINE_STATE_INVALID);
+                }
+                ticks_per_frame = (Tick)generated_value;
+            }
+            field = yyjson_obj_get(variation, "start_frame");
+            if(field != NULL) {
+                if(!state_variation_scalar(
+                        field,
+                        instance,
+                        instance_count,
+                        UINT64_C(0x73746172745f6672),
+                        &generated_value
+                    )
+                        || !isfinite(generated_value)
+                        || generated_value < 0.0
+                        || generated_value > INT_MAX
+                        || floor(generated_value) != generated_value) {
+                    return error_result_error(ERROR_ENGINE_STATE_INVALID);
+                }
+                start_frame = (int)generated_value;
+            }
+        }
+        if(!isfinite(scale_value.x)
+                || !isfinite(scale_value.y)
+                || scale_value.x <= 0.0f
+                || scale_value.y <= 0.0f
+                || !isfinite(time_per_frame)
+                || time_per_frame < 0.0
+                || start_frame < 0
+                || start_frame >= animation->asset.texture_list.amount) {
+            return error_result_error(ERROR_ENGINE_STATE_INVALID);
+        }
         scale = (Scale){scale_value.x, scale_value.y};
         sprite = graphics_create_animated_sprite(animation->asset, scale);
         sprite.animation.time_per_frame = time_per_frame;
+        sprite.animation.ticks_per_frame = ticks_per_frame;
+        sprite.animation_frame = start_frame;
         result = graphics_add_animated_sprite(entity, sprite);
         if(result.kind == ERROR_RESULT_ERROR) return result;
         state_sprite_references[index] = (StateSpriteReference){
             .used = true,
             .scale = scale,
-            .time_per_frame = time_per_frame
+            .time_per_frame = time_per_frame,
+            .ticks_per_frame = ticks_per_frame,
+            .start_frame = start_frame
         };
         memcpy(
             state_sprite_references[index].animation,
@@ -672,7 +1108,9 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
                 created[created_count] = entity_result.result.value;
                 loaded[created_count] = (StateLoadedEntity){
                     .entity = entity_result.result.value,
-                    .description = description
+                    .description = description,
+                    .instance = instance,
+                    .instance_count = instance_count
                 };
                 created_count += 1;
                 total_created = created_count;
@@ -694,7 +1132,14 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
             result = error_result_error(ERROR_ENGINE_STATE_INVALID);
             goto cleanup;
         }
-        result = state_load_components(loaded[created_count].entity, components);
+        result = state_load_components(
+            loaded[created_count].entity,
+            components,
+            loaded[created_count].instance,
+            loaded[created_count].instance_count
+        );
+        if(result.kind == ERROR_RESULT_ERROR) goto cleanup;
+        result = state_apply_placement(&loaded[created_count]);
         if(result.kind == ERROR_RESULT_ERROR) goto cleanup;
     }
 
@@ -951,6 +1396,18 @@ EngineResult game_state_save_file(const char *path) {
                 sprite,
                 "time_per_frame",
                 reference->time_per_frame
+            );
+            yyjson_mut_obj_add_uint(
+                document,
+                sprite,
+                "ticks_per_frame",
+                reference->ticks_per_frame
+            );
+            yyjson_mut_obj_add_int(
+                document,
+                sprite,
+                "start_frame",
+                reference->start_frame
             );
             yyjson_mut_obj_add_val(
                 document,
