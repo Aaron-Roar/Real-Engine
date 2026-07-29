@@ -1,13 +1,7 @@
 #include "rohr.h"
 #include <stdio.h>
-#include <time.h>
-#include <stdlib.h>
-#include "examples/test-assets/elder-fly/elderfly_descriptors.h"
 
 const Color background_color = (Color){255,255,255,255};
-AnimationAsset animation_elderfly = {0};
-AnimatedSprite sprite_elderfly = {0};
-const int amount_of_entities = 500;
 const Time demo_duration_seconds = 30.0;
 const Mass large_fly_mass = 50.0f;
 const float large_fly_control_acceleration = 240.0f;
@@ -19,7 +13,6 @@ const Torque large_fly_control_torque = 2000000.0f;
 int main(void) {
     EngineResult result;
     EntityResult entity_result;
-    AnimationAssetResult animation_result;
     KeyboardState keyboard = {0};
 
     if(rohr_error_check(result = rohr_engine_init())) {
@@ -59,37 +52,6 @@ int main(void) {
         goto fail;
     }
     Entity large_fly = entity_result.result.value;
-
-    if(rohr_error_check(animation_result = rohr_graphics_load_animation(elderfly_fly))) {
-        PRINT_ENGINE_ERROR(animation_result);
-        goto fail;
-    }
-    animation_elderfly = animation_result.result.value;
-    sprite_elderfly = rohr_graphics_create_animated_sprite(animation_elderfly, (Scale){10,10});
-    rohr_graphics_add_animated_sprite(large_fly, sprite_elderfly);
-
-    time_t seed = 1003463;
-    srand(seed);
-    for(int i = 0; i < amount_of_entities - 1; i += 1) {
-        char small_fly_name[ENTITY_NAME_MAX];
-        float size;
-
-        snprintf(small_fly_name, sizeof(small_fly_name), "small_fly_%03d", i);
-        if(rohr_error_check(entity_result = rohr_entity_find_by_name(small_fly_name))) {
-            PRINT_ENGINE_ERROR(entity_result);
-            goto fail;
-        }
-        Entity small_fly = entity_result.result.value;
-
-        (void)rohr_tools_random_range(-10, 10);
-        (void)rohr_tools_random_range(100, 200);
-        (void)rohr_tools_random_range(0, 2*PI_F);
-        (void)rohr_tools_random_range(0, -10);
-        size = rohr_tools_random_range_float(3, 5);
-        sprite_elderfly = rohr_graphics_create_animated_sprite(animation_elderfly, (Scale){size/10,size/10});
-        sprite_elderfly.animation.time_per_frame = rohr_tools_random_range_float(0.005, 0.5);
-        rohr_graphics_add_animated_sprite(small_fly, sprite_elderfly);
-    }
 
     rohr_engine_reset_clock();
     //Game Loop

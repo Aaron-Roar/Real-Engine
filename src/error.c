@@ -72,6 +72,14 @@ const char *error_default_message(EngineError error) {
             return "invalid game state";
         case ERROR_ENGINE_STATE_REFERENCE_NOT_FOUND:
             return "game state entity reference not found";
+        case ERROR_ENGINE_INVALID_GROUP_NAME:
+            return "invalid group name";
+        case ERROR_ENGINE_GROUP_NAME_TOO_LONG:
+            return "group name is too long";
+        case ERROR_ENGINE_DUPLICATE_GROUP_NAME:
+            return "duplicate group name";
+        case ERROR_ENGINE_GROUP_NOT_FOUND:
+            return "group not found";
         default:
             return "unknown error";
     }

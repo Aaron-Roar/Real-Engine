@@ -295,6 +295,15 @@ bool rohr_entity_index_has_components(EntityIndex index, CMask components);
  */
 GroupIdResult rohr_entity_group_create(void);
 
+/** Assigns a unique fixed-size name to a generic group. */
+EngineResult rohr_entity_group_set_name(GroupId group, const char *name);
+
+/** Finds a live generic group by name. */
+GroupIdResult rohr_entity_group_find_by_name(const char *name);
+
+/** Returns a copy of a generic group's fixed-size name. */
+GroupNameResult rohr_entity_group_get_name(GroupId group);
+
 /**
  * @brief Destroys a generic entity group and clears member group references.
  * @param group Group id to destroy.

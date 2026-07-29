@@ -71,6 +71,14 @@ typedef enum EngineError {
     ERROR_ENGINE_STATE_INVALID,
     /** A named entity relationship could not be resolved. */
     ERROR_ENGINE_STATE_REFERENCE_NOT_FOUND,
+    /** A group name is null or empty. */
+    ERROR_ENGINE_INVALID_GROUP_NAME,
+    /** A group name exceeds GROUP_NAME_MAX. */
+    ERROR_ENGINE_GROUP_NAME_TOO_LONG,
+    /** A group name is already assigned to another generic group. */
+    ERROR_ENGINE_DUPLICATE_GROUP_NAME,
+    /** No live generic group has the requested name. */
+    ERROR_ENGINE_GROUP_NOT_FOUND,
 } EngineError;
 
 /**

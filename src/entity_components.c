@@ -47,6 +47,8 @@ EntityNamePool entity_names_pool = {0};
 static GroupId free_group_ids[MAX_GROUPS] = {0};
 static size_t free_group_count = 0;
 static GroupId next_group_id = 1;
+static GroupName entity_group_names[MAX_GROUPS] = {0};
+static bool entity_group_names_used[MAX_GROUPS] = {0};
 
 static void entity_group_destroy_storage(EntityGroup *group);
 static EngineResult entity_group_ensure_capacity(EntityGroup *group, size_t capacity);
@@ -73,6 +75,8 @@ static void entity_id_pool_init(void) {
     memset(entity_alive_entities, 0, sizeof(entity_alive_entities));
     memset(entity_alive_positions, 0, sizeof(entity_alive_positions));
     memset(free_group_ids, 0, sizeof(free_group_ids));
+    memset(entity_group_names, 0, sizeof(entity_group_names));
+    memset(entity_group_names_used, 0, sizeof(entity_group_names_used));
     entity_id_pool.free_count = 0;
     entity_id_pool.free_index_count = 0;
     entity_id_pool.live_count = 0;
@@ -80,6 +84,8 @@ static void entity_id_pool_init(void) {
     entity_id_pool.next_index = 0;
     free_group_count = 0;
     next_group_id = 1;
+    memset(entity_group_names, 0, sizeof(entity_group_names));
+    memset(entity_group_names_used, 0, sizeof(entity_group_names_used));
 }
 
 EngineResult entity_tables_init(void) {
@@ -544,6 +550,7 @@ static void entity_clear_index(EntityIndex index) {
     if(!entity_table_index_valid(index)) {
         return;
     }
+    game_state_entity_clear(index);
     if(index < entity_alive_pool.capacity && entity_alive_pool.used[index]) {
         (void)EntityAlivePool_release_at(&entity_alive_pool, index);
     }
@@ -853,6 +860,63 @@ GroupIdResult entity_group_create(void) {
     return entity_group_create_kind(GROUP_KIND_GENERIC);
 }
 
+GroupIdResult entity_group_find_by_name(const char *name) {
+    GroupId group;
+
+    if(name == NULL || name[0] == '\0') {
+        return ERROR_RESULT_MAKE_ERROR(GroupIdResult, ERROR_ENGINE_INVALID_GROUP_NAME);
+    }
+    for(group = 1; group <= MAX_GROUPS; group += 1) {
+        EntityIndex index = entity_group_index(group);
+        if(entity_group_names_used[index]
+                && entity_group_is_alive(group)
+                && strcmp(entity_group_names[index].value, name) == 0) {
+            return ERROR_RESULT_MAKE_VALUE(GroupIdResult, group);
+        }
+    }
+    return ERROR_RESULT_MAKE_ERROR(GroupIdResult, ERROR_ENGINE_GROUP_NOT_FOUND);
+}
+
+EngineResult entity_group_set_name(GroupId group, const char *name) {
+    EntityIndex index;
+    GroupIdResult existing;
+    size_t length;
+
+    if(!entity_group_is_alive(group)
+            || entity_groups[entity_group_index(group)].kind != GROUP_KIND_GENERIC) {
+        return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
+    }
+    if(name == NULL || name[0] == '\0') {
+        return error_result_error(ERROR_ENGINE_INVALID_GROUP_NAME);
+    }
+    length = strlen(name);
+    if(length >= GROUP_NAME_MAX) {
+        return error_result_error(ERROR_ENGINE_GROUP_NAME_TOO_LONG);
+    }
+    existing = entity_group_find_by_name(name);
+    if(existing.kind == ERROR_RESULT_VALUE && existing.result.value != group) {
+        return error_result_error(ERROR_ENGINE_DUPLICATE_GROUP_NAME);
+    }
+    index = entity_group_index(group);
+    memset(entity_group_names[index].value, 0, GROUP_NAME_MAX);
+    memcpy(entity_group_names[index].value, name, length + 1);
+    entity_group_names_used[index] = true;
+    return error_result_value(true);
+}
+
+GroupNameResult entity_group_get_name(GroupId group) {
+    EntityIndex index;
+
+    if(!entity_group_is_alive(group)) {
+        return ERROR_RESULT_MAKE_ERROR(GroupNameResult, ERROR_ENGINE_INVALID_ENTITY);
+    }
+    index = entity_group_index(group);
+    if(!entity_group_names_used[index]) {
+        return ERROR_RESULT_MAKE_ERROR(GroupNameResult, ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    return ERROR_RESULT_MAKE_VALUE(GroupNameResult, entity_group_names[index]);
+}
+
 static EngineResult entity_group_destroy_internal(GroupId group) {
     EntityIndex group_index;
     EntityGroup *group_storage;
@@ -863,6 +927,8 @@ static EngineResult entity_group_destroy_internal(GroupId group) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
     group_index = entity_group_index(group);
+    entity_group_names[group_index] = (GroupName){0};
+    entity_group_names_used[group_index] = false;
     group_storage = &entity_groups[group_index];
     while(group_storage->entities.count > 0) {
         if(!entity_group_storage_last(group_storage, &entity)) {

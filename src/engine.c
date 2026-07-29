@@ -76,6 +76,7 @@ EngineResult engine_init(void) {
         SDL_Quit();
         return result;
     }
+    game_state_runtime_reset();
 
     sdl_frequency = SDL_GetPerformanceFrequency();
     sdl_prev_counter = SDL_GetPerformanceCounter();
@@ -163,6 +164,7 @@ Time engine_get_dt(void) {
 }
 
 void engine_shutdown(void) {
+    game_state_runtime_reset();
     grid_tables_destroy();
     graphics_tables_destroy();
     physics_tables_destroy();

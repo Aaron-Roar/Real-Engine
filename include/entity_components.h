@@ -28,6 +28,8 @@ typedef uint32_t EntityIndex; //An index into component tables
 
 /** Maximum entity name length, including the terminating null byte. */
 #define ENTITY_NAME_MAX 64
+/** Maximum group name length, including the terminating null byte. */
+#define GROUP_NAME_MAX 64
 
 /** Result type for functions that return an Entity. */
 ERROR_DECLARE_RESULT_TYPE(EntityResult, Entity);
@@ -40,6 +42,14 @@ typedef uint32_t GroupId;
 
 /** Result type for functions that return a GroupId. */
 ERROR_DECLARE_RESULT_TYPE(GroupIdResult, GroupId);
+
+/** Fixed-size, engine-owned generic group name. */
+typedef struct GroupName {
+    char value[GROUP_NAME_MAX];
+} GroupName;
+
+/** Result type for functions that return a GroupName. */
+ERROR_DECLARE_RESULT_TYPE(GroupNameResult, GroupName);
 
 /** Component mask value for an entity. */
 typedef uint32_t CMask; //The bit mask for an entities components
@@ -341,6 +351,15 @@ bool entity_index_has_components(EntityIndex index, CMask components);
  * @return GroupIdResult containing a group id, or an error.
  */
 GroupIdResult entity_group_create(void);
+
+/** Assign a unique name to a generic entity group. */
+EngineResult entity_group_set_name(GroupId group, const char *name);
+
+/** Find a live generic group by name. */
+GroupIdResult entity_group_find_by_name(const char *name);
+
+/** Return a copy of a generic group's fixed-size name. */
+GroupNameResult entity_group_get_name(GroupId group);
 
 /**
  * Destroy a generic group and remove it from member entity group lists.

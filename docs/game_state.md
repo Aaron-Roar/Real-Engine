@@ -11,6 +11,7 @@ in the same call.
   "entities": [
     {
       "name": "player",
+      "count": 1,
       "components": {
         "flags": ["dynamic", "collision"],
         "position": {"x": 40, "y": 60},
@@ -24,6 +25,31 @@ in the same call.
 
 Names are unique among live entities and may contain at most 63 bytes. The
 loader accepts JSON comments and trailing commas for handcrafted files.
+
+An entity description may use `count` to create multiple copies from one
+component prototype. The first copy keeps the base name and later copies use
+`_1`, `_2`, and so on. If a generated name already exists, the loader advances
+the numeric suffix until it finds a unique name.
+
+Generic groups are declared once at the document root and referenced by name
+from entity components:
+
+```json
+{
+  "groups": [{"name": "small_flies"}],
+  "entities": [{
+    "name": "small_fly",
+    "count": 499,
+    "components": {
+      "groups": ["small_flies"]
+    }
+  }]
+}
+```
+
+Group names are unique among live generic groups and may contain at most 63
+bytes. Parent-owned child groups remain internal and cannot be named through
+this schema.
 
 `components.mask` is an optional numeric `CMask`. `flags` is the more readable
 form for `static`, `dynamic`, `collision`, `targetable`, `particle`, and `hold`.
@@ -43,9 +69,30 @@ Supported value keys are:
   `lock_orientation`, and `inherit_velocity`
 - `joint`: named `a` and `b` entities, `type` (`distance`, `weld`, or `pin`),
   anchors, rest values, stiffness, damping, and angular settings
+- `animated_sprite`: a named `animation`, per-entity `scale`, and
+  `time_per_frame`
+- `groups`: an array of named generic groups
+
+Animations are named once in the top-level asset catalog. State loading must
+occur after `graphics_start()` when a file contains animation assets, because
+the engine creates SDL textures while connecting the state.
+
+```json
+"assets": {
+  "animations": [{
+    "name": "elderfly_flying",
+    "ticks_per_frame": 0,
+    "time_per_frame": 0.05,
+    "frames": [{
+      "file": "assets/elderfly/flying/f1.png",
+      "size": {"x": 50, "y": 50}
+    }]
+  }]
+}
+```
 
 Saving includes named entities only. Collision reports, broad-phase grid state,
-generic groups, and loaded SDL graphics assets are runtime-derived,
-process-local, or not yet represented by schema version 1 and are not
-serialized. Parent/child structure is serialized from the child-side `parent`
-reference, and the parent's children group is rebuilt while loading.
+and generic groups are runtime-derived or not yet represented by schema version
+1 and are not serialized. Parent/child structure is serialized from the
+child-side `parent` reference, and the parent's children group is rebuilt while
+loading.

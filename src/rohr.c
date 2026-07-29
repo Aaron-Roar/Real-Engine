@@ -63,6 +63,9 @@ EngineResult rohr_entity_add_components(Entity entity, CMask mask) { return enti
 bool rohr_entity_has_components(Entity entity, CMask components) { return entity_has_components(entity, components); }
 bool rohr_entity_index_has_components(EntityIndex index, CMask components) { return entity_index_has_components(index, components); }
 GroupIdResult rohr_entity_group_create(void) { return entity_group_create(); }
+EngineResult rohr_entity_group_set_name(GroupId group, const char *name) { return entity_group_set_name(group, name); }
+GroupIdResult rohr_entity_group_find_by_name(const char *name) { return entity_group_find_by_name(name); }
+GroupNameResult rohr_entity_group_get_name(GroupId group) { return entity_group_get_name(group); }
 EngineResult rohr_entity_group_destroy(GroupId group) { return entity_group_destroy(group); }
 EngineResult rohr_entity_group_add(GroupId group, Entity entity) { return entity_group_add(group, entity); }
 EngineResult rohr_entity_group_remove(GroupId group, Entity entity) { return entity_group_remove(group, entity); }
