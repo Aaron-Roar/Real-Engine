@@ -164,8 +164,23 @@ not perturb existing results. Generated scale values must be positive. Tick
 rates and starting frames must resolve to non-negative integers, and starting
 frames must exist in the referenced animation.
 
-Saving includes named entities only. Collision reports, broad-phase grid state,
-and generic groups are runtime-derived or not yet represented by schema version
-1 and are not serialized. Parent/child structure is serialized from the
-child-side `parent` reference, and the parent's children group is rebuilt while
-loading.
+Saving includes named entities and named generic groups. Collision reports and
+broad-phase grid state are runtime-derived and are not serialized. Parent/child
+structure is serialized from the child-side `parent` reference, and the
+parent's children group is rebuilt while loading.
+
+## Runtime saves and authored templates
+
+`game_state_save_file()` writes an exact runtime-oriented save. Counted
+prototypes are expanded so independently changed positions, velocities,
+animation values, and relationships are not lost.
+
+`game_state_save_template_file()` writes the immutable authored definitions
+retained from every successfully loaded state document. It merges named groups,
+animation assets, and entity descriptions while preserving `count`,
+`placement`, and `variation`. It deliberately does not capture runtime
+mutations or entities created only through C APIs.
+
+Retained template documents are owned by the engine state module and released
+by `engine_shutdown()`. Template saving returns an error when no state document
+has been loaded.

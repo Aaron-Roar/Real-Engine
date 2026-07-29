@@ -58,6 +58,7 @@ EntityNameResult rohr_entity_get_name(Entity entity) { return entity_get_name(en
 EngineResult rohr_game_state_load_file(const char *path) { return game_state_load_file(path); }
 EngineResult rohr_game_state_load_files(const char *const *paths, size_t path_count) { return game_state_load_files(paths, path_count); }
 EngineResult rohr_game_state_save_file(const char *path) { return game_state_save_file(path); }
+EngineResult rohr_game_state_save_template_file(const char *path) { return game_state_save_template_file(path); }
 EngineResult rohr_entity_delete(Entity entity) { return entity_delete(entity); }
 EngineResult rohr_entity_add_components(Entity entity, CMask mask) { return entity_add_components(entity, mask); }
 bool rohr_entity_has_components(Entity entity, CMask components) { return entity_has_components(entity, components); }

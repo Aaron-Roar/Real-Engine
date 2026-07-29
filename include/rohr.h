@@ -258,6 +258,9 @@ EngineResult rohr_game_state_load_files(const char *const *paths, size_t path_co
 /** Saves all named live entities to a JSON game-state file. */
 EngineResult rohr_game_state_save_file(const char *path);
 
+/** Saves retained authored definitions without expanding prototypes. */
+EngineResult rohr_game_state_save_template_file(const char *path);
+
 /**
  * @brief Deletes an entity and releases its slot for reuse.
  * @param entity Stable entity id to delete.

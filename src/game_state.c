@@ -16,6 +16,7 @@
 #define STATE_MAX_ANIMATIONS MAX_TEXTURES
 #define STATE_ASSET_NAME_MAX 64
 #define STATE_ASSET_PATH_MAX 512
+#define STATE_MAX_TEMPLATE_DOCUMENTS 64
 
 typedef struct StateDocument {
     yyjson_doc *document;
@@ -50,14 +51,25 @@ typedef struct StateSpriteReference {
 static StateAnimation state_animations[STATE_MAX_ANIMATIONS] = {0};
 static size_t state_animation_count = 0;
 static StateSpriteReference state_sprite_references[MAX_ENTITIES] = {0};
+static yyjson_doc *state_template_documents[STATE_MAX_TEMPLATE_DOCUMENTS] = {0};
+static size_t state_template_document_count = 0;
 
 static bool state_number(yyjson_val *object, const char *key, double *value);
 static bool state_vec2(yyjson_val *object, Vec2D *value);
 
 void game_state_runtime_reset(void) {
+    size_t document_index;
+
+    for(document_index = 0;
+            document_index < state_template_document_count;
+            document_index += 1) {
+        yyjson_doc_free(state_template_documents[document_index]);
+    }
     memset(state_animations, 0, sizeof(state_animations));
     memset(state_sprite_references, 0, sizeof(state_sprite_references));
+    memset(state_template_documents, 0, sizeof(state_template_documents));
     state_animation_count = 0;
+    state_template_document_count = 0;
 }
 
 void game_state_entity_clear(EntityIndex index) {
@@ -973,6 +985,9 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
     if(paths == NULL || path_count == 0 || path_count > MAX_ENTITIES) {
         return error_result_error(ERROR_ENGINE_STATE_INVALID);
     }
+    if(path_count > STATE_MAX_TEMPLATE_DOCUMENTS - state_template_document_count) {
+        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
     documents = calloc(path_count, sizeof(*documents));
     created = calloc(MAX_ENTITIES, sizeof(*created));
     loaded = calloc(MAX_ENTITIES, sizeof(*loaded));
@@ -1155,6 +1170,14 @@ cleanup:
         while(state_animation_count > initial_animation_count) {
             state_animation_count -= 1;
             state_animations[state_animation_count] = (StateAnimation){0};
+        }
+    }
+    if(result.kind == ERROR_RESULT_VALUE) {
+        for(document_index = 0; document_index < path_count; document_index += 1) {
+            state_template_documents[state_template_document_count] =
+                documents[document_index].document;
+            state_template_document_count += 1;
+            documents[document_index].document = NULL;
         }
     }
     for(document_index = 0; document_index < path_count; document_index += 1) {
@@ -1453,4 +1476,103 @@ EngineResult game_state_save_file(const char *path) {
     success = yyjson_mut_write_file(path, document, YYJSON_WRITE_PRETTY, NULL, &write_error);
     yyjson_mut_doc_free(document);
     return success ? error_result_value(true) : error_result_error(ERROR_ENGINE_STATE_IO_FAILED);
+}
+
+static bool state_template_copy_array(
+        yyjson_mut_doc *output_document,
+        yyjson_mut_val *output_array,
+        yyjson_val *input_array
+) {
+    yyjson_val *input_value;
+    size_t input_index;
+    size_t input_count;
+
+    if(input_array == NULL) return true;
+    if(!yyjson_is_arr(input_array)) return false;
+    yyjson_arr_foreach(input_array, input_index, input_count, input_value) {
+        yyjson_mut_val *output_value = yyjson_val_mut_copy(
+            output_document,
+            input_value
+        );
+        if(output_value == NULL
+                || !yyjson_mut_arr_add_val(output_array, output_value)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+EngineResult game_state_save_template_file(const char *path) {
+    yyjson_mut_doc *document;
+    yyjson_mut_val *root;
+    yyjson_mut_val *groups;
+    yyjson_mut_val *assets;
+    yyjson_mut_val *animations;
+    yyjson_mut_val *entities;
+    yyjson_write_err write_error;
+    size_t document_index;
+    bool success = true;
+
+    if(path == NULL || state_template_document_count == 0) {
+        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
+    document = yyjson_mut_doc_new(NULL);
+    if(document == NULL) {
+        return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
+    }
+    root = yyjson_mut_obj(document);
+    groups = yyjson_mut_arr(document);
+    assets = yyjson_mut_obj(document);
+    animations = yyjson_mut_arr(document);
+    entities = yyjson_mut_arr(document);
+    if(root == NULL || groups == NULL || assets == NULL
+            || animations == NULL || entities == NULL) {
+        yyjson_mut_doc_free(document);
+        return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
+    }
+    yyjson_mut_doc_set_root(document, root);
+    yyjson_mut_obj_add_uint(document, root, "version", GAME_STATE_VERSION);
+    yyjson_mut_obj_add_val(document, root, "groups", groups);
+    yyjson_mut_obj_add_val(document, assets, "animations", animations);
+    yyjson_mut_obj_add_val(document, root, "assets", assets);
+    yyjson_mut_obj_add_val(document, root, "entities", entities);
+
+    for(document_index = 0;
+            document_index < state_template_document_count && success;
+            document_index += 1) {
+        yyjson_val *input_root = yyjson_doc_get_root(
+            state_template_documents[document_index]
+        );
+        yyjson_val *input_assets = yyjson_obj_get(input_root, "assets");
+        success = state_template_copy_array(
+                document,
+                groups,
+                yyjson_obj_get(input_root, "groups")
+            )
+            && state_template_copy_array(
+                document,
+                animations,
+                input_assets == NULL
+                    ? NULL
+                    : yyjson_obj_get(input_assets, "animations")
+            )
+            && state_template_copy_array(
+                document,
+                entities,
+                yyjson_obj_get(input_root, "entities")
+            );
+    }
+    if(success) {
+        success = yyjson_mut_write_file(
+            path,
+            document,
+            YYJSON_WRITE_PRETTY,
+            NULL,
+            &write_error
+        );
+    }
+    yyjson_mut_doc_free(document);
+    return success
+        ? error_result_value(true)
+        : error_result_error(ERROR_ENGINE_STATE_IO_FAILED);
 }

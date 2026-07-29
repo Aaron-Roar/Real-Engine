@@ -27,8 +27,17 @@ EngineResult game_state_load_file(const char *path);
  * Save all named live entities to one JSON state file.
  *
  * Unnamed entities are omitted because stable cross-session references require
- * names. Runtime-only collision reports and loaded graphics assets are omitted.
+ * names. Runtime-derived collision reports and grid state are omitted.
  */
 EngineResult game_state_save_file(const char *path);
+
+/**
+ * Save retained authored state definitions without expanding prototypes.
+ *
+ * This merges the immutable definitions from all successfully loaded state
+ * documents. It preserves count, placement, and variation declarations but
+ * does not capture runtime mutations.
+ */
+EngineResult game_state_save_template_file(const char *path);
 
 #endif
