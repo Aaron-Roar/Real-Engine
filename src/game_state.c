@@ -16,7 +16,6 @@
 #define STATE_MAX_ANIMATIONS MAX_TEXTURES
 #define STATE_ASSET_NAME_MAX 64
 #define STATE_ASSET_PATH_MAX 512
-#define STATE_MAX_TEMPLATE_DOCUMENTS 64
 
 typedef struct StateDocument {
     yyjson_doc *document;
@@ -51,7 +50,7 @@ typedef struct StateSpriteReference {
 static StateAnimation state_animations[STATE_MAX_ANIMATIONS] = {0};
 static size_t state_animation_count = 0;
 static StateSpriteReference state_sprite_references[MAX_ENTITIES] = {0};
-static yyjson_doc *state_template_documents[STATE_MAX_TEMPLATE_DOCUMENTS] = {0};
+static yyjson_doc *state_template_documents[GAME_STATE_MAX_TEMPLATE_DOCUMENTS] = {0};
 static size_t state_template_document_count = 0;
 
 static bool state_number(yyjson_val *object, const char *key, double *value);
@@ -111,9 +110,13 @@ static EngineResult state_load_animation_definition(yyjson_val *definition) {
             || !yyjson_is_arr(frames)
             || !state_number(definition, "time_per_frame", &time_per_frame)
             || !yyjson_is_uint(ticks)
-            || state_find_animation(yyjson_get_str(name)) != NULL
             || state_animation_count >= STATE_MAX_ANIMATIONS) {
         return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
+    if(state_find_animation(yyjson_get_str(name)) != NULL) {
+        return error_result_error(
+            ERROR_ENGINE_STATE_DUPLICATE_ASSET_DEFINITION
+        );
     }
     frame_count = yyjson_arr_size(frames);
     if(frame_count == 0 || frame_count > MAX_ANIMATIONS_FRAMES) {
@@ -820,7 +823,9 @@ static EngineResult state_load_components(
         }
         animation = state_find_animation(yyjson_get_str(animation_name));
         if(animation == NULL) {
-            return error_result_error(ERROR_ENGINE_STATE_REFERENCE_NOT_FOUND);
+            return error_result_error(
+                ERROR_ENGINE_STATE_ASSET_REFERENCE_NOT_FOUND
+            );
         }
         base_value = yyjson_obj_get(value, "time_per_frame");
         if(base_value != NULL) {
@@ -985,8 +990,11 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
     if(paths == NULL || path_count == 0 || path_count > MAX_ENTITIES) {
         return error_result_error(ERROR_ENGINE_STATE_INVALID);
     }
-    if(path_count > STATE_MAX_TEMPLATE_DOCUMENTS - state_template_document_count) {
-        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    if(path_count
+            > GAME_STATE_MAX_TEMPLATE_DOCUMENTS - state_template_document_count) {
+        return error_result_error(
+            ERROR_ENGINE_STATE_TEMPLATE_DOCUMENT_LIMIT_EXCEEDED
+        );
     }
     documents = calloc(path_count, sizeof(*documents));
     created = calloc(MAX_ENTITIES, sizeof(*created));

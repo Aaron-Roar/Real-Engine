@@ -80,6 +80,12 @@ const char *error_default_message(EngineError error) {
             return "duplicate group name";
         case ERROR_ENGINE_GROUP_NOT_FOUND:
             return "group not found";
+        case ERROR_ENGINE_STATE_TEMPLATE_DOCUMENT_LIMIT_EXCEEDED:
+            return "retained game state template document limit exceeded";
+        case ERROR_ENGINE_STATE_DUPLICATE_ASSET_DEFINITION:
+            return "duplicate game state asset definition";
+        case ERROR_ENGINE_STATE_ASSET_REFERENCE_NOT_FOUND:
+            return "game state asset reference not found";
         default:
             return "unknown error";
     }

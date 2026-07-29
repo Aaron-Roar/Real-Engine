@@ -183,4 +183,11 @@ mutations or entities created only through C APIs.
 
 Retained template documents are owned by the engine state module and released
 by `engine_shutdown()`. Template saving returns an error when no state document
-has been loaded.
+has been loaded. Loading more than 64 retained documents in one engine session
+returns `ERROR_ENGINE_STATE_TEMPLATE_DOCUMENT_LIMIT_EXCEEDED`. The public
+`GAME_STATE_MAX_TEMPLATE_DOCUMENTS` constant exposes this capacity.
+
+Duplicate names in the asset catalog return
+`ERROR_ENGINE_STATE_DUPLICATE_ASSET_DEFINITION`. An entity component referring
+to an animation or other named asset that was not defined returns
+`ERROR_ENGINE_STATE_ASSET_REFERENCE_NOT_FOUND`.

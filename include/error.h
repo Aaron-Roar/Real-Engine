@@ -79,6 +79,12 @@ typedef enum EngineError {
     ERROR_ENGINE_DUPLICATE_GROUP_NAME,
     /** No live generic group has the requested name. */
     ERROR_ENGINE_GROUP_NOT_FOUND,
+    /** Loading state files would exceed the retained template document limit. */
+    ERROR_ENGINE_STATE_TEMPLATE_DOCUMENT_LIMIT_EXCEEDED,
+    /** A named asset is defined more than once in retained state. */
+    ERROR_ENGINE_STATE_DUPLICATE_ASSET_DEFINITION,
+    /** A state component references an unknown named asset. */
+    ERROR_ENGINE_STATE_ASSET_REFERENCE_NOT_FOUND,
 } EngineError;
 
 /**
