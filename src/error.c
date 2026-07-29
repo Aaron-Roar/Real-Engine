@@ -60,6 +60,32 @@ const char *error_default_message(EngineError error) {
             return "texture load failed";
         case ERROR_ENGINE_ANIMATION_LOAD_FAILED:
             return "animation load failed";
+        case ERROR_ENGINE_INVALID_ENTITY_NAME:
+            return "invalid entity name";
+        case ERROR_ENGINE_ENTITY_NAME_TOO_LONG:
+            return "entity name is too long";
+        case ERROR_ENGINE_DUPLICATE_ENTITY_NAME:
+            return "duplicate entity name";
+        case ERROR_ENGINE_STATE_IO_FAILED:
+            return "game state file I/O failed";
+        case ERROR_ENGINE_STATE_INVALID:
+            return "invalid game state";
+        case ERROR_ENGINE_STATE_REFERENCE_NOT_FOUND:
+            return "game state entity reference not found";
+        case ERROR_ENGINE_INVALID_GROUP_NAME:
+            return "invalid group name";
+        case ERROR_ENGINE_GROUP_NAME_TOO_LONG:
+            return "group name is too long";
+        case ERROR_ENGINE_DUPLICATE_GROUP_NAME:
+            return "duplicate group name";
+        case ERROR_ENGINE_GROUP_NOT_FOUND:
+            return "group not found";
+        case ERROR_ENGINE_STATE_TEMPLATE_DOCUMENT_LIMIT_EXCEEDED:
+            return "retained game state template document limit exceeded";
+        case ERROR_ENGINE_STATE_DUPLICATE_ASSET_DEFINITION:
+            return "duplicate game state asset definition";
+        case ERROR_ENGINE_STATE_ASSET_REFERENCE_NOT_FOUND:
+            return "game state asset reference not found";
         default:
             return "unknown error";
     }

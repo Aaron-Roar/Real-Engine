@@ -52,11 +52,21 @@ EntityResult rohr_entity_alive_at(uint32_t position) { return entity_alive_at(po
 bool rohr_entity_get_index(Entity entity, EntityIndex *index) { return entity_get_index(entity, index); }
 EntityResult rohr_entity_from_index(EntityIndex index) { return entity_from_index(index); }
 EntityResult rohr_entity_add(void) { return entity_add(); }
+EngineResult rohr_entity_set_name(Entity entity, const char *name) { return entity_set_name(entity, name); }
+EntityResult rohr_entity_find_by_name(const char *name) { return entity_find_by_name(name); }
+EntityNameResult rohr_entity_get_name(Entity entity) { return entity_get_name(entity); }
+EngineResult rohr_game_state_load_file(const char *path) { return game_state_load_file(path); }
+EngineResult rohr_game_state_load_files(const char *const *paths, size_t path_count) { return game_state_load_files(paths, path_count); }
+EngineResult rohr_game_state_save_file(const char *path) { return game_state_save_file(path); }
+EngineResult rohr_game_state_save_template_file(const char *path) { return game_state_save_template_file(path); }
 EngineResult rohr_entity_delete(Entity entity) { return entity_delete(entity); }
 EngineResult rohr_entity_add_components(Entity entity, CMask mask) { return entity_add_components(entity, mask); }
 bool rohr_entity_has_components(Entity entity, CMask components) { return entity_has_components(entity, components); }
 bool rohr_entity_index_has_components(EntityIndex index, CMask components) { return entity_index_has_components(index, components); }
 GroupIdResult rohr_entity_group_create(void) { return entity_group_create(); }
+EngineResult rohr_entity_group_set_name(GroupId group, const char *name) { return entity_group_set_name(group, name); }
+GroupIdResult rohr_entity_group_find_by_name(const char *name) { return entity_group_find_by_name(name); }
+GroupNameResult rohr_entity_group_get_name(GroupId group) { return entity_group_get_name(group); }
 EngineResult rohr_entity_group_destroy(GroupId group) { return entity_group_destroy(group); }
 EngineResult rohr_entity_group_add(GroupId group, Entity entity) { return entity_group_add(group, entity); }
 EngineResult rohr_entity_group_remove(GroupId group, Entity entity) { return entity_group_remove(group, entity); }

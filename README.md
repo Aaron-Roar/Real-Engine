@@ -97,6 +97,7 @@ engine/
 * `pkg-config`
 * `sdl3`
 * `sdl3-image`
+* `yyjson` is vendored under `lib/` (version 0.12.0, MIT)
 * `ffmpeg` for recording or converting demo media
 * Math library: `libm` / `-lm`
 
@@ -153,6 +154,7 @@ Readable Markdown docs are committed in the repo:
 * [Documentation overview](docs/README.md)
 * [Architecture notes](docs/architecture.md)
 * [Entity ids](docs/entity_ids.md)
+* [JSON game state](docs/game_state.md)
 * [Error handling](docs/errors.md)
 
 Generate the Doxygen docs with:

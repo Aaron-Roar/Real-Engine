@@ -1,0 +1,352 @@
+{
+    "version": 1,
+    "entities": [
+        {
+            "name": "wall_1",
+            "components": {
+                "mask": 13,
+                "flags": [
+                    "static",
+                    "collision"
+                ],
+                "position": {
+                    "x": 0.0,
+                    "y": -80.0
+                },
+                "orientation": 2.094395160675049,
+                "friction": 1.0,
+                "restitution": 0.5,
+                "hit_box": [
+                    {
+                        "x": 20.0,
+                        "y": 200.0
+                    },
+                    {
+                        "x": 20.0,
+                        "y": -200.0
+                    },
+                    {
+                        "x": -20.0,
+                        "y": -200.0
+                    },
+                    {
+                        "x": -20.0,
+                        "y": 200.0
+                    }
+                ]
+            }
+        },
+        {
+            "name": "wall_2",
+            "components": {
+                "mask": 13,
+                "flags": [
+                    "static",
+                    "collision"
+                ],
+                "position": {
+                    "x": -180.0,
+                    "y": -10.0
+                },
+                "orientation": 0.0,
+                "friction": 1.0,
+                "restitution": 0.5,
+                "hit_box": [
+                    {
+                        "x": 20.0,
+                        "y": 30.0
+                    },
+                    {
+                        "x": 20.0,
+                        "y": -30.0
+                    },
+                    {
+                        "x": -20.0,
+                        "y": -30.0
+                    },
+                    {
+                        "x": -20.0,
+                        "y": 30.0
+                    }
+                ]
+            }
+        },
+        {
+            "name": "wall_3",
+            "components": {
+                "mask": 13,
+                "flags": [
+                    "static",
+                    "collision"
+                ],
+                "position": {
+                    "x": 180.0,
+                    "y": -10.0
+                },
+                "orientation": 0.0,
+                "friction": 1.0,
+                "restitution": 0.5,
+                "hit_box": [
+                    {
+                        "x": 20.0,
+                        "y": 30.0
+                    },
+                    {
+                        "x": 20.0,
+                        "y": -30.0
+                    },
+                    {
+                        "x": -20.0,
+                        "y": -30.0
+                    },
+                    {
+                        "x": -20.0,
+                        "y": 30.0
+                    }
+                ]
+            }
+        },
+        {
+            "name": "large_fly",
+            "components": {
+                "mask": 131598,
+                "flags": [
+                    "dynamic",
+                    "collision"
+                ],
+                "position": {
+                    "x": 0.0,
+                    "y": 300.0
+                },
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0
+                },
+                "acceleration": {
+                    "x": 0.0,
+                    "y": -30.0
+                },
+                "mass": 50.0,
+                "orientation": 0.0,
+                "friction": 0.4000000059604645,
+                "restitution": 0.10000000149011612,
+                "hit_box": [
+                    {
+                        "x": 75.0,
+                        "y": 110.0
+                    },
+                    {
+                        "x": 75.0,
+                        "y": -110.0
+                    },
+                    {
+                        "x": -75.0,
+                        "y": -110.0
+                    },
+                    {
+                        "x": -75.0,
+                        "y": 110.0
+                    }
+                ],
+                "animated_sprite": {
+                    "scale": {
+                        "x": 10.0,
+                        "y": 10.0
+                    },
+                    "time_per_frame": 0.05000000074505806,
+                    "animation": "elderfly_flying"
+                }
+            }
+        },
+        {
+            "name": "small_fly",
+            "components": {
+                "mask": 197134,
+                "flags": [
+                    "dynamic",
+                    "collision",
+                    "particle"
+                ],
+                "position": {
+                    "x": 9.0,
+                    "y": 122.0
+                },
+                "velocity": {
+                    "x": 0.0,
+                    "y": 3.0
+                },
+                "acceleration": {
+                    "x": 0.0,
+                    "y": -50.0
+                },
+                "mass": 1.0,
+                "orientation": 6.0,
+                "friction": 0.4000000059604645,
+                "restitution": 0.20000000298023224,
+                "hit_box": [
+                    {
+                        "x": 4.681777477264404,
+                        "y": 0.0
+                    },
+                    {
+                        "x": -2.3408889770507812,
+                        "y": 4.054538249969482
+                    },
+                    {
+                        "x": -2.340888261795044,
+                        "y": -4.054538249969482
+                    }
+                ],
+                "animated_sprite": {
+                    "scale": {
+                        "x": 0.4681777358055115,
+                        "y": 0.4681777358055115
+                    },
+                    "time_per_frame": 0.0,
+                    "ticks_per_frame": 3,
+                    "start_frame": 0,
+                    "animation": "elderfly_flying",
+                    "variation": {
+                        "scale": {
+                            "random": {
+                                "min": {
+                                    "x": 0.3,
+                                    "y": 0.3
+                                },
+                                "max": {
+                                    "x": 0.5,
+                                    "y": 0.5
+                                },
+                                "seed": 100
+                            }
+                        },
+                        "ticks_per_frame": {
+                            "cycle": [
+                                2,
+                                3,
+                                4,
+                                5
+                            ]
+                        },
+                        "start_frame": {
+                            "sequence": {
+                                "start": 0,
+                                "step": 1,
+                                "wrap": 12
+                            }
+                        }
+                    }
+                },
+                "groups": [
+                    "small_flies"
+                ]
+            },
+            "count": 499,
+            "placement": {
+                "type": "circle",
+                "radius": 80.0,
+                "start_angle": 0.0
+            }
+        }
+    ],
+    "assets": {
+        "animations": [
+            {
+                "name": "elderfly_flying",
+                "ticks_per_frame": 0,
+                "time_per_frame": 0.05,
+                "frames": [
+                    {
+                        "file": "examples/test-assets/elder-fly/flying/f1.png",
+                        "size": {
+                            "x": 50.0,
+                            "y": 50.0
+                        }
+                    },
+                    {
+                        "file": "examples/test-assets/elder-fly/flying/f2.png",
+                        "size": {
+                            "x": 50.0,
+                            "y": 50.0
+                        }
+                    },
+                    {
+                        "file": "examples/test-assets/elder-fly/flying/f3.png",
+                        "size": {
+                            "x": 50.0,
+                            "y": 50.0
+                        }
+                    },
+                    {
+                        "file": "examples/test-assets/elder-fly/flying/f4.png",
+                        "size": {
+                            "x": 50.0,
+                            "y": 50.0
+                        }
+                    },
+                    {
+                        "file": "examples/test-assets/elder-fly/flying/f5.png",
+                        "size": {
+                            "x": 50.0,
+                            "y": 50.0
+                        }
+                    },
+                    {
+                        "file": "examples/test-assets/elder-fly/flying/f6.png",
+                        "size": {
+                            "x": 50.0,
+                            "y": 50.0
+                        }
+                    },
+                    {
+                        "file": "examples/test-assets/elder-fly/flying/f7.png",
+                        "size": {
+                            "x": 50.0,
+                            "y": 50.0
+                        }
+                    },
+                    {
+                        "file": "examples/test-assets/elder-fly/flying/f8.png",
+                        "size": {
+                            "x": 50.0,
+                            "y": 50.0
+                        }
+                    },
+                    {
+                        "file": "examples/test-assets/elder-fly/flying/f9.png",
+                        "size": {
+                            "x": 50.0,
+                            "y": 50.0
+                        }
+                    },
+                    {
+                        "file": "examples/test-assets/elder-fly/flying/f10.png",
+                        "size": {
+                            "x": 50.0,
+                            "y": 50.0
+                        }
+                    },
+                    {
+                        "file": "examples/test-assets/elder-fly/flying/f11.png",
+                        "size": {
+                            "x": 50.0,
+                            "y": 50.0
+                        }
+                    },
+                    {
+                        "file": "examples/test-assets/elder-fly/flying/f12.png",
+                        "size": {
+                            "x": 50.0,
+                            "y": 50.0
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    "groups": [
+        {
+            "name": "small_flies"
+        }
+    ]
+}

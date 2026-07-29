@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include "error.h"
+#include "entity_components.h"
 
 /**
  * Ensure all entity-indexed subsystem tables can address capacity slots.
@@ -36,5 +37,10 @@ EngineResult grid_tables_init(void);
 EngineResult grid_tables_ensure_capacity(size_t capacity);
 /** Destroy grid tables. */
 void grid_tables_destroy(void);
+
+/** Reset engine-owned serializable asset and sprite-reference state. */
+void game_state_runtime_reset(void);
+/** Clear serializable state associated with a deleted entity index. */
+void game_state_entity_clear(EntityIndex index);
 
 #endif

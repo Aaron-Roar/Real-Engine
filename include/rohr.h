@@ -7,6 +7,7 @@
 #include "entity_components.h"
 #include "error.h"
 #include "graphics.h"
+#include "game_state.h"
 #include "grid.h"
 #include "level_editor.h"
 #include "math2d.h"
@@ -239,6 +240,27 @@ EntityResult rohr_entity_from_index(EntityIndex index);
  */
 EntityResult rohr_entity_add(void);
 
+/** Assigns a unique fixed-size name to an entity. */
+EngineResult rohr_entity_set_name(Entity entity, const char *name);
+
+/** Finds a live entity by its state-file name. */
+EntityResult rohr_entity_find_by_name(const char *name);
+
+/** Returns a copy of an entity's fixed-size name component. */
+EntityNameResult rohr_entity_get_name(Entity entity);
+
+/** Loads and merges one JSON game-state file. */
+EngineResult rohr_game_state_load_file(const char *path);
+
+/** Loads multiple JSON files with cross-file name resolution. */
+EngineResult rohr_game_state_load_files(const char *const *paths, size_t path_count);
+
+/** Saves all named live entities to a JSON game-state file. */
+EngineResult rohr_game_state_save_file(const char *path);
+
+/** Saves retained authored definitions without expanding prototypes. */
+EngineResult rohr_game_state_save_template_file(const char *path);
+
 /**
  * @brief Deletes an entity and releases its slot for reuse.
  * @param entity Stable entity id to delete.
@@ -275,6 +297,15 @@ bool rohr_entity_index_has_components(EntityIndex index, CMask components);
  * @return GroupIdResult containing a group id, or an error.
  */
 GroupIdResult rohr_entity_group_create(void);
+
+/** Assigns a unique fixed-size name to a generic group. */
+EngineResult rohr_entity_group_set_name(GroupId group, const char *name);
+
+/** Finds a live generic group by name. */
+GroupIdResult rohr_entity_group_find_by_name(const char *name);
+
+/** Returns a copy of a generic group's fixed-size name. */
+GroupNameResult rohr_entity_group_get_name(GroupId group);
 
 /**
  * @brief Destroys a generic entity group and clears member group references.

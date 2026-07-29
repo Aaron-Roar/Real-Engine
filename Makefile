@@ -2,7 +2,7 @@ CC := clang
 AR := ar
 
 PKGS := sdl3 sdl3-image
-CFLAGS := -Iinclude -Isrc -I. -Iexamples/test-assets $(shell pkg-config --cflags $(PKGS))
+CFLAGS := -Iinclude -Isrc -Ilib -I. -Iexamples/test-assets $(shell pkg-config --cflags $(PKGS))
 LIBS := $(shell pkg-config --libs $(PKGS)) -lm
 
 ENGINE_SRC := \
@@ -19,9 +19,11 @@ ENGINE_SRC := \
 	src/tools.c \
 	src/level_editor.c\
 	src/grid.c\
-	src/controller.c
+	src/controller.c \
+	src/game_state.c
 
 ENGINE_OBJ := $(patsubst src/%.c,build/obj/%.o,$(ENGINE_SRC))
+ENGINE_OBJ += build/obj/yyjson.o
 ENGINE_LIB := lib/librohr_engine.a
 DOXYGEN := doxygen
 PANDOC := pandoc
@@ -40,8 +42,9 @@ PIT_BINARY := build/examples/flies_in_pit
 BALL_BINARY := build/examples/flies_around_ball
 VIEW_BINARY := build/examples/view_port
 FINISH_BINARY := build/examples/fly_to_finish
+STATE_BINARY := build/examples/game_state
 
-.PHONY: help all build build-engine build-example-pit build-example-ball build-example-view build-example-finish run-pit run-ball run-view run-finish docs clean-docs clean
+.PHONY: help all build build-engine build-example-pit build-example-ball build-example-view build-example-finish build-example-state run-pit run-ball run-view run-finish run-state docs clean-docs clean
 
 help:
 	@printf '%s\n' \
@@ -74,6 +77,10 @@ help:
 		"		  Builds examples/fly-to-finish/fly_to_finish.c" \
 		"		  Outputs build/examples/fly_to_finish" \
 		"" \
+		"  build-example-state" \
+		"		  Builds examples/game-state/game_state.c" \
+		"		  Outputs build/examples/game_state" \
+		"" \
 		"  run-pit" \
 		"		  Builds and runs the flies_in_pit example" \
 		"" \
@@ -85,6 +92,9 @@ help:
 		"" \
 		"  run-finish" \
 		"		  Builds and runs the fly_to_finish example" \
+		"" \
+		"  run-state" \
+		"		  Builds and runs the JSON game-state example" \
 		"" \
 		"  docs" \
 		"		  Updates docs/public_api.md from include/rohr.h" \
@@ -101,7 +111,7 @@ help:
 
 all: build
 
-build: build-example-view build-example-pit build-example-ball build-example-finish
+build: build-example-view build-example-pit build-example-ball build-example-finish build-example-state
 
 build-engine: $(ENGINE_LIB)
 
@@ -113,11 +123,17 @@ build-example-view: $(VIEW_BINARY)
 
 build-example-finish: $(FINISH_BINARY)
 
+build-example-state: $(STATE_BINARY)
+
 $(ENGINE_LIB): $(ENGINE_OBJ)
 	@mkdir -p lib
 	$(AR) rcs $@ $^
 
 build/obj/%.o: src/%.c
+	@mkdir -p build/obj
+	$(CC) -c $< $(CFLAGS) -o $@
+
+build/obj/yyjson.o: lib/yyjson.c
 	@mkdir -p build/obj
 	$(CC) -c $< $(CFLAGS) -o $@
 
@@ -137,6 +153,10 @@ $(FINISH_BINARY): examples/fly-to-finish/fly_to_finish.c $(ENGINE_LIB) $(ASSET_S
 	@mkdir -p build/examples
 	$(CC) $^ $(CFLAGS) -o $@ $(LIBS)
 
+$(STATE_BINARY): examples/game-state/game_state.c $(ENGINE_LIB)
+	@mkdir -p build/examples
+	$(CC) $^ $(CFLAGS) -o $@ $(LIBS)
+
 run-pit: $(PIT_BINARY)
 	./$(PIT_BINARY)
 
@@ -148,6 +168,9 @@ run-view: $(VIEW_BINARY)
 
 run-finish: $(FINISH_BINARY)
 	./$(FINISH_BINARY)
+
+run-state: $(STATE_BINARY)
+	SDL_VIDEODRIVER=dummy ./$(STATE_BINARY)
 
 docs: $(API_MARKDOWN) $(README_HTML) $(STATIC_README_HTML)
 	$(DOXYGEN) $(DOCS_DOXYFILE)

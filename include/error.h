@@ -59,6 +59,32 @@ typedef enum EngineError {
     ERROR_ENGINE_TEXTURE_LOAD_FAILED,
     /** One or more animation texture frames could not be loaded. */
     ERROR_ENGINE_ANIMATION_LOAD_FAILED,
+    /** An entity name is null or empty. */
+    ERROR_ENGINE_INVALID_ENTITY_NAME,
+    /** An entity name exceeds ENTITY_NAME_MAX. */
+    ERROR_ENGINE_ENTITY_NAME_TOO_LONG,
+    /** An entity name is already assigned to another live entity. */
+    ERROR_ENGINE_DUPLICATE_ENTITY_NAME,
+    /** A game-state file could not be read or written. */
+    ERROR_ENGINE_STATE_IO_FAILED,
+    /** A game-state document does not match the supported schema. */
+    ERROR_ENGINE_STATE_INVALID,
+    /** A named entity relationship could not be resolved. */
+    ERROR_ENGINE_STATE_REFERENCE_NOT_FOUND,
+    /** A group name is null or empty. */
+    ERROR_ENGINE_INVALID_GROUP_NAME,
+    /** A group name exceeds GROUP_NAME_MAX. */
+    ERROR_ENGINE_GROUP_NAME_TOO_LONG,
+    /** A group name is already assigned to another generic group. */
+    ERROR_ENGINE_DUPLICATE_GROUP_NAME,
+    /** No live generic group has the requested name. */
+    ERROR_ENGINE_GROUP_NOT_FOUND,
+    /** Loading state files would exceed the retained template document limit. */
+    ERROR_ENGINE_STATE_TEMPLATE_DOCUMENT_LIMIT_EXCEEDED,
+    /** A named asset is defined more than once in retained state. */
+    ERROR_ENGINE_STATE_DUPLICATE_ASSET_DEFINITION,
+    /** A state component references an unknown named asset. */
+    ERROR_ENGINE_STATE_ASSET_REFERENCE_NOT_FOUND,
 } EngineError;
 
 /**
