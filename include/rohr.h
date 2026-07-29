@@ -7,6 +7,7 @@
 #include "entity_components.h"
 #include "error.h"
 #include "graphics.h"
+#include "game_state.h"
 #include "grid.h"
 #include "level_editor.h"
 #include "math2d.h"
@@ -238,6 +239,24 @@ EntityResult rohr_entity_from_index(EntityIndex index);
  * limit is reached.
  */
 EntityResult rohr_entity_add(void);
+
+/** Assigns a unique fixed-size name to an entity. */
+EngineResult rohr_entity_set_name(Entity entity, const char *name);
+
+/** Finds a live entity by its state-file name. */
+EntityResult rohr_entity_find_by_name(const char *name);
+
+/** Returns a copy of an entity's fixed-size name component. */
+EntityNameResult rohr_entity_get_name(Entity entity);
+
+/** Loads and merges one JSON game-state file. */
+EngineResult rohr_game_state_load_file(const char *path);
+
+/** Loads multiple JSON files with cross-file name resolution. */
+EngineResult rohr_game_state_load_files(const char *const *paths, size_t path_count);
+
+/** Saves all named live entities to a JSON game-state file. */
+EngineResult rohr_game_state_save_file(const char *path);
 
 /**
  * @brief Deletes an entity and releases its slot for reuse.

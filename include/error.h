@@ -59,6 +59,18 @@ typedef enum EngineError {
     ERROR_ENGINE_TEXTURE_LOAD_FAILED,
     /** One or more animation texture frames could not be loaded. */
     ERROR_ENGINE_ANIMATION_LOAD_FAILED,
+    /** An entity name is null or empty. */
+    ERROR_ENGINE_INVALID_ENTITY_NAME,
+    /** An entity name exceeds ENTITY_NAME_MAX. */
+    ERROR_ENGINE_ENTITY_NAME_TOO_LONG,
+    /** An entity name is already assigned to another live entity. */
+    ERROR_ENGINE_DUPLICATE_ENTITY_NAME,
+    /** A game-state file could not be read or written. */
+    ERROR_ENGINE_STATE_IO_FAILED,
+    /** A game-state document does not match the supported schema. */
+    ERROR_ENGINE_STATE_INVALID,
+    /** A named entity relationship could not be resolved. */
+    ERROR_ENGINE_STATE_REFERENCE_NOT_FOUND,
 } EngineError;
 
 /**

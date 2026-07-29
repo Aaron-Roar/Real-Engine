@@ -58,6 +58,8 @@ set(ROHR_ENGINE_SOURCES
     src/systems.c
     src/tools.c
     src/controller.c
+    src/game_state.c
+    lib/yyjson.c
 )
 
 add_library(rohr_engine STATIC ${ROHR_ENGINE_SOURCES})
@@ -67,6 +69,7 @@ target_include_directories(rohr_engine
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/lib
 )
 target_link_libraries(rohr_engine
     PUBLIC
@@ -102,3 +105,4 @@ endfunction()
 rohr_add_example(view_port examples/view-port/view_port.c)
 rohr_add_example(flies_in_pit examples/flies-in-pit/flies_in_pit.c)
 rohr_add_example(flies_around_ball examples/flies-around-ball/flies_around_ball.c)
+rohr_add_example(game_state examples/game-state/game_state.c)

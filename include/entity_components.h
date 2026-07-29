@@ -26,6 +26,9 @@ typedef uint32_t EntityIndex; //An index into component tables
 /** Maximum number of component bits reserved by the engine. */
 #define MAX_COMPONENTS 100
 
+/** Maximum entity name length, including the terminating null byte. */
+#define ENTITY_NAME_MAX 64
+
 /** Result type for functions that return an Entity. */
 ERROR_DECLARE_RESULT_TYPE(EntityResult, Entity);
 
@@ -96,7 +99,17 @@ typedef enum {
     HOLD                        = 1 << 18,
     /** Entity belongs to one or more groups. */
     GROUP                       = 1 << 19,
+    /** Entity has a human-readable name used for state-file references. */
+    ENTITY_NAME                 = 1 << 20,
 } Component;
+
+/** Fixed-size, engine-owned entity name. */
+typedef struct EntityName {
+    char value[ENTITY_NAME_MAX];
+} EntityName;
+
+/** Result type for functions that return an EntityName. */
+ERROR_DECLARE_RESULT_TYPE(EntityNameResult, EntityName);
 
 /** Parent entity id alias. */
 typedef Entity Parent;
@@ -167,6 +180,8 @@ MEMORY_DECLARE_OBJECT_POOL(EntityGroupPool, EntityGroup);
 MEMORY_DECLARE_OBJECT_POOL(LifeTimePool, LifeTime);
 /** Pool storing target entity ids by EntityIndex. */
 MEMORY_DECLARE_OBJECT_POOL(TargetPool, Entity);
+/** Pool storing fixed-size entity names by EntityIndex. */
+MEMORY_DECLARE_OBJECT_POOL(EntityNamePool, EntityName);
 
 /** Parent pool backing the parents table. */
 extern ParentPool parents_pool;
@@ -180,6 +195,8 @@ extern EntityGroupPool entity_groups_pool;
 extern LifeTimePool life_times_pool;
 /** Target pool backing the targets table. */
 extern TargetPool targets_pool;
+/** Entity name pool backing the entity_names table. */
+extern EntityNamePool entity_names_pool;
 
 /** Parent table indexed by EntityIndex. */
 #define parents parents_pool.objects
@@ -193,6 +210,33 @@ extern TargetPool targets_pool;
 #define life_times life_times_pool.objects
 /** Target table indexed by EntityIndex. */
 #define targets targets_pool.objects
+/** Entity name table indexed by EntityIndex. */
+#define entity_names entity_names_pool.objects
+
+/**
+ * Assign a unique, non-empty name to an entity.
+ *
+ * @param entity Entity id to name.
+ * @param name Null-terminated name shorter than ENTITY_NAME_MAX.
+ * @return EngineResult describing success or failure.
+ */
+EngineResult entity_set_name(Entity entity, const char *name);
+
+/**
+ * Find a live entity by its unique name.
+ *
+ * @param name Null-terminated entity name.
+ * @return EntityResult containing the entity id, or an error.
+ */
+EntityResult entity_find_by_name(const char *name);
+
+/**
+ * Return a copy of an entity's fixed-size name component.
+ *
+ * @param entity Entity id to inspect.
+ * @return EntityNameResult containing the name, or an error.
+ */
+EntityNameResult entity_get_name(Entity entity);
 
 /**
  * Check whether an entity id currently refers to a live entity.

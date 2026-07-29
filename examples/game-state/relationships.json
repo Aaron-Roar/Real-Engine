@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "entities": [
+    {
+      "name": "seeker",
+      "components": {
+        "flags": ["dynamic"],
+        "position": {"x": 200.0, "y": 60.0},
+        "target": "player",
+        "parent": "camera_anchor"
+      }
+    }
+  ]
+}

@@ -60,6 +60,18 @@ const char *error_default_message(EngineError error) {
             return "texture load failed";
         case ERROR_ENGINE_ANIMATION_LOAD_FAILED:
             return "animation load failed";
+        case ERROR_ENGINE_INVALID_ENTITY_NAME:
+            return "invalid entity name";
+        case ERROR_ENGINE_ENTITY_NAME_TOO_LONG:
+            return "entity name is too long";
+        case ERROR_ENGINE_DUPLICATE_ENTITY_NAME:
+            return "duplicate entity name";
+        case ERROR_ENGINE_STATE_IO_FAILED:
+            return "game state file I/O failed";
+        case ERROR_ENGINE_STATE_INVALID:
+            return "invalid game state";
+        case ERROR_ENGINE_STATE_REFERENCE_NOT_FOUND:
+            return "game state entity reference not found";
         default:
             return "unknown error";
     }

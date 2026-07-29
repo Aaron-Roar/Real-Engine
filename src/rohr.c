@@ -52,6 +52,12 @@ EntityResult rohr_entity_alive_at(uint32_t position) { return entity_alive_at(po
 bool rohr_entity_get_index(Entity entity, EntityIndex *index) { return entity_get_index(entity, index); }
 EntityResult rohr_entity_from_index(EntityIndex index) { return entity_from_index(index); }
 EntityResult rohr_entity_add(void) { return entity_add(); }
+EngineResult rohr_entity_set_name(Entity entity, const char *name) { return entity_set_name(entity, name); }
+EntityResult rohr_entity_find_by_name(const char *name) { return entity_find_by_name(name); }
+EntityNameResult rohr_entity_get_name(Entity entity) { return entity_get_name(entity); }
+EngineResult rohr_game_state_load_file(const char *path) { return game_state_load_file(path); }
+EngineResult rohr_game_state_load_files(const char *const *paths, size_t path_count) { return game_state_load_files(paths, path_count); }
+EngineResult rohr_game_state_save_file(const char *path) { return game_state_save_file(path); }
 EngineResult rohr_entity_delete(Entity entity) { return entity_delete(entity); }
 EngineResult rohr_entity_add_components(Entity entity, CMask mask) { return entity_add_components(entity, mask); }
 bool rohr_entity_has_components(Entity entity, CMask components) { return entity_has_components(entity, components); }
