@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "entities": [],
+  "ui": {
+    "buttons": [
+      {
+        "name": "settings_button",
+        "id": "main_menu.settings",
+        "label": "Settings",
+        "bounds": {
+          "x": 220.0,
+          "y": 205.0,
+          "width": 200.0,
+          "height": 55.0
+        },
+        "style": {
+          "idle": {"red": 55, "green": 65, "blue": 81, "alpha": 255},
+          "hovered": {"red": 95, "green": 80, "blue": 145, "alpha": 255},
+          "pressed": {"red": 65, "green": 50, "blue": 105, "alpha": 255}
+        }
+      }
+    ]
+  }
+}

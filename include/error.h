@@ -57,6 +57,10 @@ typedef enum EngineError {
     ERROR_ENGINE_COMPONENT_MISSING,
     /** A texture asset could not be loaded. */
     ERROR_ENGINE_TEXTURE_LOAD_FAILED,
+    /** A font asset could not be loaded. */
+    ERROR_ENGINE_FONT_LOAD_FAILED,
+    /** A reusable text asset could not be created. */
+    ERROR_ENGINE_TEXT_CREATE_FAILED,
     /** One or more animation texture frames could not be loaded. */
     ERROR_ENGINE_ANIMATION_LOAD_FAILED,
     /** An entity name is null or empty. */
@@ -85,6 +89,8 @@ typedef enum EngineError {
     ERROR_ENGINE_STATE_DUPLICATE_ASSET_DEFINITION,
     /** A state component references an unknown named asset. */
     ERROR_ENGINE_STATE_ASSET_REFERENCE_NOT_FOUND,
+    /** No loaded UI button has the requested authored name. */
+    ERROR_ENGINE_UI_DEFINITION_NOT_FOUND,
 } EngineError;
 
 /**

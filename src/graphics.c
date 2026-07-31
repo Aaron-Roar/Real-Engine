@@ -10,6 +10,8 @@
 
 static SDL_Renderer *sdl_renderer = NULL;
 static SDL_Window *sdl_window = NULL;
+static TTF_TextEngine *ttf_text_engine = NULL;
+static bool ttf_initialized = false;
 static Camera camera = {0};
 
 typedef struct ActiveCameraAttachment {
@@ -608,6 +610,10 @@ EngineResult graphics_start(void) {
         SDL_Log("Couldn't initialize SDL: %s", SDL_GetError());
         return error_result_error(ERROR_ENGINE_GRAPHICS_INIT_FAILED);
     }
+    if(!TTF_Init()) {
+        return error_result_error(ERROR_ENGINE_GRAPHICS_INIT_FAILED);
+    }
+    ttf_initialized = true;
 
     console_write(LOG_ENGINE, "Starting game window and renderer\n");
     console_write(LOG_ENGINE, "Window width: %d\n", WINDOW_WIDTH);
@@ -621,6 +627,8 @@ EngineResult graphics_start(void) {
             &sdl_renderer
         )) {
         SDL_Log("Couldn't create window/renderer: %s", SDL_GetError());
+        TTF_Quit();
+        ttf_initialized = false;
         return error_result_error(ERROR_ENGINE_GRAPHICS_INIT_FAILED);
     }
 
@@ -631,6 +639,16 @@ EngineResult graphics_start(void) {
         WINDOW_HEIGHT,
         SDL_LOGICAL_PRESENTATION_LETTERBOX
     );
+    ttf_text_engine = TTF_CreateRendererTextEngine(sdl_renderer);
+    if(ttf_text_engine == NULL) {
+        SDL_DestroyRenderer(sdl_renderer);
+        SDL_DestroyWindow(sdl_window);
+        sdl_renderer = NULL;
+        sdl_window = NULL;
+        TTF_Quit();
+        ttf_initialized = false;
+        return error_result_error(ERROR_ENGINE_GRAPHICS_INIT_FAILED);
+    }
 
     console_write(LOG_ENGINE, "Graphics initialization complete\n");
     console_write(LOG_ENGINE, "---Initializing Graphics---\n");
@@ -638,12 +656,22 @@ EngineResult graphics_start(void) {
 }
 
 void graphics_renderer_end(void) {
+    if(ttf_text_engine != NULL) {
+        TTF_DestroyRendererTextEngine(ttf_text_engine);
+        ttf_text_engine = NULL;
+    }
+    if(ttf_initialized) {
+        TTF_Quit();
+        ttf_initialized = false;
+    }
     SDL_DestroyRenderer(sdl_renderer);
+    sdl_renderer = NULL;
     console_write(LOG_ENGINE, "Renderer terminated\n");
 }
 
 void graphics_window_end(void) {
     SDL_DestroyWindow(sdl_window);
+    sdl_window = NULL;
     console_write(LOG_ENGINE, "Window terminated\n");
 }
 
@@ -872,6 +900,74 @@ TextureAssetResult graphics_load_texture(TextureDescriptor text_desc) {
         }
 
         return ERROR_RESULT_MAKE_VALUE(TextureAssetResult, asset);
+}
+
+FontAssetResult graphics_load_font(FontDescriptor descriptor) {
+    FontAsset asset = {0};
+
+    if(descriptor.file == NULL || descriptor.point_size <= 0.0f || !ttf_initialized) {
+        return ERROR_RESULT_MAKE_ERROR(FontAssetResult, ERROR_ENGINE_FONT_LOAD_FAILED);
+    }
+    asset.font = TTF_OpenFont(descriptor.file, descriptor.point_size);
+    if(asset.font == NULL) {
+        return ERROR_RESULT_MAKE_ERROR(FontAssetResult, ERROR_ENGINE_FONT_LOAD_FAILED);
+    }
+    return ERROR_RESULT_MAKE_VALUE(FontAssetResult, asset);
+}
+
+void graphics_destroy_font(FontAsset *font) {
+    if(font == NULL || font->font == NULL) {
+        return;
+    }
+    TTF_CloseFont(font->font);
+    *font = (FontAsset){0};
+}
+
+TextAssetResult graphics_create_text(const FontAsset *font, const char *value, Color color) {
+    TextAsset asset = {0};
+    int width;
+    int height;
+
+    if(font == NULL || font->font == NULL || value == NULL || ttf_text_engine == NULL) {
+        return ERROR_RESULT_MAKE_ERROR(TextAssetResult, ERROR_ENGINE_TEXT_CREATE_FAILED);
+    }
+    if(value[0] == '\0') {
+        return ERROR_RESULT_MAKE_VALUE(TextAssetResult, asset);
+    }
+    asset.text = TTF_CreateText(ttf_text_engine, font->font, value, 0);
+    if(asset.text == NULL || !TTF_SetTextColor(
+            asset.text,
+            color.red,
+            color.green,
+            color.blue,
+            color.alpha) || !TTF_GetTextSize(asset.text, &width, &height)) {
+        if(asset.text != NULL) {
+            TTF_DestroyText(asset.text);
+        }
+        return ERROR_RESULT_MAKE_ERROR(TextAssetResult, ERROR_ENGINE_TEXT_CREATE_FAILED);
+    }
+    asset.size = (Scale){
+        .x = (float)width,
+        .y = (float)height,
+    };
+    return ERROR_RESULT_MAKE_VALUE(TextAssetResult, asset);
+}
+
+void graphics_destroy_text(TextAsset *text) {
+    if(text == NULL) {
+        return;
+    }
+    if(text->text != NULL) {
+        TTF_DestroyText(text->text);
+    }
+    *text = (TextAsset){0};
+}
+
+bool graphics_draw_text(const TextAsset *text, Position position) {
+    if(text == NULL || text->text == NULL) {
+        return false;
+    }
+    return TTF_DrawRendererText(text->text, position.x, position.y);
 }
 
 AnimationAssetResult graphics_load_animation(AnimationDescriptor anim_desc) {

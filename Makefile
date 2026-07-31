@@ -1,7 +1,7 @@
 CC := clang
 AR := ar
 
-PKGS := sdl3 sdl3-image
+PKGS := sdl3 sdl3-image sdl3-ttf
 CFLAGS := -Iinclude -Isrc -Ilib -I. -Iexamples/test-assets $(shell pkg-config --cflags $(PKGS))
 LIBS := $(shell pkg-config --libs $(PKGS)) -lm
 

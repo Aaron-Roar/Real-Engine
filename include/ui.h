@@ -5,6 +5,10 @@
 #include "controller.h"
 #include "graphics.h"
 
+#define UI_DEFINITION_NAME_MAX 64
+#define UI_ID_MAX 128
+#define UI_LABEL_MAX 128
+
 /** Axis-aligned rectangle in logical screen coordinates. */
 typedef struct UIRect {
     float x;
@@ -34,14 +38,35 @@ typedef struct UIButtonResult {
     bool clicked;
 } UIButtonResult;
 
+/** Authored button data that can be loaded independently of runtime state. */
+typedef struct UIButtonDefinition {
+    char name[UI_DEFINITION_NAME_MAX];
+    char id[UI_ID_MAX];
+    char label[UI_LABEL_MAX];
+    UIRect bounds;
+    UIButtonStyle style;
+} UIButtonDefinition;
+
+/** Result type for functions that return a button definition. */
+ERROR_DECLARE_RESULT_TYPE(UIButtonDefinitionResult, UIButtonDefinition);
+
 /** Start a UI frame with pointer coordinates in logical screen space. */
 void ui_begin_frame(UIInput input);
 
 /**
  * Draw and update a button identified by a stable, non-empty string.
- * Passing NULL for style uses the default button colors.
+ * Passing NULL for label, or an empty TextAsset created from "", draws no
+ * automatic label. Passing NULL for style uses the default button colors.
  */
-UIButtonResult ui_button(const char *id, UIRect bounds, const UIButtonStyle *style);
+UIButtonResult ui_button(
+    const char *id,
+    const TextAsset *label,
+    UIRect bounds,
+    const UIButtonStyle *style
+);
+
+/** Draw reusable text centered inside logical screen-space bounds. */
+void ui_label(const TextAsset *text, UIRect bounds);
 
 /** Draw a disabled button that cannot capture or consume input. */
 void ui_button_disabled(UIRect bounds, const UIButtonStyle *style);

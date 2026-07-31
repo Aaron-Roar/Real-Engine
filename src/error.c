@@ -58,6 +58,10 @@ const char *error_default_message(EngineError error) {
             return "component missing";
         case ERROR_ENGINE_TEXTURE_LOAD_FAILED:
             return "texture load failed";
+        case ERROR_ENGINE_FONT_LOAD_FAILED:
+            return "font load failed";
+        case ERROR_ENGINE_TEXT_CREATE_FAILED:
+            return "text creation failed";
         case ERROR_ENGINE_ANIMATION_LOAD_FAILED:
             return "animation load failed";
         case ERROR_ENGINE_INVALID_ENTITY_NAME:
@@ -86,6 +90,8 @@ const char *error_default_message(EngineError error) {
             return "duplicate game state asset definition";
         case ERROR_ENGINE_STATE_ASSET_REFERENCE_NOT_FOUND:
             return "game state asset reference not found";
+        case ERROR_ENGINE_UI_DEFINITION_NOT_FOUND:
+            return "UI definition not found";
         default:
             return "unknown error";
     }

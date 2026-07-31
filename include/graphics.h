@@ -4,6 +4,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_surface.h>
 #include <SDL3/SDL_main.h>
+#include <SDL3_ttf/SDL_ttf.h>
 #include "entity_components.h"
 #include "engine.h"
 #include "physics.h"
@@ -85,6 +86,38 @@ typedef struct {
 
 /** Result type for functions that return a TextureAsset. */
 ERROR_DECLARE_RESULT_TYPE(TextureAssetResult, TextureAsset);
+
+/** Descriptor for loading a scalable font from disk. */
+typedef struct FontDescriptor {
+    /** Path to a font file supported by SDL3_ttf. */
+    const char *file;
+    /** Font point size. */
+    float point_size;
+} FontDescriptor;
+
+/**
+ * Loaded font owned by the caller. Destroy all text created from this font
+ * before destroying the font, and destroy the font before graphics shutdown.
+ */
+typedef struct FontAsset {
+    TTF_Font *font;
+} FontAsset;
+
+/** Result type for functions that return a FontAsset. */
+ERROR_DECLARE_RESULT_TYPE(FontAssetResult, FontAsset);
+
+/**
+ * Reusable rendered text owned by the caller. Destroy it before its font and
+ * before graphics shutdown.
+ */
+typedef struct TextAsset {
+    TTF_Text *text;
+    /** Logical screen-space dimensions of the rendered text. */
+    Scale size;
+} TextAsset;
+
+/** Result type for functions that return a TextAsset. */
+ERROR_DECLARE_RESULT_TYPE(TextAssetResult, TextAsset);
 
 /** Fixed list of loaded textures for an animation. */
 typedef struct {
@@ -204,6 +237,21 @@ void graphics_draw_hit_boxes(void);
 
 /** Load a texture from a descriptor. */
 TextureAssetResult graphics_load_texture(TextureDescriptor text_desc);
+
+/** Load a font. The caller must destroy successful assets. */
+FontAssetResult graphics_load_font(FontDescriptor descriptor);
+
+/** Close a loaded font after all text assets using it are destroyed. */
+void graphics_destroy_font(FontAsset *font);
+
+/** Create reusable text. An empty string produces an empty text asset. */
+TextAssetResult graphics_create_text(const FontAsset *font, const char *value, Color color);
+
+/** Destroy reusable text. */
+void graphics_destroy_text(TextAsset *text);
+
+/** Draw reusable text with its top-left corner in logical screen space. */
+bool graphics_draw_text(const TextAsset *text, Position position);
 
 /** Load an animation from texture descriptors. */
 AnimationAssetResult graphics_load_animation(AnimationDescriptor anim_desc);

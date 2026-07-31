@@ -26,6 +26,44 @@ in the same call.
 Names are unique among live entities and may contain at most 63 bytes. The
 loader accepts JSON comments and trailing commas for handcrafted files.
 
+## User interface definitions
+
+Immediate-mode button layout and styling can be authored under `ui.buttons`:
+
+```json
+"ui": {
+  "buttons": [{
+    "name": "settings_button",
+    "id": "main_menu.settings",
+    "label": "Settings",
+    "bounds": {
+      "x": 220,
+      "y": 205,
+      "width": 200,
+      "height": 55
+    },
+    "style": {
+      "hovered": {"red": 95, "green": 80, "blue": 145, "alpha": 255}
+    }
+  }]
+}
+```
+
+`name` identifies the authored definition for
+`game_state_find_ui_button()`. `id` is the stable runtime interaction ID and
+must also be unique. `label` is optional and defaults to an empty string.
+Bounds use logical screen coordinates and require positive width and height.
+
+The `style` object and each of its `idle`, `hovered`, `pressed`, and `disabled`
+colors are optional. Omitted colors use the default button style. Each supplied
+color requires unsigned `red`, `green`, `blue`, and `alpha` values from 0 to
+255.
+
+Loading a definition does not draw it or handle its click. The game retrieves
+the definition, creates any desired text asset, calls `ui_button()` while the
+menu is active, and handles the returned interaction result. Runtime and
+template saves preserve loaded button definitions.
+
 An entity description may use `count` to create multiple copies from one
 component prototype. The first copy keeps the base name and later copies use
 `_1`, `_2`, and so on. If a generated name already exists, the loader advances

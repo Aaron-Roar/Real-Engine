@@ -57,6 +57,7 @@ EntityResult rohr_entity_find_by_name(const char *name) { return entity_find_by_
 EntityNameResult rohr_entity_get_name(Entity entity) { return entity_get_name(entity); }
 EngineResult rohr_game_state_load_file(const char *path) { return game_state_load_file(path); }
 EngineResult rohr_game_state_load_files(const char *const *paths, size_t path_count) { return game_state_load_files(paths, path_count); }
+UIButtonDefinitionResult rohr_game_state_find_ui_button(const char *name) { return game_state_find_ui_button(name); }
 EngineResult rohr_game_state_save_file(const char *path) { return game_state_save_file(path); }
 EngineResult rohr_game_state_save_template_file(const char *path) { return game_state_save_template_file(path); }
 EngineResult rohr_entity_delete(Entity entity) { return entity_delete(entity); }
@@ -189,6 +190,11 @@ void rohr_graphics_draw_hit_box(Entity entity, Fill fill_type) { graphics_draw_h
 void rohr_graphics_draw_hit_box_colored(Entity entity, Fill fill_type, Color color) { graphics_draw_hit_box_colored(entity, fill_type, color); }
 void rohr_graphics_draw_hit_boxes(void) { graphics_draw_hit_boxes(); }
 TextureAssetResult rohr_graphics_load_texture(TextureDescriptor text_desc) { return graphics_load_texture(text_desc); }
+FontAssetResult rohr_graphics_load_font(FontDescriptor descriptor) { return graphics_load_font(descriptor); }
+void rohr_graphics_destroy_font(FontAsset *font) { graphics_destroy_font(font); }
+TextAssetResult rohr_graphics_create_text(const FontAsset *font, const char *value, Color color) { return graphics_create_text(font, value, color); }
+void rohr_graphics_destroy_text(TextAsset *text) { graphics_destroy_text(text); }
+bool rohr_graphics_draw_text(const TextAsset *text, Position position) { return graphics_draw_text(text, position); }
 AnimationAssetResult rohr_graphics_load_animation(AnimationDescriptor anim_desc) { return graphics_load_animation(anim_desc); }
 AnimatedSprite rohr_graphics_create_animated_sprite(AnimationAsset asset_ptr, Scale scale) { return graphics_create_animated_sprite(asset_ptr, scale); }
 EngineResult rohr_graphics_add_animated_sprite(Entity entity, AnimatedSprite sprite) { return graphics_add_animated_sprite(entity, sprite); }
@@ -285,7 +291,8 @@ int rohr_tools_random_range(int min, int max) { return tools_random_range(min, m
 float rohr_tools_random_range_float(float min, float max) { return tools_random_range_float(min, max); }
 
 void rohr_ui_begin_frame(UIInput input) { ui_begin_frame(input); }
-UIButtonResult rohr_ui_button(const char *id, UIRect bounds, const UIButtonStyle *style) { return ui_button(id, bounds, style); }
+UIButtonResult rohr_ui_button(const char *id, const TextAsset *label, UIRect bounds, const UIButtonStyle *style) { return ui_button(id, label, bounds, style); }
+void rohr_ui_label(const TextAsset *text, UIRect bounds) { ui_label(text, bounds); }
 void rohr_ui_button_disabled(UIRect bounds, const UIButtonStyle *style) { ui_button_disabled(bounds, style); }
 bool rohr_ui_pointer_consumed(void) { return ui_pointer_consumed(); }
 void rohr_ui_end_frame(void) { ui_end_frame(); }

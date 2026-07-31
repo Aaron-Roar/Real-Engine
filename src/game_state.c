@@ -14,6 +14,7 @@
 #include "yyjson.h"
 
 #define STATE_MAX_ANIMATIONS MAX_TEXTURES
+#define STATE_MAX_UI_BUTTONS 256
 #define STATE_ASSET_NAME_MAX 64
 #define STATE_ASSET_PATH_MAX 512
 
@@ -22,6 +23,7 @@ typedef struct StateDocument {
     yyjson_val *entities;
     yyjson_val *groups;
     yyjson_val *animations;
+    yyjson_val *ui_buttons;
     yyjson_val *camera;
 } StateDocument;
 
@@ -48,9 +50,15 @@ typedef struct StateSpriteReference {
     int start_frame;
 } StateSpriteReference;
 
+typedef struct StateUIButton {
+    UIButtonDefinition definition;
+} StateUIButton;
+
 static StateAnimation state_animations[STATE_MAX_ANIMATIONS] = {0};
 static size_t state_animation_count = 0;
 static StateSpriteReference state_sprite_references[MAX_ENTITIES] = {0};
+static StateUIButton state_ui_buttons[STATE_MAX_UI_BUTTONS] = {0};
+static size_t state_ui_button_count = 0;
 static yyjson_doc *state_template_documents[GAME_STATE_MAX_TEMPLATE_DOCUMENTS] = {0};
 static size_t state_template_document_count = 0;
 static bool state_template_camera_retained = false;
@@ -68,8 +76,10 @@ void game_state_runtime_reset(void) {
     }
     memset(state_animations, 0, sizeof(state_animations));
     memset(state_sprite_references, 0, sizeof(state_sprite_references));
+    memset(state_ui_buttons, 0, sizeof(state_ui_buttons));
     memset(state_template_documents, 0, sizeof(state_template_documents));
     state_animation_count = 0;
+    state_ui_button_count = 0;
     state_template_document_count = 0;
     state_template_camera_retained = false;
 }
@@ -169,6 +179,136 @@ static bool state_number(yyjson_val *object, const char *key, double *value) {
     }
     *value = yyjson_get_num(item);
     return true;
+}
+
+static bool state_color(yyjson_val *object, Color *color) {
+    yyjson_val *red;
+    yyjson_val *green;
+    yyjson_val *blue;
+    yyjson_val *alpha;
+
+    if(!yyjson_is_obj(object) || color == NULL) return false;
+    red = yyjson_obj_get(object, "red");
+    green = yyjson_obj_get(object, "green");
+    blue = yyjson_obj_get(object, "blue");
+    alpha = yyjson_obj_get(object, "alpha");
+    if(!yyjson_is_uint(red) || yyjson_get_uint(red) > UINT8_MAX
+            || !yyjson_is_uint(green) || yyjson_get_uint(green) > UINT8_MAX
+            || !yyjson_is_uint(blue) || yyjson_get_uint(blue) > UINT8_MAX
+            || !yyjson_is_uint(alpha) || yyjson_get_uint(alpha) > UINT8_MAX) {
+        return false;
+    }
+    *color = (Color){
+        .red = (uint8_t)yyjson_get_uint(red),
+        .green = (uint8_t)yyjson_get_uint(green),
+        .blue = (uint8_t)yyjson_get_uint(blue),
+        .alpha = (uint8_t)yyjson_get_uint(alpha),
+    };
+    return true;
+}
+
+static StateUIButton *state_find_ui_button_internal(const char *name) {
+    size_t i;
+
+    if(name == NULL) return NULL;
+    for(i = 0; i < state_ui_button_count; i += 1) {
+        if(strcmp(state_ui_buttons[i].definition.name, name) == 0) {
+            return &state_ui_buttons[i];
+        }
+    }
+    return NULL;
+}
+
+UIButtonDefinitionResult game_state_find_ui_button(const char *name) {
+    StateUIButton *button = state_find_ui_button_internal(name);
+
+    if(button == NULL) {
+        return ERROR_RESULT_MAKE_ERROR(
+            UIButtonDefinitionResult,
+            ERROR_ENGINE_UI_DEFINITION_NOT_FOUND
+        );
+    }
+    return ERROR_RESULT_MAKE_VALUE(
+        UIButtonDefinitionResult,
+        button->definition
+    );
+}
+
+static EngineResult state_load_ui_button_definition(yyjson_val *value) {
+    yyjson_val *name;
+    yyjson_val *id;
+    yyjson_val *label;
+    yyjson_val *bounds;
+    yyjson_val *style;
+    UIButtonDefinition definition = {0};
+    double x;
+    double y;
+    double width;
+    double height;
+    size_t i;
+
+    if(!yyjson_is_obj(value) || state_ui_button_count >= STATE_MAX_UI_BUTTONS) {
+        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
+    name = yyjson_obj_get(value, "name");
+    id = yyjson_obj_get(value, "id");
+    label = yyjson_obj_get(value, "label");
+    bounds = yyjson_obj_get(value, "bounds");
+    style = yyjson_obj_get(value, "style");
+    if(!yyjson_is_str(name) || yyjson_get_len(name) == 0
+            || yyjson_get_len(name) >= UI_DEFINITION_NAME_MAX
+            || !yyjson_is_str(id) || yyjson_get_len(id) == 0
+            || yyjson_get_len(id) >= UI_ID_MAX
+            || (label != NULL && (!yyjson_is_str(label)
+                || yyjson_get_len(label) >= UI_LABEL_MAX))
+            || !yyjson_is_obj(bounds)
+            || !state_number(bounds, "x", &x)
+            || !state_number(bounds, "y", &y)
+            || !state_number(bounds, "width", &width)
+            || !state_number(bounds, "height", &height)
+            || !isfinite(x) || !isfinite(y)
+            || !isfinite(width) || width <= 0.0
+            || !isfinite(height) || height <= 0.0
+            || (style != NULL && !yyjson_is_obj(style))) {
+        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
+    if(state_find_ui_button_internal(yyjson_get_str(name)) != NULL) {
+        return error_result_error(ERROR_ENGINE_STATE_DUPLICATE_ASSET_DEFINITION);
+    }
+    for(i = 0; i < state_ui_button_count; i += 1) {
+        if(strcmp(state_ui_buttons[i].definition.id, yyjson_get_str(id)) == 0) {
+            return error_result_error(ERROR_ENGINE_STATE_DUPLICATE_ASSET_DEFINITION);
+        }
+    }
+
+    memcpy(definition.name, yyjson_get_str(name), yyjson_get_len(name) + 1);
+    memcpy(definition.id, yyjson_get_str(id), yyjson_get_len(id) + 1);
+    if(label != NULL) {
+        memcpy(definition.label, yyjson_get_str(label), yyjson_get_len(label) + 1);
+    }
+    definition.bounds = (UIRect){
+        .x = (float)x,
+        .y = (float)y,
+        .width = (float)width,
+        .height = (float)height,
+    };
+    definition.style = ui_default_button_style();
+    if(style != NULL) {
+#define LOAD_UI_COLOR(Key, Field) do { \
+    yyjson_val *color_value = yyjson_obj_get(style, Key); \
+    if(color_value != NULL && !state_color(color_value, &definition.style.Field)) { \
+        return error_result_error(ERROR_ENGINE_STATE_INVALID); \
+    } \
+} while(0)
+        LOAD_UI_COLOR("idle", idle);
+        LOAD_UI_COLOR("hovered", hovered);
+        LOAD_UI_COLOR("pressed", pressed);
+        LOAD_UI_COLOR("disabled", disabled);
+#undef LOAD_UI_COLOR
+    }
+    state_ui_buttons[state_ui_button_count].definition = definition;
+    state_ui_button_count += 1;
+    return error_result_value(true);
 }
 
 static bool state_boolean(yyjson_val *object, const char *key, bool *value) {
@@ -1087,6 +1227,7 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
     size_t created_group_count = 0;
     size_t camera_definition_count = 0;
     size_t initial_animation_count = state_animation_count;
+    size_t initial_ui_button_count = state_ui_button_count;
     EngineResult result = error_result_value(true);
 
     if(paths == NULL || path_count == 0 || path_count > MAX_ENTITIES) {
@@ -1114,6 +1255,7 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
         yyjson_val *root;
         yyjson_val *version;
         yyjson_val *assets;
+        yyjson_val *ui;
         yyjson_read_err read_error;
         if(paths[document_index] == NULL) {
             result = error_result_error(ERROR_ENGINE_STATE_INVALID);
@@ -1134,6 +1276,10 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
         documents[document_index].entities = yyjson_obj_get(root, "entities");
         documents[document_index].groups = yyjson_obj_get(root, "groups");
         documents[document_index].camera = yyjson_obj_get(root, "camera");
+        ui = yyjson_obj_get(root, "ui");
+        documents[document_index].ui_buttons = ui == NULL
+            ? NULL
+            : yyjson_obj_get(ui, "buttons");
         assets = yyjson_obj_get(root, "assets");
         documents[document_index].animations = assets == NULL
             ? NULL
@@ -1146,6 +1292,9 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
                 || (documents[document_index].camera != NULL
                     && !yyjson_is_obj(documents[document_index].camera))
                 || (assets != NULL && !yyjson_is_obj(assets))
+                || (ui != NULL && !yyjson_is_obj(ui))
+                || (documents[document_index].ui_buttons != NULL
+                    && !yyjson_is_arr(documents[document_index].ui_buttons))
                 || (documents[document_index].animations != NULL
                     && !yyjson_is_arr(documents[document_index].animations))) {
             result = error_result_error(ERROR_ENGINE_STATE_INVALID);
@@ -1158,6 +1307,22 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
                 result = error_result_error(ERROR_ENGINE_STATE_INVALID);
                 goto cleanup;
             }
+        }
+    }
+
+    for(document_index = 0; document_index < path_count; document_index += 1) {
+        yyjson_val *definition;
+        size_t button_index;
+        size_t button_count;
+        if(documents[document_index].ui_buttons == NULL) continue;
+        yyjson_arr_foreach(
+            documents[document_index].ui_buttons,
+            button_index,
+            button_count,
+            definition
+        ) {
+            result = state_load_ui_button_definition(definition);
+            if(result.kind == ERROR_RESULT_ERROR) goto cleanup;
         }
     }
 
@@ -1294,6 +1459,12 @@ cleanup:
         }
     }
     if(result.kind == ERROR_RESULT_ERROR) {
+        while(state_ui_button_count > initial_ui_button_count) {
+            state_ui_button_count -= 1;
+            state_ui_buttons[state_ui_button_count] = (StateUIButton){0};
+        }
+    }
+    if(result.kind == ERROR_RESULT_ERROR) {
         while(state_animation_count > initial_animation_count) {
             state_animation_count -= 1;
             state_animations[state_animation_count] = (StateAnimation){0};
@@ -1331,6 +1502,47 @@ static yyjson_mut_val *state_write_vec2(yyjson_mut_doc *document, Vec2D value) {
     return object;
 }
 
+static yyjson_mut_val *state_write_color(
+        yyjson_mut_doc *document,
+        Color color
+) {
+    yyjson_mut_val *object = yyjson_mut_obj(document);
+    yyjson_mut_obj_add_uint(document, object, "red", color.red);
+    yyjson_mut_obj_add_uint(document, object, "green", color.green);
+    yyjson_mut_obj_add_uint(document, object, "blue", color.blue);
+    yyjson_mut_obj_add_uint(document, object, "alpha", color.alpha);
+    return object;
+}
+
+static yyjson_mut_val *state_write_ui_button(
+        yyjson_mut_doc *document,
+        const UIButtonDefinition *button
+) {
+    yyjson_mut_val *definition;
+    yyjson_mut_val *bounds;
+    yyjson_mut_val *style;
+
+    if(document == NULL || button == NULL) return NULL;
+    definition = yyjson_mut_obj(document);
+    bounds = yyjson_mut_obj(document);
+    style = yyjson_mut_obj(document);
+    if(definition == NULL || bounds == NULL || style == NULL) return NULL;
+    yyjson_mut_obj_add_strcpy(document, definition, "name", button->name);
+    yyjson_mut_obj_add_strcpy(document, definition, "id", button->id);
+    yyjson_mut_obj_add_strcpy(document, definition, "label", button->label);
+    yyjson_mut_obj_add_real(document, bounds, "x", button->bounds.x);
+    yyjson_mut_obj_add_real(document, bounds, "y", button->bounds.y);
+    yyjson_mut_obj_add_real(document, bounds, "width", button->bounds.width);
+    yyjson_mut_obj_add_real(document, bounds, "height", button->bounds.height);
+    yyjson_mut_obj_add_val(document, definition, "bounds", bounds);
+    yyjson_mut_obj_add_val(document, style, "idle", state_write_color(document, button->style.idle));
+    yyjson_mut_obj_add_val(document, style, "hovered", state_write_color(document, button->style.hovered));
+    yyjson_mut_obj_add_val(document, style, "pressed", state_write_color(document, button->style.pressed));
+    yyjson_mut_obj_add_val(document, style, "disabled", state_write_color(document, button->style.disabled));
+    yyjson_mut_obj_add_val(document, definition, "style", style);
+    return definition;
+}
+
 static void state_write_named_reference(
         yyjson_mut_doc *document,
         yyjson_mut_val *components,
@@ -1349,6 +1561,8 @@ EngineResult game_state_save_file(const char *path) {
     yyjson_mut_val *group_array;
     yyjson_mut_val *assets;
     yyjson_mut_val *animation_array;
+    yyjson_mut_val *ui;
+    yyjson_mut_val *ui_buttons;
     uint32_t position;
     yyjson_write_err write_error;
     bool success;
@@ -1361,12 +1575,16 @@ EngineResult game_state_save_file(const char *path) {
     group_array = yyjson_mut_arr(document);
     assets = yyjson_mut_obj(document);
     animation_array = yyjson_mut_arr(document);
+    ui = yyjson_mut_obj(document);
+    ui_buttons = yyjson_mut_arr(document);
     yyjson_mut_doc_set_root(document, root);
     yyjson_mut_obj_add_uint(document, root, "version", GAME_STATE_VERSION);
     yyjson_mut_obj_add_val(document, root, "groups", group_array);
     yyjson_mut_obj_add_val(document, assets, "animations", animation_array);
     yyjson_mut_obj_add_val(document, root, "assets", assets);
     yyjson_mut_obj_add_val(document, root, "entities", entity_array);
+    yyjson_mut_obj_add_val(document, ui, "buttons", ui_buttons);
+    yyjson_mut_obj_add_val(document, root, "ui", ui);
 
     {
         yyjson_mut_val *camera = yyjson_mut_obj(document);
@@ -1486,6 +1704,18 @@ EngineResult game_state_save_file(const char *path) {
         }
         yyjson_mut_obj_add_val(document, definition, "frames", frames);
         yyjson_mut_arr_add_val(animation_array, definition);
+    }
+
+    for(position = 0; position < state_ui_button_count; position += 1) {
+        yyjson_mut_val *definition = state_write_ui_button(
+            document,
+            &state_ui_buttons[position].definition
+        );
+        if(definition == NULL) {
+            yyjson_mut_doc_free(document);
+            return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
+        }
+        yyjson_mut_arr_add_val(ui_buttons, definition);
     }
 
     for(position = 0; position < entity_alive_count(); position += 1) {
@@ -1704,6 +1934,8 @@ EngineResult game_state_save_template_file(const char *path) {
     yyjson_mut_val *assets;
     yyjson_mut_val *animations;
     yyjson_mut_val *entities;
+    yyjson_mut_val *ui;
+    yyjson_mut_val *ui_buttons;
     bool camera_copied = false;
     yyjson_write_err write_error;
     size_t document_index;
@@ -1721,8 +1953,11 @@ EngineResult game_state_save_template_file(const char *path) {
     assets = yyjson_mut_obj(document);
     animations = yyjson_mut_arr(document);
     entities = yyjson_mut_arr(document);
+    ui = yyjson_mut_obj(document);
+    ui_buttons = yyjson_mut_arr(document);
     if(root == NULL || groups == NULL || assets == NULL
-            || animations == NULL || entities == NULL) {
+            || animations == NULL || entities == NULL
+            || ui == NULL || ui_buttons == NULL) {
         yyjson_mut_doc_free(document);
         return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
     }
@@ -1732,6 +1967,8 @@ EngineResult game_state_save_template_file(const char *path) {
     yyjson_mut_obj_add_val(document, assets, "animations", animations);
     yyjson_mut_obj_add_val(document, root, "assets", assets);
     yyjson_mut_obj_add_val(document, root, "entities", entities);
+    yyjson_mut_obj_add_val(document, ui, "buttons", ui_buttons);
+    yyjson_mut_obj_add_val(document, root, "ui", ui);
 
     for(document_index = 0;
             document_index < state_template_document_count && success;
@@ -1741,6 +1978,7 @@ EngineResult game_state_save_template_file(const char *path) {
         );
         yyjson_val *input_assets = yyjson_obj_get(input_root, "assets");
         yyjson_val *input_camera = yyjson_obj_get(input_root, "camera");
+        yyjson_val *input_ui = yyjson_obj_get(input_root, "ui");
         success = state_template_copy_array(
                 document,
                 groups,
@@ -1757,6 +1995,13 @@ EngineResult game_state_save_template_file(const char *path) {
                 document,
                 entities,
                 yyjson_obj_get(input_root, "entities")
+            )
+            && state_template_copy_array(
+                document,
+                ui_buttons,
+                input_ui == NULL
+                    ? NULL
+                    : yyjson_obj_get(input_ui, "buttons")
             );
         if(success && input_camera != NULL) {
             yyjson_mut_val *output_camera;

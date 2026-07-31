@@ -256,6 +256,9 @@ EngineResult rohr_game_state_load_file(const char *path);
 /** Loads multiple JSON files with cross-file name resolution. */
 EngineResult rohr_game_state_load_files(const char *const *paths, size_t path_count);
 
+/** @brief Finds a UI button definition loaded from JSON. */
+UIButtonDefinitionResult rohr_game_state_find_ui_button(const char *name);
+
 /** Saves all named live entities to a JSON game-state file. */
 EngineResult rohr_game_state_save_file(const char *path);
 
@@ -966,6 +969,21 @@ void rohr_graphics_draw_hit_boxes(void);
  */
 TextureAssetResult rohr_graphics_load_texture(TextureDescriptor text_desc);
 
+/** @brief Loads a caller-owned font asset. */
+FontAssetResult rohr_graphics_load_font(FontDescriptor descriptor);
+
+/** @brief Destroys a font after its text assets have been destroyed. */
+void rohr_graphics_destroy_font(FontAsset *font);
+
+/** @brief Creates reusable caller-owned text. */
+TextAssetResult rohr_graphics_create_text(const FontAsset *font, const char *value, Color color);
+
+/** @brief Destroys reusable text. */
+void rohr_graphics_destroy_text(TextAsset *text);
+
+/** @brief Draws text in logical screen coordinates. */
+bool rohr_graphics_draw_text(const TextAsset *text, Position position);
+
 /**
  * @brief Loads an animation asset.
  * @param anim_desc Animation descriptor containing load settings.
@@ -1535,8 +1553,19 @@ float rohr_tools_random_range_float(float min, float max);
 /** @brief Starts a UI frame with logical screen-space pointer input. */
 void rohr_ui_begin_frame(UIInput input);
 
-/** @brief Draws and updates one button identified by a stable string. */
-UIButtonResult rohr_ui_button(const char *id, UIRect bounds, const UIButtonStyle *style);
+/**
+ * @brief Draws and updates one button identified by a stable string.
+ * @param label Optional centered label; NULL or empty draws no label.
+ */
+UIButtonResult rohr_ui_button(
+    const char *id,
+    const TextAsset *label,
+    UIRect bounds,
+    const UIButtonStyle *style
+);
+
+/** @brief Draws reusable text centered inside bounds. */
+void rohr_ui_label(const TextAsset *text, UIRect bounds);
 
 /** @brief Draws a disabled button that cannot capture input. */
 void rohr_ui_button_disabled(UIRect bounds, const UIButtonStyle *style);

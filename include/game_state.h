@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include "error.h"
+#include "ui.h"
 
 /** Current JSON game-state schema version. */
 #define GAME_STATE_VERSION 1
@@ -25,6 +26,9 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count);
 
 /** Load entities from one JSON state file. */
 EngineResult game_state_load_file(const char *path);
+
+/** Find a UI button definition loaded from JSON by its authored name. */
+UIButtonDefinitionResult game_state_find_ui_button(const char *name);
 
 /**
  * Save all named live entities to one JSON state file.

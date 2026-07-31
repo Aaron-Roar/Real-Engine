@@ -51,7 +51,12 @@ void ui_begin_frame(UIInput input) {
     ui_context.frame_active = true;
 }
 
-UIButtonResult ui_button(const char *id, UIRect bounds, const UIButtonStyle *style) {
+UIButtonResult ui_button(
+    const char *id,
+    const TextAsset *label,
+    UIRect bounds,
+    const UIButtonStyle *style
+) {
     UIButtonResult result = {0};
     UIButtonStyle resolved_style = style == NULL ? ui_default_button_style() : *style;
     uint64_t button_id = ui_hash_id(id);
@@ -99,7 +104,21 @@ UIButtonResult ui_button(const char *id, UIRect bounds, const UIButtonStyle *sty
         result.pressed ? resolved_style.pressed :
             (result.hovered ? resolved_style.hovered : resolved_style.idle)
     );
+    ui_label(label, bounds);
     return result;
+}
+
+void ui_label(const TextAsset *text, UIRect bounds) {
+    Position position;
+
+    if(text == NULL || text->text == NULL) {
+        return;
+    }
+    position = (Position){
+        .x = bounds.x + (bounds.width - text->size.x) * 0.5f,
+        .y = bounds.y + (bounds.height - text->size.y) * 0.5f,
+    };
+    (void)graphics_draw_text(text, position);
 }
 
 void ui_button_disabled(UIRect bounds, const UIButtonStyle *style) {
