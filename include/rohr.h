@@ -265,6 +265,9 @@ UIFontDefinitionResult rohr_game_state_find_ui_font(const char *name);
 /** @brief Finds a standalone UI label definition loaded from JSON. */
 UILabelDefinitionResult rohr_game_state_find_ui_label(const char *name);
 
+/** @brief Finds a UI slider definition loaded from JSON. */
+UISliderDefinitionResult rohr_game_state_find_ui_slider(const char *name);
+
 /** Saves all named live entities to a JSON game-state file. */
 EngineResult rohr_game_state_save_file(const char *path);
 
@@ -943,6 +946,9 @@ void rohr_graphics_draw_background(Color color);
  */
 bool rohr_graphics_draw_screen_rect(float x, float y, float width, float height, Color color);
 
+/** @brief Draws a centered rotated rectangle in logical screen space. */
+bool rohr_graphics_draw_screen_quad(Position center, float width, float height, float angle, Color color);
+
 /**
  * @brief Presents the current graphics frame.
  */
@@ -1584,5 +1590,15 @@ void rohr_ui_end_frame(void);
 
 /** @brief Returns the default button colors. */
 UIButtonStyle rohr_ui_default_button_style(void);
+
+/** @brief Returns the default slider configuration and 0..1 range. */
+UISliderConfig rohr_ui_default_slider_config(void);
+
+/** @brief Draws and updates a caller-owned slider value. */
+UISliderResult rohr_ui_slider(const char *id, float value, const UISliderConfig *config);
+
+/** @brief Draws a slider with optional caller-owned label and value text. */
+UISliderResult rohr_ui_slider_with_text(const char *id, float value,
+    const UISliderConfig *config, const UISliderText *text);
 
 #endif

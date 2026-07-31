@@ -17,6 +17,7 @@
 #define STATE_MAX_UI_BUTTONS 256
 #define STATE_MAX_UI_FONTS 64
 #define STATE_MAX_UI_LABELS 256
+#define STATE_MAX_UI_SLIDERS 256
 #define STATE_ASSET_NAME_MAX 64
 #define STATE_ASSET_PATH_MAX 512
 
@@ -28,6 +29,7 @@ typedef struct StateDocument {
     yyjson_val *ui_buttons;
     yyjson_val *ui_fonts;
     yyjson_val *ui_labels;
+    yyjson_val *ui_sliders;
     yyjson_val *camera;
 } StateDocument;
 
@@ -66,6 +68,10 @@ typedef struct StateUILabel {
     UILabelDefinition definition;
 } StateUILabel;
 
+typedef struct StateUISlider {
+    UISliderDefinition definition;
+} StateUISlider;
+
 static StateAnimation state_animations[STATE_MAX_ANIMATIONS] = {0};
 static size_t state_animation_count = 0;
 static StateSpriteReference state_sprite_references[MAX_ENTITIES] = {0};
@@ -75,6 +81,8 @@ static StateUIFont state_ui_fonts[STATE_MAX_UI_FONTS] = {0};
 static size_t state_ui_font_count = 0;
 static StateUILabel state_ui_labels[STATE_MAX_UI_LABELS] = {0};
 static size_t state_ui_label_count = 0;
+static StateUISlider state_ui_sliders[STATE_MAX_UI_SLIDERS] = {0};
+static size_t state_ui_slider_count = 0;
 static yyjson_doc *state_template_documents[GAME_STATE_MAX_TEMPLATE_DOCUMENTS] = {0};
 static size_t state_template_document_count = 0;
 static bool state_template_camera_retained = false;
@@ -95,11 +103,13 @@ void game_state_runtime_reset(void) {
     memset(state_ui_buttons, 0, sizeof(state_ui_buttons));
     memset(state_ui_fonts, 0, sizeof(state_ui_fonts));
     memset(state_ui_labels, 0, sizeof(state_ui_labels));
+    memset(state_ui_sliders, 0, sizeof(state_ui_sliders));
     memset(state_template_documents, 0, sizeof(state_template_documents));
     state_animation_count = 0;
     state_ui_button_count = 0;
     state_ui_font_count = 0;
     state_ui_label_count = 0;
+    state_ui_slider_count = 0;
     state_template_document_count = 0;
     state_template_camera_retained = false;
 }
@@ -263,6 +273,18 @@ static StateUILabel *state_find_ui_label_internal(const char *name) {
     return NULL;
 }
 
+static StateUISlider *state_find_ui_slider_internal(const char *name) {
+    size_t i;
+
+    if(name == NULL) return NULL;
+    for(i = 0; i < state_ui_slider_count; i += 1) {
+        if(strcmp(state_ui_sliders[i].definition.name, name) == 0) {
+            return &state_ui_sliders[i];
+        }
+    }
+    return NULL;
+}
+
 UIButtonDefinitionResult game_state_find_ui_button(const char *name) {
     StateUIButton *button = state_find_ui_button_internal(name);
 
@@ -300,6 +322,18 @@ UILabelDefinitionResult game_state_find_ui_label(const char *name) {
         );
     }
     return ERROR_RESULT_MAKE_VALUE(UILabelDefinitionResult, label->definition);
+}
+
+UISliderDefinitionResult game_state_find_ui_slider(const char *name) {
+    StateUISlider *slider = state_find_ui_slider_internal(name);
+
+    if(slider == NULL) {
+        return ERROR_RESULT_MAKE_ERROR(
+            UISliderDefinitionResult,
+            ERROR_ENGINE_UI_DEFINITION_NOT_FOUND
+        );
+    }
+    return ERROR_RESULT_MAKE_VALUE(UISliderDefinitionResult, slider->definition);
 }
 
 static bool state_ui_bounds(yyjson_val *value, UIRect *bounds) {
@@ -381,6 +415,167 @@ static EngineResult state_load_ui_label_definition(yyjson_val *value) {
     return error_result_value(true);
 }
 
+static EngineResult state_load_ui_slider_definition(yyjson_val *value) {
+    yyjson_val *name;
+    yyjson_val *id;
+    yyjson_val *range;
+    yyjson_val *style;
+    yyjson_val *field;
+    yyjson_val *label;
+    yyjson_val *font;
+    yyjson_val *value_format;
+    yyjson_val *text_color;
+    UISliderDefinition definition = {0};
+    double number;
+    size_t i;
+
+    if(!yyjson_is_obj(value) || state_ui_slider_count >= STATE_MAX_UI_SLIDERS) {
+        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
+    name = yyjson_obj_get(value, "name");
+    id = yyjson_obj_get(value, "id");
+    range = yyjson_obj_get(value, "range");
+    style = yyjson_obj_get(value, "style");
+    label = yyjson_obj_get(value, "label");
+    font = yyjson_obj_get(value, "font");
+    value_format = yyjson_obj_get(value, "value_format");
+    text_color = yyjson_obj_get(value, "text_color");
+    definition.config = ui_default_slider_config();
+    if(!yyjson_is_str(name) || yyjson_get_len(name) == 0
+            || yyjson_get_len(name) >= UI_DEFINITION_NAME_MAX
+            || !yyjson_is_str(id) || yyjson_get_len(id) == 0
+            || yyjson_get_len(id) >= UI_ID_MAX
+            || !state_vec2(yyjson_obj_get(value, "center"), &definition.config.center)
+            || !state_number(value, "length", &number)
+            || !isfinite(number) || number <= 0.0
+            || (range != NULL && !yyjson_is_obj(range))
+            || (style != NULL && !yyjson_is_obj(style))
+            || (label != NULL && (!yyjson_is_str(label)
+                || yyjson_get_len(label) >= UI_LABEL_MAX))
+            || (value_format != NULL && (!yyjson_is_str(value_format)
+                || yyjson_get_len(value_format) >= UI_LABEL_MAX))
+            || state_find_ui_slider_internal(yyjson_get_str(name)) != NULL) {
+        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
+    definition.config.length = (float)number;
+    definition.text_color = (Color){255, 255, 255, 255};
+    if(label != NULL) memcpy(definition.label, yyjson_get_str(label), yyjson_get_len(label) + 1);
+    if(value_format != NULL) memcpy(definition.value_format,
+        yyjson_get_str(value_format), yyjson_get_len(value_format) + 1);
+    if(definition.label[0] != '\0' || definition.value_format[0] != '\0') {
+        if(!yyjson_is_str(font) || yyjson_get_len(font) == 0
+                || yyjson_get_len(font) >= UI_DEFINITION_NAME_MAX
+                || state_find_ui_font_internal(yyjson_get_str(font)) == NULL) {
+            return error_result_error(ERROR_ENGINE_STATE_INVALID);
+        }
+        memcpy(definition.font, yyjson_get_str(font), yyjson_get_len(font) + 1);
+    } else if(font != NULL) {
+        if(!yyjson_is_str(font) || yyjson_get_len(font) >= UI_DEFINITION_NAME_MAX) {
+            return error_result_error(ERROR_ENGINE_STATE_INVALID);
+        }
+        memcpy(definition.font, yyjson_get_str(font), yyjson_get_len(font) + 1);
+    }
+    if(text_color != NULL && !state_color(text_color, &definition.text_color)) {
+        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
+    field = yyjson_obj_get(value, "angle");
+    if(field != NULL) {
+        if(!yyjson_is_num(field) || !isfinite(yyjson_get_num(field))) {
+            return error_result_error(ERROR_ENGINE_STATE_INVALID);
+        }
+        definition.config.angle = (float)yyjson_get_num(field);
+    }
+    if(range != NULL) {
+        double min_value;
+        double max_value;
+        if(!state_number(range, "min", &min_value)
+                || !state_number(range, "max", &max_value)
+                || !isfinite(min_value) || !isfinite(max_value)
+                || min_value == max_value) {
+            return error_result_error(ERROR_ENGINE_STATE_INVALID);
+        }
+        definition.config.min_value = (float)min_value;
+        definition.config.max_value = (float)max_value;
+    }
+    field = yyjson_obj_get(value, "step");
+    if(field != NULL) {
+        if(!yyjson_is_num(field) || !isfinite(yyjson_get_num(field))
+                || yyjson_get_num(field) < 0.0) {
+            return error_result_error(ERROR_ENGINE_STATE_INVALID);
+        }
+        definition.config.step = (float)yyjson_get_num(field);
+    }
+    definition.initial_value = definition.config.min_value;
+    field = yyjson_obj_get(value, "initial_value");
+    if(field != NULL) {
+        float low = fminf(definition.config.min_value, definition.config.max_value);
+        float high = fmaxf(definition.config.min_value, definition.config.max_value);
+        if(!yyjson_is_num(field) || !isfinite(yyjson_get_num(field))
+                || yyjson_get_num(field) < low || yyjson_get_num(field) > high) {
+            return error_result_error(ERROR_ENGINE_STATE_INVALID);
+        }
+        definition.initial_value = (float)yyjson_get_num(field);
+    }
+    if(style != NULL) {
+#define LOAD_SLIDER_COLOR(Key, Field) do { \
+    yyjson_val *color_value = yyjson_obj_get(style, Key); \
+    if(color_value != NULL && !state_color(color_value, &definition.config.style.Field)) { \
+        return error_result_error(ERROR_ENGINE_STATE_INVALID); \
+    } \
+} while(0)
+        LOAD_SLIDER_COLOR("track", track);
+        LOAD_SLIDER_COLOR("fill", fill);
+        LOAD_SLIDER_COLOR("handle", handle);
+        LOAD_SLIDER_COLOR("handle_hovered", handle_hovered);
+        LOAD_SLIDER_COLOR("handle_pressed", handle_pressed);
+#undef LOAD_SLIDER_COLOR
+#define LOAD_SLIDER_SIZE(Key, Field) do { \
+    yyjson_val *size_value = yyjson_obj_get(style, Key); \
+    if(size_value != NULL) { \
+        if(!yyjson_is_num(size_value) || !isfinite(yyjson_get_num(size_value)) \
+                || yyjson_get_num(size_value) <= 0.0) { \
+            return error_result_error(ERROR_ENGINE_STATE_INVALID); \
+        } \
+        definition.config.style.Field = (float)yyjson_get_num(size_value); \
+    } \
+} while(0)
+        LOAD_SLIDER_SIZE("track_thickness", track_thickness);
+        LOAD_SLIDER_SIZE("handle_width", handle_width);
+        LOAD_SLIDER_SIZE("handle_height", handle_height);
+        field = yyjson_obj_get(style, "step_button_size");
+        if(field != NULL) {
+            if(!yyjson_is_num(field) || !isfinite(yyjson_get_num(field))
+                    || yyjson_get_num(field) < 0.0) {
+                return error_result_error(ERROR_ENGINE_STATE_INVALID);
+            }
+            definition.config.style.step_button_size = (float)yyjson_get_num(field);
+        }
+#undef LOAD_SLIDER_SIZE
+        field = yyjson_obj_get(style, "step_button_gap");
+        if(field != NULL) {
+            if(!yyjson_is_num(field) || !isfinite(yyjson_get_num(field))
+                    || yyjson_get_num(field) < 0.0) {
+                return error_result_error(ERROR_ENGINE_STATE_INVALID);
+            }
+            definition.config.style.step_button_gap = (float)yyjson_get_num(field);
+        }
+    }
+    for(i = 0; i < state_ui_slider_count; i += 1) {
+        if(strcmp(state_ui_sliders[i].definition.id, yyjson_get_str(id)) == 0) {
+            return error_result_error(ERROR_ENGINE_STATE_DUPLICATE_ASSET_DEFINITION);
+        }
+    }
+    for(i = 0; i < state_ui_button_count; i += 1) {
+        if(strcmp(state_ui_buttons[i].definition.id, yyjson_get_str(id)) == 0) {
+            return error_result_error(ERROR_ENGINE_STATE_DUPLICATE_ASSET_DEFINITION);
+        }
+    }
+    memcpy(definition.name, yyjson_get_str(name), yyjson_get_len(name) + 1);
+    memcpy(definition.id, yyjson_get_str(id), yyjson_get_len(id) + 1);
+    state_ui_sliders[state_ui_slider_count++].definition = definition;
+    return error_result_value(true);
+}
+
 static EngineResult state_load_ui_button_definition(yyjson_val *value) {
     yyjson_val *name;
     yyjson_val *id;
@@ -424,6 +619,11 @@ static EngineResult state_load_ui_button_definition(yyjson_val *value) {
     }
     for(i = 0; i < state_ui_button_count; i += 1) {
         if(strcmp(state_ui_buttons[i].definition.id, yyjson_get_str(id)) == 0) {
+            return error_result_error(ERROR_ENGINE_STATE_DUPLICATE_ASSET_DEFINITION);
+        }
+    }
+    for(i = 0; i < state_ui_slider_count; i += 1) {
+        if(strcmp(state_ui_sliders[i].definition.id, yyjson_get_str(id)) == 0) {
             return error_result_error(ERROR_ENGINE_STATE_DUPLICATE_ASSET_DEFINITION);
         }
     }
@@ -1377,6 +1577,7 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
     size_t initial_ui_button_count = state_ui_button_count;
     size_t initial_ui_font_count = state_ui_font_count;
     size_t initial_ui_label_count = state_ui_label_count;
+    size_t initial_ui_slider_count = state_ui_slider_count;
     EngineResult result = error_result_value(true);
 
     if(paths == NULL || path_count == 0 || path_count > MAX_ENTITIES) {
@@ -1435,6 +1636,9 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
         documents[document_index].ui_labels = ui == NULL
             ? NULL
             : yyjson_obj_get(ui, "labels");
+        documents[document_index].ui_sliders = ui == NULL
+            ? NULL
+            : yyjson_obj_get(ui, "sliders");
         assets = yyjson_obj_get(root, "assets");
         documents[document_index].animations = assets == NULL
             ? NULL
@@ -1454,6 +1658,8 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
                     && !yyjson_is_arr(documents[document_index].ui_fonts))
                 || (documents[document_index].ui_labels != NULL
                     && !yyjson_is_arr(documents[document_index].ui_labels))
+                || (documents[document_index].ui_sliders != NULL
+                    && !yyjson_is_arr(documents[document_index].ui_sliders))
                 || (documents[document_index].animations != NULL
                     && !yyjson_is_arr(documents[document_index].animations))) {
             result = error_result_error(ERROR_ENGINE_STATE_INVALID);
@@ -1481,6 +1687,22 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
             definition
         ) {
             result = state_load_ui_font_definition(definition);
+            if(result.kind == ERROR_RESULT_ERROR) goto cleanup;
+        }
+    }
+
+    for(document_index = 0; document_index < path_count; document_index += 1) {
+        yyjson_val *definition;
+        size_t slider_index;
+        size_t slider_count;
+        if(documents[document_index].ui_sliders == NULL) continue;
+        yyjson_arr_foreach(
+            documents[document_index].ui_sliders,
+            slider_index,
+            slider_count,
+            definition
+        ) {
+            result = state_load_ui_slider_definition(definition);
             if(result.kind == ERROR_RESULT_ERROR) goto cleanup;
         }
     }
@@ -1650,6 +1872,10 @@ cleanup:
         }
     }
     if(result.kind == ERROR_RESULT_ERROR) {
+        while(state_ui_slider_count > initial_ui_slider_count) {
+            state_ui_slider_count -= 1;
+            state_ui_sliders[state_ui_slider_count] = (StateUISlider){0};
+        }
         while(state_ui_label_count > initial_ui_label_count) {
             state_ui_label_count -= 1;
             state_ui_labels[state_ui_label_count] = (StateUILabel){0};
@@ -1780,6 +2006,51 @@ static yyjson_mut_val *state_write_ui_label(
     return definition;
 }
 
+static yyjson_mut_val *state_write_ui_slider(
+        yyjson_mut_doc *document,
+        const UISliderDefinition *slider
+) {
+    yyjson_mut_val *definition;
+    yyjson_mut_val *center;
+    yyjson_mut_val *range;
+    yyjson_mut_val *style;
+    if(document == NULL || slider == NULL) return NULL;
+    definition = yyjson_mut_obj(document);
+    center = yyjson_mut_obj(document);
+    range = yyjson_mut_obj(document);
+    style = yyjson_mut_obj(document);
+    if(definition == NULL || center == NULL || range == NULL || style == NULL) return NULL;
+    yyjson_mut_obj_add_strcpy(document, definition, "name", slider->name);
+    yyjson_mut_obj_add_strcpy(document, definition, "id", slider->id);
+    yyjson_mut_obj_add_strcpy(document, definition, "label", slider->label);
+    yyjson_mut_obj_add_strcpy(document, definition, "font", slider->font);
+    yyjson_mut_obj_add_strcpy(document, definition, "value_format", slider->value_format);
+    yyjson_mut_obj_add_val(document, definition, "text_color",
+        state_write_color(document, slider->text_color));
+    yyjson_mut_obj_add_real(document, center, "x", slider->config.center.x);
+    yyjson_mut_obj_add_real(document, center, "y", slider->config.center.y);
+    yyjson_mut_obj_add_val(document, definition, "center", center);
+    yyjson_mut_obj_add_real(document, definition, "length", slider->config.length);
+    yyjson_mut_obj_add_real(document, definition, "angle", slider->config.angle);
+    yyjson_mut_obj_add_real(document, range, "min", slider->config.min_value);
+    yyjson_mut_obj_add_real(document, range, "max", slider->config.max_value);
+    yyjson_mut_obj_add_val(document, definition, "range", range);
+    yyjson_mut_obj_add_real(document, definition, "step", slider->config.step);
+    yyjson_mut_obj_add_real(document, definition, "initial_value", slider->initial_value);
+    yyjson_mut_obj_add_val(document, style, "track", state_write_color(document, slider->config.style.track));
+    yyjson_mut_obj_add_val(document, style, "fill", state_write_color(document, slider->config.style.fill));
+    yyjson_mut_obj_add_val(document, style, "handle", state_write_color(document, slider->config.style.handle));
+    yyjson_mut_obj_add_val(document, style, "handle_hovered", state_write_color(document, slider->config.style.handle_hovered));
+    yyjson_mut_obj_add_val(document, style, "handle_pressed", state_write_color(document, slider->config.style.handle_pressed));
+    yyjson_mut_obj_add_real(document, style, "track_thickness", slider->config.style.track_thickness);
+    yyjson_mut_obj_add_real(document, style, "handle_width", slider->config.style.handle_width);
+    yyjson_mut_obj_add_real(document, style, "handle_height", slider->config.style.handle_height);
+    yyjson_mut_obj_add_real(document, style, "step_button_size", slider->config.style.step_button_size);
+    yyjson_mut_obj_add_real(document, style, "step_button_gap", slider->config.style.step_button_gap);
+    yyjson_mut_obj_add_val(document, definition, "style", style);
+    return definition;
+}
+
 static void state_write_named_reference(
         yyjson_mut_doc *document,
         yyjson_mut_val *components,
@@ -1802,6 +2073,7 @@ EngineResult game_state_save_file(const char *path) {
     yyjson_mut_val *ui_buttons;
     yyjson_mut_val *ui_fonts;
     yyjson_mut_val *ui_labels;
+    yyjson_mut_val *ui_sliders;
     uint32_t position;
     yyjson_write_err write_error;
     bool success;
@@ -1818,6 +2090,7 @@ EngineResult game_state_save_file(const char *path) {
     ui_buttons = yyjson_mut_arr(document);
     ui_fonts = yyjson_mut_arr(document);
     ui_labels = yyjson_mut_arr(document);
+    ui_sliders = yyjson_mut_arr(document);
     yyjson_mut_doc_set_root(document, root);
     yyjson_mut_obj_add_uint(document, root, "version", GAME_STATE_VERSION);
     yyjson_mut_obj_add_val(document, root, "groups", group_array);
@@ -1827,6 +2100,7 @@ EngineResult game_state_save_file(const char *path) {
     yyjson_mut_obj_add_val(document, ui, "buttons", ui_buttons);
     yyjson_mut_obj_add_val(document, ui, "fonts", ui_fonts);
     yyjson_mut_obj_add_val(document, ui, "labels", ui_labels);
+    yyjson_mut_obj_add_val(document, ui, "sliders", ui_sliders);
     yyjson_mut_obj_add_val(document, root, "ui", ui);
 
     {
@@ -1970,6 +2244,12 @@ EngineResult game_state_save_file(const char *path) {
         yyjson_mut_arr_add_val(
             ui_labels,
             state_write_ui_label(document, &state_ui_labels[position].definition)
+        );
+    }
+    for(position = 0; position < state_ui_slider_count; position += 1) {
+        yyjson_mut_arr_add_val(
+            ui_sliders,
+            state_write_ui_slider(document, &state_ui_sliders[position].definition)
         );
     }
 
@@ -2193,6 +2473,7 @@ EngineResult game_state_save_template_file(const char *path) {
     yyjson_mut_val *ui_buttons;
     yyjson_mut_val *ui_fonts;
     yyjson_mut_val *ui_labels;
+    yyjson_mut_val *ui_sliders;
     bool camera_copied = false;
     yyjson_write_err write_error;
     size_t document_index;
@@ -2214,10 +2495,11 @@ EngineResult game_state_save_template_file(const char *path) {
     ui_buttons = yyjson_mut_arr(document);
     ui_fonts = yyjson_mut_arr(document);
     ui_labels = yyjson_mut_arr(document);
+    ui_sliders = yyjson_mut_arr(document);
     if(root == NULL || groups == NULL || assets == NULL
             || animations == NULL || entities == NULL
             || ui == NULL || ui_buttons == NULL
-            || ui_fonts == NULL || ui_labels == NULL) {
+            || ui_fonts == NULL || ui_labels == NULL || ui_sliders == NULL) {
         yyjson_mut_doc_free(document);
         return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
     }
@@ -2230,6 +2512,7 @@ EngineResult game_state_save_template_file(const char *path) {
     yyjson_mut_obj_add_val(document, ui, "buttons", ui_buttons);
     yyjson_mut_obj_add_val(document, ui, "fonts", ui_fonts);
     yyjson_mut_obj_add_val(document, ui, "labels", ui_labels);
+    yyjson_mut_obj_add_val(document, ui, "sliders", ui_sliders);
     yyjson_mut_obj_add_val(document, root, "ui", ui);
 
     for(document_index = 0;
@@ -2278,6 +2561,13 @@ EngineResult game_state_save_template_file(const char *path) {
                 input_ui == NULL
                     ? NULL
                     : yyjson_obj_get(input_ui, "labels")
+            )
+            && state_template_copy_array(
+                document,
+                ui_sliders,
+                input_ui == NULL
+                    ? NULL
+                    : yyjson_obj_get(input_ui, "sliders")
             );
         if(success && input_camera != NULL) {
             yyjson_mut_val *output_camera;

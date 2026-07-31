@@ -73,6 +73,63 @@ typedef struct UILabelDefinition {
 
 ERROR_DECLARE_RESULT_TYPE(UILabelDefinitionResult, UILabelDefinition);
 
+/** Customizable visual state for an immediate-mode slider. */
+typedef struct UISliderStyle {
+    Color track;
+    Color fill;
+    Color handle;
+    Color handle_hovered;
+    Color handle_pressed;
+    float track_thickness;
+    float handle_width;
+    float handle_height;
+    float step_button_size;
+    float step_button_gap;
+} UISliderStyle;
+
+/** Runtime slider geometry and value range. */
+typedef struct UISliderConfig {
+    Position center;
+    float length;
+    /** Counterclockwise angle in logical screen-space radians. */
+    float angle;
+    float min_value;
+    float max_value;
+    /** Zero gives continuous movement; a positive value enables snapping. */
+    float step;
+    UISliderStyle style;
+} UISliderConfig;
+
+/** Optional, caller-owned text drawn with a slider. */
+typedef struct UISliderText {
+    const TextAsset *label;
+    const TextAsset *value;
+    const TextAsset *minus;
+    const TextAsset *plus;
+} UISliderText;
+
+/** Interaction and updated value returned by a slider. */
+typedef struct UISliderResult {
+    bool hovered;
+    bool pressed;
+    bool changed;
+    float value;
+} UISliderResult;
+
+/** Authored slider definition loaded independently of runtime value state. */
+typedef struct UISliderDefinition {
+    char name[UI_DEFINITION_NAME_MAX];
+    char id[UI_ID_MAX];
+    char label[UI_LABEL_MAX];
+    char font[UI_DEFINITION_NAME_MAX];
+    char value_format[UI_LABEL_MAX];
+    Color text_color;
+    UISliderConfig config;
+    float initial_value;
+} UISliderDefinition;
+
+ERROR_DECLARE_RESULT_TYPE(UISliderDefinitionResult, UISliderDefinition);
+
 /** Start a UI frame with pointer coordinates in logical screen space. */
 void ui_begin_frame(UIInput input);
 
@@ -102,5 +159,23 @@ void ui_end_frame(void);
 
 /** Return the engine default button colors. */
 UIButtonStyle ui_default_button_style(void);
+
+/** Return default slider geometry, 0..1 range, and colors. */
+UISliderConfig ui_default_slider_config(void);
+
+/** Draw and update a slider while leaving its value owned by the caller. */
+UISliderResult ui_slider(
+    const char *id,
+    float value,
+    const UISliderConfig *config
+);
+
+/** Draw and update a slider with optional label, value, and -/+ text assets. */
+UISliderResult ui_slider_with_text(
+    const char *id,
+    float value,
+    const UISliderConfig *config,
+    const UISliderText *text
+);
 
 #endif

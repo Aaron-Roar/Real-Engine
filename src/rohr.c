@@ -60,6 +60,7 @@ EngineResult rohr_game_state_load_files(const char *const *paths, size_t path_co
 UIButtonDefinitionResult rohr_game_state_find_ui_button(const char *name) { return game_state_find_ui_button(name); }
 UIFontDefinitionResult rohr_game_state_find_ui_font(const char *name) { return game_state_find_ui_font(name); }
 UILabelDefinitionResult rohr_game_state_find_ui_label(const char *name) { return game_state_find_ui_label(name); }
+UISliderDefinitionResult rohr_game_state_find_ui_slider(const char *name) { return game_state_find_ui_slider(name); }
 EngineResult rohr_game_state_save_file(const char *path) { return game_state_save_file(path); }
 EngineResult rohr_game_state_save_template_file(const char *path) { return game_state_save_template_file(path); }
 EngineResult rohr_entity_delete(Entity entity) { return entity_delete(entity); }
@@ -187,6 +188,7 @@ void rohr_graphics_end(void) { graphics_end(); }
 bool rohr_graphics_poll_events(SDL_Event *event) { return graphics_poll_events(event); }
 void rohr_graphics_draw_background(Color color) { graphics_draw_background(color); }
 bool rohr_graphics_draw_screen_rect(float x, float y, float width, float height, Color color) { return graphics_draw_screen_rect(x, y, width, height, color); }
+bool rohr_graphics_draw_screen_quad(Position center, float width, float height, float angle, Color color) { return graphics_draw_screen_quad(center, width, height, angle, color); }
 void rohr_graphics_show(void) { graphics_show(); }
 void rohr_graphics_draw_hit_box(Entity entity, Fill fill_type) { graphics_draw_hit_box(entity, fill_type); }
 void rohr_graphics_draw_hit_box_colored(Entity entity, Fill fill_type, Color color) { graphics_draw_hit_box_colored(entity, fill_type, color); }
@@ -299,3 +301,6 @@ void rohr_ui_button_disabled(UIRect bounds, const UIButtonStyle *style) { ui_but
 bool rohr_ui_pointer_consumed(void) { return ui_pointer_consumed(); }
 void rohr_ui_end_frame(void) { ui_end_frame(); }
 UIButtonStyle rohr_ui_default_button_style(void) { return ui_default_button_style(); }
+UISliderConfig rohr_ui_default_slider_config(void) { return ui_default_slider_config(); }
+UISliderResult rohr_ui_slider(const char *id, float value, const UISliderConfig *config) { return ui_slider(id, value, config); }
+UISliderResult rohr_ui_slider_with_text(const char *id, float value, const UISliderConfig *config, const UISliderText *text) { return ui_slider_with_text(id, value, config, text); }

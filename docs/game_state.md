@@ -90,6 +90,61 @@ the definition, creates any desired text asset, calls `ui_button()` while the
 menu is active, and handles the returned interaction result. Runtime and
 template saves preserve loaded font, label, and button definitions.
 
+Sliders are authored independently from their runtime values:
+
+```json
+"sliders": [{
+  "name": "volume_slider",
+  "id": "settings.volume",
+  "center": {"x": 320, "y": 280},
+  "length": 220,
+  "angle": 0.25,
+  "range": {"min": -100, "max": 100},
+  "step": 5,
+  "initial_value": 0,
+  "label": "Volume",
+  "font": "menu_font",
+  "value_format": "%.0f%%",
+  "text_color": {"red": 240, "green": 244, "blue": 250, "alpha": 255},
+  "style": {
+    "track": {"red": 50, "green": 58, "blue": 72, "alpha": 255},
+    "fill": {"red": 100, "green": 140, "blue": 230, "alpha": 255},
+    "track_thickness": 10,
+    "handle_width": 18,
+    "handle_height": 32
+  }
+}]
+```
+
+`center` and positive `length` are required. `angle` is optional and defaults
+to zero; it is measured counterclockwise in logical screen-space radians. The
+range defaults to `0..1` when omitted. Explicit endpoints may be positive,
+negative, or descending, but cannot be equal. `initial_value` defaults to the
+first range endpoint and must fall between the two endpoints.
+
+`step` is optional and defaults to zero, which gives continuous movement. A
+positive step snaps values relative to the first range endpoint. Step controls
+are implied by `style.step_button_size`: omission or zero disables them, while
+a positive size enables them when `step` is positive. The minus control is
+placed at the numerically lower end and the plus control at the higher end.
+Their screen sides therefore reverse automatically for a descending range.
+
+`label`, `font`, `value_format`, and `text_color` describe optional slider
+text. A non-empty label or value format requires a valid named font. Text
+assets remain owned by the game: pass prepared label/value and optional `-`/`+`
+assets through `ui_slider_with_text()`. Recreate the formatted value asset only
+when `UISliderResult.changed` is true. `NULL` assets omit the corresponding
+automatic text.
+
+Slider colors and sizes are optional and inherit the engine defaults. Supported
+colors are `track`, `fill`, `handle`, `handle_hovered`, and `handle_pressed`.
+Supported positive sizes are `track_thickness`, `handle_width`,
+`handle_height`, and `step_button_size`; `step_button_size` defaults to zero,
+and `step_button_gap` may always be zero. The game
+retrieves definitions with
+`game_state_find_ui_slider()`, retains the current value, and passes that value
+back to `ui_slider()` each frame.
+
 An entity description may use `count` to create multiple copies from one
 component prototype. The first copy keeps the base name and later copies use
 `_1`, `_2`, and so on. If a generated name already exists, the loader advances

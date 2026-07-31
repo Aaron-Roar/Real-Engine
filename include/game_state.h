@@ -36,6 +36,9 @@ UIFontDefinitionResult game_state_find_ui_font(const char *name);
 /** Find a standalone UI label definition loaded from JSON by name. */
 UILabelDefinitionResult game_state_find_ui_label(const char *name);
 
+/** Find a UI slider definition loaded from JSON by name. */
+UISliderDefinitionResult game_state_find_ui_slider(const char *name);
+
 /**
  * Save all named live entities to one JSON state file.
  *

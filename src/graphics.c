@@ -719,6 +719,48 @@ bool graphics_draw_screen_rect(float x, float y, float width, float height, Colo
     return SDL_RenderFillRect(sdl_renderer, &rect);
 }
 
+bool graphics_draw_screen_quad(
+    Position center,
+    float width,
+    float height,
+    float angle,
+    Color color
+) {
+    SDL_Vertex vertices[4] = {0};
+    const int indices[6] = {0, 1, 2, 0, 2, 3};
+    float half_width = width * 0.5f;
+    float half_height = height * 0.5f;
+    Vec2D axis = {cosf(angle), -sinf(angle)};
+    Vec2D perpendicular = {sinf(angle), cosf(angle)};
+    const float signs[4][2] = {
+        {-1.0f, -1.0f},
+        { 1.0f, -1.0f},
+        { 1.0f,  1.0f},
+        {-1.0f,  1.0f},
+    };
+    int i;
+
+    if(sdl_renderer == NULL || width <= 0.0f || height <= 0.0f
+            || !isfinite(angle)) {
+        return false;
+    }
+    for(i = 0; i < 4; i += 1) {
+        vertices[i].position.x = center.x
+            + axis.x * half_width * signs[i][0]
+            + perpendicular.x * half_height * signs[i][1];
+        vertices[i].position.y = center.y
+            + axis.y * half_width * signs[i][0]
+            + perpendicular.y * half_height * signs[i][1];
+        vertices[i].color = (SDL_FColor){
+            color.red / 255.0f,
+            color.green / 255.0f,
+            color.blue / 255.0f,
+            color.alpha / 255.0f,
+        };
+    }
+    return SDL_RenderGeometry(sdl_renderer, NULL, vertices, 4, indices, 6);
+}
+
 void graphics_draw_rect(Shape rect, Position pos) {
     SDL_FRect sdl_rect;
     (void)rect;

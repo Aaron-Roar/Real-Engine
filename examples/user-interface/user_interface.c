@@ -13,11 +13,17 @@ int main(void) {
     TextAsset settings_label = {0};
     TextAsset quit_label = {0};
     TextAsset description = {0};
+    TextAsset slider_label = {0};
+    TextAsset slider_value_label = {0};
+    TextAsset slider_minus = {0};
+    TextAsset slider_plus = {0};
     UIFontDefinition font_definition;
     UILabelDefinition title_definition;
     UILabelDefinition play_definition;
     UILabelDefinition description_definition;
     UIButtonDefinition settings_button;
+    UISliderDefinition value_slider;
+    float slider_value;
 
     {
         EngineResult init_result = rohr_engine_init();
@@ -81,6 +87,15 @@ int main(void) {
             goto fail;
         }
         description_definition = description_result.result.value;
+
+        UISliderDefinitionResult slider_result =
+            rohr_game_state_find_ui_slider("angled_value_slider");
+        if(rohr_error_check(slider_result)) {
+            PRINT_ENGINE_ERROR(slider_result);
+            goto fail;
+        }
+        value_slider = slider_result.result.value;
+        slider_value = value_slider.initial_value;
     }
     {
         FontAssetResult font_result = rohr_graphics_load_font((FontDescriptor){
@@ -147,6 +162,41 @@ int main(void) {
             goto fail;
         }
         description = description_result.result.value;
+
+        TextAssetResult slider_label_result = rohr_graphics_create_text(
+            &font, value_slider.label, value_slider.text_color
+        );
+        if(rohr_error_check(slider_label_result)) {
+            PRINT_ENGINE_ERROR(slider_label_result);
+            goto fail;
+        }
+        slider_label = slider_label_result.result.value;
+        TextAssetResult minus_result = rohr_graphics_create_text(
+            &font, "-", value_slider.text_color
+        );
+        if(rohr_error_check(minus_result)) {
+            PRINT_ENGINE_ERROR(minus_result);
+            goto fail;
+        }
+        slider_minus = minus_result.result.value;
+        TextAssetResult plus_result = rohr_graphics_create_text(
+            &font, "+", value_slider.text_color
+        );
+        if(rohr_error_check(plus_result)) {
+            PRINT_ENGINE_ERROR(plus_result);
+            goto fail;
+        }
+        slider_plus = plus_result.result.value;
+        char value_text[UI_LABEL_MAX];
+        snprintf(value_text, sizeof(value_text), value_slider.value_format, slider_value);
+        TextAssetResult value_result = rohr_graphics_create_text(
+            &font, value_text, value_slider.text_color
+        );
+        if(rohr_error_check(value_result)) {
+            PRINT_ENGINE_ERROR(value_result);
+            goto fail;
+        }
+        slider_value_label = value_result.result.value;
     }
 
     while(running) {
@@ -185,6 +235,32 @@ int main(void) {
             &description,
             description_definition.bounds
         );
+        UISliderResult slider = rohr_ui_slider_with_text(
+            value_slider.id,
+            slider_value,
+            &value_slider.config,
+            &(UISliderText){
+                .label = &slider_label,
+                .value = &slider_value_label,
+                .minus = &slider_minus,
+                .plus = &slider_plus,
+            }
+        );
+        slider_value = slider.value;
+        if(slider.changed) {
+            char value_text[UI_LABEL_MAX];
+            snprintf(value_text, sizeof(value_text), value_slider.value_format, slider_value);
+            rohr_graphics_destroy_text(&slider_value_label);
+            TextAssetResult value_result = rohr_graphics_create_text(
+                &font, value_text, value_slider.text_color
+            );
+            if(rohr_error_check(value_result)) {
+                PRINT_ENGINE_ERROR(value_result);
+                running = false;
+            } else {
+                slider_value_label = value_result.result.value;
+            }
+        }
 
         if(play.clicked) printf("Play clicked\n");
         if(settings.clicked) printf("Settings clicked\n");
@@ -194,6 +270,10 @@ int main(void) {
         rohr_graphics_show();
     }
 
+    rohr_graphics_destroy_text(&slider_plus);
+    rohr_graphics_destroy_text(&slider_minus);
+    rohr_graphics_destroy_text(&slider_value_label);
+    rohr_graphics_destroy_text(&slider_label);
     rohr_graphics_destroy_text(&description);
     rohr_graphics_destroy_text(&quit_label);
     rohr_graphics_destroy_text(&settings_label);
@@ -205,6 +285,10 @@ int main(void) {
     return 0;
 
 fail:
+    rohr_graphics_destroy_text(&slider_plus);
+    rohr_graphics_destroy_text(&slider_minus);
+    rohr_graphics_destroy_text(&slider_value_label);
+    rohr_graphics_destroy_text(&slider_label);
     rohr_graphics_destroy_text(&description);
     rohr_graphics_destroy_text(&quit_label);
     rohr_graphics_destroy_text(&settings_label);
