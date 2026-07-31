@@ -58,6 +58,8 @@ EntityNameResult rohr_entity_get_name(Entity entity) { return entity_get_name(en
 EngineResult rohr_game_state_load_file(const char *path) { return game_state_load_file(path); }
 EngineResult rohr_game_state_load_files(const char *const *paths, size_t path_count) { return game_state_load_files(paths, path_count); }
 UIButtonDefinitionResult rohr_game_state_find_ui_button(const char *name) { return game_state_find_ui_button(name); }
+UIFontDefinitionResult rohr_game_state_find_ui_font(const char *name) { return game_state_find_ui_font(name); }
+UILabelDefinitionResult rohr_game_state_find_ui_label(const char *name) { return game_state_find_ui_label(name); }
 EngineResult rohr_game_state_save_file(const char *path) { return game_state_save_file(path); }
 EngineResult rohr_game_state_save_template_file(const char *path) { return game_state_save_template_file(path); }
 EngineResult rohr_entity_delete(Entity entity) { return entity_delete(entity); }

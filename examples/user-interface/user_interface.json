@@ -2,11 +2,43 @@
   "version": 1,
   "entities": [],
   "ui": {
+    "fonts": [
+      {
+        "name": "menu_font",
+        "file": "examples/user-interface/JetBrainsMono-BoldItalic.ttf",
+        "point_size": 24.0
+      }
+    ],
+    "labels": [
+      {
+        "name": "example_title",
+        "text": "Rohr Engine UI Example",
+        "font": "menu_font",
+        "color": {"red": 240, "green": 244, "blue": 250, "alpha": 255},
+        "bounds": {"x": 0.0, "y": 30.0, "width": 640.0, "height": 50.0}
+      },
+      {
+        "name": "play_label",
+        "text": "Play",
+        "font": "menu_font",
+        "color": {"red": 240, "green": 244, "blue": 250, "alpha": 255},
+        "bounds": {"x": 220.0, "y": 130.0, "width": 200.0, "height": 55.0}
+      },
+      {
+        "name": "example_description",
+        "text": "Buttons support hover, press, click, and optional labels.",
+        "font": "menu_font",
+        "color": {"red": 170, "green": 180, "blue": 195, "alpha": 255},
+        "bounds": {"x": 0.0, "y": 405.0, "width": 640.0, "height": 45.0}
+      }
+    ],
     "buttons": [
       {
         "name": "settings_button",
         "id": "main_menu.settings",
         "label": "Settings",
+        "font": "menu_font",
+        "text_color": {"red": 240, "green": 244, "blue": 250, "alpha": 255},
         "bounds": {
           "x": 220.0,
           "y": 205.0,

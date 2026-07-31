@@ -8,6 +8,7 @@
 #define UI_DEFINITION_NAME_MAX 64
 #define UI_ID_MAX 128
 #define UI_LABEL_MAX 128
+#define UI_FONT_PATH_MAX 512
 
 /** Axis-aligned rectangle in logical screen coordinates. */
 typedef struct UIRect {
@@ -43,12 +44,34 @@ typedef struct UIButtonDefinition {
     char name[UI_DEFINITION_NAME_MAX];
     char id[UI_ID_MAX];
     char label[UI_LABEL_MAX];
+    char font[UI_DEFINITION_NAME_MAX];
+    Color text_color;
     UIRect bounds;
     UIButtonStyle style;
 } UIButtonDefinition;
 
 /** Result type for functions that return a button definition. */
 ERROR_DECLARE_RESULT_TYPE(UIButtonDefinitionResult, UIButtonDefinition);
+
+/** Authored font settings. The game owns the loaded FontAsset. */
+typedef struct UIFontDefinition {
+    char name[UI_DEFINITION_NAME_MAX];
+    char file[UI_FONT_PATH_MAX];
+    float point_size;
+} UIFontDefinition;
+
+ERROR_DECLARE_RESULT_TYPE(UIFontDefinitionResult, UIFontDefinition);
+
+/** Authored standalone label data in logical screen coordinates. */
+typedef struct UILabelDefinition {
+    char name[UI_DEFINITION_NAME_MAX];
+    char text[UI_LABEL_MAX];
+    char font[UI_DEFINITION_NAME_MAX];
+    Color color;
+    UIRect bounds;
+} UILabelDefinition;
+
+ERROR_DECLARE_RESULT_TYPE(UILabelDefinitionResult, UILabelDefinition);
 
 /** Start a UI frame with pointer coordinates in logical screen space. */
 void ui_begin_frame(UIInput input);

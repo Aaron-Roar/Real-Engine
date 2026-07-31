@@ -4,9 +4,6 @@
 #define PRINT_ENGINE_ERROR(engine_result) \
     fprintf(stderr, "%s\n", rohr_error_default_message((engine_result).result.error))
 
-static const char *ui_font_path =
-    "examples/user-interface/JetBrainsMono-BoldItalic.ttf";
-
 int main(void) {
     MouseState mouse = {0};
     bool running = true;
@@ -16,6 +13,10 @@ int main(void) {
     TextAsset settings_label = {0};
     TextAsset quit_label = {0};
     TextAsset description = {0};
+    UIFontDefinition font_definition;
+    UILabelDefinition title_definition;
+    UILabelDefinition play_definition;
+    UILabelDefinition description_definition;
     UIButtonDefinition settings_button;
 
     {
@@ -48,11 +49,43 @@ int main(void) {
             goto fail;
         }
         settings_button = settings_result.result.value;
+
+        UIFontDefinitionResult font_result =
+            rohr_game_state_find_ui_font("menu_font");
+        if(rohr_error_check(font_result)) {
+            PRINT_ENGINE_ERROR(font_result);
+            goto fail;
+        }
+        font_definition = font_result.result.value;
+
+        UILabelDefinitionResult title_result =
+            rohr_game_state_find_ui_label("example_title");
+        if(rohr_error_check(title_result)) {
+            PRINT_ENGINE_ERROR(title_result);
+            goto fail;
+        }
+        title_definition = title_result.result.value;
+
+        UILabelDefinitionResult play_result =
+            rohr_game_state_find_ui_label("play_label");
+        if(rohr_error_check(play_result)) {
+            PRINT_ENGINE_ERROR(play_result);
+            goto fail;
+        }
+        play_definition = play_result.result.value;
+
+        UILabelDefinitionResult description_result =
+            rohr_game_state_find_ui_label("example_description");
+        if(rohr_error_check(description_result)) {
+            PRINT_ENGINE_ERROR(description_result);
+            goto fail;
+        }
+        description_definition = description_result.result.value;
     }
     {
         FontAssetResult font_result = rohr_graphics_load_font((FontDescriptor){
-            .file = ui_font_path,
-            .point_size = 24.0f,
+            .file = font_definition.file,
+            .point_size = font_definition.point_size,
         });
         if(rohr_error_check(font_result)) {
             PRINT_ENGINE_ERROR(font_result);
@@ -62,8 +95,8 @@ int main(void) {
 
         TextAssetResult title_result = rohr_graphics_create_text(
             &font,
-            "Rohr Engine UI Example",
-            (Color){240, 244, 250, 255}
+            title_definition.text,
+            title_definition.color
         );
         if(rohr_error_check(title_result)) {
             PRINT_ENGINE_ERROR(title_result);
@@ -73,8 +106,8 @@ int main(void) {
 
         TextAssetResult play_result = rohr_graphics_create_text(
             &font,
-            "Play",
-            (Color){240, 244, 250, 255}
+            play_definition.text,
+            play_definition.color
         );
         if(rohr_error_check(play_result)) {
             PRINT_ENGINE_ERROR(play_result);
@@ -85,7 +118,7 @@ int main(void) {
         TextAssetResult settings_result = rohr_graphics_create_text(
             &font,
             settings_button.label,
-            (Color){240, 244, 250, 255}
+            settings_button.text_color
         );
         if(rohr_error_check(settings_result)) {
             PRINT_ENGINE_ERROR(settings_result);
@@ -106,8 +139,8 @@ int main(void) {
 
         TextAssetResult description_result = rohr_graphics_create_text(
             &font,
-            "Buttons support hover, press, click, and optional labels.",
-            (Color){170, 180, 195, 255}
+            description_definition.text,
+            description_definition.color
         );
         if(rohr_error_check(description_result)) {
             PRINT_ENGINE_ERROR(description_result);
@@ -134,9 +167,9 @@ int main(void) {
             .primary_button = mouse.button_states[MOUSE_BUTTON_LEFT],
         });
 
-        rohr_ui_label(&title, (UIRect){0.0f, 30.0f, WINDOW_WIDTH, 50.0f});
+        rohr_ui_label(&title, title_definition.bounds);
 
-        UIRect play_bounds = {220.0f, 130.0f, 200.0f, 55.0f};
+        UIRect play_bounds = play_definition.bounds;
         UIButtonResult play = rohr_ui_button("main_menu.play", NULL, play_bounds, NULL);
         UIButtonResult settings = rohr_ui_button(
             settings_button.id,
@@ -150,7 +183,7 @@ int main(void) {
         rohr_ui_label(&play_label, play_bounds);
         rohr_ui_label(
             &description,
-            (UIRect){0.0f, 405.0f, WINDOW_WIDTH, 45.0f}
+            description_definition.bounds
         );
 
         if(play.clicked) printf("Play clicked\n");

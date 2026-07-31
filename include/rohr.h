@@ -259,6 +259,12 @@ EngineResult rohr_game_state_load_files(const char *const *paths, size_t path_co
 /** @brief Finds a UI button definition loaded from JSON. */
 UIButtonDefinitionResult rohr_game_state_find_ui_button(const char *name);
 
+/** @brief Finds a UI font definition loaded from JSON. */
+UIFontDefinitionResult rohr_game_state_find_ui_font(const char *name);
+
+/** @brief Finds a standalone UI label definition loaded from JSON. */
+UILabelDefinitionResult rohr_game_state_find_ui_label(const char *name);
+
 /** Saves all named live entities to a JSON game-state file. */
 EngineResult rohr_game_state_save_file(const char *path);
 

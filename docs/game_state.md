@@ -28,14 +28,29 @@ loader accepts JSON comments and trailing commas for handcrafted files.
 
 ## User interface definitions
 
-Immediate-mode button layout and styling can be authored under `ui.buttons`:
+Fonts, standalone labels, and immediate-mode buttons can be authored under
+`ui`:
 
 ```json
 "ui": {
+  "fonts": [{
+    "name": "menu_font",
+    "file": "assets/fonts/menu.ttf",
+    "point_size": 24
+  }],
+  "labels": [{
+    "name": "menu_title",
+    "text": "Main Menu",
+    "font": "menu_font",
+    "color": {"red": 255, "green": 255, "blue": 255, "alpha": 255},
+    "bounds": {"x": 0, "y": 30, "width": 640, "height": 50}
+  }],
   "buttons": [{
     "name": "settings_button",
     "id": "main_menu.settings",
     "label": "Settings",
+    "font": "menu_font",
+    "text_color": {"red": 255, "green": 255, "blue": 255, "alpha": 255},
     "bounds": {
       "x": 220,
       "y": 205,
@@ -49,10 +64,21 @@ Immediate-mode button layout and styling can be authored under `ui.buttons`:
 }
 ```
 
-`name` identifies the authored definition for
+Font definitions provide a unique name, font-file path, and positive point
+size. They are retrieved with `game_state_find_ui_font()`; the game explicitly
+loads and owns the resulting `FontAsset`.
+
+Standalone labels have a unique name, text, named font, color, and bounds. They
+are retrieved with `game_state_find_ui_label()`. This data is independent from
+buttons and can be drawn with `ui_label()` after the game creates its text
+asset.
+
+Button `name` identifies the authored definition for
 `game_state_find_ui_button()`. `id` is the stable runtime interaction ID and
-must also be unique. `label` is optional and defaults to an empty string.
-Bounds use logical screen coordinates and require positive width and height.
+must also be unique. `label` is optional and defaults to an empty string. A
+non-empty button label requires a valid named `font`; `text_color` is optional
+and defaults to opaque white. Bounds use logical screen coordinates and require
+positive width and height.
 
 The `style` object and each of its `idle`, `hovered`, `pressed`, and `disabled`
 colors are optional. Omitted colors use the default button style. Each supplied
@@ -62,7 +88,7 @@ color requires unsigned `red`, `green`, `blue`, and `alpha` values from 0 to
 Loading a definition does not draw it or handle its click. The game retrieves
 the definition, creates any desired text asset, calls `ui_button()` while the
 menu is active, and handles the returned interaction result. Runtime and
-template saves preserve loaded button definitions.
+template saves preserve loaded font, label, and button definitions.
 
 An entity description may use `count` to create multiple copies from one
 component prototype. The first copy keeps the base name and later copies use

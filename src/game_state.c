@@ -15,6 +15,8 @@
 
 #define STATE_MAX_ANIMATIONS MAX_TEXTURES
 #define STATE_MAX_UI_BUTTONS 256
+#define STATE_MAX_UI_FONTS 64
+#define STATE_MAX_UI_LABELS 256
 #define STATE_ASSET_NAME_MAX 64
 #define STATE_ASSET_PATH_MAX 512
 
@@ -24,6 +26,8 @@ typedef struct StateDocument {
     yyjson_val *groups;
     yyjson_val *animations;
     yyjson_val *ui_buttons;
+    yyjson_val *ui_fonts;
+    yyjson_val *ui_labels;
     yyjson_val *camera;
 } StateDocument;
 
@@ -54,11 +58,23 @@ typedef struct StateUIButton {
     UIButtonDefinition definition;
 } StateUIButton;
 
+typedef struct StateUIFont {
+    UIFontDefinition definition;
+} StateUIFont;
+
+typedef struct StateUILabel {
+    UILabelDefinition definition;
+} StateUILabel;
+
 static StateAnimation state_animations[STATE_MAX_ANIMATIONS] = {0};
 static size_t state_animation_count = 0;
 static StateSpriteReference state_sprite_references[MAX_ENTITIES] = {0};
 static StateUIButton state_ui_buttons[STATE_MAX_UI_BUTTONS] = {0};
 static size_t state_ui_button_count = 0;
+static StateUIFont state_ui_fonts[STATE_MAX_UI_FONTS] = {0};
+static size_t state_ui_font_count = 0;
+static StateUILabel state_ui_labels[STATE_MAX_UI_LABELS] = {0};
+static size_t state_ui_label_count = 0;
 static yyjson_doc *state_template_documents[GAME_STATE_MAX_TEMPLATE_DOCUMENTS] = {0};
 static size_t state_template_document_count = 0;
 static bool state_template_camera_retained = false;
@@ -77,9 +93,13 @@ void game_state_runtime_reset(void) {
     memset(state_animations, 0, sizeof(state_animations));
     memset(state_sprite_references, 0, sizeof(state_sprite_references));
     memset(state_ui_buttons, 0, sizeof(state_ui_buttons));
+    memset(state_ui_fonts, 0, sizeof(state_ui_fonts));
+    memset(state_ui_labels, 0, sizeof(state_ui_labels));
     memset(state_template_documents, 0, sizeof(state_template_documents));
     state_animation_count = 0;
     state_ui_button_count = 0;
+    state_ui_font_count = 0;
+    state_ui_label_count = 0;
     state_template_document_count = 0;
     state_template_camera_retained = false;
 }
@@ -219,6 +239,30 @@ static StateUIButton *state_find_ui_button_internal(const char *name) {
     return NULL;
 }
 
+static StateUIFont *state_find_ui_font_internal(const char *name) {
+    size_t i;
+
+    if(name == NULL) return NULL;
+    for(i = 0; i < state_ui_font_count; i += 1) {
+        if(strcmp(state_ui_fonts[i].definition.name, name) == 0) {
+            return &state_ui_fonts[i];
+        }
+    }
+    return NULL;
+}
+
+static StateUILabel *state_find_ui_label_internal(const char *name) {
+    size_t i;
+
+    if(name == NULL) return NULL;
+    for(i = 0; i < state_ui_label_count; i += 1) {
+        if(strcmp(state_ui_labels[i].definition.name, name) == 0) {
+            return &state_ui_labels[i];
+        }
+    }
+    return NULL;
+}
+
 UIButtonDefinitionResult game_state_find_ui_button(const char *name) {
     StateUIButton *button = state_find_ui_button_internal(name);
 
@@ -234,17 +278,118 @@ UIButtonDefinitionResult game_state_find_ui_button(const char *name) {
     );
 }
 
-static EngineResult state_load_ui_button_definition(yyjson_val *value) {
-    yyjson_val *name;
-    yyjson_val *id;
-    yyjson_val *label;
-    yyjson_val *bounds;
-    yyjson_val *style;
-    UIButtonDefinition definition = {0};
+UIFontDefinitionResult game_state_find_ui_font(const char *name) {
+    StateUIFont *font = state_find_ui_font_internal(name);
+
+    if(font == NULL) {
+        return ERROR_RESULT_MAKE_ERROR(
+            UIFontDefinitionResult,
+            ERROR_ENGINE_UI_DEFINITION_NOT_FOUND
+        );
+    }
+    return ERROR_RESULT_MAKE_VALUE(UIFontDefinitionResult, font->definition);
+}
+
+UILabelDefinitionResult game_state_find_ui_label(const char *name) {
+    StateUILabel *label = state_find_ui_label_internal(name);
+
+    if(label == NULL) {
+        return ERROR_RESULT_MAKE_ERROR(
+            UILabelDefinitionResult,
+            ERROR_ENGINE_UI_DEFINITION_NOT_FOUND
+        );
+    }
+    return ERROR_RESULT_MAKE_VALUE(UILabelDefinitionResult, label->definition);
+}
+
+static bool state_ui_bounds(yyjson_val *value, UIRect *bounds) {
     double x;
     double y;
     double width;
     double height;
+
+    if(!yyjson_is_obj(value) || bounds == NULL
+            || !state_number(value, "x", &x)
+            || !state_number(value, "y", &y)
+            || !state_number(value, "width", &width)
+            || !state_number(value, "height", &height)
+            || !isfinite(x) || !isfinite(y)
+            || !isfinite(width) || width <= 0.0
+            || !isfinite(height) || height <= 0.0) {
+        return false;
+    }
+    *bounds = (UIRect){(float)x, (float)y, (float)width, (float)height};
+    return true;
+}
+
+static EngineResult state_load_ui_font_definition(yyjson_val *value) {
+    yyjson_val *name;
+    yyjson_val *file;
+    double point_size;
+    UIFontDefinition definition = {0};
+
+    if(!yyjson_is_obj(value) || state_ui_font_count >= STATE_MAX_UI_FONTS) {
+        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
+    name = yyjson_obj_get(value, "name");
+    file = yyjson_obj_get(value, "file");
+    if(!yyjson_is_str(name) || yyjson_get_len(name) == 0
+            || yyjson_get_len(name) >= UI_DEFINITION_NAME_MAX
+            || !yyjson_is_str(file) || yyjson_get_len(file) == 0
+            || yyjson_get_len(file) >= UI_FONT_PATH_MAX
+            || !state_number(value, "point_size", &point_size)
+            || !isfinite(point_size) || point_size <= 0.0
+            || state_find_ui_font_internal(yyjson_get_str(name)) != NULL) {
+        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
+    memcpy(definition.name, yyjson_get_str(name), yyjson_get_len(name) + 1);
+    memcpy(definition.file, yyjson_get_str(file), yyjson_get_len(file) + 1);
+    definition.point_size = (float)point_size;
+    state_ui_fonts[state_ui_font_count++].definition = definition;
+    return error_result_value(true);
+}
+
+static EngineResult state_load_ui_label_definition(yyjson_val *value) {
+    yyjson_val *name;
+    yyjson_val *text;
+    yyjson_val *font;
+    yyjson_val *color;
+    UILabelDefinition definition = {0};
+
+    if(!yyjson_is_obj(value) || state_ui_label_count >= STATE_MAX_UI_LABELS) {
+        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
+    name = yyjson_obj_get(value, "name");
+    text = yyjson_obj_get(value, "text");
+    font = yyjson_obj_get(value, "font");
+    color = yyjson_obj_get(value, "color");
+    if(!yyjson_is_str(name) || yyjson_get_len(name) == 0
+            || yyjson_get_len(name) >= UI_DEFINITION_NAME_MAX
+            || !yyjson_is_str(text) || yyjson_get_len(text) >= UI_LABEL_MAX
+            || !yyjson_is_str(font) || yyjson_get_len(font) == 0
+            || yyjson_get_len(font) >= UI_DEFINITION_NAME_MAX
+            || state_find_ui_font_internal(yyjson_get_str(font)) == NULL
+            || !state_color(color, &definition.color)
+            || !state_ui_bounds(yyjson_obj_get(value, "bounds"), &definition.bounds)
+            || state_find_ui_label_internal(yyjson_get_str(name)) != NULL) {
+        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
+    memcpy(definition.name, yyjson_get_str(name), yyjson_get_len(name) + 1);
+    memcpy(definition.text, yyjson_get_str(text), yyjson_get_len(text) + 1);
+    memcpy(definition.font, yyjson_get_str(font), yyjson_get_len(font) + 1);
+    state_ui_labels[state_ui_label_count++].definition = definition;
+    return error_result_value(true);
+}
+
+static EngineResult state_load_ui_button_definition(yyjson_val *value) {
+    yyjson_val *name;
+    yyjson_val *id;
+    yyjson_val *label;
+    yyjson_val *font;
+    yyjson_val *text_color;
+    yyjson_val *bounds;
+    yyjson_val *style;
+    UIButtonDefinition definition = {0};
     size_t i;
 
     if(!yyjson_is_obj(value) || state_ui_button_count >= STATE_MAX_UI_BUTTONS) {
@@ -253,6 +398,8 @@ static EngineResult state_load_ui_button_definition(yyjson_val *value) {
     name = yyjson_obj_get(value, "name");
     id = yyjson_obj_get(value, "id");
     label = yyjson_obj_get(value, "label");
+    font = yyjson_obj_get(value, "font");
+    text_color = yyjson_obj_get(value, "text_color");
     bounds = yyjson_obj_get(value, "bounds");
     style = yyjson_obj_get(value, "style");
     if(!yyjson_is_str(name) || yyjson_get_len(name) == 0
@@ -261,14 +408,14 @@ static EngineResult state_load_ui_button_definition(yyjson_val *value) {
             || yyjson_get_len(id) >= UI_ID_MAX
             || (label != NULL && (!yyjson_is_str(label)
                 || yyjson_get_len(label) >= UI_LABEL_MAX))
-            || !yyjson_is_obj(bounds)
-            || !state_number(bounds, "x", &x)
-            || !state_number(bounds, "y", &y)
-            || !state_number(bounds, "width", &width)
-            || !state_number(bounds, "height", &height)
-            || !isfinite(x) || !isfinite(y)
-            || !isfinite(width) || width <= 0.0
-            || !isfinite(height) || height <= 0.0
+            || (font != NULL && (!yyjson_is_str(font)
+                || yyjson_get_len(font) == 0
+                || yyjson_get_len(font) >= UI_DEFINITION_NAME_MAX
+                || state_find_ui_font_internal(yyjson_get_str(font)) == NULL))
+            || (label != NULL && yyjson_get_len(label) > 0 && font == NULL)
+            || (text_color != NULL
+                && !state_color(text_color, &definition.text_color))
+            || !state_ui_bounds(bounds, &definition.bounds)
             || (style != NULL && !yyjson_is_obj(style))) {
         return error_result_error(ERROR_ENGINE_STATE_INVALID);
     }
@@ -286,12 +433,12 @@ static EngineResult state_load_ui_button_definition(yyjson_val *value) {
     if(label != NULL) {
         memcpy(definition.label, yyjson_get_str(label), yyjson_get_len(label) + 1);
     }
-    definition.bounds = (UIRect){
-        .x = (float)x,
-        .y = (float)y,
-        .width = (float)width,
-        .height = (float)height,
-    };
+    if(font != NULL) {
+        memcpy(definition.font, yyjson_get_str(font), yyjson_get_len(font) + 1);
+    }
+    if(text_color == NULL) {
+        definition.text_color = (Color){255, 255, 255, 255};
+    }
     definition.style = ui_default_button_style();
     if(style != NULL) {
 #define LOAD_UI_COLOR(Key, Field) do { \
@@ -1228,6 +1375,8 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
     size_t camera_definition_count = 0;
     size_t initial_animation_count = state_animation_count;
     size_t initial_ui_button_count = state_ui_button_count;
+    size_t initial_ui_font_count = state_ui_font_count;
+    size_t initial_ui_label_count = state_ui_label_count;
     EngineResult result = error_result_value(true);
 
     if(paths == NULL || path_count == 0 || path_count > MAX_ENTITIES) {
@@ -1280,6 +1429,12 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
         documents[document_index].ui_buttons = ui == NULL
             ? NULL
             : yyjson_obj_get(ui, "buttons");
+        documents[document_index].ui_fonts = ui == NULL
+            ? NULL
+            : yyjson_obj_get(ui, "fonts");
+        documents[document_index].ui_labels = ui == NULL
+            ? NULL
+            : yyjson_obj_get(ui, "labels");
         assets = yyjson_obj_get(root, "assets");
         documents[document_index].animations = assets == NULL
             ? NULL
@@ -1295,6 +1450,10 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
                 || (ui != NULL && !yyjson_is_obj(ui))
                 || (documents[document_index].ui_buttons != NULL
                     && !yyjson_is_arr(documents[document_index].ui_buttons))
+                || (documents[document_index].ui_fonts != NULL
+                    && !yyjson_is_arr(documents[document_index].ui_fonts))
+                || (documents[document_index].ui_labels != NULL
+                    && !yyjson_is_arr(documents[document_index].ui_labels))
                 || (documents[document_index].animations != NULL
                     && !yyjson_is_arr(documents[document_index].animations))) {
             result = error_result_error(ERROR_ENGINE_STATE_INVALID);
@@ -1307,6 +1466,38 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
                 result = error_result_error(ERROR_ENGINE_STATE_INVALID);
                 goto cleanup;
             }
+        }
+    }
+
+    for(document_index = 0; document_index < path_count; document_index += 1) {
+        yyjson_val *definition;
+        size_t font_index;
+        size_t font_count;
+        if(documents[document_index].ui_fonts == NULL) continue;
+        yyjson_arr_foreach(
+            documents[document_index].ui_fonts,
+            font_index,
+            font_count,
+            definition
+        ) {
+            result = state_load_ui_font_definition(definition);
+            if(result.kind == ERROR_RESULT_ERROR) goto cleanup;
+        }
+    }
+
+    for(document_index = 0; document_index < path_count; document_index += 1) {
+        yyjson_val *definition;
+        size_t label_index;
+        size_t label_count;
+        if(documents[document_index].ui_labels == NULL) continue;
+        yyjson_arr_foreach(
+            documents[document_index].ui_labels,
+            label_index,
+            label_count,
+            definition
+        ) {
+            result = state_load_ui_label_definition(definition);
+            if(result.kind == ERROR_RESULT_ERROR) goto cleanup;
         }
     }
 
@@ -1459,6 +1650,14 @@ cleanup:
         }
     }
     if(result.kind == ERROR_RESULT_ERROR) {
+        while(state_ui_label_count > initial_ui_label_count) {
+            state_ui_label_count -= 1;
+            state_ui_labels[state_ui_label_count] = (StateUILabel){0};
+        }
+        while(state_ui_font_count > initial_ui_font_count) {
+            state_ui_font_count -= 1;
+            state_ui_fonts[state_ui_font_count] = (StateUIFont){0};
+        }
         while(state_ui_button_count > initial_ui_button_count) {
             state_ui_button_count -= 1;
             state_ui_buttons[state_ui_button_count] = (StateUIButton){0};
@@ -1530,6 +1729,10 @@ static yyjson_mut_val *state_write_ui_button(
     yyjson_mut_obj_add_strcpy(document, definition, "name", button->name);
     yyjson_mut_obj_add_strcpy(document, definition, "id", button->id);
     yyjson_mut_obj_add_strcpy(document, definition, "label", button->label);
+    if(button->font[0] != '\0') {
+        yyjson_mut_obj_add_strcpy(document, definition, "font", button->font);
+        yyjson_mut_obj_add_val(document, definition, "text_color", state_write_color(document, button->text_color));
+    }
     yyjson_mut_obj_add_real(document, bounds, "x", button->bounds.x);
     yyjson_mut_obj_add_real(document, bounds, "y", button->bounds.y);
     yyjson_mut_obj_add_real(document, bounds, "width", button->bounds.width);
@@ -1540,6 +1743,40 @@ static yyjson_mut_val *state_write_ui_button(
     yyjson_mut_obj_add_val(document, style, "pressed", state_write_color(document, button->style.pressed));
     yyjson_mut_obj_add_val(document, style, "disabled", state_write_color(document, button->style.disabled));
     yyjson_mut_obj_add_val(document, definition, "style", style);
+    return definition;
+}
+
+static yyjson_mut_val *state_write_ui_font(
+        yyjson_mut_doc *document,
+        const UIFontDefinition *font
+) {
+    yyjson_mut_val *definition = yyjson_mut_obj(document);
+    if(definition == NULL || font == NULL) return NULL;
+    yyjson_mut_obj_add_strcpy(document, definition, "name", font->name);
+    yyjson_mut_obj_add_strcpy(document, definition, "file", font->file);
+    yyjson_mut_obj_add_real(document, definition, "point_size", font->point_size);
+    return definition;
+}
+
+static yyjson_mut_val *state_write_ui_label(
+        yyjson_mut_doc *document,
+        const UILabelDefinition *label
+) {
+    yyjson_mut_val *definition;
+    yyjson_mut_val *bounds;
+    if(document == NULL || label == NULL) return NULL;
+    definition = yyjson_mut_obj(document);
+    bounds = yyjson_mut_obj(document);
+    if(definition == NULL || bounds == NULL) return NULL;
+    yyjson_mut_obj_add_strcpy(document, definition, "name", label->name);
+    yyjson_mut_obj_add_strcpy(document, definition, "text", label->text);
+    yyjson_mut_obj_add_strcpy(document, definition, "font", label->font);
+    yyjson_mut_obj_add_val(document, definition, "color", state_write_color(document, label->color));
+    yyjson_mut_obj_add_real(document, bounds, "x", label->bounds.x);
+    yyjson_mut_obj_add_real(document, bounds, "y", label->bounds.y);
+    yyjson_mut_obj_add_real(document, bounds, "width", label->bounds.width);
+    yyjson_mut_obj_add_real(document, bounds, "height", label->bounds.height);
+    yyjson_mut_obj_add_val(document, definition, "bounds", bounds);
     return definition;
 }
 
@@ -1563,6 +1800,8 @@ EngineResult game_state_save_file(const char *path) {
     yyjson_mut_val *animation_array;
     yyjson_mut_val *ui;
     yyjson_mut_val *ui_buttons;
+    yyjson_mut_val *ui_fonts;
+    yyjson_mut_val *ui_labels;
     uint32_t position;
     yyjson_write_err write_error;
     bool success;
@@ -1577,6 +1816,8 @@ EngineResult game_state_save_file(const char *path) {
     animation_array = yyjson_mut_arr(document);
     ui = yyjson_mut_obj(document);
     ui_buttons = yyjson_mut_arr(document);
+    ui_fonts = yyjson_mut_arr(document);
+    ui_labels = yyjson_mut_arr(document);
     yyjson_mut_doc_set_root(document, root);
     yyjson_mut_obj_add_uint(document, root, "version", GAME_STATE_VERSION);
     yyjson_mut_obj_add_val(document, root, "groups", group_array);
@@ -1584,6 +1825,8 @@ EngineResult game_state_save_file(const char *path) {
     yyjson_mut_obj_add_val(document, root, "assets", assets);
     yyjson_mut_obj_add_val(document, root, "entities", entity_array);
     yyjson_mut_obj_add_val(document, ui, "buttons", ui_buttons);
+    yyjson_mut_obj_add_val(document, ui, "fonts", ui_fonts);
+    yyjson_mut_obj_add_val(document, ui, "labels", ui_labels);
     yyjson_mut_obj_add_val(document, root, "ui", ui);
 
     {
@@ -1716,6 +1959,18 @@ EngineResult game_state_save_file(const char *path) {
             return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
         }
         yyjson_mut_arr_add_val(ui_buttons, definition);
+    }
+    for(position = 0; position < state_ui_font_count; position += 1) {
+        yyjson_mut_arr_add_val(
+            ui_fonts,
+            state_write_ui_font(document, &state_ui_fonts[position].definition)
+        );
+    }
+    for(position = 0; position < state_ui_label_count; position += 1) {
+        yyjson_mut_arr_add_val(
+            ui_labels,
+            state_write_ui_label(document, &state_ui_labels[position].definition)
+        );
     }
 
     for(position = 0; position < entity_alive_count(); position += 1) {
@@ -1936,6 +2191,8 @@ EngineResult game_state_save_template_file(const char *path) {
     yyjson_mut_val *entities;
     yyjson_mut_val *ui;
     yyjson_mut_val *ui_buttons;
+    yyjson_mut_val *ui_fonts;
+    yyjson_mut_val *ui_labels;
     bool camera_copied = false;
     yyjson_write_err write_error;
     size_t document_index;
@@ -1955,9 +2212,12 @@ EngineResult game_state_save_template_file(const char *path) {
     entities = yyjson_mut_arr(document);
     ui = yyjson_mut_obj(document);
     ui_buttons = yyjson_mut_arr(document);
+    ui_fonts = yyjson_mut_arr(document);
+    ui_labels = yyjson_mut_arr(document);
     if(root == NULL || groups == NULL || assets == NULL
             || animations == NULL || entities == NULL
-            || ui == NULL || ui_buttons == NULL) {
+            || ui == NULL || ui_buttons == NULL
+            || ui_fonts == NULL || ui_labels == NULL) {
         yyjson_mut_doc_free(document);
         return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
     }
@@ -1968,6 +2228,8 @@ EngineResult game_state_save_template_file(const char *path) {
     yyjson_mut_obj_add_val(document, root, "assets", assets);
     yyjson_mut_obj_add_val(document, root, "entities", entities);
     yyjson_mut_obj_add_val(document, ui, "buttons", ui_buttons);
+    yyjson_mut_obj_add_val(document, ui, "fonts", ui_fonts);
+    yyjson_mut_obj_add_val(document, ui, "labels", ui_labels);
     yyjson_mut_obj_add_val(document, root, "ui", ui);
 
     for(document_index = 0;
@@ -2002,6 +2264,20 @@ EngineResult game_state_save_template_file(const char *path) {
                 input_ui == NULL
                     ? NULL
                     : yyjson_obj_get(input_ui, "buttons")
+            )
+            && state_template_copy_array(
+                document,
+                ui_fonts,
+                input_ui == NULL
+                    ? NULL
+                    : yyjson_obj_get(input_ui, "fonts")
+            )
+            && state_template_copy_array(
+                document,
+                ui_labels,
+                input_ui == NULL
+                    ? NULL
+                    : yyjson_obj_get(input_ui, "labels")
             );
         if(success && input_camera != NULL) {
             yyjson_mut_val *output_camera;
