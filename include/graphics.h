@@ -187,6 +187,9 @@ bool graphics_poll_events(SDL_Event *event);
 /** Clear the render target with a background color. */
 void graphics_draw_background(Color color);
 
+/** Draw a filled rectangle in logical screen coordinates. */
+bool graphics_draw_screen_rect(float x, float y, float width, float height, Color color);
+
 /** Present the current frame. */
 void graphics_show(void);
 

@@ -20,6 +20,7 @@ ENGINE_SRC := \
 	src/level_editor.c\
 	src/grid.c\
 	src/controller.c \
+	src/ui.c \
 	src/game_state.c
 
 ENGINE_OBJ := $(patsubst src/%.c,build/obj/%.o,$(ENGINE_SRC))
@@ -44,8 +45,9 @@ VIEW_BINARY := build/examples/view_port
 FINISH_BINARY := build/examples/fly_to_finish
 STATE_BINARY := build/examples/game_state
 PONG_BINARY := build/examples/pong
+UI_BINARY := build/examples/user_interface
 
-.PHONY: help all build build-engine build-example-pit build-example-ball build-example-view build-example-finish build-example-state build-example-pong run-pit run-ball run-view run-finish run-state run-pong docs clean-docs clean
+.PHONY: help all build build-engine build-example-pit build-example-ball build-example-view build-example-finish build-example-state build-example-pong build-example-ui run-pit run-ball run-view run-finish run-state run-pong run-ui docs clean-docs clean
 
 help:
 	@printf '%s\n' \
@@ -119,7 +121,7 @@ help:
 
 all: build
 
-build: build-example-view build-example-pit build-example-ball build-example-finish build-example-state build-example-pong
+build: build-example-view build-example-pit build-example-ball build-example-finish build-example-state build-example-pong build-example-ui
 
 build-engine: $(ENGINE_LIB)
 
@@ -134,6 +136,8 @@ build-example-finish: $(FINISH_BINARY)
 build-example-state: $(STATE_BINARY)
 
 build-example-pong: $(PONG_BINARY)
+
+build-example-ui: $(UI_BINARY)
 
 $(ENGINE_LIB): $(ENGINE_OBJ)
 	@mkdir -p lib
@@ -171,6 +175,10 @@ $(PONG_BINARY): examples/pong/pong.c $(ENGINE_LIB)
 	@mkdir -p build/examples
 	$(CC) $^ $(CFLAGS) -o $@ $(LIBS)
 
+$(UI_BINARY): examples/user-interface/user_interface.c $(ENGINE_LIB)
+	@mkdir -p build/examples
+	$(CC) $^ $(CFLAGS) -o $@ $(LIBS)
+
 run-pit: $(PIT_BINARY)
 	./$(PIT_BINARY)
 
@@ -188,6 +196,9 @@ run-state: $(STATE_BINARY)
 
 run-pong: $(PONG_BINARY)
 	./$(PONG_BINARY)
+
+run-ui: $(UI_BINARY)
+	./$(UI_BINARY)
 
 docs: $(API_MARKDOWN) $(README_HTML) $(STATIC_README_HTML)
 	$(DOXYGEN) $(DOCS_DOXYFILE)

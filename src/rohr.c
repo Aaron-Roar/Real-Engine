@@ -183,6 +183,7 @@ EngineResult rohr_graphics_start(void) { return graphics_start(); }
 void rohr_graphics_end(void) { graphics_end(); }
 bool rohr_graphics_poll_events(SDL_Event *event) { return graphics_poll_events(event); }
 void rohr_graphics_draw_background(Color color) { graphics_draw_background(color); }
+bool rohr_graphics_draw_screen_rect(float x, float y, float width, float height, Color color) { return graphics_draw_screen_rect(x, y, width, height, color); }
 void rohr_graphics_show(void) { graphics_show(); }
 void rohr_graphics_draw_hit_box(Entity entity, Fill fill_type) { graphics_draw_hit_box(entity, fill_type); }
 void rohr_graphics_draw_hit_box_colored(Entity entity, Fill fill_type, Color color) { graphics_draw_hit_box_colored(entity, fill_type, color); }
@@ -276,3 +277,10 @@ void rohr_tools_append_string(char *src, char *dst, size_t src_size, size_t dst_
 uint32_t rohr_tools_sizeof_string(char *str, char delimiter) { return tool_sizeof_string(str, delimiter); }
 int rohr_tools_random_range(int min, int max) { return tools_random_range(min, max); }
 float rohr_tools_random_range_float(float min, float max) { return tools_random_range_float(min, max); }
+
+void rohr_ui_begin_frame(UIInput input) { ui_begin_frame(input); }
+UIButtonResult rohr_ui_button(const char *id, UIRect bounds, const UIButtonStyle *style) { return ui_button(id, bounds, style); }
+void rohr_ui_button_disabled(UIRect bounds, const UIButtonStyle *style) { ui_button_disabled(bounds, style); }
+bool rohr_ui_pointer_consumed(void) { return ui_pointer_consumed(); }
+void rohr_ui_end_frame(void) { ui_end_frame(); }
+UIButtonStyle rohr_ui_default_button_style(void) { return ui_default_button_style(); }

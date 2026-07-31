@@ -670,6 +670,23 @@ void graphics_draw_background(Color color) {
     SDL_RenderClear(sdl_renderer);  /* start with a blank canvas. */
 }
 
+bool graphics_draw_screen_rect(float x, float y, float width, float height, Color color) {
+    SDL_FRect rect = {
+        .x = x,
+        .y = y,
+        .w = width,
+        .h = height,
+    };
+
+    if(sdl_renderer == NULL || width <= 0.0f || height <= 0.0f) {
+        return false;
+    }
+    if(!SDL_SetRenderDrawColor(sdl_renderer, color.red, color.green, color.blue, color.alpha)) {
+        return false;
+    }
+    return SDL_RenderFillRect(sdl_renderer, &rect);
+}
+
 void graphics_draw_rect(Shape rect, Position pos) {
     SDL_FRect sdl_rect;
     (void)rect;

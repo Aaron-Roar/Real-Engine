@@ -14,6 +14,7 @@
 #include "physics.h"
 #include "systems.h"
 #include "tools.h"
+#include "ui.h"
 
 /**
  * @file rohr.h
@@ -928,6 +929,12 @@ bool rohr_graphics_poll_events(SDL_Event *event);
 void rohr_graphics_draw_background(Color color);
 
 /**
+ * @brief Draws a filled rectangle in logical screen coordinates.
+ * @return true when SDL accepted the draw command.
+ */
+bool rohr_graphics_draw_screen_rect(float x, float y, float width, float height, Color color);
+
+/**
  * @brief Presents the current graphics frame.
  */
 void rohr_graphics_show(void);
@@ -1517,5 +1524,23 @@ int rohr_tools_random_range(int min, int max);
  * @return Random float between min and max.
  */
 float rohr_tools_random_range_float(float min, float max);
+
+/** @brief Starts a UI frame with logical screen-space pointer input. */
+void rohr_ui_begin_frame(UIInput input);
+
+/** @brief Draws and updates one button identified by a stable string. */
+UIButtonResult rohr_ui_button(const char *id, UIRect bounds, const UIButtonStyle *style);
+
+/** @brief Draws a disabled button that cannot capture input. */
+void rohr_ui_button_disabled(UIRect bounds, const UIButtonStyle *style);
+
+/** @brief Returns whether UI consumed pointer input during this frame. */
+bool rohr_ui_pointer_consumed(void);
+
+/** @brief Finishes the current UI frame. */
+void rohr_ui_end_frame(void);
+
+/** @brief Returns the default button colors. */
+UIButtonStyle rohr_ui_default_button_style(void);
 
 #endif
