@@ -734,8 +734,16 @@ static EngineResult state_load_components(
     LOAD_VEC2("position", PositionPool, positions_pool, NONE)
     LOAD_VEC2("velocity", VelocityPool, velocities_pool, DYNAMIC)
     LOAD_VEC2("acceleration", AccelerationPool, accelerations_pool, DYNAMIC)
-    LOAD_VEC2("force", ForcePool, forces_pool, FORCE)
 #undef LOAD_VEC2
+
+    value = yyjson_obj_get(components, "force");
+    if(value != NULL) {
+        if(!state_vec2(value, &vector)) {
+            return error_result_error(ERROR_ENGINE_STATE_INVALID);
+        }
+        result = physics_set_force_component(entity, vector);
+        if(result.kind == ERROR_RESULT_ERROR) return result;
+    }
 
 #define LOAD_SCALAR(Key, Pool, Table, Bit) \
     value = yyjson_obj_get(components, Key); \
@@ -750,11 +758,33 @@ static EngineResult state_load_components(
     LOAD_SCALAR("mass", MassPool, mass, MASS)
     LOAD_SCALAR("orientation", OrientationPool, orientations, NONE)
     LOAD_SCALAR("angular_velocity", AngularVelocityPool, angular_velocities, DYNAMIC)
-    LOAD_SCALAR("angular_acceleration", AngularAccelerationPool, angular_accelerations, DYNAMIC)
-    LOAD_SCALAR("torque", TorquePool, torques, TORQUE)
     LOAD_SCALAR("friction", FrictionPool, frictions, NONE)
     LOAD_SCALAR("restitution", RestitutionPool, restitutions, NONE)
 #undef LOAD_SCALAR
+
+    value = yyjson_obj_get(components, "angular_acceleration");
+    if(value != NULL) {
+        if(!yyjson_is_num(value)) {
+            return error_result_error(ERROR_ENGINE_STATE_INVALID);
+        }
+        result = physics_set_angular_acceleration(
+            entity,
+            (AngularAcceleration)yyjson_get_num(value)
+        );
+        if(result.kind == ERROR_RESULT_ERROR) return result;
+    }
+
+    value = yyjson_obj_get(components, "torque");
+    if(value != NULL) {
+        if(!yyjson_is_num(value)) {
+            return error_result_error(ERROR_ENGINE_STATE_INVALID);
+        }
+        result = physics_set_torque_component(
+            entity,
+            (Torque)yyjson_get_num(value)
+        );
+        if(result.kind == ERROR_RESULT_ERROR) return result;
+    }
 
     value = yyjson_obj_get(components, "hit_box");
     if(value != NULL) {
@@ -767,9 +797,8 @@ static EngineResult state_load_components(
         Entity target;
         result = state_resolve_name(value, &target);
         if(result.kind == ERROR_RESULT_ERROR) return result;
-        if(TargetPool_store_at(&targets_pool, index, target).kind == ERROR_RESULT_ERROR)
-            return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
-        entity_mask[index] |= TARGETABLE;
+        result = physics_set_target(entity, target);
+        if(result.kind == ERROR_RESULT_ERROR) return result;
     }
 
     value = yyjson_obj_get(components, "parent");
@@ -867,9 +896,8 @@ static EngineResult state_load_components(
 #undef JOINT_NUMBER
         if(!state_boolean(value, "lock_angle", &joint.lock_angle))
             return error_result_error(ERROR_ENGINE_STATE_INVALID);
-        if(JointPool_store_at(&joints_pool, index, joint).kind == ERROR_RESULT_ERROR)
-            return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
-        entity_mask[index] |= JOINT;
+        result = physics_set_joint_component(entity, joint);
+        if(result.kind == ERROR_RESULT_ERROR) return result;
     }
 
     value = yyjson_obj_get(components, "animated_sprite");

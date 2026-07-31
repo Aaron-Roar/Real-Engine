@@ -844,6 +844,21 @@ Sets an entity acceleration component value.
 
 **Returns:** EngineResult describing success or failure.
 
+### `rohr_physics_set_angular_acceleration`
+
+```c
+EngineResult rohr_physics_set_angular_acceleration( Entity entity, AngularAcceleration acceleration );
+```
+
+Sets an entity angular acceleration component value.
+
+| Parameter | Description |
+| --- | --- |
+| `entity` | Entity to modify. |
+| `acceleration` | Angular acceleration value. |
+
+**Returns:** EngineResult describing success or failure.
+
 ### `rohr_physics_set_acceleration_toward_position`
 
 ```c
@@ -1139,6 +1154,21 @@ Sets an entity force component value.
 
 **Returns:** EntityResult containing entity on success, or an error.
 
+### `rohr_physics_set_force_component`
+
+```c
+EngineResult rohr_physics_set_force_component(Entity entity, Force force);
+```
+
+Sets force component data directly on an existing entity.
+
+| Parameter | Description |
+| --- | --- |
+| `entity` | Entity to modify. |
+| `force` | Force component value. |
+
+**Returns:** EngineResult describing success or failure.
+
 ### `rohr_physics_apply_force_for_one_tick`
 
 ```c
@@ -1168,6 +1198,21 @@ Sets an entity torque component value.
 | `t` | Torque value. |
 
 **Returns:** EntityResult containing entity on success, or an error.
+
+### `rohr_physics_set_torque_component`
+
+```c
+EngineResult rohr_physics_set_torque_component(Entity entity, Torque torque);
+```
+
+Sets torque component data directly on an existing entity.
+
+| Parameter | Description |
+| --- | --- |
+| `entity` | Entity to modify. |
+| `torque` | Torque component value. |
+
+**Returns:** EngineResult describing success or failure.
 
 ### `rohr_physics_apply_torque_for_one_tick`
 
@@ -1438,6 +1483,36 @@ Locks one entity to another using their current transform offset.
 | `lock_position` | true to lock position. |
 | `lock_orientation` | true to lock orientation. |
 | `inherit_velocity` | true to inherit driver velocity. |
+
+**Returns:** EngineResult describing success or failure.
+
+### `rohr_physics_set_target`
+
+```c
+EngineResult rohr_physics_set_target(Entity entity, Entity target);
+```
+
+Sets the target used by a force or torque source entity.
+
+| Parameter | Description |
+| --- | --- |
+| `entity` | Force or torque source entity to modify. |
+| `target` | Live entity that receives the force or torque. |
+
+**Returns:** EngineResult describing success or failure.
+
+### `rohr_physics_set_joint_component`
+
+```c
+EngineResult rohr_physics_set_joint_component(Entity entity, Joint joint);
+```
+
+Adds or replaces complete joint data on an existing entity.
+
+| Parameter | Description |
+| --- | --- |
+| `entity` | Entity that owns the joint component. |
+| `joint` | Complete joint component value. |
 
 **Returns:** EngineResult describing success or failure.
 

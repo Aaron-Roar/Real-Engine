@@ -243,6 +243,11 @@ bool physics_entity_can_move(EntityIndex index);
 
 /** Set an entity's base linear acceleration. */
 EngineResult physics_set_acceleration(Entity entity, Acceleration a);
+/** Set an entity's angular acceleration and mark it dynamic. */
+EngineResult physics_set_angular_acceleration(
+        Entity entity,
+        AngularAcceleration acceleration
+);
 /** Set acceleration toward a world position using a scalar magnitude. */
 EngineResult physics_set_acceleration_toward_position(Entity entity, float acceleration_magnitude, Position position);
 /** Set acceleration toward another entity's current world position. */
@@ -281,10 +286,14 @@ EngineResult physics_set_position(Entity entity, Position p);
 EngineResult physics_set_mass(Entity entity, Mass m);
 /** Create a force entity targeting the given entity. */
 EntityResult physics_set_force(Entity entity, Force f);
+/** Set force component data directly on an existing entity. */
+EngineResult physics_set_force_component(Entity entity, Force force);
 /** Create a force entity that applies for one physics tick. */
 EngineResult physics_apply_force_for_one_tick(Entity entity, Force f);
 /** Create a torque entity targeting the given entity. */
 EntityResult physics_set_torque(Entity entity, Torque t);
+/** Set torque component data directly on an existing entity. */
+EngineResult physics_set_torque_component(Entity entity, Torque torque);
 /** Create a torque entity that applies for one physics tick. */
 EngineResult physics_apply_torque_for_one_tick(Entity entity, Torque t);
 /** Set an entity's hitbox and add collision/hitbox components. */
@@ -351,6 +360,12 @@ EngineResult physics_set_transform_lock_current_transform(
         bool lock_orientation,
         bool inherit_velocity
 );
+
+/** Set the target component used by force and torque source entities. */
+EngineResult physics_set_target(Entity entity, Entity target);
+
+/** Add or replace complete joint component data on an existing entity. */
+EngineResult physics_set_joint_component(Entity entity, Joint joint);
 
 /**
  * Create a joint entity connecting two live entities.

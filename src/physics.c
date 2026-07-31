@@ -572,6 +572,21 @@ EntityResult physics_set_force(Entity entity, Force f) {
     return ERROR_RESULT_MAKE_VALUE(EntityResult, force_entity);
 }
 
+EngineResult physics_set_force_component(Entity entity, Force force) {
+    EntityIndex index;
+    EngineResult result = physics_get_live_index(entity, &index);
+
+    if(result.kind == ERROR_RESULT_ERROR) {
+        return result;
+    }
+    if(ForcePool_store_at(&forces_pool, index, force).kind
+            == ERROR_RESULT_ERROR) {
+        return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
+    }
+    entity_mask[index] |= FORCE;
+    return error_result_value(true);
+}
+
 EngineResult physics_apply_force_for_one_tick(Entity entity, Force f) {
     EntityResult force_result = physics_set_force(entity, f);
     EngineResult result;
@@ -679,6 +694,21 @@ EntityResult physics_set_torque(Entity entity, Torque t) {
     return ERROR_RESULT_MAKE_VALUE(EntityResult, torque_entity);
 }
 
+EngineResult physics_set_torque_component(Entity entity, Torque torque) {
+    EntityIndex index;
+    EngineResult result = physics_get_live_index(entity, &index);
+
+    if(result.kind == ERROR_RESULT_ERROR) {
+        return result;
+    }
+    if(TorquePool_store_at(&torques_pool, index, torque).kind
+            == ERROR_RESULT_ERROR) {
+        return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
+    }
+    entity_mask[index] |= TORQUE;
+    return error_result_value(true);
+}
+
 EngineResult physics_apply_torque_for_one_tick(Entity entity, Torque t) {
     EntityResult torque_result = physics_set_torque(entity, t);
     EngineResult result;
@@ -730,6 +760,30 @@ EngineResult physics_set_angular_velocity(Entity entity, AngularVelocity v) {
     }
     (void)AngularVelocityPool_store_at(&angular_velocities_pool, index, v);
     console_debug_write(LOG_ENGINE, "Set Entity: %d Angular Velocity: %f\n", entity, v);
+    return error_result_value(true);
+}
+
+EngineResult physics_set_angular_acceleration(
+        Entity entity,
+        AngularAcceleration acceleration
+) {
+    EntityIndex index;
+    EngineResult result = physics_get_live_index(entity, &index);
+
+    if(result.kind == ERROR_RESULT_ERROR) {
+        return result;
+    }
+    result = physics_set_dynamic(entity);
+    if(result.kind == ERROR_RESULT_ERROR) {
+        return result;
+    }
+    if(AngularAccelerationPool_store_at(
+            &angular_accelerations_pool,
+            index,
+            acceleration
+        ).kind == ERROR_RESULT_ERROR) {
+        return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
+    }
     return error_result_value(true);
 }
 ShapeResult physics_get_global_hit_box(Entity entity) {
@@ -990,6 +1044,54 @@ EngineResult physics_set_transform_lock_current_transform(
         inherit_velocity
     );
 }
+EngineResult physics_set_target(Entity entity, Entity target) {
+    EntityIndex index;
+    EntityIndex target_index;
+    EngineResult result = physics_get_live_index(entity, &index);
+
+    if(result.kind == ERROR_RESULT_ERROR) {
+        return result;
+    }
+    result = physics_get_live_index(target, &target_index);
+    if(result.kind == ERROR_RESULT_ERROR) {
+        return result;
+    }
+    if(TargetPool_store_at(&targets_pool, index, target).kind
+            == ERROR_RESULT_ERROR) {
+        return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
+    }
+    entity_mask[index] |= TARGETABLE;
+    return error_result_value(true);
+}
+
+EngineResult physics_set_joint_component(Entity entity, Joint joint) {
+    EntityIndex index;
+    EntityIndex a_index;
+    EntityIndex b_index;
+    EngineResult result = physics_get_live_index(entity, &index);
+
+    if(result.kind == ERROR_RESULT_ERROR) {
+        return result;
+    }
+    if(joint.type < JOINT_DISTANCE || joint.type > JOINT_PIN) {
+        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
+    result = physics_get_live_index(joint.a, &a_index);
+    if(result.kind == ERROR_RESULT_ERROR) {
+        return result;
+    }
+    result = physics_get_live_index(joint.b, &b_index);
+    if(result.kind == ERROR_RESULT_ERROR) {
+        return result;
+    }
+    if(JointPool_store_at(&joints_pool, index, joint).kind
+            == ERROR_RESULT_ERROR) {
+        return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
+    }
+    entity_mask[index] |= JOINT;
+    return error_result_value(true);
+}
+
 EntityResult physics_set_joint(
     Entity a,
     Entity b,
@@ -1018,11 +1120,6 @@ EntityResult physics_set_joint(
         return ERROR_RESULT_MAKE_ERROR(EntityResult, ERROR_ENGINE_ENTITY_NOT_FOUND);
     }
 
-    result = entity_add_components(joint, JOINT);
-    if(result.kind == ERROR_RESULT_ERROR) {
-        return ERROR_RESULT_MAKE_ERROR(EntityResult, result.result.error);
-    }
-
     Vec2D world_anchor_a = {
         .x = positions[a_index].x + math_rotate_vector(local_anchor_a, orientations[a_index]).x,
         .y = positions[a_index].y + math_rotate_vector(local_anchor_a, orientations[a_index]).y
@@ -1038,7 +1135,7 @@ EntityResult physics_set_joint(
         .y = world_anchor_b.y - world_anchor_a.y
     };
 
-    (void)JointPool_store_at(&joints_pool, joint_index, (Joint){
+    result = physics_set_joint_component(joint, (Joint){
         .type = type,
         .a = a,
         .b = b,
@@ -1052,6 +1149,10 @@ EntityResult physics_set_joint(
         .angular_stiffness = 0.0f,
         .angular_damping = 0.0f
     });
+    if(result.kind == ERROR_RESULT_ERROR) {
+        (void)entity_delete(joint);
+        return ERROR_RESULT_MAKE_ERROR(EntityResult, result.result.error);
+    }
 
     return ERROR_RESULT_MAKE_VALUE(EntityResult, joint);
 }

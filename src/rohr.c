@@ -89,6 +89,9 @@ Collision rohr_physics_sat_collision(Shape shape_1, Shape shape_2) { return phys
 Vec1D rohr_physics_circle_moment_of_inertia(Shape circle, Mass mass_value) { return physics_circle_moment_of_inertia(circle, mass_value); }
 bool rohr_physics_entity_is_held(EntityIndex index) { return physics_entity_is_held(index); }
 EngineResult rohr_physics_set_acceleration(Entity entity, Acceleration a) { return physics_set_acceleration(entity, a); }
+EngineResult rohr_physics_set_angular_acceleration(Entity entity, AngularAcceleration acceleration) {
+    return physics_set_angular_acceleration(entity, acceleration);
+}
 EngineResult rohr_physics_set_acceleration_toward_position(Entity entity, float acceleration_magnitude, Position position) {
     return physics_set_acceleration_toward_position(entity, acceleration_magnitude, position);
 }
@@ -132,8 +135,14 @@ EngineResult rohr_physics_apply_impulse(Entity entity, Vec2D impulse) { return p
 EngineResult rohr_physics_set_position(Entity entity, Position p) { return physics_set_position(entity, p); }
 EngineResult rohr_physics_set_mass(Entity entity, Mass m) { return physics_set_mass(entity, m); }
 EntityResult rohr_physics_set_force(Entity entity, Force f) { return physics_set_force(entity, f); }
+EngineResult rohr_physics_set_force_component(Entity entity, Force force) {
+    return physics_set_force_component(entity, force);
+}
 EngineResult rohr_physics_apply_force_for_one_tick(Entity entity, Force f) { return physics_apply_force_for_one_tick(entity, f); }
 EntityResult rohr_physics_set_torque(Entity entity, Torque t) { return physics_set_torque(entity, t); }
+EngineResult rohr_physics_set_torque_component(Entity entity, Torque torque) {
+    return physics_set_torque_component(entity, torque);
+}
 EngineResult rohr_physics_apply_torque_for_one_tick(Entity entity, Torque t) { return physics_apply_torque_for_one_tick(entity, t); }
 EngineResult rohr_physics_set_hitbox(Entity entity, Shape hitbox) { return physics_set_hitbox(entity, hitbox); }
 EngineResult rohr_physics_set_orientation(Entity entity, Orientation angle) { return physics_set_orientation(entity, angle); }
@@ -155,6 +164,12 @@ EngineResult rohr_physics_set_transform_lock(Entity driven, Entity driver, Vec2D
 EngineResult rohr_physics_remove_transform_lock(Entity entity) { return physics_remove_transform_lock(entity); }
 EngineResult rohr_physics_set_transform_lock_current_transform(Entity driven, Entity driver, bool lock_position, bool lock_orientation, bool inherit_velocity) {
     return physics_set_transform_lock_current_transform(driven, driver, lock_position, lock_orientation, inherit_velocity);
+}
+EngineResult rohr_physics_set_target(Entity entity, Entity target) {
+    return physics_set_target(entity, target);
+}
+EngineResult rohr_physics_set_joint_component(Entity entity, Joint joint) {
+    return physics_set_joint_component(entity, joint);
 }
 EntityResult rohr_physics_set_joint(Entity a, Entity b, JointType type, Vec2D local_anchor_a, Vec2D local_anchor_b, float stiffness, float damping) {
     return physics_set_joint(a, b, type, local_anchor_a, local_anchor_b, stiffness, damping);

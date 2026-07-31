@@ -470,6 +470,17 @@ bool rohr_physics_entity_is_held(EntityIndex index);
 EngineResult rohr_physics_set_acceleration(Entity entity, Acceleration a);
 
 /**
+ * @brief Sets an entity angular acceleration component value.
+ * @param entity Entity to modify.
+ * @param acceleration Angular acceleration value.
+ * @return EngineResult describing success or failure.
+ */
+EngineResult rohr_physics_set_angular_acceleration(
+    Entity entity,
+    AngularAcceleration acceleration
+);
+
+/**
  * @brief Sets entity acceleration toward a world position.
  * @param entity Entity to modify.
  * @param acceleration_magnitude Acceleration magnitude to apply along the direction to position.
@@ -632,6 +643,14 @@ EngineResult rohr_physics_set_mass(Entity entity, Mass m);
 EntityResult rohr_physics_set_force(Entity entity, Force f);
 
 /**
+ * @brief Sets force component data directly on an existing entity.
+ * @param entity Entity to modify.
+ * @param force Force component value.
+ * @return EngineResult describing success or failure.
+ */
+EngineResult rohr_physics_set_force_component(Entity entity, Force force);
+
+/**
  * @brief Applies force to an entity for one physics tick.
  * @param entity Entity to target.
  * @param f Force vector.
@@ -646,6 +665,14 @@ EngineResult rohr_physics_apply_force_for_one_tick(Entity entity, Force f);
  * @return EntityResult containing entity on success, or an error.
  */
 EntityResult rohr_physics_set_torque(Entity entity, Torque t);
+
+/**
+ * @brief Sets torque component data directly on an existing entity.
+ * @param entity Entity to modify.
+ * @param torque Torque component value.
+ * @return EngineResult describing success or failure.
+ */
+EngineResult rohr_physics_set_torque_component(Entity entity, Torque torque);
 
 /**
  * @brief Applies torque to an entity for one physics tick.
@@ -806,6 +833,22 @@ EngineResult rohr_physics_set_transform_lock_current_transform(
     bool lock_orientation,
     bool inherit_velocity
 );
+
+/**
+ * @brief Sets the target used by a force or torque source entity.
+ * @param entity Force or torque source entity to modify.
+ * @param target Live entity that receives the force or torque.
+ * @return EngineResult describing success or failure.
+ */
+EngineResult rohr_physics_set_target(Entity entity, Entity target);
+
+/**
+ * @brief Adds or replaces complete joint data on an existing entity.
+ * @param entity Entity that owns the joint component.
+ * @param joint Complete joint component value.
+ * @return EngineResult describing success or failure.
+ */
+EngineResult rohr_physics_set_joint_component(Entity entity, Joint joint);
 
 /**
  * @brief Creates a joint between two entities.
