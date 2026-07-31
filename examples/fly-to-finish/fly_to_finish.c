@@ -55,9 +55,6 @@ static Color obstacle_color_for_size(float size, float speed) {
 }
 
 static EngineResult spawn_obstacle(ObstacleRecord records[], size_t *next_record) {
-    EntityResult entity_result;
-    EngineResult result;
-    Entity obstacle;
     float size;
     float speed;
     float mass_value;
@@ -85,11 +82,11 @@ static EngineResult spawn_obstacle(ObstacleRecord records[], size_t *next_record
         mass_value = 5000.0f;
     }
 
-    entity_result = rohr_entity_add();
+    EntityResult entity_result = rohr_entity_add();
     if(rohr_error_check(entity_result)) {
         return rohr_error_result_error(entity_result.result.error);
     }
-    obstacle = entity_result.result.value;
+    Entity obstacle = entity_result.result.value;
     rohr_physics_set_position(obstacle, (Position){
         .x = rohr_tools_random_range_float(screen_left + size, screen_right - size),
         .y = spawn_y
@@ -102,10 +99,14 @@ static EngineResult spawn_obstacle(ObstacleRecord records[], size_t *next_record
     rohr_physics_set_friction(obstacle, 0.45f);
     rohr_physics_set_hitbox(obstacle, rohr_math_create_circle(size, 8));
     rohr_physics_set_dynamic(obstacle);
-    result = rohr_entity_set_life_time(obstacle, rohr_engine_get_time() + 12.0, 0);
-    if(rohr_error_check(result)) {
+    EngineResult lifetime_result = rohr_entity_set_life_time(
+        obstacle,
+        rohr_engine_get_time() + 12.0,
+        0
+    );
+    if(rohr_error_check(lifetime_result)) {
         rohr_entity_delete(obstacle);
-        return result;
+        return lifetime_result;
     }
 
     if(records[*next_record].active && rohr_entity_is_alive(records[*next_record].entity)) {
@@ -131,8 +132,6 @@ static EngineResult reset_level(
         Time *level_start_time,
         bool *reached_finish
         ) {
-    EngineResult result;
-
     if(records == NULL || next_record == NULL || next_spawn_time == NULL ||
             level_start_time == NULL || reached_finish == NULL) {
         return rohr_error_result_error(ERROR_MEMORY_POOL_NULL_POINTER);
@@ -140,24 +139,24 @@ static EngineResult reset_level(
 
     for(size_t i = 0; i < MAX_OBSTACLE_RECORDS; i += 1) {
         if(records[i].active && rohr_entity_is_alive(records[i].entity)) {
-            result = rohr_entity_delete(records[i].entity);
-            if(rohr_error_check(result)) {
-                return result;
+            EngineResult delete_result = rohr_entity_delete(records[i].entity);
+            if(rohr_error_check(delete_result)) {
+                return delete_result;
             }
         }
         records[i] = (ObstacleRecord){0};
     }
 
-    result = rohr_physics_set_position(player, player_start_position);
-    if(rohr_error_check(result)) { return result; }
-    result = rohr_physics_set_orientation(player, player_start_orientation);
-    if(rohr_error_check(result)) { return result; }
-    result = rohr_physics_set_velocity(player, (Velocity){0});
-    if(rohr_error_check(result)) { return result; }
-    result = rohr_physics_set_acceleration(player, (Acceleration){0});
-    if(rohr_error_check(result)) { return result; }
-    result = rohr_physics_set_angular_velocity(player, 0.0f);
-    if(rohr_error_check(result)) { return result; }
+    EngineResult position_result = rohr_physics_set_position(player, player_start_position);
+    if(rohr_error_check(position_result)) { return position_result; }
+    EngineResult orientation_result = rohr_physics_set_orientation(player, player_start_orientation);
+    if(rohr_error_check(orientation_result)) { return orientation_result; }
+    EngineResult velocity_result = rohr_physics_set_velocity(player, (Velocity){0});
+    if(rohr_error_check(velocity_result)) { return velocity_result; }
+    EngineResult acceleration_result = rohr_physics_set_acceleration(player, (Acceleration){0});
+    if(rohr_error_check(acceleration_result)) { return acceleration_result; }
+    EngineResult angular_velocity_result = rohr_physics_set_angular_velocity(player, 0.0f);
+    if(rohr_error_check(angular_velocity_result)) { return angular_velocity_result; }
 
     *next_record = 0;
     *level_start_time = rohr_engine_get_time();
@@ -167,10 +166,6 @@ static EngineResult reset_level(
 }
 
 int main(void) {
-    EngineResult result;
-    EntityResult entity_result;
-    ShapeResult player_shape_result;
-    ShapeResult finish_shape_result;
     KeyboardState keyboard = {0};
     ObstacleRecord obstacle_records[MAX_OBSTACLE_RECORDS] = {0};
     size_t next_obstacle_record = 0;
@@ -178,6 +173,7 @@ int main(void) {
     Time level_start_time = 0.0;
     Entity player;
     Entity finish_line;
+    Entity wall_mid;
     Entity walls[4];
     const char *wall_names[4] = {
         "wall_left",
@@ -191,47 +187,59 @@ int main(void) {
     Mass player_mass;
     bool reached_finish = false;
 
-    if(rohr_error_check(result = rohr_engine_init())) {
-        PRINT_ENGINE_ERROR(result);
-        return 1;
+    {
+        EngineResult init_result = rohr_engine_init();
+        if(rohr_error_check(init_result)) {
+            PRINT_ENGINE_ERROR(init_result);
+            return 1;
+        }
     }
     rohr_engine_set_dt(1/(float)120);
-    if(rohr_error_check(result = rohr_graphics_start())) {
-        PRINT_ENGINE_ERROR(result);
-        rohr_engine_shutdown();
-        return 1;
+    {
+        EngineResult graphics_result = rohr_graphics_start();
+        if(rohr_error_check(graphics_result)) {
+            PRINT_ENGINE_ERROR(graphics_result);
+            rohr_engine_shutdown();
+            return 1;
+        }
     }
 
-    result = rohr_game_state_load_file(
+    EngineResult load_result = rohr_game_state_load_file(
         "examples/fly-to-finish/fly_to_finish.json"
     );
-    if(rohr_error_check(result)) {
-        PRINT_ENGINE_ERROR(result);
+    if(rohr_error_check(load_result)) {
+        PRINT_ENGINE_ERROR(load_result);
         goto fail;
     }
 
-    entity_result = rohr_entity_find_by_name("finish_line");
-    if(rohr_error_check(entity_result)) {
-        PRINT_ENGINE_ERROR(entity_result);
+    EntityResult finish_line_result = rohr_entity_find_by_name("finish_line");
+    if(rohr_error_check(finish_line_result)) {
+        PRINT_ENGINE_ERROR(finish_line_result);
         goto fail;
     }
-    finish_line = entity_result.result.value;
+    finish_line = finish_line_result.result.value;
 
     for(size_t wall_index = 0; wall_index < 4; wall_index += 1) {
-        entity_result = rohr_entity_find_by_name(wall_names[wall_index]);
-        if(rohr_error_check(entity_result)) {
-            PRINT_ENGINE_ERROR(entity_result);
+        EntityResult wall_result = rohr_entity_find_by_name(wall_names[wall_index]);
+        if(rohr_error_check(wall_result)) {
+            PRINT_ENGINE_ERROR(wall_result);
             goto fail;
         }
-        walls[wall_index] = entity_result.result.value;
+        walls[wall_index] = wall_result.result.value;
     }
 
-    entity_result = rohr_entity_find_by_name("player");
-    if(rohr_error_check(entity_result)) {
-        PRINT_ENGINE_ERROR(entity_result);
+    EntityResult player_result = rohr_entity_find_by_name("player");
+    if(rohr_error_check(player_result)) {
+        PRINT_ENGINE_ERROR(player_result);
         goto fail;
     }
-    player = entity_result.result.value;
+    player = player_result.result.value;
+    EntityResult wall_mid_result = rohr_entity_find_by_name("wall_mid");
+    if(rohr_error_check(wall_mid_result)) {
+        PRINT_ENGINE_ERROR(wall_mid_result);
+        goto fail;
+    }
+    wall_mid = wall_mid_result.result.value;
     if(!rohr_entity_get_index(player, &player_index)
             || !positions_pool.used[player_index]
             || !orientations_pool.used[player_index]
@@ -266,7 +274,7 @@ int main(void) {
         rohr_controller_add_key_event(&keyboard, rohr_controller_capture_keyboard_event(&event));
 
         if(rohr_controller_key_pressed(&keyboard, SDLK_R)) {
-            result = reset_level(
+            EngineResult reset_result = reset_level(
                     player,
                     player_start_position,
                     player_start_orientation,
@@ -276,8 +284,8 @@ int main(void) {
                     &level_start_time,
                     &reached_finish
             );
-            if(rohr_error_check(result)) {
-                PRINT_ENGINE_ERROR(result);
+            if(rohr_error_check(reset_result)) {
+                PRINT_ENGINE_ERROR(reset_result);
                 goto fail;
             }
         }
@@ -287,9 +295,9 @@ int main(void) {
             rohr_engine_get_time() - level_start_time >= player_control_delay_seconds;
 
         if(level_active && rohr_engine_get_time() >= next_spawn_time) {
-            result = spawn_obstacle(obstacle_records, &next_obstacle_record);
-            if(rohr_error_check(result)) {
-                PRINT_ENGINE_ERROR(result);
+            EngineResult spawn_result = spawn_obstacle(obstacle_records, &next_obstacle_record);
+            if(rohr_error_check(spawn_result)) {
+                PRINT_ENGINE_ERROR(spawn_result);
                 goto fail;
             }
             next_spawn_time = rohr_engine_get_time() + spawn_interval_seconds;
@@ -303,31 +311,31 @@ int main(void) {
 
         thrust_axis = player_forward(orientations[player_index]);
         if(player_control_enabled && rohr_controller_key_down(&keyboard, SDLK_W)) {
-            result = rohr_physics_apply_force_for_one_tick(player, (Force){
+            EngineResult thrust_result = rohr_physics_apply_force_for_one_tick(player, (Force){
                 .x = thrust_axis.x * player_mass * player_thrust_acceleration,
                 .y = thrust_axis.y * player_mass * player_thrust_acceleration
             });
-            if(rohr_error_check(result)) {
-                PRINT_ENGINE_ERROR(result);
+            if(rohr_error_check(thrust_result)) {
+                PRINT_ENGINE_ERROR(thrust_result);
                 goto fail;
             }
         }
         if(player_control_enabled && rohr_controller_key_down(&keyboard, SDLK_S) && speed > 0.001f) {
-            result = rohr_physics_apply_force_for_one_tick(player, (Force){
+            EngineResult brake_result = rohr_physics_apply_force_for_one_tick(player, (Force){
                 .x = -(player_velocity.x / speed) * player_mass * player_brake_acceleration,
                 .y = -(player_velocity.y / speed) * player_mass * player_brake_acceleration
             });
-            if(rohr_error_check(result)) {
-                PRINT_ENGINE_ERROR(result);
+            if(rohr_error_check(brake_result)) {
+                PRINT_ENGINE_ERROR(brake_result);
                 goto fail;
             }
         }
 
         turn_axis = rohr_controller_axis_from_keycodes(&keyboard, SDLK_UNKNOWN, SDLK_A, SDLK_UNKNOWN, SDLK_D);
         if(player_control_enabled && turn_axis.x != 0.0f) {
-            result = rohr_physics_apply_torque_for_one_tick(player, -turn_axis.x * player_control_torque);
-            if(rohr_error_check(result)) {
-                PRINT_ENGINE_ERROR(result);
+            EngineResult torque_result = rohr_physics_apply_torque_for_one_tick(player, -turn_axis.x * player_control_torque);
+            if(rohr_error_check(torque_result)) {
+                PRINT_ENGINE_ERROR(torque_result);
                 goto fail;
             }
         }
@@ -345,8 +353,8 @@ int main(void) {
         }
 
         if(level_active) {
-            player_shape_result = rohr_physics_get_global_hit_box(player);
-            finish_shape_result = rohr_physics_get_global_hit_box(finish_line);
+            ShapeResult player_shape_result = rohr_physics_get_global_hit_box(player);
+            ShapeResult finish_shape_result = rohr_physics_get_global_hit_box(finish_line);
             if(player_shape_result.kind == ERROR_RESULT_VALUE && finish_shape_result.kind == ERROR_RESULT_VALUE) {
                 Collision finish_collision = rohr_physics_sat_collision(
                     player_shape_result.result.value,
@@ -364,7 +372,6 @@ int main(void) {
                 wall_color
             );
         }
-        Entity wall_mid = rohr_entity_find_by_name("wall_mid").result.value;
         rohr_graphics_draw_hit_box_colored(wall_mid, GRAPHICS_FILLED, obstacle_records[1].color);
         rohr_graphics_draw_hit_box_colored(finish_line, GRAPHICS_FILLED, finish_line_color);
         rohr_graphics_draw_hit_box_colored(player, GRAPHICS_OUTLINE, finish_line_color);

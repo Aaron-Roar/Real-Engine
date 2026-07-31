@@ -11,47 +11,57 @@ const Torque large_fly_control_torque = 2000000.0f;
     fprintf(stderr, "%s\n", rohr_error_default_message((engine_result).result.error))
 
 int main(void) {
-    EngineResult result;
-    EntityResult entity_result;
     KeyboardState keyboard = {0};
 
-    if(rohr_error_check(result = rohr_engine_init())) {
-        PRINT_ENGINE_ERROR(result);
-        return 1;
+    {
+        EngineResult init_result = rohr_engine_init();
+        if(rohr_error_check(init_result)) {
+            PRINT_ENGINE_ERROR(init_result);
+            return 1;
+        }
     }
     rohr_engine_set_dt(1/(float)120);
-    if(rohr_error_check(result = rohr_graphics_start())) {
-        PRINT_ENGINE_ERROR(result);
-        rohr_engine_shutdown();
-        return 1;
+    {
+        EngineResult graphics_result = rohr_graphics_start();
+        if(rohr_error_check(graphics_result)) {
+            PRINT_ENGINE_ERROR(graphics_result);
+            rohr_engine_shutdown();
+            return 1;
+        }
     }
 
-    if(rohr_error_check(result = rohr_game_state_load_file(
-            "examples/flies-in-pit/flies_in_pit.json"))) {
-        PRINT_ENGINE_ERROR(result);
+    EngineResult load_result = rohr_game_state_load_file(
+        "examples/flies-in-pit/flies_in_pit.json"
+    );
+    if(rohr_error_check(load_result)) {
+        PRINT_ENGINE_ERROR(load_result);
         goto fail;
     }
 
-    if(rohr_error_check(entity_result = rohr_entity_find_by_name("wall_1"))) {
-        PRINT_ENGINE_ERROR(entity_result);
+    EntityResult wall_1_result = rohr_entity_find_by_name("wall_1");
+    if(rohr_error_check(wall_1_result)) {
+        PRINT_ENGINE_ERROR(wall_1_result);
         goto fail;
     }
-    Entity wall_1 = entity_result.result.value;
-    if(rohr_error_check(entity_result = rohr_entity_find_by_name("wall_2"))) {
-        PRINT_ENGINE_ERROR(entity_result);
+    Entity wall_1 = wall_1_result.result.value;
+    EntityResult wall_2_result = rohr_entity_find_by_name("wall_2");
+    if(rohr_error_check(wall_2_result)) {
+        PRINT_ENGINE_ERROR(wall_2_result);
         goto fail;
     }
-    Entity wall_2 = entity_result.result.value;
-    if(rohr_error_check(entity_result = rohr_entity_find_by_name("wall_3"))) {
-        PRINT_ENGINE_ERROR(entity_result);
+    Entity wall_2 = wall_2_result.result.value;
+    EntityResult wall_3_result = rohr_entity_find_by_name("wall_3");
+    if(rohr_error_check(wall_3_result)) {
+        PRINT_ENGINE_ERROR(wall_3_result);
         goto fail;
     }
-    Entity wall_3 = entity_result.result.value;
-    if(rohr_error_check(entity_result = rohr_entity_find_by_name("large_fly"))) {
-        PRINT_ENGINE_ERROR(entity_result);
+    Entity wall_3 = wall_3_result.result.value;
+    EntityResult large_fly_result = rohr_entity_find_by_name("large_fly");
+    if(rohr_error_check(large_fly_result)) {
+        PRINT_ENGINE_ERROR(large_fly_result);
         goto fail;
     }
-    Entity large_fly = entity_result.result.value;
+    Entity large_fly = large_fly_result.result.value;
     CameraAttachment camera_attachment;
     if(!rohr_graphics_get_camera_attachment(&camera_attachment)
             || camera_attachment.entity != large_fly
@@ -90,19 +100,19 @@ int main(void) {
         Vec2D move_axis = rohr_controller_wasd_axis(&keyboard);
         Vec2D turn_axis = rohr_controller_axis_from_keycodes(&keyboard, SDLK_UNKNOWN, SDLK_LEFT, SDLK_UNKNOWN, SDLK_RIGHT);
         if(move_axis.x != 0.0f || move_axis.y != 0.0f) {
-            result = rohr_physics_apply_force_for_one_tick(large_fly, (Force){
+            EngineResult force_result = rohr_physics_apply_force_for_one_tick(large_fly, (Force){
                 .x = move_axis.x * large_fly_mass * large_fly_control_acceleration,
                 .y = move_axis.y * large_fly_mass * large_fly_control_acceleration
             });
-            if(rohr_error_check(result)) {
-                PRINT_ENGINE_ERROR(result);
+            if(rohr_error_check(force_result)) {
+                PRINT_ENGINE_ERROR(force_result);
                 goto fail;
             }
         }
         if(turn_axis.x != 0.0f) {
-            result = rohr_physics_apply_torque_for_one_tick(large_fly, -turn_axis.x * large_fly_control_torque);
-            if(rohr_error_check(result)) {
-                PRINT_ENGINE_ERROR(result);
+            EngineResult torque_result = rohr_physics_apply_torque_for_one_tick(large_fly, -turn_axis.x * large_fly_control_torque);
+            if(rohr_error_check(torque_result)) {
+                PRINT_ENGINE_ERROR(torque_result);
                 goto fail;
             }
         }

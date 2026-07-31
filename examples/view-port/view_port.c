@@ -15,29 +15,31 @@ const float camera_turn_speed = PI_F * 0.5f;
     fprintf(stderr, "%s\n", rohr_error_default_message((engine_result).result.error))
 
 int main(void) {
-    EngineResult result;
-    EntityResult entity_result;
-    AnimationAssetResult animation_result;
-
-    if(rohr_error_check(result = rohr_engine_init())) {
-        PRINT_ENGINE_ERROR(result);
-        return 1;
+    {
+        EngineResult init_result = rohr_engine_init();
+        if(rohr_error_check(init_result)) {
+            PRINT_ENGINE_ERROR(init_result);
+            return 1;
+        }
     }
     KeyboardState keyboard = {0};
     MouseState mouse = {0};
     //rohr_level_editor_init();
-    if(rohr_error_check(result = rohr_graphics_start())) {
-        PRINT_ENGINE_ERROR(result);
-        rohr_engine_shutdown();
-        return 1;
+    {
+        EngineResult graphics_result = rohr_graphics_start();
+        if(rohr_error_check(graphics_result)) {
+            PRINT_ENGINE_ERROR(graphics_result);
+            rohr_engine_shutdown();
+            return 1;
+        }
     }
 
-    Entity water_smash;
-    if(rohr_error_check(entity_result = rohr_entity_add())) {
-        PRINT_ENGINE_ERROR(entity_result);
+    EntityResult water_smash_result = rohr_entity_add();
+    if(rohr_error_check(water_smash_result)) {
+        PRINT_ENGINE_ERROR(water_smash_result);
         goto fail;
     }
-    water_smash = entity_result.result.value;
+    Entity water_smash = water_smash_result.result.value;
     rohr_physics_set_position(water_smash, (Position){.x = 0, .y = 0});
     rohr_physics_set_orientation(water_smash, 0);
     rohr_physics_set_mass(water_smash, 50);
@@ -47,14 +49,16 @@ int main(void) {
     rohr_physics_set_hitbox(water_smash, shape4);
     rohr_physics_set_friction(water_smash, 0.4);
     rohr_physics_set_dynamic(water_smash);
-    if(rohr_error_check(result = rohr_graphics_attach_camera(
+    EngineResult camera_result = rohr_graphics_attach_camera(
             water_smash,
             (Vec2D){.x = 0.0f, .y = 100.0f},
-            0.0f))) {
-        PRINT_ENGINE_ERROR(result);
+            0.0f);
+    if(rohr_error_check(camera_result)) {
+        PRINT_ENGINE_ERROR(camera_result);
         goto fail;
     }
-    if(rohr_error_check(animation_result = rohr_graphics_load_animation(elderfly_fly))) {
+    AnimationAssetResult animation_result = rohr_graphics_load_animation(elderfly_fly);
+    if(rohr_error_check(animation_result)) {
         PRINT_ENGINE_ERROR(animation_result);
         goto fail;
     }

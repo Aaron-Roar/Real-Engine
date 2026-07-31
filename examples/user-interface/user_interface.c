@@ -5,27 +5,27 @@
     fprintf(stderr, "%s\n", rohr_error_default_message((engine_result).result.error))
 
 int main(void) {
-    EngineResult result;
     MouseState mouse = {0};
     bool running = true;
 
-    result = rohr_engine_init();
-    if(rohr_error_check(result)) {
-        PRINT_ENGINE_ERROR(result);
-        return 1;
+    {
+        EngineResult init_result = rohr_engine_init();
+        if(rohr_error_check(init_result)) {
+            PRINT_ENGINE_ERROR(init_result);
+            return 1;
+        }
     }
-    result = rohr_graphics_start();
-    if(rohr_error_check(result)) {
-        PRINT_ENGINE_ERROR(result);
-        rohr_engine_shutdown();
-        return 1;
+    {
+        EngineResult graphics_result = rohr_graphics_start();
+        if(rohr_error_check(graphics_result)) {
+            PRINT_ENGINE_ERROR(graphics_result);
+            rohr_engine_shutdown();
+            return 1;
+        }
     }
 
     while(running) {
         SDL_Event event = rohr_engine_poll_event();
-        UIButtonResult play;
-        UIButtonResult settings;
-        UIButtonResult quit;
 
         if(event.type == SDL_EVENT_QUIT) {
             break;
@@ -42,9 +42,9 @@ int main(void) {
             .primary_button = mouse.button_states[MOUSE_BUTTON_LEFT],
         });
 
-        play = rohr_ui_button("main_menu.play", (UIRect){220.0f, 130.0f, 200.0f, 55.0f}, NULL);
-        settings = rohr_ui_button("main_menu.settings", (UIRect){220.0f, 205.0f, 200.0f, 55.0f}, NULL);
-        quit = rohr_ui_button("main_menu.quit", (UIRect){220.0f, 280.0f, 200.0f, 55.0f}, NULL);
+        UIButtonResult play = rohr_ui_button("main_menu.play", (UIRect){220.0f, 130.0f, 200.0f, 55.0f}, NULL);
+        UIButtonResult settings = rohr_ui_button("main_menu.settings", (UIRect){220.0f, 205.0f, 200.0f, 55.0f}, NULL);
+        UIButtonResult quit = rohr_ui_button("main_menu.quit", (UIRect){220.0f, 280.0f, 200.0f, 55.0f}, NULL);
 
         if(play.clicked) printf("Play clicked\n");
         if(settings.clicked) printf("Settings clicked\n");

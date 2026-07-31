@@ -17,37 +17,40 @@ const Torque ball_control_torque = 2000000.0f;
     fprintf(stderr, "%s\n", rohr_error_default_message((engine_result).result.error))
 
 int main(void) {
-    EngineResult result;
-    EntityResult entity_result;
-    ChildrenResult children_result;
-    AnimationAssetResult animation_result;
     GroupId children_group = GROUP_INVALID;
     KeyboardState keyboard = {0};
 
-    if(rohr_error_check(result = rohr_engine_init())) {
-        PRINT_ENGINE_ERROR(result);
-        return 1;
+    {
+        EngineResult init_result = rohr_engine_init();
+        if(rohr_error_check(init_result)) {
+            PRINT_ENGINE_ERROR(init_result);
+            return 1;
+        }
     }
     rohr_engine_set_dt(1/(float)120);
-    if(rohr_error_check(result = rohr_graphics_start())) {
-        PRINT_ENGINE_ERROR(result);
-        rohr_engine_shutdown();
-        return 1;
+    {
+        EngineResult graphics_result = rohr_graphics_start();
+        if(rohr_error_check(graphics_result)) {
+            PRINT_ENGINE_ERROR(graphics_result);
+            rohr_engine_shutdown();
+            return 1;
+        }
     }
 
-    if(rohr_error_check(animation_result = rohr_graphics_load_animation(elderfly_fly))) {
+    AnimationAssetResult animation_result = rohr_graphics_load_animation(elderfly_fly);
+    if(rohr_error_check(animation_result)) {
         PRINT_ENGINE_ERROR(animation_result);
         goto fail;
     }
     animation = animation_result.result.value;
     sprite = rohr_graphics_create_animated_sprite(animation, (Scale){3,3});
 
-    Entity ball;
-    if(rohr_error_check(entity_result = rohr_entity_add())) {
-        PRINT_ENGINE_ERROR(entity_result);
+    EntityResult ball_result = rohr_entity_add();
+    if(rohr_error_check(ball_result)) {
+        PRINT_ENGINE_ERROR(ball_result);
         goto fail;
     }
-    ball = entity_result.result.value;
+    Entity ball = ball_result.result.value;
     rohr_physics_set_position(ball, (Position){.x = 0, .y = 100});
     rohr_physics_set_orientation(ball, 0);
     rohr_physics_set_mass(ball, ball_mass);
@@ -64,12 +67,12 @@ int main(void) {
     time_t seed = 1003463;
     srand(seed);
     for(int i = 0; i < amount_of_entities; i += 1) {
-        Entity small_fly;
-        if(rohr_error_check(entity_result = rohr_entity_add())) {
-            PRINT_ENGINE_ERROR(entity_result);
+        EntityResult small_fly_result = rohr_entity_add();
+        if(rohr_error_check(small_fly_result)) {
+            PRINT_ENGINE_ERROR(small_fly_result);
             goto fail;
         }
-        small_fly = entity_result.result.value;
+        Entity small_fly = small_fly_result.result.value;
         rohr_physics_set_position(small_fly, (Position){.x = rohr_tools_random_range(100, 400), .y = rohr_tools_random_range(0, 300)});
         rohr_physics_set_orientation(small_fly, rohr_tools_random_range(0, 2*PI_F));
         rohr_physics_set_mass(small_fly, 10);
@@ -81,8 +84,9 @@ int main(void) {
         rohr_physics_set_hitbox(small_fly, small_fly_shape);
         rohr_physics_set_friction(small_fly, 0.4);
         rohr_physics_set_dynamic(small_fly);
-        if(rohr_error_check(result = rohr_entity_set_parent(small_fly, ball))) {
-            PRINT_ENGINE_ERROR(result);
+        EngineResult parent_result = rohr_entity_set_parent(small_fly, ball);
+        if(rohr_error_check(parent_result)) {
+            PRINT_ENGINE_ERROR(parent_result);
             goto fail;
         }
         sprite = rohr_graphics_create_animated_sprite(animation, (Scale){size/10, size/10});
@@ -91,7 +95,8 @@ int main(void) {
         rohr_entity_add_components(small_fly, PARTICLE);
     }
 
-    if(rohr_error_check(children_result = rohr_entity_get_children(ball))) {
+    ChildrenResult children_result = rohr_entity_get_children(ball);
+    if(rohr_error_check(children_result)) {
         PRINT_ENGINE_ERROR(children_result);
         goto fail;
     }
@@ -130,30 +135,31 @@ int main(void) {
         Vec2D turn_axis = rohr_controller_axis_from_keycodes(&keyboard, SDLK_UNKNOWN, SDLK_LEFT, SDLK_UNKNOWN, SDLK_RIGHT);
 
         if(move_axis.x != 0.0f || move_axis.y != 0.0f) {
-            result = rohr_physics_apply_force_for_one_tick(ball, (Force){
+            EngineResult force_result = rohr_physics_apply_force_for_one_tick(ball, (Force){
                 .x = -move_axis.x * ball_mass * ball_control_acceleration,
                 .y = -move_axis.y * ball_mass * ball_control_acceleration
             });
-            if(rohr_error_check(result)) {
-                PRINT_ENGINE_ERROR(result);
+            if(rohr_error_check(force_result)) {
+                PRINT_ENGINE_ERROR(force_result);
                 goto fail;
             }
         }
         if(turn_axis.x != 0.0f) {
-            result = rohr_physics_apply_torque_for_one_tick(ball, -turn_axis.x * ball_control_torque);
-            if(rohr_error_check(result)) {
-                PRINT_ENGINE_ERROR(result);
+            EngineResult torque_result = rohr_physics_apply_torque_for_one_tick(ball, -turn_axis.x * ball_control_torque);
+            if(rohr_error_check(torque_result)) {
+                PRINT_ENGINE_ERROR(torque_result);
                 goto fail;
             }
         }
 
+        EngineResult acceleration_result;
         if(phase_time < 3.0) {
-            result = rohr_physics_group_set_acceleration_toward_entity(children_group, acceleration_magnitude, ball);
+            acceleration_result = rohr_physics_group_set_acceleration_toward_entity(children_group, acceleration_magnitude, ball);
         } else {
-            result = rohr_physics_group_set_acceleration_away_from_entity(children_group, acceleration_magnitude, ball);
+            acceleration_result = rohr_physics_group_set_acceleration_away_from_entity(children_group, acceleration_magnitude, ball);
         }
-        if(rohr_error_check(result)) {
-            PRINT_ENGINE_ERROR(result);
+        if(rohr_error_check(acceleration_result)) {
+            PRINT_ENGINE_ERROR(acceleration_result);
             goto fail;
         }
 

@@ -18,28 +18,24 @@ static const float right_paddle_min_y = -312.0f;
 static const float right_paddle_max_y = -20.0f;
 
 static EngineResult pong_find_entity(const char *name, Entity *entity) {
-    EntityResult result;
-
     if(name == NULL || entity == NULL) {
         return rohr_error_result_error(ERROR_MEMORY_POOL_NULL_POINTER);
     }
-    result = rohr_entity_find_by_name(name);
-    if(rohr_error_check(result)) {
-        return rohr_error_result_error(result.result.error);
+    EntityResult find_result = rohr_entity_find_by_name(name);
+    if(rohr_error_check(find_result)) {
+        return rohr_error_result_error(find_result.result.error);
     }
-    *entity = result.result.value;
+    *entity = find_result.result.value;
     return rohr_error_result_value(true);
 }
 
 static EngineResult pong_reset_ball(Entity ball, int serve_direction) {
-    EngineResult result;
-
-    result = rohr_physics_set_position(ball, (Position){0.0f, 0.0f});
-    if(rohr_error_check(result)) return result;
-    result = rohr_physics_set_orientation(ball, 0.0f);
-    if(rohr_error_check(result)) return result;
-    result = rohr_physics_set_angular_velocity(ball, 0.0f);
-    if(rohr_error_check(result)) return result;
+    EngineResult position_result = rohr_physics_set_position(ball, (Position){0.0f, 0.0f});
+    if(rohr_error_check(position_result)) return position_result;
+    EngineResult orientation_result = rohr_physics_set_orientation(ball, 0.0f);
+    if(rohr_error_check(orientation_result)) return orientation_result;
+    EngineResult angular_velocity_result = rohr_physics_set_angular_velocity(ball, 0.0f);
+    if(rohr_error_check(angular_velocity_result)) return angular_velocity_result;
     return rohr_physics_set_velocity(ball, (Velocity){
         .x = serve_direction * 25.0f,
         .y = serve_direction * 45.0f
@@ -88,14 +84,13 @@ static EngineResult pong_constrain_paddle(
     }
     if(!position_changed) return rohr_error_result_value(true);
     {
-        EngineResult result = rohr_physics_set_position(paddle, position);
-        if(rohr_error_check(result)) return result;
+        EngineResult position_result = rohr_physics_set_position(paddle, position);
+        if(rohr_error_check(position_result)) return position_result;
     }
     return rohr_physics_set_velocity(paddle, velocity);
 }
 
 int main(void) {
-    EngineResult result;
     KeyboardState keyboard = {0};
     Entity wall_bottom;
     Entity wall_top;
@@ -107,25 +102,55 @@ int main(void) {
     int right_score = 0;
     int serve_direction = 1;
 
-    if(rohr_error_check(result = rohr_engine_init())) {
-        PRINT_ENGINE_ERROR(result);
-        return 1;
+    {
+        EngineResult init_result = rohr_engine_init();
+        if(rohr_error_check(init_result)) {
+            PRINT_ENGINE_ERROR(init_result);
+            return 1;
+        }
     }
     rohr_engine_set_dt(1.0f / 120.0f);
-    if(rohr_error_check(result = rohr_graphics_start())) {
-        PRINT_ENGINE_ERROR(result);
-        rohr_engine_shutdown();
-        return 1;
+    {
+        EngineResult graphics_result = rohr_graphics_start();
+        if(rohr_error_check(graphics_result)) {
+            PRINT_ENGINE_ERROR(graphics_result);
+            rohr_engine_shutdown();
+            return 1;
+        }
     }
-    if(rohr_error_check(result = rohr_game_state_load_file(
-            "examples/pong/pong.json"))
-            || rohr_error_check(result = pong_find_entity("wall_bottom", &wall_bottom))
-            || rohr_error_check(result = pong_find_entity("wall_top", &wall_top))
-            || rohr_error_check(result = pong_find_entity("center_line", &center_line))
-            || rohr_error_check(result = pong_find_entity("paddle_left", &paddle_left))
-            || rohr_error_check(result = pong_find_entity("paddle_right", &paddle_right))
-            || rohr_error_check(result = pong_find_entity("ball", &ball))) {
-        PRINT_ENGINE_ERROR(result);
+    EngineResult load_result = rohr_game_state_load_file("examples/pong/pong.json");
+    if(rohr_error_check(load_result)) {
+        PRINT_ENGINE_ERROR(load_result);
+        goto fail;
+    }
+    EngineResult wall_bottom_result = pong_find_entity("wall_bottom", &wall_bottom);
+    if(rohr_error_check(wall_bottom_result)) {
+        PRINT_ENGINE_ERROR(wall_bottom_result);
+        goto fail;
+    }
+    EngineResult wall_top_result = pong_find_entity("wall_top", &wall_top);
+    if(rohr_error_check(wall_top_result)) {
+        PRINT_ENGINE_ERROR(wall_top_result);
+        goto fail;
+    }
+    EngineResult center_line_result = pong_find_entity("center_line", &center_line);
+    if(rohr_error_check(center_line_result)) {
+        PRINT_ENGINE_ERROR(center_line_result);
+        goto fail;
+    }
+    EngineResult paddle_left_result = pong_find_entity("paddle_left", &paddle_left);
+    if(rohr_error_check(paddle_left_result)) {
+        PRINT_ENGINE_ERROR(paddle_left_result);
+        goto fail;
+    }
+    EngineResult paddle_right_result = pong_find_entity("paddle_right", &paddle_right);
+    if(rohr_error_check(paddle_right_result)) {
+        PRINT_ENGINE_ERROR(paddle_right_result);
+        goto fail;
+    }
+    EngineResult ball_result = pong_find_entity("ball", &ball);
+    if(rohr_error_check(ball_result)) {
+        PRINT_ENGINE_ERROR(ball_result);
         goto fail;
     }
 
@@ -148,48 +173,48 @@ int main(void) {
         right_axis = pong_screen_axis_to_world(
             rohr_controller_arrow_axis(&keyboard)
         );
-        result = rohr_physics_set_velocity(
+        EngineResult left_velocity_result = rohr_physics_set_velocity(
             paddle_left,
             (Velocity){
                 left_axis.x * paddle_speed,
                 left_axis.y * paddle_speed
             }
         );
-        if(rohr_error_check(result)) {
-            PRINT_ENGINE_ERROR(result);
+        if(rohr_error_check(left_velocity_result)) {
+            PRINT_ENGINE_ERROR(left_velocity_result);
             goto fail;
         }
-        result = rohr_physics_set_velocity(
+        EngineResult right_velocity_result = rohr_physics_set_velocity(
             paddle_right,
             (Velocity){
                 right_axis.x * paddle_speed,
                 right_axis.y * paddle_speed
             }
         );
-        if(rohr_error_check(result)) {
-            PRINT_ENGINE_ERROR(result);
+        if(rohr_error_check(right_velocity_result)) {
+            PRINT_ENGINE_ERROR(right_velocity_result);
             goto fail;
         }
 
         rohr_engine_update_time();
         rohr_engine_update_tick();
         rohr_system_update_physics(rohr_engine_get_dt());
-        result = pong_constrain_paddle(
+        EngineResult left_constraint_result = pong_constrain_paddle(
             paddle_left,
             left_paddle_min_y,
             left_paddle_max_y
         );
-        if(rohr_error_check(result)) {
-            PRINT_ENGINE_ERROR(result);
+        if(rohr_error_check(left_constraint_result)) {
+            PRINT_ENGINE_ERROR(left_constraint_result);
             goto fail;
         }
-        result = pong_constrain_paddle(
+        EngineResult right_constraint_result = pong_constrain_paddle(
             paddle_right,
             right_paddle_min_y,
             right_paddle_max_y
         );
-        if(rohr_error_check(result)) {
-            PRINT_ENGINE_ERROR(result);
+        if(rohr_error_check(right_constraint_result)) {
+            PRINT_ENGINE_ERROR(right_constraint_result);
             goto fail;
         }
 
@@ -198,18 +223,18 @@ int main(void) {
             right_score += 1;
             serve_direction = -1;
             printf("Left: %d  Right: %d\n", left_score, right_score);
-            result = pong_reset_ball(ball, serve_direction);
-            if(rohr_error_check(result)) {
-                PRINT_ENGINE_ERROR(result);
+            EngineResult reset_result = pong_reset_ball(ball, serve_direction);
+            if(rohr_error_check(reset_result)) {
+                PRINT_ENGINE_ERROR(reset_result);
                 goto fail;
             }
         } else if(positions[ball_index].y < -goal_y) {
             left_score += 1;
             serve_direction = 1;
             printf("Left: %d  Right: %d\n", left_score, right_score);
-            result = pong_reset_ball(ball, serve_direction);
-            if(rohr_error_check(result)) {
-                PRINT_ENGINE_ERROR(result);
+            EngineResult reset_result = pong_reset_ball(ball, serve_direction);
+            if(rohr_error_check(reset_result)) {
+                PRINT_ENGINE_ERROR(reset_result);
                 goto fail;
             }
         }
