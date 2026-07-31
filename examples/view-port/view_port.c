@@ -119,7 +119,10 @@ int main(void) {
         rohr_controller_update_mouse_states(&mouse);
         rohr_controller_add_mouse_event(&mouse, mouse_event);
         if(mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_DOWN) {
-            rohr_physics_set_position(water_smash, mouse.position);
+            rohr_physics_set_position(
+                water_smash,
+                rohr_controller_mouse_world_position(&mouse)
+            );
         }
         if(mouse.button_states[MOUSE_BUTTON_RIGHT] == MOUSE_BUTTON_STATE_DOWN) {
             EntityIndex water_smash_index;

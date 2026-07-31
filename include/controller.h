@@ -62,14 +62,14 @@ typedef enum {
     MOUSE_BUTTON_STATE_NONE,
 } MouseButtonState;
 
-/** Mouse position in world coordinates. */
+/** Mouse position in logical screen coordinates. */
 typedef Vec2D MousePosition;
 
 /** Current mouse state. */
 typedef struct {
     /** Button states indexed by MouseButton. */
     MouseButtonState button_states[MOUSE_BUTTON_COUNT];
-    /** Current mouse position. */
+    /** Current mouse position in logical screen coordinates. */
     MousePosition position;
 } MouseState;
 
@@ -79,7 +79,7 @@ typedef struct {
     MouseButton button;
     /** New button state from the event. */
     MouseButtonState state;
-    /** Mouse position at event capture time. */
+    /** Mouse position in logical screen coordinates at event capture time. */
     MousePosition position;
 } MouseEvent;
 

@@ -264,6 +264,12 @@ void rohr_controller_print_mouse_event(MouseEvent event) { print_mouse_event(eve
 void rohr_controller_update_mouse_states(MouseState *mouse) { update_mouse_states(mouse); }
 void rohr_controller_add_mouse_event(MouseState *mouse, MouseEvent mouse_event) { add_mouse_event(mouse, mouse_event); }
 MouseEvent rohr_controller_capture_mouse_event(const SDL_Event *sdl_event) { return capture_mouse_event(sdl_event); }
+Position rohr_controller_mouse_world_position(const MouseState *mouse) {
+    if(mouse == NULL) {
+        return (Position){0};
+    }
+    return graphics_screen_to_world(mouse->position);
+}
 
 void rohr_grid_add_entity_to_grids(Entity entity) { add_entity_to_grids(entity); }
 bool rohr_grid_checked_pair(Entity entity_1, Entity entity_2) { return checked_pair(entity_1, entity_2); }

@@ -271,6 +271,9 @@ Position graphics_world_to_screen(Position pos);
 /** Convert logical screen coordinates to world coordinates. */
 Position graphics_screen_to_world(Position screen);
 
+/** Convert SDL window coordinates to logical screen coordinates. */
+Position graphics_window_to_screen(Position window);
+
 /** Get the mouse position in logical screen coordinates. */
 Position graphics_get_mouse_screen_position(void);
 

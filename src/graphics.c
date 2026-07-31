@@ -573,29 +573,33 @@ Position graphics_screen_to_world(Position screen) {
     };
 }
 
-Position graphics_get_mouse_screen_position(void) {
-    float window_x;
-    float window_y;
+Position graphics_window_to_screen(Position window) {
     float screen_x;
     float screen_y;
 
-    if(sdl_renderer == NULL) {
-        return (Position){0};
-    }
-    SDL_GetMouseState(&window_x, &window_y);
-    if(!SDL_RenderCoordinatesFromWindow(
-        sdl_renderer,
-        window_x,
-        window_y,
-        &screen_x,
-        &screen_y
-    )) {
+    if(sdl_renderer == NULL || !SDL_RenderCoordinatesFromWindow(
+            sdl_renderer,
+            window.x,
+            window.y,
+            &screen_x,
+            &screen_y)) {
         return (Position){0};
     }
     return (Position){
         .x = screen_x,
         .y = screen_y,
     };
+}
+
+Position graphics_get_mouse_screen_position(void) {
+    float window_x;
+    float window_y;
+
+    if(sdl_renderer == NULL) {
+        return (Position){0};
+    }
+    SDL_GetMouseState(&window_x, &window_y);
+    return graphics_window_to_screen((Position){window_x, window_y});
 }
 
 EngineResult graphics_start(void) {

@@ -153,15 +153,6 @@ void update_key_states(KeyboardState *keyboard) {
     }
 }
 
-Vec2D get_mouse_position(void) {
-    Position world_position =
-        graphics_screen_to_world(graphics_get_mouse_screen_position());
-
-    return (Vec2D){
-        .x = world_position.x,
-        .y = world_position.y,
-    };
-}
 MouseEvent capture_mouse_event(const SDL_Event *sdl_event) {
     MouseEvent mouse_event = {
         .button = MOUSE_BUTTON_NONE,
@@ -214,7 +205,10 @@ MouseEvent capture_mouse_event(const SDL_Event *sdl_event) {
                 break;
         }
     }
-    mouse_event.position = get_mouse_position();
+    mouse_event.position = graphics_window_to_screen((Position){
+        .x = sdl_event->button.x,
+        .y = sdl_event->button.y,
+    });
 
     return mouse_event;
 }
@@ -259,7 +253,7 @@ void update_mouse_states(MouseState *mouse) {
             mouse->button_states[i] = MOUSE_BUTTON_STATE_DOWN;
         }
     }
-    mouse->position = get_mouse_position();
+    mouse->position = graphics_get_mouse_screen_position();
 }
 const char *mouse_button_name(MouseButton button)
 {

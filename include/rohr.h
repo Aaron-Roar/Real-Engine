@@ -1447,6 +1447,13 @@ void rohr_controller_add_mouse_event(MouseState *mouse, MouseEvent mouse_event);
 MouseEvent rohr_controller_capture_mouse_event(const SDL_Event *sdl_event);
 
 /**
+ * @brief Converts the current logical screen-space mouse position to world space.
+ * @param mouse Mouse state to convert.
+ * @return World position under the mouse, or zero when mouse is NULL.
+ */
+Position rohr_controller_mouse_world_position(const MouseState *mouse);
+
+/**
  * @brief Adds an entity to the spatial grid tables.
  * @param entity Entity to add.
  */
