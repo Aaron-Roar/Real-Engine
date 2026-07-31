@@ -132,6 +132,12 @@ Run the viewport example:
 make run-view
 ```
 
+Run the Pong example:
+
+```sh
+make run-pong
+```
+
 ## Nix
 
 If you use Nix, the development shell includes the C toolchain, SDL dependencies, ffmpeg, and Doxygen:
@@ -187,6 +193,7 @@ Current examples:
 * `flies-in-pit`: physics, particles, animated sprites, collisions, grid drawing, and recording.
 * `flies-around-ball`: joints, attraction-style motion, particles, and animated sprites.
 * `view-port`: basic sprite movement and input handling.
+* `pong`: rotated JSON-authored arena, two-player WASD/arrow controls, collision paddles, and scoring.
 
 Build output goes to:
 

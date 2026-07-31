@@ -191,3 +191,49 @@ Duplicate names in the asset catalog return
 `ERROR_ENGINE_STATE_DUPLICATE_ASSET_DEFINITION`. An entity component referring
 to an animation or other named asset that was not defined returns
 `ERROR_ENGINE_STATE_ASSET_REFERENCE_NOT_FOUND`.
+
+## Cameras
+
+A state may attach the active camera to one named entity:
+
+```json
+"camera": {
+  "attachment": {
+    "entity": "player",
+    "position_offset": {"x": 0, "y": 20},
+    "orientation_offset": 0,
+    "follow_position": true,
+    "follow_orientation": false
+  }
+}
+```
+
+The entity may be declared in any file passed to the same
+`game_state_load_files()` call. It must have both a position and orientation.
+`follow_position` and `follow_orientation` are optional and default to `true`.
+They independently control which parts of the entity transform are inherited.
+When orientation is followed, `position_offset` is in entity-local space and
+rotates with the entity. Otherwise it is world-space. When position is not
+followed, `position_offset` is the fixed camera world position. Likewise,
+`orientation_offset` is added to the entity orientation when it is followed,
+and becomes the fixed world orientation when it is not.
+
+A standalone camera uses an explicit world-space transform:
+
+```json
+"camera": {
+  "transform": {
+    "position": {"x": 320, "y": 180},
+    "orientation": 0.5
+  }
+}
+```
+
+`attachment` and `transform` are mutually exclusive. Loading a standalone
+transform detaches any currently followed entity.
+
+Only one retained input document per engine session may declare a camera;
+additional declarations are rejected as ambiguous.
+
+Runtime saves emit either the active named attachment or the current standalone
+transform. Compact template saves preserve the authored camera declaration.

@@ -27,6 +27,31 @@ typedef struct {
     float y;
 } Scale;
 
+/** World-space camera transform used by the renderer. */
+typedef struct {
+    /** World position shown at the center of the viewport. */
+    Position position;
+    /** Counterclockwise world orientation in radians. */
+    Orientation orientation;
+} Camera;
+
+/** Non-owning description of an entity-following camera attachment. */
+typedef struct {
+    /** Entity transform followed by the camera. */
+    Entity entity;
+    /**
+     * Local offset when following orientation, otherwise a world-space offset
+     * or fixed position.
+     */
+    Vec2D position_offset;
+    /** Relative or fixed orientation in radians. */
+    Orientation orientation_offset;
+    /** Whether the camera inherits the entity position. */
+    bool follow_position;
+    /** Whether the camera inherits the entity orientation. */
+    bool follow_orientation;
+} CameraAttachment;
+
 /** Descriptor for loading a texture from disk. */
 typedef struct {
   /** Path to the texture file. */
@@ -194,6 +219,48 @@ void graphics_update_sprite_frames(Tick current_tick, Time current_time);
 
 /** Scale an entity's animated sprite textures. */
 void graphics_scale_textures(Entity entity, Scale scale);
+
+/** Replace the active camera transform. */
+void graphics_set_camera(Camera camera);
+
+/** Return the active camera transform. */
+Camera graphics_get_camera(void);
+
+/** Translate the active camera in world space. */
+void graphics_move_camera(Vec2D translation);
+
+/** Rotate the active camera counterclockwise by radians. */
+void graphics_rotate_camera(Orientation radians);
+
+/**
+ * Attach the camera to an entity transform.
+ *
+ * The position offset is expressed in the entity's local space. The
+ * orientation offset is added to the entity's orientation.
+ */
+EngineResult graphics_attach_camera(
+    Entity entity,
+    Vec2D position_offset,
+    Orientation orientation_offset
+);
+
+/** Attach a camera with independent position and orientation following. */
+EngineResult graphics_attach_camera_with_options(
+    Entity entity,
+    Vec2D position_offset,
+    Orientation orientation_offset,
+    bool follow_position,
+    bool follow_orientation
+);
+
+/** Detach the camera while preserving its resolved world transform. */
+void graphics_detach_camera(void);
+
+/** Report whether the camera is attached to a live entity transform. */
+bool graphics_camera_is_attached(void);
+
+/** Copy the active attachment description to the caller. */
+bool graphics_get_camera_attachment(CameraAttachment *attachment);
 
 /** Convert world coordinates to logical screen coordinates. */
 Position graphics_world_to_screen(Position pos);

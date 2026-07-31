@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "camera": {
+    "transform": {
+      "position": {"x": 0.0, "y": 0.0},
+      "orientation": -1.57079632679
+    }
+  },
+  "entities": [
+    {
+      "name": "wall_bottom",
+      "components": {
+        "flags": ["static", "collision"],
+        "position": {"x": -250.0, "y": 0.0},
+        "orientation": 0.0,
+        "friction": 0.0,
+        "restitution": 0.8,
+        "hit_box": [
+          {"x": 10.0, "y": 340.0},
+          {"x": 10.0, "y": -340.0},
+          {"x": -10.0, "y": -340.0},
+          {"x": -10.0, "y": 340.0}
+        ]
+      }
+    },
+    {
+      "name": "wall_top",
+      "components": {
+        "flags": ["static", "collision"],
+        "position": {"x": 250.0, "y": 0.0},
+        "orientation": 0.0,
+        "friction": 0.0,
+        "restitution": 0.8,
+        "hit_box": [
+          {"x": 10.0, "y": 340.0},
+          {"x": 10.0, "y": -340.0},
+          {"x": -10.0, "y": -340.0},
+          {"x": -10.0, "y": 340.0}
+        ]
+      }
+    },
+    {
+      "name": "center_line",
+      "components": {
+        "position": {"x": 0.0, "y": 0.0},
+        "orientation": 0.0,
+        "hit_box": [
+          {"x": 190.0, "y": 2.0},
+          {"x": 190.0, "y": -2.0},
+          {"x": -190.0, "y": -2.0},
+          {"x": -190.0, "y": 2.0}
+        ]
+      }
+    },
+    {
+      "name": "paddle_left",
+      "components": {
+        "flags": ["dynamic", "collision"],
+        "position": {"x": 0.0, "y": 280.0},
+        "orientation": 0.0,
+        "velocity": {"x": 0.0, "y": 0.0},
+        "acceleration": {"x": 0.0, "y": 0.0},
+        "angular_velocity": 0.0,
+        "mass": 1000.0,
+        "friction": 0.0,
+        "restitution": 0.8,
+        "hit_box": [
+          {"x": 50.0, "y": 8.0},
+          {"x": 50.0, "y": -8.0},
+          {"x": -50.0, "y": -8.0},
+          {"x": -50.0, "y": 8.0}
+        ],
+        "angle_lock": {"min": 0.0, "max": 0.0}
+      }
+    },
+    {
+      "name": "paddle_right",
+      "components": {
+        "flags": ["dynamic", "collision"],
+        "position": {"x": 0.0, "y": -280.0},
+        "orientation": 0.0,
+        "velocity": {"x": 0.0, "y": 0.0},
+        "acceleration": {"x": 0.0, "y": 0.0},
+        "angular_velocity": 0.0,
+        "mass": 1000.0,
+        "friction": 0.0,
+        "restitution": 0.8,
+        "hit_box": [
+          {"x": 50.0, "y": 8.0},
+          {"x": 50.0, "y": -8.0},
+          {"x": -50.0, "y": -8.0},
+          {"x": -50.0, "y": 8.0}
+        ],
+        "angle_lock": {"min": 0.0, "max": 0.0}
+      }
+    },
+    {
+      "name": "ball",
+      "components": {
+        "flags": ["dynamic", "collision", "particle"],
+        "position": {"x": 0.0, "y": 0.0},
+        "orientation": 0.0,
+        "velocity": {"x": 25.0, "y": 45.0},
+        "acceleration": {"x": 0.0, "y": 0.0},
+        "angular_velocity": 0.0,
+        "mass": 2.0,
+        "friction": 0.0,
+        "restitution": 0.5,
+        "hit_box": [
+          {"x": 10.0, "y": 0.0},
+          {"x": 8.660254, "y": 5.0},
+          {"x": 5.0, "y": 8.660254},
+          {"x": 0.0, "y": 10.0},
+          {"x": -5.0, "y": 8.660254},
+          {"x": -8.660254, "y": 5.0},
+          {"x": -10.0, "y": 0.0},
+          {"x": -8.660254, "y": -5.0},
+          {"x": -5.0, "y": -8.660254},
+          {"x": 0.0, "y": -10.0},
+          {"x": 5.0, "y": -8.660254},
+          {"x": 8.660254, "y": -5.0}
+        ]
+      }
+    }
+  ]
+}

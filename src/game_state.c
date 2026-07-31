@@ -22,6 +22,7 @@ typedef struct StateDocument {
     yyjson_val *entities;
     yyjson_val *groups;
     yyjson_val *animations;
+    yyjson_val *camera;
 } StateDocument;
 
 typedef struct StateLoadedEntity {
@@ -52,6 +53,7 @@ static size_t state_animation_count = 0;
 static StateSpriteReference state_sprite_references[MAX_ENTITIES] = {0};
 static yyjson_doc *state_template_documents[GAME_STATE_MAX_TEMPLATE_DOCUMENTS] = {0};
 static size_t state_template_document_count = 0;
+static bool state_template_camera_retained = false;
 
 static bool state_number(yyjson_val *object, const char *key, double *value);
 static bool state_vec2(yyjson_val *object, Vec2D *value);
@@ -69,6 +71,7 @@ void game_state_runtime_reset(void) {
     memset(state_template_documents, 0, sizeof(state_template_documents));
     state_animation_count = 0;
     state_template_document_count = 0;
+    state_template_camera_retained = false;
 }
 
 void game_state_entity_clear(EntityIndex index) {
@@ -337,6 +340,76 @@ static EngineResult state_resolve_name(yyjson_val *value, Entity *entity) {
     }
     *entity = result.result.value;
     return error_result_value(true);
+}
+
+static EngineResult state_load_camera(yyjson_val *camera) {
+    yyjson_val *attachment;
+    yyjson_val *transform;
+    yyjson_val *entity_name;
+    Vec2D position_offset;
+    Position position;
+    double orientation;
+    double orientation_offset;
+    bool follow_position;
+    bool follow_orientation;
+    Entity entity;
+    EngineResult result;
+
+    if(!yyjson_is_obj(camera)) {
+        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
+    attachment = yyjson_obj_get(camera, "attachment");
+    transform = yyjson_obj_get(camera, "transform");
+    if((attachment != NULL && !yyjson_is_obj(attachment))
+            || (transform != NULL && !yyjson_is_obj(transform))
+            || (attachment == NULL) == (transform == NULL)) {
+        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
+    if(transform != NULL) {
+        if(!state_vec2(yyjson_obj_get(transform, "position"), &position)
+                || !state_number(transform, "orientation", &orientation)) {
+            return error_result_error(ERROR_ENGINE_STATE_INVALID);
+        }
+        graphics_set_camera((Camera){
+            .position = position,
+            .orientation = (Orientation)orientation
+        });
+        return error_result_value(true);
+    }
+
+    entity_name = yyjson_obj_get(attachment, "entity");
+    if(!state_vec2(
+            yyjson_obj_get(attachment, "position_offset"),
+            &position_offset
+        )
+            || !state_number(
+                attachment,
+                "orientation_offset",
+                &orientation_offset
+            )
+            || !state_optional_boolean(
+                attachment,
+                "follow_position",
+                true,
+                &follow_position
+            )
+            || !state_optional_boolean(
+                attachment,
+                "follow_orientation",
+                true,
+                &follow_orientation
+            )) {
+        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
+    result = state_resolve_name(entity_name, &entity);
+    if(result.kind == ERROR_RESULT_ERROR) return result;
+    return graphics_attach_camera_with_options(
+        entity,
+        position_offset,
+        (Orientation)orientation_offset,
+        follow_position,
+        follow_orientation
+    );
 }
 
 static bool state_entity_count(yyjson_val *description, uint64_t *count) {
@@ -984,6 +1057,7 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
     size_t created_count = 0;
     size_t total_created = 0;
     size_t created_group_count = 0;
+    size_t camera_definition_count = 0;
     size_t initial_animation_count = state_animation_count;
     EngineResult result = error_result_value(true);
 
@@ -1031,6 +1105,7 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
         version = yyjson_obj_get(root, "version");
         documents[document_index].entities = yyjson_obj_get(root, "entities");
         documents[document_index].groups = yyjson_obj_get(root, "groups");
+        documents[document_index].camera = yyjson_obj_get(root, "camera");
         assets = yyjson_obj_get(root, "assets");
         documents[document_index].animations = assets == NULL
             ? NULL
@@ -1040,11 +1115,21 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
                 || !yyjson_is_arr(documents[document_index].entities)
                 || (documents[document_index].groups != NULL
                     && !yyjson_is_arr(documents[document_index].groups))
+                || (documents[document_index].camera != NULL
+                    && !yyjson_is_obj(documents[document_index].camera))
                 || (assets != NULL && !yyjson_is_obj(assets))
                 || (documents[document_index].animations != NULL
                     && !yyjson_is_arr(documents[document_index].animations))) {
             result = error_result_error(ERROR_ENGINE_STATE_INVALID);
             goto cleanup;
+        }
+        if(documents[document_index].camera != NULL) {
+            camera_definition_count += 1;
+            if(camera_definition_count > 1
+                    || state_template_camera_retained) {
+                result = error_result_error(ERROR_ENGINE_STATE_INVALID);
+                goto cleanup;
+            }
         }
     }
 
@@ -1166,6 +1251,12 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
         if(result.kind == ERROR_RESULT_ERROR) goto cleanup;
     }
 
+    for(document_index = 0; document_index < path_count; document_index += 1) {
+        if(documents[document_index].camera == NULL) continue;
+        result = state_load_camera(documents[document_index].camera);
+        if(result.kind == ERROR_RESULT_ERROR) goto cleanup;
+    }
+
 cleanup:
     if(result.kind == ERROR_RESULT_ERROR) state_rollback(created, total_created);
     if(result.kind == ERROR_RESULT_ERROR) {
@@ -1181,6 +1272,9 @@ cleanup:
         }
     }
     if(result.kind == ERROR_RESULT_VALUE) {
+        if(camera_definition_count > 0) {
+            state_template_camera_retained = true;
+        }
         for(document_index = 0; document_index < path_count; document_index += 1) {
             state_template_documents[state_template_document_count] =
                 documents[document_index].document;
@@ -1245,6 +1339,71 @@ EngineResult game_state_save_file(const char *path) {
     yyjson_mut_obj_add_val(document, assets, "animations", animation_array);
     yyjson_mut_obj_add_val(document, root, "assets", assets);
     yyjson_mut_obj_add_val(document, root, "entities", entity_array);
+
+    {
+        yyjson_mut_val *camera = yyjson_mut_obj(document);
+        CameraAttachment attachment;
+        if(graphics_get_camera_attachment(&attachment)) {
+            EntityNameResult entity_name = entity_get_name(attachment.entity);
+            if(entity_name.kind == ERROR_RESULT_VALUE) {
+                yyjson_mut_val *attachment_value = yyjson_mut_obj(document);
+                yyjson_mut_obj_add_strcpy(
+                    document,
+                    attachment_value,
+                    "entity",
+                    entity_name.result.value.value
+                );
+                yyjson_mut_obj_add_val(
+                    document,
+                    attachment_value,
+                    "position_offset",
+                    state_write_vec2(document, attachment.position_offset)
+                );
+                yyjson_mut_obj_add_real(
+                    document,
+                    attachment_value,
+                    "orientation_offset",
+                    attachment.orientation_offset
+                );
+                yyjson_mut_obj_add_bool(
+                    document,
+                    attachment_value,
+                    "follow_position",
+                    attachment.follow_position
+                );
+                yyjson_mut_obj_add_bool(
+                    document,
+                    attachment_value,
+                    "follow_orientation",
+                    attachment.follow_orientation
+                );
+                yyjson_mut_obj_add_val(
+                    document,
+                    camera,
+                    "attachment",
+                    attachment_value
+                );
+            }
+        }
+        if(yyjson_mut_obj_size(camera) == 0) {
+            Camera camera_value = graphics_get_camera();
+            yyjson_mut_val *transform = yyjson_mut_obj(document);
+            yyjson_mut_obj_add_val(
+                document,
+                transform,
+                "position",
+                state_write_vec2(document, camera_value.position)
+            );
+            yyjson_mut_obj_add_real(
+                document,
+                transform,
+                "orientation",
+                camera_value.orientation
+            );
+            yyjson_mut_obj_add_val(document, camera, "transform", transform);
+        }
+        yyjson_mut_obj_add_val(document, root, "camera", camera);
+    }
 
     for(position = 1; position <= MAX_GROUPS; position += 1) {
         GroupNameResult name = entity_group_get_name((GroupId)position);
@@ -1517,6 +1676,7 @@ EngineResult game_state_save_template_file(const char *path) {
     yyjson_mut_val *assets;
     yyjson_mut_val *animations;
     yyjson_mut_val *entities;
+    bool camera_copied = false;
     yyjson_write_err write_error;
     size_t document_index;
     bool success = true;
@@ -1552,6 +1712,7 @@ EngineResult game_state_save_template_file(const char *path) {
             state_template_documents[document_index]
         );
         yyjson_val *input_assets = yyjson_obj_get(input_root, "assets");
+        yyjson_val *input_camera = yyjson_obj_get(input_root, "camera");
         success = state_template_copy_array(
                 document,
                 groups,
@@ -1569,6 +1730,22 @@ EngineResult game_state_save_template_file(const char *path) {
                 entities,
                 yyjson_obj_get(input_root, "entities")
             );
+        if(success && input_camera != NULL) {
+            yyjson_mut_val *output_camera;
+            if(camera_copied) {
+                success = false;
+                continue;
+            }
+            output_camera = yyjson_val_mut_copy(document, input_camera);
+            success = output_camera != NULL
+                && yyjson_mut_obj_add_val(
+                    document,
+                    root,
+                    "camera",
+                    output_camera
+                );
+            camera_copied = success;
+        }
     }
     if(success) {
         success = yyjson_mut_write_file(

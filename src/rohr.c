@@ -179,6 +179,15 @@ EngineResult rohr_graphics_add_animated_sprite(Entity entity, AnimatedSprite spr
 void rohr_graphics_draw_animated_sprites(void) { graphics_draw_animated_sprites(); }
 void rohr_graphics_update_sprite_frames(Tick current_tick, Time current_time) { graphics_update_sprite_frames(current_tick, current_time); }
 void rohr_graphics_scale_textures(Entity entity, Scale scale) { graphics_scale_textures(entity, scale); }
+void rohr_graphics_set_camera(Camera camera) { graphics_set_camera(camera); }
+Camera rohr_graphics_get_camera(void) { return graphics_get_camera(); }
+void rohr_graphics_move_camera(Vec2D translation) { graphics_move_camera(translation); }
+void rohr_graphics_rotate_camera(Orientation radians) { graphics_rotate_camera(radians); }
+EngineResult rohr_graphics_attach_camera(Entity entity, Vec2D position_offset, Orientation orientation_offset) { return graphics_attach_camera(entity, position_offset, orientation_offset); }
+EngineResult rohr_graphics_attach_camera_with_options(Entity entity, Vec2D position_offset, Orientation orientation_offset, bool follow_position, bool follow_orientation) { return graphics_attach_camera_with_options(entity, position_offset, orientation_offset, follow_position, follow_orientation); }
+void rohr_graphics_detach_camera(void) { graphics_detach_camera(); }
+bool rohr_graphics_camera_is_attached(void) { return graphics_camera_is_attached(); }
+bool rohr_graphics_get_camera_attachment(CameraAttachment *attachment) { return graphics_get_camera_attachment(attachment); }
 Position rohr_graphics_world_to_screen(Position pos) { return graphics_world_to_screen(pos); }
 Position rohr_graphics_screen_to_world(Position screen) { return graphics_screen_to_world(screen); }
 Position rohr_graphics_get_mouse_screen_position(void) { return graphics_get_mouse_screen_position(); }

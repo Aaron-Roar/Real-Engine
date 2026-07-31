@@ -1,5 +1,12 @@
 {
   "version": 1,
+  "camera": {
+    "attachment": {
+      "entity": "player",
+      "position_offset": {"x": 10.0, "y": -20.0},
+      "orientation_offset": 0.25
+    }
+  },
   "entities": [
     {
       "name": "seeker",

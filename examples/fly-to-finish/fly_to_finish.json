@@ -1,0 +1,172 @@
+{
+  "version": 1,
+  "camera": {
+    "attachment": {
+      "entity": "player",
+      "position_offset": {"x": 0.0, "y": 0.0},
+      "orientation_offset": 0.0,
+      "follow_position": true,
+      "follow_orientation": true
+    }
+  },
+  "entities": [
+    {
+      "name": "finish_line",
+      "components": { "position": {"x": 0.0, "y": 210.0},
+        "orientation": 0.0,
+        "hit_box": [
+          {"x": 100.0, "y": 16.0},
+          {"x": 100.0, "y": -16.0},
+          {"x": -100.0, "y": -16.0},
+          {"x": -100.0, "y": 16.0}
+        ]
+      }
+    },
+    {
+      "name": "wall_left",
+      "components": {
+        "flags": ["static", "collision"],
+        "position": {"x": -330.0, "y": 65.0},
+        "orientation": 0.0,
+        "friction": 0.7,
+        "restitution": 0.1,
+        "hit_box": [
+          {"x": 10.0, "y": 325.0},
+          {"x": 10.0, "y": -325.0},
+          {"x": -10.0, "y": -325.0},
+          {"x": -10.0, "y": 325.0}
+        ]
+      }
+    },
+    {
+      "name": "wall_right",
+      "components": {
+        "flags": ["static", "collision"],
+        "position": {"x": 330.0, "y": 65.0},
+        "orientation": 0.0,
+        "friction": 0.7,
+        "restitution": 0.1,
+        "hit_box": [
+          {"x": 10.0, "y": 325.0},
+          {"x": 10.0, "y": -325.0},
+          {"x": -10.0, "y": -325.0},
+          {"x": -10.0, "y": 325.0}
+        ]
+      }
+    },
+    {
+      "name": "wall_bottom",
+      "components": {
+        "flags": ["static", "collision"],
+        "position": {"x": 0.0, "y": -250.0},
+        "orientation": 0.0,
+        "friction": 0.7,
+        "restitution": 0.1,
+        "hit_box": [
+          {"x": 340.0, "y": 10.0},
+          {"x": 340.0, "y": -10.0},
+          {"x": -340.0, "y": -10.0},
+          {"x": -340.0, "y": 10.0}
+        ]
+      }
+    },
+    {
+      "name": "wall_top",
+      "components": {
+        "flags": ["static", "collision"],
+        "position": {"x": 0.0, "y": 380.0},
+        "orientation": 0.0,
+        "friction": 0.7,
+        "restitution": 0.1,
+        "hit_box": [
+          {"x": 340.0, "y": 10.0},
+          {"x": 340.0, "y": -10.0},
+          {"x": -340.0, "y": -10.0},
+          {"x": -340.0, "y": 10.0}
+        ]
+      }
+    },
+    {
+      "name": "wall_mid",
+      "components": {
+        "flags": ["static", "collision"],
+        "position": {"x": 0.0, "y": -0.0},
+        "orientation": 0.0,
+        "friction": 0.7,
+        "restitution": 0.1,
+        "hit_box": [
+          {"x": 50.0, "y": 10.0},
+          {"x": 50.0, "y": -10.0},
+          {"x": -50.0, "y": -10.0},
+          {"x": -50.0, "y": 10.0}
+        ]
+      }
+    },
+    {
+      "name": "player",
+      "components": {
+        "flags": ["dynamic", "collision"],
+        "position": {"x": 0.0, "y": -194.0},
+        "orientation": 0.0,
+        "velocity": {"x": 0.0, "y": 0.0},
+        "acceleration": {"x": 0.0, "y": 0.0},
+        "angular_velocity": 0.0,
+        "mass": 1000.0,
+        "restitution": 0.005,
+        "friction": 0.1,
+        "hit_box": [
+          {"x": 10.0, "y": 0.0},
+          {"x": 9.51056516, "y": 3.09016994},
+          {"x": 8.09016994, "y": 5.87785252},
+          {"x": 5.87785252, "y": 8.09016994},
+          {"x": 3.09016994, "y": 9.51056516},
+          {"x": 0.0, "y": 10.0},
+          {"x": -3.09016994, "y": 9.51056516},
+          {"x": -5.87785252, "y": 8.09016994},
+          {"x": -8.09016994, "y": 5.87785252},
+          {"x": -9.51056516, "y": 3.09016994},
+          {"x": -10.0, "y": 0.0},
+          {"x": -9.51056516, "y": -3.09016994},
+          {"x": -8.09016994, "y": -5.87785252},
+          {"x": -5.87785252, "y": -8.09016994},
+          {"x": -3.09016994, "y": -9.51056516},
+          {"x": 0.0, "y": -10.0},
+          {"x": 3.09016994, "y": -9.51056516},
+          {"x": 5.87785252, "y": -8.09016994},
+          {"x": 8.09016994, "y": -5.87785252},
+          {"x": 9.51056516, "y": -3.09016994}
+        ],
+        "animated_sprite": {
+          "animation": "elderfly_flying",
+          "scale": {"x": 1.0, "y": 1.0},
+          "time_per_frame": 0.05,
+          "ticks_per_frame": 0,
+          "start_frame": 0
+        }
+      }
+    }
+  ],
+  "assets": {
+    "animations": [
+      {
+        "name": "elderfly_flying",
+        "ticks_per_frame": 0,
+        "time_per_frame": 0.05,
+        "frames": [
+          {"file": "examples/test-assets/elder-fly/flying/f1.png", "size": {"x": 50.0, "y": 50.0}},
+          {"file": "examples/test-assets/elder-fly/flying/f2.png", "size": {"x": 50.0, "y": 50.0}},
+          {"file": "examples/test-assets/elder-fly/flying/f3.png", "size": {"x": 50.0, "y": 50.0}},
+          {"file": "examples/test-assets/elder-fly/flying/f4.png", "size": {"x": 50.0, "y": 50.0}},
+          {"file": "examples/test-assets/elder-fly/flying/f5.png", "size": {"x": 50.0, "y": 50.0}},
+          {"file": "examples/test-assets/elder-fly/flying/f6.png", "size": {"x": 50.0, "y": 50.0}},
+          {"file": "examples/test-assets/elder-fly/flying/f7.png", "size": {"x": 50.0, "y": 50.0}},
+          {"file": "examples/test-assets/elder-fly/flying/f8.png", "size": {"x": 50.0, "y": 50.0}},
+          {"file": "examples/test-assets/elder-fly/flying/f9.png", "size": {"x": 50.0, "y": 50.0}},
+          {"file": "examples/test-assets/elder-fly/flying/f10.png", "size": {"x": 50.0, "y": 50.0}},
+          {"file": "examples/test-assets/elder-fly/flying/f11.png", "size": {"x": 50.0, "y": 50.0}},
+          {"file": "examples/test-assets/elder-fly/flying/f12.png", "size": {"x": 50.0, "y": 50.0}}
+        ]
+      }
+    ]
+  }
+}

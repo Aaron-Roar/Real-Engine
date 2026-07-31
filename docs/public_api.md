@@ -25,6 +25,7 @@ Entity values are stable ids, not component table indexes. Use the public entity
 - <a href="#controller-input">Controller Input</a>
 - <a href="#spatial-grid">Spatial Grid</a>
 - <a href="#tools">Tools</a>
+- <a href="#other">Other</a>
 
 ## Engine
 
@@ -415,6 +416,30 @@ Entity ids are stable handles and may not match component table indexes.
 
 **Returns:** EntityResult containing the new entity id, or an error if the entity limit is reached.
 
+### `rohr_entity_set_name`
+
+```c
+EngineResult rohr_entity_set_name(Entity entity, const char *name);
+```
+
+ Assigns a unique fixed-size name to an entity.
+
+### `rohr_entity_find_by_name`
+
+```c
+EntityResult rohr_entity_find_by_name(const char *name);
+```
+
+ Finds a live entity by its state-file name.
+
+### `rohr_entity_get_name`
+
+```c
+EntityNameResult rohr_entity_get_name(Entity entity);
+```
+
+ Returns a copy of an entity's fixed-size name component.
+
 ### `rohr_entity_delete`
 
 ```c
@@ -483,6 +508,30 @@ GroupIdResult rohr_entity_group_create(void);
 Creates a reusable entity group.
 
 **Returns:** GroupIdResult containing a group id, or an error.
+
+### `rohr_entity_group_set_name`
+
+```c
+EngineResult rohr_entity_group_set_name(GroupId group, const char *name);
+```
+
+ Assigns a unique fixed-size name to a generic group.
+
+### `rohr_entity_group_find_by_name`
+
+```c
+GroupIdResult rohr_entity_group_find_by_name(const char *name);
+```
+
+ Finds a live generic group by name.
+
+### `rohr_entity_group_get_name`
+
+```c
+GroupNameResult rohr_entity_group_get_name(GroupId group);
+```
+
+ Returns a copy of a generic group's fixed-size name.
 
 ### `rohr_entity_group_destroy`
 
@@ -1653,6 +1702,130 @@ Scales textures attached to an entity.
 | `entity` | Entity to modify. |
 | `scale` | Scale value. |
 
+### `rohr_graphics_set_camera`
+
+```c
+void rohr_graphics_set_camera(Camera camera);
+```
+
+Replaces the active camera transform.
+
+| Parameter | Description |
+| --- | --- |
+| `camera` | World-space camera position and orientation. |
+
+### `rohr_graphics_get_camera`
+
+```c
+Camera rohr_graphics_get_camera(void);
+```
+
+Returns the active camera transform.
+
+**Returns:** Current world-space camera transform.
+
+### `rohr_graphics_move_camera`
+
+```c
+void rohr_graphics_move_camera(Vec2D translation);
+```
+
+Translates the active camera in world space.
+
+| Parameter | Description |
+| --- | --- |
+| `translation` | World-space translation to add. |
+
+### `rohr_graphics_rotate_camera`
+
+```c
+void rohr_graphics_rotate_camera(Orientation radians);
+```
+
+Rotates the active camera counterclockwise.
+
+| Parameter | Description |
+| --- | --- |
+| `radians` | Rotation in radians to add. |
+
+### `rohr_graphics_attach_camera`
+
+```c
+EngineResult rohr_graphics_attach_camera( Entity entity, Vec2D position_offset, Orientation orientation_offset );
+```
+
+Attaches the camera to an entity's position and orientation.
+
+The position offset is in the entity's local space and rotates with the
+
+entity. The orientation offset is added to the entity's orientation.
+
+| Parameter | Description |
+| --- | --- |
+| `entity` | Entity transform to follow. |
+| `position_offset` | Local-space position offset. |
+| `orientation_offset` | Orientation offset in radians. |
+
+**Returns:** EngineResult describing success or a missing transform.
+
+### `rohr_graphics_attach_camera_with_options`
+
+```c
+EngineResult rohr_graphics_attach_camera_with_options( Entity entity, Vec2D position_offset, Orientation orientation_offset, bool follow_position, bool follow_orientation );
+```
+
+Attaches a camera with independent transform inheritance.
+
+When orientation following is disabled, position_offset is world-space.
+
+When position following is disabled, position_offset is the fixed camera
+
+position. When orientation following is disabled, orientation_offset is the
+
+fixed camera orientation.
+
+| Parameter | Description |
+| --- | --- |
+| `entity` | Entity to associate with the camera. |
+| `position_offset` | Relative offset or fixed world position. |
+| `orientation_offset` | Relative or fixed orientation in radians. |
+| `follow_position` | Whether to inherit entity position. |
+| `follow_orientation` | Whether to inherit entity orientation. |
+
+**Returns:** EngineResult describing success or a missing required transform.
+
+### `rohr_graphics_detach_camera`
+
+```c
+void rohr_graphics_detach_camera(void);
+```
+
+Detaches the camera and preserves its current world transform.
+
+### `rohr_graphics_camera_is_attached`
+
+```c
+bool rohr_graphics_camera_is_attached(void);
+```
+
+Reports whether the camera is attached to a live entity transform.
+
+**Returns:** true when attached to a valid entity transform.
+
+### `rohr_graphics_get_camera_attachment`
+
+```c
+bool rohr_graphics_get_camera_attachment(CameraAttachment *attachment);
+```
+
+Copies the active camera attachment description.
+
+| Parameter | Description |
+| --- | --- |
+| `attachment` | Destination owned by the caller. |
+
+**Returns:** true when the camera has a valid entity attachment.
+
 ### `rohr_graphics_world_to_screen`
 
 ```c
@@ -2465,3 +2638,37 @@ Returns a random float in a range.
 | `max` | Maximum value. |
 
 **Returns:** Random float between min and max.
+
+## Other
+
+### `rohr_game_state_load_file`
+
+```c
+EngineResult rohr_game_state_load_file(const char *path);
+```
+
+ Loads and merges one JSON game-state file.
+
+### `rohr_game_state_load_files`
+
+```c
+EngineResult rohr_game_state_load_files(const char *const *paths, size_t path_count);
+```
+
+ Loads multiple JSON files with cross-file name resolution.
+
+### `rohr_game_state_save_file`
+
+```c
+EngineResult rohr_game_state_save_file(const char *path);
+```
+
+ Saves all named live entities to a JSON game-state file.
+
+### `rohr_game_state_save_template_file`
+
+```c
+EngineResult rohr_game_state_save_template_file(const char *path);
+```
+
+ Saves retained authored definitions without expanding prototypes.

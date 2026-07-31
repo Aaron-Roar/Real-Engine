@@ -959,6 +959,88 @@ void rohr_graphics_update_sprite_frames(Tick current_tick, Time current_time);
 void rohr_graphics_scale_textures(Entity entity, Scale scale);
 
 /**
+ * @brief Replaces the active camera transform.
+ * @param camera World-space camera position and orientation.
+ */
+void rohr_graphics_set_camera(Camera camera);
+
+/**
+ * @brief Returns the active camera transform.
+ * @return Current world-space camera transform.
+ */
+Camera rohr_graphics_get_camera(void);
+
+/**
+ * @brief Translates the active camera in world space.
+ * @param translation World-space translation to add.
+ */
+void rohr_graphics_move_camera(Vec2D translation);
+
+/**
+ * @brief Rotates the active camera counterclockwise.
+ * @param radians Rotation in radians to add.
+ */
+void rohr_graphics_rotate_camera(Orientation radians);
+
+/**
+ * @brief Attaches the camera to an entity's position and orientation.
+ *
+ * The position offset is in the entity's local space and rotates with the
+ * entity. The orientation offset is added to the entity's orientation.
+ *
+ * @param entity Entity transform to follow.
+ * @param position_offset Local-space position offset.
+ * @param orientation_offset Orientation offset in radians.
+ * @return EngineResult describing success or a missing transform.
+ */
+EngineResult rohr_graphics_attach_camera(
+    Entity entity,
+    Vec2D position_offset,
+    Orientation orientation_offset
+);
+
+/**
+ * @brief Attaches a camera with independent transform inheritance.
+ *
+ * When orientation following is disabled, position_offset is world-space.
+ * When position following is disabled, position_offset is the fixed camera
+ * position. When orientation following is disabled, orientation_offset is the
+ * fixed camera orientation.
+ *
+ * @param entity Entity to associate with the camera.
+ * @param position_offset Relative offset or fixed world position.
+ * @param orientation_offset Relative or fixed orientation in radians.
+ * @param follow_position Whether to inherit entity position.
+ * @param follow_orientation Whether to inherit entity orientation.
+ * @return EngineResult describing success or a missing required transform.
+ */
+EngineResult rohr_graphics_attach_camera_with_options(
+    Entity entity,
+    Vec2D position_offset,
+    Orientation orientation_offset,
+    bool follow_position,
+    bool follow_orientation
+);
+
+/**
+ * @brief Detaches the camera and preserves its current world transform.
+ */
+void rohr_graphics_detach_camera(void);
+
+/**
+ * @brief Reports whether the camera is attached to a live entity transform.
+ * @return true when attached to a valid entity transform.
+ */
+bool rohr_graphics_camera_is_attached(void);
+
+/**
+ * @brief Copies the active camera attachment description.
+ * @param attachment Destination owned by the caller.
+ * @return true when the camera has a valid entity attachment.
+ */
+bool rohr_graphics_get_camera_attachment(CameraAttachment *attachment);
+
+/**
  * @brief Converts a world position to screen coordinates.
  * @param pos World position.
  * @return Screen-space position.

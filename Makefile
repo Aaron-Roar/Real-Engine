@@ -43,8 +43,9 @@ BALL_BINARY := build/examples/flies_around_ball
 VIEW_BINARY := build/examples/view_port
 FINISH_BINARY := build/examples/fly_to_finish
 STATE_BINARY := build/examples/game_state
+PONG_BINARY := build/examples/pong
 
-.PHONY: help all build build-engine build-example-pit build-example-ball build-example-view build-example-finish build-example-state run-pit run-ball run-view run-finish run-state docs clean-docs clean
+.PHONY: help all build build-engine build-example-pit build-example-ball build-example-view build-example-finish build-example-state build-example-pong run-pit run-ball run-view run-finish run-state run-pong docs clean-docs clean
 
 help:
 	@printf '%s\n' \
@@ -81,6 +82,10 @@ help:
 		"		  Builds examples/game-state/game_state.c" \
 		"		  Outputs build/examples/game_state" \
 		"" \
+		"  build-example-pong" \
+		"		  Builds examples/pong/pong.c" \
+		"		  Outputs build/examples/pong" \
+		"" \
 		"  run-pit" \
 		"		  Builds and runs the flies_in_pit example" \
 		"" \
@@ -95,6 +100,9 @@ help:
 		"" \
 		"  run-state" \
 		"		  Builds and runs the JSON game-state example" \
+		"" \
+		"  run-pong" \
+		"		  Builds and runs the Pong example" \
 		"" \
 		"  docs" \
 		"		  Updates docs/public_api.md from include/rohr.h" \
@@ -111,7 +119,7 @@ help:
 
 all: build
 
-build: build-example-view build-example-pit build-example-ball build-example-finish build-example-state
+build: build-example-view build-example-pit build-example-ball build-example-finish build-example-state build-example-pong
 
 build-engine: $(ENGINE_LIB)
 
@@ -124,6 +132,8 @@ build-example-view: $(VIEW_BINARY)
 build-example-finish: $(FINISH_BINARY)
 
 build-example-state: $(STATE_BINARY)
+
+build-example-pong: $(PONG_BINARY)
 
 $(ENGINE_LIB): $(ENGINE_OBJ)
 	@mkdir -p lib
@@ -149,11 +159,15 @@ $(VIEW_BINARY): examples/view-port/view_port.c $(ENGINE_LIB) $(ASSET_SRC)
 	@mkdir -p build/examples
 	$(CC) $^ $(CFLAGS) -o $@ $(LIBS)
 
-$(FINISH_BINARY): examples/fly-to-finish/fly_to_finish.c $(ENGINE_LIB) $(ASSET_SRC)
+$(FINISH_BINARY): examples/fly-to-finish/fly_to_finish.c $(ENGINE_LIB)
 	@mkdir -p build/examples
 	$(CC) $^ $(CFLAGS) -o $@ $(LIBS)
 
 $(STATE_BINARY): examples/game-state/game_state.c $(ENGINE_LIB)
+	@mkdir -p build/examples
+	$(CC) $^ $(CFLAGS) -o $@ $(LIBS)
+
+$(PONG_BINARY): examples/pong/pong.c $(ENGINE_LIB)
 	@mkdir -p build/examples
 	$(CC) $^ $(CFLAGS) -o $@ $(LIBS)
 
@@ -171,6 +185,9 @@ run-finish: $(FINISH_BINARY)
 
 run-state: $(STATE_BINARY)
 	SDL_VIDEODRIVER=dummy ./$(STATE_BINARY)
+
+run-pong: $(PONG_BINARY)
+	./$(PONG_BINARY)
 
 docs: $(API_MARKDOWN) $(README_HTML) $(STATIC_README_HTML)
 	$(DOXYGEN) $(DOCS_DOXYFILE)

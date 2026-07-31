@@ -382,19 +382,35 @@ Position system_collision_contact_point(Entity entity_1, Entity entity_2, Collis
 
     Position point_1 = {0};
     Position point_2 = {0};
-    //PARTICLE
-    if(entity_index_has_components(entity_1, PARTICLE) && entity_index_has_components(entity_2, PARTICLE)){
+    bool entity_1_particle =
+        entity_index_has_components(entity_1, PARTICLE);
+    bool entity_2_particle =
+        entity_index_has_components(entity_2, PARTICLE);
+
+    if(entity_1_particle) {
         Vec1D r1 = math_circle_radius(shape_1, math_polygon_centroid(shape_1));
-        Vec1D r2 = math_circle_radius(shape_2, math_polygon_centroid(shape_2));
         point_1 = system_get_particle_edge(entity_1, normal, r1);
-        point_2 = system_get_particle_edge(entity_2, opposite_normal, r2);
-    }
-    else {
+    } else {
         point_1 = system_support_point_average(shape_1, normal);
+    }
+    if(entity_2_particle) {
+        Vec1D r2 = math_circle_radius(shape_2, math_polygon_centroid(shape_2));
+        point_2 = system_get_particle_edge(entity_2, opposite_normal, r2);
+    } else {
         point_2 = system_support_point_average(shape_2, opposite_normal);
-
     }
 
+    /*
+     * A frictionless normal impulse on a particle must pass through its
+     * center. Polygon support averaging can otherwise create a false lever
+     * arm and convert translational bounce energy into particle spin.
+     */
+    if(entity_1_particle && !entity_2_particle) {
+        return point_1;
+    }
+    if(!entity_1_particle && entity_2_particle) {
+        return point_2;
+    }
 
     //Use dynamic entities contact point
     if(entity_1_dynamic && !entity_2_dynamic) {

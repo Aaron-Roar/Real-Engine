@@ -10,6 +10,14 @@
 
 static SDL_Renderer *sdl_renderer = NULL;
 static SDL_Window *sdl_window = NULL;
+static Camera camera = {0};
+
+typedef struct ActiveCameraAttachment {
+    CameraAttachment value;
+    bool attached;
+} ActiveCameraAttachment;
+
+static ActiveCameraAttachment camera_attachment = {0};
 
 MEMORY_DEFINE_OBJECT_POOL(AnimatedSpritePool, AnimatedSprite)
 
@@ -46,6 +54,8 @@ static void graphics_recording_disable(const char *reason) {
 }
 
 EngineResult graphics_tables_init(void) {
+    camera = (Camera){0};
+    camera_attachment = (ActiveCameraAttachment){0};
     if(AnimatedSpritePool_init(&animated_sprites_pool, 0).kind == ERROR_RESULT_ERROR) {
         graphics_tables_destroy();
         return error_result_error(ERROR_ENGINE_GRAPHICS_TABLES_INIT_FAILED);
@@ -320,11 +330,6 @@ void graphics_draw_grid(void) {
         float world_x =
             grid_min_x + col * CELL_SIZE;
 
-        if(world_x < -WINDOW_WIDTH * 0.5f ||
-           world_x >  WINDOW_WIDTH * 0.5f) {
-            continue;
-        }
-
         Position top = graphics_world_to_screen(
             (Position){
                 .x = world_x,
@@ -349,11 +354,6 @@ void graphics_draw_grid(void) {
     for(int row = 0; row <= GRID_ROWS; row++) {
         float world_y =
             grid_min_y + row * CELL_SIZE;
-
-        if(world_y < -WINDOW_HEIGHT * 0.5f ||
-           world_y >  WINDOW_HEIGHT * 0.5f) {
-            continue;
-        }
 
         Position left = graphics_world_to_screen(
             (Position){
@@ -408,17 +408,168 @@ Color graphics_create_color_rgba(uint8_t red, uint8_t green, uint8_t blue, uint8
   };
 }
 
+static bool graphics_resolve_camera_attachment(void) {
+    EntityIndex index;
+    Vec2D world_offset = camera_attachment.value.position_offset;
+
+    if(!camera_attachment.attached) {
+        return false;
+    }
+    if(!entity_get_index(camera_attachment.value.entity, &index)
+            || (camera_attachment.value.follow_position
+                && (index >= positions_pool.capacity
+                    || !positions_pool.used[index]))
+            || (camera_attachment.value.follow_orientation
+                && (index >= orientations_pool.capacity
+                    || !orientations_pool.used[index]))) {
+        camera_attachment = (ActiveCameraAttachment){0};
+        return false;
+    }
+
+    if(camera_attachment.value.follow_orientation) {
+        world_offset = math_rotate_vector(
+            camera_attachment.value.position_offset,
+            orientations[index]
+        );
+    }
+    camera = (Camera){
+        .position = camera_attachment.value.follow_position
+            ? (Position){
+                .x = positions[index].x + world_offset.x,
+                .y = positions[index].y + world_offset.y
+            }
+            : camera_attachment.value.position_offset,
+        .orientation = camera_attachment.value.follow_orientation
+            ? orientations[index]
+                + camera_attachment.value.orientation_offset
+            : camera_attachment.value.orientation_offset
+    };
+    return true;
+}
+
+void graphics_set_camera(Camera value) {
+    camera_attachment = (ActiveCameraAttachment){0};
+    camera = value;
+}
+
+Camera graphics_get_camera(void) {
+    (void)graphics_resolve_camera_attachment();
+    return camera;
+}
+
+void graphics_move_camera(Vec2D translation) {
+    EntityIndex index;
+
+    if(graphics_resolve_camera_attachment()
+            && entity_get_index(camera_attachment.value.entity, &index)) {
+        Vec2D local_translation = camera_attachment.value.follow_orientation
+            ? math_rotate_vector(translation, -orientations[index])
+            : translation;
+        camera_attachment.value.position_offset.x += local_translation.x;
+        camera_attachment.value.position_offset.y += local_translation.y;
+    }
+    camera.position.x += translation.x;
+    camera.position.y += translation.y;
+}
+
+void graphics_rotate_camera(Orientation radians) {
+    if(graphics_resolve_camera_attachment()) {
+        camera_attachment.value.orientation_offset += radians;
+    }
+    camera.orientation += radians;
+}
+
+EngineResult graphics_attach_camera(
+    Entity entity,
+    Vec2D position_offset,
+    Orientation orientation_offset
+) {
+    return graphics_attach_camera_with_options(
+        entity,
+        position_offset,
+        orientation_offset,
+        true,
+        true
+    );
+}
+
+EngineResult graphics_attach_camera_with_options(
+    Entity entity,
+    Vec2D position_offset,
+    Orientation orientation_offset,
+    bool follow_position,
+    bool follow_orientation
+) {
+    EntityIndex index;
+
+    if(!entity_get_index(entity, &index)) {
+        return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
+    }
+    if((follow_position
+            && (index >= positions_pool.capacity
+                || !positions_pool.used[index]))
+            || (follow_orientation
+                && (index >= orientations_pool.capacity
+                    || !orientations_pool.used[index]))) {
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    }
+
+    camera_attachment = (ActiveCameraAttachment){
+        .value = {
+            .entity = entity,
+            .position_offset = position_offset,
+            .orientation_offset = orientation_offset,
+            .follow_position = follow_position,
+            .follow_orientation = follow_orientation
+        },
+        .attached = true
+    };
+    (void)graphics_resolve_camera_attachment();
+    return error_result_value(true);
+}
+
+void graphics_detach_camera(void) {
+    (void)graphics_resolve_camera_attachment();
+    camera_attachment = (ActiveCameraAttachment){0};
+}
+
+bool graphics_camera_is_attached(void) {
+    return graphics_resolve_camera_attachment();
+}
+
+bool graphics_get_camera_attachment(CameraAttachment *attachment) {
+    if(attachment == NULL || !graphics_resolve_camera_attachment()) {
+        return false;
+    }
+    *attachment = camera_attachment.value;
+    return true;
+}
+
 Position graphics_world_to_screen(Position world) {
+    (void)graphics_resolve_camera_attachment();
+    Vec2D relative = {
+        .x = world.x - camera.position.x,
+        .y = world.y - camera.position.y
+    };
+    Vec2D camera_space = math_rotate_vector(relative, -camera.orientation);
+
     return (Position){
-        .x = world.x + WINDOW_WIDTH * 0.5f,
-        .y = WINDOW_HEIGHT * 0.5f - world.y
+        .x = camera_space.x + WINDOW_WIDTH * 0.5f,
+        .y = WINDOW_HEIGHT * 0.5f - camera_space.y
     };
 }
 
 Position graphics_screen_to_world(Position screen) {
-    return (Position){
+    (void)graphics_resolve_camera_attachment();
+    Vec2D camera_space = {
         .x = screen.x - WINDOW_WIDTH * 0.5f,
         .y = WINDOW_HEIGHT * 0.5f - screen.y
+    };
+    Vec2D relative = math_rotate_vector(camera_space, camera.orientation);
+
+    return (Position){
+        .x = relative.x + camera.position.x,
+        .y = relative.y + camera.position.y
     };
 }
 
@@ -744,6 +895,7 @@ void graphics_update_sprite_frame(AnimatedSprite *sprite, Tick current_tick, Tim
 
 void graphics_draw_texture(TextureAsset texture_asset, Position pos, Orientation ort) {
     SDL_FRect dst_rect = {0};
+    (void)graphics_resolve_camera_attachment();
     Position screen_loc = graphics_world_to_screen(pos);
     dst_rect.w = texture_asset.size.x;//(float) texture_width;
     dst_rect.h = texture_asset.size.y;//(float) texture_width;
@@ -754,7 +906,7 @@ void graphics_draw_texture(TextureAsset texture_asset, Position pos, Orientation
         .x = dst_rect.w * 0.5f,
         .y = dst_rect.h * 0.5f
     };
-    double degrees = -(double)ort * 180.0 / (double)PI_F;
+    double degrees = -(double)(ort - camera.orientation) * 180.0 / (double)PI_F;
     SDL_RenderTextureRotated(
         sdl_renderer,
     texture_asset.texture,

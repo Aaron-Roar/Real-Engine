@@ -106,3 +106,11 @@ rohr_add_example(view_port examples/view-port/view_port.c)
 rohr_add_example(flies_in_pit examples/flies-in-pit/flies_in_pit.c)
 rohr_add_example(flies_around_ball examples/flies-around-ball/flies_around_ball.c)
 rohr_add_example(game_state examples/game-state/game_state.c)
+
+add_executable(pong examples/pong/pong.c)
+target_link_libraries(pong PRIVATE rohr_engine)
+target_include_directories(pong PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+set_target_properties(pong
+    PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/examples
+)

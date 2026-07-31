@@ -1,5 +1,17 @@
 {
     "version": 1,
+    "camera": {
+        "attachment": {
+            "entity": "large_fly",
+            "position_offset": {
+                "x": 0.0,
+                "y": 0.0
+            },
+            "orientation_offset": 0.0,
+            "follow_position": true,
+            "follow_orientation": false
+        }
+    },
     "entities": [
         {
             "name": "wall_1",
