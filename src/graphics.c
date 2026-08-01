@@ -23,6 +23,13 @@ typedef struct ActiveCameraAttachment {
 static ActiveCameraAttachment camera_attachment = {0};
 static Camera cameras[MAX_CAMERAS] = {0};
 static ActiveCameraAttachment camera_attachments[MAX_CAMERAS] = {0};
+typedef struct CameraRuntime {
+    CameraRenderCallback callback;
+    void *context;
+    bool enabled;
+    bool pause_with_engine;
+} CameraRuntime;
+static CameraRuntime camera_runtime[MAX_CAMERAS] = {0};
 static uint32_t camera_generations[MAX_CAMERAS] = {0};
 static bool cameras_used[MAX_CAMERAS] = {0};
 static CameraId active_camera = CAMERA_INVALID;
@@ -183,6 +190,7 @@ EngineResult graphics_tables_init(void) {
     CameraConfig default_config = graphics_camera_default_config();
     memset(cameras, 0, sizeof(cameras));
     memset(camera_attachments, 0, sizeof(camera_attachments));
+    memset(camera_runtime, 0, sizeof(camera_runtime));
     memset(camera_generations, 0, sizeof(camera_generations));
     memset(cameras_used, 0, sizeof(cameras_used));
     cameras_used[0] = true;
@@ -190,6 +198,7 @@ EngineResult graphics_tables_init(void) {
     active_camera = graphics_camera_id(0);
     camera = graphics_camera_from_config(default_config);
     cameras[0] = camera;
+    camera_runtime[0].enabled = true;
     camera_attachment = (ActiveCameraAttachment){0};
     memset(screens, 0, sizeof(screens));
     memset(viewports, 0, sizeof(viewports));
@@ -568,6 +577,7 @@ CameraIdResult graphics_camera_create(CameraConfig config) {
             cameras_used[slot] = true;
             cameras[slot] = graphics_camera_from_config(config);
             camera_attachments[slot] = (ActiveCameraAttachment){0};
+            camera_runtime[slot] = (CameraRuntime){.enabled = true};
             return ERROR_RESULT_MAKE_VALUE(CameraIdResult, graphics_camera_id(slot));
         }
     }
@@ -651,6 +661,7 @@ EngineResult graphics_camera_destroy(CameraId id) {
     cameras_used[slot] = false;
     cameras[slot] = (Camera){0};
     camera_attachments[slot] = (ActiveCameraAttachment){0};
+    camera_runtime[slot] = (CameraRuntime){0};
     return error_result_value(true);
 }
 
@@ -929,7 +940,7 @@ static EngineResult graphics_screen_end(void) {
     return error_result_value(true);
 }
 
-EngineResult graphics_camera_begin(CameraId camera_id) {
+static EngineResult graphics_camera_begin(CameraId camera_id) {
     size_t screen_slot;
     int width = WINDOW_WIDTH;
     int height = WINDOW_HEIGHT;
@@ -964,8 +975,58 @@ EngineResult graphics_camera_begin(CameraId camera_id) {
     );
 }
 
-EngineResult graphics_camera_end(void) {
+static EngineResult graphics_camera_end(void) {
     return graphics_screen_end();
+}
+
+EngineResult graphics_camera_set_render_callback(
+    CameraId camera_id,
+    CameraRenderCallback callback,
+    void *context
+) {
+    size_t slot;
+    if(!graphics_camera_slot(camera_id, &slot)) {
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    camera_runtime[slot].callback = callback;
+    camera_runtime[slot].context = context;
+    return error_result_value(true);
+}
+
+EngineResult graphics_camera_set_enable(CameraId camera_id) {
+    size_t slot;
+    if(!graphics_camera_slot(camera_id, &slot)) {
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    camera_runtime[slot].enabled = true;
+    return error_result_value(true);
+}
+
+EngineResult graphics_camera_set_disable(CameraId camera_id) {
+    size_t slot;
+    if(!graphics_camera_slot(camera_id, &slot)) {
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    camera_runtime[slot].enabled = false;
+    return error_result_value(true);
+}
+
+EngineResult graphics_camera_set_pause_with_engine(CameraId camera_id) {
+    size_t slot;
+    if(!graphics_camera_slot(camera_id, &slot)) {
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    camera_runtime[slot].pause_with_engine = true;
+    return error_result_value(true);
+}
+
+EngineResult graphics_camera_set_render_when_paused(CameraId camera_id) {
+    size_t slot;
+    if(!graphics_camera_slot(camera_id, &slot)) {
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    camera_runtime[slot].pause_with_engine = false;
+    return error_result_value(true);
 }
 
 ViewportConfig graphics_viewport_default_config(void) {
@@ -1337,6 +1398,26 @@ static void graphics_draw_empty_viewport(ViewportRectangle rectangle) {
     }
 }
 
+static void graphics_render_viewport_cameras(void) {
+    bool rendered[MAX_CAMERAS] = {0};
+    size_t viewport_slot;
+    for(viewport_slot = 0; viewport_slot < MAX_VIEWPORTS; viewport_slot += 1) {
+        CameraId camera_id;
+        CameraRuntime *runtime;
+        size_t camera_slot;
+        if(!viewports_used[viewport_slot] || !viewports[viewport_slot].enabled) continue;
+        camera_id = viewports[viewport_slot].camera;
+        if(!graphics_camera_slot(camera_id, &camera_slot) || rendered[camera_slot]) continue;
+        rendered[camera_slot] = true;
+        runtime = &camera_runtime[camera_slot];
+        if(!runtime->enabled || runtime->callback == NULL
+                || (runtime->pause_with_engine && engine_is_paused())) continue;
+        if(graphics_camera_begin(camera_id).kind == ERROR_RESULT_ERROR) continue;
+        runtime->callback(camera_id, runtime->context);
+        (void)graphics_camera_end();
+    }
+}
+
 static void graphics_draw_viewports(void) {
     size_t viewport_slot;
     bool has_enabled_viewport = false;
@@ -1411,6 +1492,7 @@ static void graphics_draw_viewports(void) {
 }
 
 void graphics_show(void) {
+    graphics_render_viewport_cameras();
     graphics_draw_viewports();
       if(screen_recorder.recording) {
         if(!graphics_record_frame()) {

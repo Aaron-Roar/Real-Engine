@@ -1,5 +1,12 @@
 #include "rohr.h"
 
+static void count_camera_render(CameraId camera, void *context) {
+    int *count = context;
+    (void)camera;
+    *count += 1;
+    rohr_graphics_draw_background((Color){0, 0, 0, 255});
+}
+
 int main(void) {
     CameraConfig config = rohr_camera_default_config();
     CameraId original;
@@ -8,6 +15,7 @@ int main(void) {
     CameraResult camera_result;
     ViewportIdResult viewport_result;
     Position screen;
+    int render_count = 0;
 
     if(rohr_error_check(rohr_engine_init())) return 1;
     if(rohr_error_check(rohr_graphics_start())) {
@@ -46,11 +54,23 @@ int main(void) {
                 viewport_result.result.value,
                 original
             ))
+            || rohr_error_check(rohr_camera_set_render_callback(
+                original,
+                count_camera_render,
+                &render_count
+            ))
             || rohr_error_check(rohr_viewport_set_enable(viewport_result.result.value))
-            || rohr_error_check(rohr_camera_begin(original))
-            || !rohr_error_check(rohr_camera_begin(original))
-            || rohr_error_check(rohr_camera_end())
+            || (rohr_graphics_show(), render_count != 1)
+            || rohr_error_check(rohr_camera_set_disable(original))
+            || (rohr_graphics_show(), render_count != 1)
+            || rohr_error_check(rohr_camera_set_enable(original))
+            || rohr_error_check(rohr_camera_set_pause_with_engine(original))
+            || (rohr_engine_pause(), rohr_graphics_show(), render_count != 1)
+            || rohr_error_check(rohr_camera_set_render_when_paused(original))
+            || (rohr_graphics_show(), render_count != 2)
+            || (rohr_engine_resume(), false)
             || rohr_error_check(rohr_viewport_set_disable(viewport_result.result.value))
+            || (rohr_graphics_show(), render_count != 2)
             || rohr_error_check(rohr_viewport_clear_camera(viewport_result.result.value))
             || rohr_error_check(rohr_viewport_destroy(viewport_result.result.value))) {
         rohr_graphics_end();

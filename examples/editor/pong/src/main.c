@@ -21,6 +21,16 @@ static const float left_paddle_max_y = 312.0f;
 static const float right_paddle_min_y = -312.0f;
 static const float right_paddle_max_y = -20.0f;
 
+typedef struct PongRenderContext {
+    Entity wall_bottom;
+    Entity wall_top;
+    Entity center_line;
+    Entity paddle_left;
+    Entity paddle_right;
+    Entity ball;
+    bool ball_on_fire;
+} PongRenderContext;
+
 static void pong_draw_field(
     Entity wall_bottom,
     Entity wall_top,
@@ -42,29 +52,19 @@ static void pong_draw_field(
     );
 }
 
-static EngineResult pong_draw_camera(
-    CameraId camera,
-    Entity wall_bottom,
-    Entity wall_top,
-    Entity center_line,
-    Entity paddle_left,
-    Entity paddle_right,
-    Entity ball,
-    bool ball_on_fire
-) {
-    EngineResult result = rohr_camera_begin(camera);
-    if(rohr_error_check(result)) return result;
+static void pong_render_camera(CameraId camera, void *context_value) {
+    PongRenderContext *context = context_value;
+    (void)camera;
     rohr_graphics_draw_background(background_color);
     pong_draw_field(
-        wall_bottom,
-        wall_top,
-        center_line,
-        paddle_left,
-        paddle_right,
-        ball,
-        ball_on_fire
+        context->wall_bottom,
+        context->wall_top,
+        context->center_line,
+        context->paddle_left,
+        context->paddle_right,
+        context->ball,
+        context->ball_on_fire
     );
-    return rohr_camera_end();
 }
 
 static EngineResult pong_reset_ball(Entity ball, int serve_direction) {
@@ -143,6 +143,7 @@ int main(void) {
     CameraId ball_camera = CAMERA_INVALID;
     ViewportId left_viewport = VIEWPORT_INVALID;
     ViewportId right_viewport = VIEWPORT_INVALID;
+    PongRenderContext render_context = {0};
     bool ball_behind_left = false;
     bool ball_behind_right = false;
     int left_score = 0;
@@ -231,6 +232,14 @@ int main(void) {
         goto fail;
     }
     ball = ball_result.result.value;
+    render_context = (PongRenderContext){
+        .wall_bottom = wall_bottom,
+        .wall_top = wall_top,
+        .center_line = center_line,
+        .paddle_left = paddle_left,
+        .paddle_right = paddle_right,
+        .ball = ball,
+    };
 
     left_camera = rohr_camera_get_active();
     {
@@ -301,6 +310,19 @@ int main(void) {
                 || rohr_error_check(rohr_viewport_set_enable(left_viewport))
                 || rohr_error_check(rohr_viewport_set_enable(right_viewport))) goto fail;
     }
+    if(rohr_error_check(rohr_camera_set_render_callback(
+            left_camera,
+            pong_render_camera,
+            &render_context
+        )) || rohr_error_check(rohr_camera_set_render_callback(
+            right_camera,
+            pong_render_camera,
+            &render_context
+        )) || rohr_error_check(rohr_camera_set_render_callback(
+            ball_camera,
+            pong_render_camera,
+            &render_context
+        ))) goto fail;
 
     rohr_engine_reset_clock();
     while(true) {
@@ -425,37 +447,9 @@ int main(void) {
 
         {
             GameBallOnFireResult fire_result = game_ball_on_fire_get(ball);
-            BallOnFire ball_on_fire = rohr_error_check(fire_result)
+            render_context.ball_on_fire = rohr_error_check(fire_result)
                 ? false
                 : fire_result.result.value;
-            if(rohr_error_check(pong_draw_camera(
-                left_camera,
-                wall_bottom,
-                wall_top,
-                center_line,
-                paddle_left,
-                paddle_right,
-                ball,
-                ball_on_fire
-            )) || rohr_error_check(pong_draw_camera(
-                right_camera,
-                wall_bottom,
-                wall_top,
-                center_line,
-                paddle_left,
-                paddle_right,
-                ball,
-                ball_on_fire
-            )) || rohr_error_check(pong_draw_camera(
-                ball_camera,
-                wall_bottom,
-                wall_top,
-                center_line,
-                paddle_left,
-                paddle_right,
-                ball,
-                ball_on_fire
-            ))) goto fail;
             if(rohr_error_check(rohr_viewport_set_camera(
                     left_viewport,
                     ball_behind_left ? ball_camera : left_camera

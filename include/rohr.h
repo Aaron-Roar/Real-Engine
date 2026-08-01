@@ -1149,8 +1149,15 @@ EngineResult rohr_camera_attach(
 /** Detaches a camera while preserving its resolved transform. */
 EngineResult rohr_camera_detach(CameraId camera);
 
-EngineResult rohr_camera_begin(CameraId camera);
-EngineResult rohr_camera_end(void);
+EngineResult rohr_camera_set_render_callback(
+    CameraId camera,
+    CameraRenderCallback callback,
+    void *context
+);
+EngineResult rohr_camera_set_enable(CameraId camera);
+EngineResult rohr_camera_set_disable(CameraId camera);
+EngineResult rohr_camera_set_pause_with_engine(CameraId camera);
+EngineResult rohr_camera_set_render_when_paused(CameraId camera);
 
 ViewportConfig rohr_viewport_default_config(void);
 ViewportIdResult rohr_viewport_create(ViewportConfig config);

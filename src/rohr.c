@@ -256,8 +256,11 @@ EngineResult rohr_camera_attach(
     );
 }
 EngineResult rohr_camera_detach(CameraId camera_id) { return graphics_camera_detach_from(camera_id); }
-EngineResult rohr_camera_begin(CameraId camera) { return graphics_camera_begin(camera); }
-EngineResult rohr_camera_end(void) { return graphics_camera_end(); }
+EngineResult rohr_camera_set_render_callback(CameraId camera, CameraRenderCallback callback, void *context) { return graphics_camera_set_render_callback(camera, callback, context); }
+EngineResult rohr_camera_set_enable(CameraId camera) { return graphics_camera_set_enable(camera); }
+EngineResult rohr_camera_set_disable(CameraId camera) { return graphics_camera_set_disable(camera); }
+EngineResult rohr_camera_set_pause_with_engine(CameraId camera) { return graphics_camera_set_pause_with_engine(camera); }
+EngineResult rohr_camera_set_render_when_paused(CameraId camera) { return graphics_camera_set_render_when_paused(camera); }
 ViewportConfig rohr_viewport_default_config(void) { return graphics_viewport_default_config(); }
 ViewportIdResult rohr_viewport_create(ViewportConfig config) { return graphics_viewport_create(config); }
 EngineResult rohr_viewport_destroy(ViewportId viewport) { return graphics_viewport_destroy(viewport); }

@@ -33,6 +33,7 @@ typedef struct {
 
 /** Stable handle for an engine-owned camera. */
 typedef uint32_t CameraId;
+typedef void (*CameraRenderCallback)(CameraId camera, void *context);
 
 /** Invalid camera handle. */
 #define CAMERA_INVALID 0
@@ -395,10 +396,18 @@ EngineResult graphics_camera_attach_to(
 );
 EngineResult graphics_camera_detach_from(CameraId camera);
 
-/** Begin rendering the camera into its engine-owned render surface. */
-EngineResult graphics_camera_begin(CameraId camera);
-/** Finish rendering the current camera and return to the window target. */
-EngineResult graphics_camera_end(void);
+/** Register the drawing callback invoked automatically when this camera is needed. */
+EngineResult graphics_camera_set_render_callback(
+    CameraId camera,
+    CameraRenderCallback callback,
+    void *context
+);
+EngineResult graphics_camera_set_enable(CameraId camera);
+EngineResult graphics_camera_set_disable(CameraId camera);
+/** Skip camera rendering while the engine is paused. */
+EngineResult graphics_camera_set_pause_with_engine(CameraId camera);
+/** Continue camera rendering while paused; this is the default. */
+EngineResult graphics_camera_set_render_when_paused(CameraId camera);
 
 /** Return a disabled, full-window viewport using contain fitting. */
 ViewportConfig graphics_viewport_default_config(void);
