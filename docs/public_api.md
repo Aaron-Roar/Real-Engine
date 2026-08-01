@@ -21,7 +21,6 @@ Entity values are stable ids, not component table indexes. Use the public entity
 - <a href="#graphics">Graphics</a>
 - <a href="#math">Math</a>
 - <a href="#systems">Systems</a>
-- <a href="#level-editor">Level Editor</a>
 - <a href="#controller-input">Controller Input</a>
 - <a href="#spatial-grid">Spatial Grid</a>
 - <a href="#tools">Tools</a>
@@ -1642,6 +1641,24 @@ Draws the frame background.
 | --- | --- |
 | `color` | Background color. |
 
+### `rohr_graphics_draw_screen_rect`
+
+```c
+bool rohr_graphics_draw_screen_rect(float x, float y, float width, float height, Color color);
+```
+
+Draws a filled rectangle in logical screen coordinates.
+
+**Returns:** true when SDL accepted the draw command.
+
+### `rohr_graphics_draw_screen_quad`
+
+```c
+bool rohr_graphics_draw_screen_quad(Position center, float width, float height, float angle, Color color);
+```
+
+ @brief Draws a centered rotated rectangle in logical screen space.
+
 ### `rohr_graphics_show`
 
 ```c
@@ -1698,6 +1715,46 @@ Loads a texture asset.
 | `text_desc` | Texture descriptor containing load settings. |
 
 **Returns:** TextureAssetResult containing the asset, or an error.
+
+### `rohr_graphics_load_font`
+
+```c
+FontAssetResult rohr_graphics_load_font(FontDescriptor descriptor);
+```
+
+ @brief Loads a caller-owned font asset.
+
+### `rohr_graphics_destroy_font`
+
+```c
+void rohr_graphics_destroy_font(FontAsset *font);
+```
+
+ @brief Destroys a font after its text assets have been destroyed.
+
+### `rohr_graphics_create_text`
+
+```c
+TextAssetResult rohr_graphics_create_text(const FontAsset *font, const char *value, Color color);
+```
+
+ @brief Creates reusable caller-owned text.
+
+### `rohr_graphics_destroy_text`
+
+```c
+void rohr_graphics_destroy_text(TextAsset *text);
+```
+
+ @brief Destroys reusable text.
+
+### `rohr_graphics_draw_text`
+
+```c
+bool rohr_graphics_draw_text(const TextAsset *text, Position position);
+```
+
+ @brief Draws text in logical screen coordinates.
 
 ### `rohr_graphics_load_animation`
 
@@ -2355,28 +2412,6 @@ void rohr_system_clean_entities_past_lifetime(void);
 
 Deletes entities whose lifetime has expired.
 
-## Level Editor
-
-### `rohr_level_editor_init`
-
-```c
-EngineResult rohr_level_editor_init(void);
-```
-
-Initializes the level editor.
-
-**Returns:** EngineResult describing success or failure.
-
-### `rohr_level_editor_update`
-
-```c
-EngineResult rohr_level_editor_update(void);
-```
-
-Updates the level editor.
-
-**Returns:** EngineResult describing success or failure.
-
 ## Controller Input
 
 ### `rohr_controller_update_key_states`
@@ -2564,6 +2599,20 @@ Converts an SDL event into a Rohr mouse event.
 
 **Returns:** MouseEvent derived from sdl_event.
 
+### `rohr_controller_mouse_world_position`
+
+```c
+Position rohr_controller_mouse_world_position(const MouseState *mouse);
+```
+
+Converts the current logical screen-space mouse position to world space.
+
+| Parameter | Description |
+| --- | --- |
+| `mouse` | Mouse state to convert. |
+
+**Returns:** World position under the mouse, or zero when mouse is NULL.
+
 ## Spatial Grid
 
 ### `rohr_grid_add_entity_to_grids`
@@ -2732,6 +2781,38 @@ EngineResult rohr_game_state_load_files(const char *const *paths, size_t path_co
 
  Loads multiple JSON files with cross-file name resolution.
 
+### `rohr_ui_button_find_by_name`
+
+```c
+UIButtonDefinitionResult rohr_ui_button_find_by_name(const char *name);
+```
+
+ @brief Finds a UI button definition loaded from JSON.
+
+### `rohr_ui_font_find_by_name`
+
+```c
+UIFontDefinitionResult rohr_ui_font_find_by_name(const char *name);
+```
+
+ @brief Finds a UI font definition loaded from JSON.
+
+### `rohr_ui_label_find_by_name`
+
+```c
+UILabelDefinitionResult rohr_ui_label_find_by_name(const char *name);
+```
+
+ @brief Finds a standalone UI label definition loaded from JSON.
+
+### `rohr_ui_slider_find_by_name`
+
+```c
+UISliderDefinitionResult rohr_ui_slider_find_by_name(const char *name);
+```
+
+ @brief Finds a UI slider definition loaded from JSON.
+
 ### `rohr_game_state_save_file`
 
 ```c
@@ -2747,3 +2828,87 @@ EngineResult rohr_game_state_save_template_file(const char *path);
 ```
 
  Saves retained authored definitions without expanding prototypes.
+
+### `rohr_ui_begin_frame`
+
+```c
+void rohr_ui_begin_frame(UIInput input);
+```
+
+ @brief Starts a UI frame with logical screen-space pointer input.
+
+### `rohr_ui_button`
+
+```c
+UIButtonResult rohr_ui_button( const char *id, const TextAsset *label, UIRect bounds, const UIButtonStyle *style );
+```
+
+Draws and updates one button identified by a stable string.
+
+| Parameter | Description |
+| --- | --- |
+| `label` | Optional centered label; NULL or empty draws no label. |
+
+### `rohr_ui_label`
+
+```c
+void rohr_ui_label(const TextAsset *text, UIRect bounds);
+```
+
+ @brief Draws reusable text centered inside bounds.
+
+### `rohr_ui_button_disabled`
+
+```c
+void rohr_ui_button_disabled(UIRect bounds, const UIButtonStyle *style);
+```
+
+ @brief Draws a disabled button that cannot capture input.
+
+### `rohr_ui_pointer_consumed`
+
+```c
+bool rohr_ui_pointer_consumed(void);
+```
+
+ @brief Returns whether UI consumed pointer input during this frame.
+
+### `rohr_ui_end_frame`
+
+```c
+void rohr_ui_end_frame(void);
+```
+
+ @brief Finishes the current UI frame.
+
+### `rohr_ui_default_button_style`
+
+```c
+UIButtonStyle rohr_ui_default_button_style(void);
+```
+
+ @brief Returns the default button colors.
+
+### `rohr_ui_default_slider_config`
+
+```c
+UISliderConfig rohr_ui_default_slider_config(void);
+```
+
+ @brief Returns the default slider configuration and 0..1 range.
+
+### `rohr_ui_slider`
+
+```c
+UISliderResult rohr_ui_slider(const char *id, float value, const UISliderConfig *config);
+```
+
+ @brief Draws and updates a caller-owned slider value.
+
+### `rohr_ui_slider_with_text`
+
+```c
+UISliderResult rohr_ui_slider_with_text(const char *id, float value, const UISliderConfig *config, const UISliderText *text);
+```
+
+ @brief Draws a slider with optional caller-owned label and value text.

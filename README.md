@@ -93,7 +93,7 @@ engine/
 
 * C compiler: `clang` or `gcc`
 * C standard library
-* `make`
+* CMake 3.20 or newer
 * `pkg-config`
 * `sdl3`
 * `sdl3-image`
@@ -101,60 +101,81 @@ engine/
 * `ffmpeg` for recording or converting demo media
 * Math library: `libm` / `-lm`
 
-Build the engine and examples:
+Enter the development environment before configuring:
 
 ```sh
-make build
+nix develop
 ```
 
-Build only the engine core or editor:
+### CMake cheat sheet
+
+List the available configuration, build, and test presets:
 
 ```sh
-make build-engine
-make build-editor
+cmake --list-presets
+cmake --list-presets=build
+cmake --list-presets=test
 ```
 
-Build the two example groups independently:
+Configure and build everything in debug mode:
 
 ```sh
-make build-core-examples
-make build-editor-examples
+cmake --preset debug
+cmake --build --preset debug --parallel
 ```
+
+Configure and build everything in release mode:
+
+```sh
+cmake --preset release
+cmake --build --preset release --parallel
+```
+
+Build only the core or editor examples:
+
+```sh
+cmake --build --preset core-examples --parallel
+cmake --build --preset editor-examples --parallel
+```
+
+Build one example by its CMake target name:
+
+```sh
+cmake --build build/debug --target pong
+cmake --build build/debug --target basic_editor
+```
+
+List every available target:
+
+```sh
+cmake --build build/debug --target help
+```
+
+Build and run the tests:
+
+```sh
+cmake --build --preset tests --parallel
+ctest --preset debug
+```
+
+Clean compiled debug outputs while preserving the CMake configuration:
+
+```sh
+cmake --build --preset debug --target clean
+```
+
+Recreate the debug configuration when the cache needs to be reset:
+
+```sh
+cmake --preset debug --fresh
+```
+
+Examples and tests can be disabled for library-only builds with
+`-DROHR_BUILD_EXAMPLES=OFF` and `-DROHR_BUILD_TESTS=OFF`.
 
 Games include `rohr.h` and link `librohr_engine.a`. Editor applications include
 `rohr_editor.h`, use the `RE_` API, and link `librohr_editor.a` followed by
 `librohr_engine.a`.
-
-Or build the runtime targets with CMake:
-
-```sh
-cmake -S . -B build/cmake
-cmake --build build/cmake
-```
-
-Run the pit example:
-
-```sh
-make run-pit
-```
-
-Run the ball example:
-
-```sh
-make run-ball
-```
-
-Run the viewport example:
-
-```sh
-make run-view
-```
-
-Run the Pong example:
-
-```sh
-make run-pong
-```
 
 ## Nix
 
@@ -164,10 +185,11 @@ If you use Nix, the development shell includes the C toolchain, SDL dependencies
 nix develop
 ```
 
-Then build normally:
+Then use the CMake commands above. For example:
 
 ```sh
-make build
+cmake --preset debug
+cmake --build --preset debug --parallel
 ```
 
 ## Documentation
@@ -184,7 +206,7 @@ Readable Markdown docs are committed in the repo:
 Generate the Doxygen docs with:
 
 ```sh
-make docs
+cmake --build --preset debug --target docs
 ```
 
 The generated HTML is written to:
@@ -198,7 +220,7 @@ Documentation source lives in `docs/`, and API comments live mainly in `include/
 For a movable standalone README preview, run:
 
 ```sh
-make static-readme
+cmake --build --preset debug --target static_readme
 ```
 
 That writes `build/static/readme.html` and stages linked video assets under
