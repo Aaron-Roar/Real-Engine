@@ -228,6 +228,18 @@ Returns the symbolic name for an engine error.
 
 **Returns:** Static string containing the error name.
 
+### `rohr_error_print_stderr`
+
+```c
+void rohr_error_print_stderr(EngineError error);
+```
+
+Prints an engine error message to stderr.
+
+| Parameter | Description |
+| --- | --- |
+| `error` | Error code to print. |
+
 ## Console
 
 ### `rohr_console_print_logs`

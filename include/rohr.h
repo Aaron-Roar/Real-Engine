@@ -137,6 +137,12 @@ const char *rohr_error_default_message(EngineError error);
 const char *rohr_error_string(EngineError error);
 
 /**
+ * @brief Prints an engine error message to stderr.
+ * @param error Error code to print.
+ */
+void rohr_error_print_stderr(EngineError error);
+
+/**
  * @brief Prints buffered console log messages.
  */
 void rohr_console_print_logs(void);

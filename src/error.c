@@ -1,4 +1,5 @@
 #include "error.h"
+#include <stdio.h>
 
 EngineResult error_result_value(bool value) {
     return (EngineResult){
@@ -99,4 +100,8 @@ const char *error_default_message(EngineError error) {
 
 const char *error_string(EngineError error) {
     return error_default_message(error);
+}
+
+void error_print_stderr(EngineError error) {
+    fprintf(stderr, "%s\n", error_default_message(error));
 }

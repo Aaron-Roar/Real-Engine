@@ -166,4 +166,7 @@ const char *error_default_message(EngineError error);
  */
 const char *error_string(EngineError error);
 
+/** Print an EngineError message to stderr. */
+void error_print_stderr(EngineError error);
+
 #endif

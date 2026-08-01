@@ -2,9 +2,6 @@
 #include "game_components.h"
 #include <stdio.h>
 
-#define PRINT_ENGINE_ERROR(engine_result) \
-    fprintf(stderr, "%s\n", rohr_error_default_message((engine_result).result.error))
-
 static const Color background_color = {18, 22, 30, 255};
 static const Color foreground_color = {235, 240, 245, 255};
 static const Color left_color = {70, 170, 255, 255};
@@ -115,7 +112,7 @@ int main(void) {
     {
         EngineResult init_result = rohr_engine_init();
         if(rohr_error_check(init_result)) {
-            PRINT_ENGINE_ERROR(init_result);
+            rohr_error_print_stderr(init_result.result.error);
             return 1;
         }
     }
@@ -123,7 +120,7 @@ int main(void) {
     {
         EngineResult graphics_result = rohr_graphics_start();
         if(rohr_error_check(graphics_result)) {
-            PRINT_ENGINE_ERROR(graphics_result);
+            rohr_error_print_stderr(graphics_result.result.error);
             rohr_engine_shutdown();
             return 1;
         }
@@ -133,39 +130,45 @@ int main(void) {
     }
     EngineResult load_result = rohr_game_state_load_file("examples/editor/pong/pong.json");
     if(rohr_error_check(load_result)) {
-        PRINT_ENGINE_ERROR(load_result);
+        rohr_error_print_stderr(load_result.result.error);
         goto fail;
     }
-    EngineResult wall_bottom_result = RE_entity_find_by_name("wall_bottom", &wall_bottom);
+    EntityResult wall_bottom_result = RE_entity_find_by_name("wall_bottom");
     if(rohr_error_check(wall_bottom_result)) {
-        PRINT_ENGINE_ERROR(wall_bottom_result);
+        rohr_error_print_stderr(wall_bottom_result.result.error);
         goto fail;
     }
-    EngineResult wall_top_result = RE_entity_find_by_name("wall_top", &wall_top);
+    wall_bottom = wall_bottom_result.result.value;
+    EntityResult wall_top_result = RE_entity_find_by_name("wall_top");
     if(rohr_error_check(wall_top_result)) {
-        PRINT_ENGINE_ERROR(wall_top_result);
+        rohr_error_print_stderr(wall_top_result.result.error);
         goto fail;
     }
-    EngineResult center_line_result = RE_entity_find_by_name("center_line", &center_line);
+    wall_top = wall_top_result.result.value;
+    EntityResult center_line_result = RE_entity_find_by_name("center_line");
     if(rohr_error_check(center_line_result)) {
-        PRINT_ENGINE_ERROR(center_line_result);
+        rohr_error_print_stderr(center_line_result.result.error);
         goto fail;
     }
-    EngineResult paddle_left_result = RE_entity_find_by_name("paddle_left", &paddle_left);
+    center_line = center_line_result.result.value;
+    EntityResult paddle_left_result = RE_entity_find_by_name("paddle_left");
     if(rohr_error_check(paddle_left_result)) {
-        PRINT_ENGINE_ERROR(paddle_left_result);
+        rohr_error_print_stderr(paddle_left_result.result.error);
         goto fail;
     }
-    EngineResult paddle_right_result = RE_entity_find_by_name("paddle_right", &paddle_right);
+    paddle_left = paddle_left_result.result.value;
+    EntityResult paddle_right_result = RE_entity_find_by_name("paddle_right");
     if(rohr_error_check(paddle_right_result)) {
-        PRINT_ENGINE_ERROR(paddle_right_result);
+        rohr_error_print_stderr(paddle_right_result.result.error);
         goto fail;
     }
-    EngineResult ball_result = RE_entity_find_by_name("ball", &ball);
+    paddle_right = paddle_right_result.result.value;
+    EntityResult ball_result = RE_entity_find_by_name("ball");
     if(rohr_error_check(ball_result)) {
-        PRINT_ENGINE_ERROR(ball_result);
+        rohr_error_print_stderr(ball_result.result.error);
         goto fail;
     }
+    ball = ball_result.result.value;
 
     rohr_engine_reset_clock();
     while(true) {
@@ -190,7 +193,7 @@ int main(void) {
             }
         );
         if(rohr_error_check(left_velocity_result)) {
-            PRINT_ENGINE_ERROR(left_velocity_result);
+            rohr_error_print_stderr(left_velocity_result.result.error);
             goto fail;
         }
         EngineResult right_velocity_result = rohr_physics_set_velocity(
@@ -201,7 +204,7 @@ int main(void) {
             }
         );
         if(rohr_error_check(right_velocity_result)) {
-            PRINT_ENGINE_ERROR(right_velocity_result);
+            rohr_error_print_stderr(right_velocity_result.result.error);
             goto fail;
         }
 
@@ -229,7 +232,7 @@ int main(void) {
             left_paddle_max_y
         );
         if(rohr_error_check(left_constraint_result)) {
-            PRINT_ENGINE_ERROR(left_constraint_result);
+            rohr_error_print_stderr(left_constraint_result.result.error);
             goto fail;
         }
         EngineResult right_constraint_result = pong_constrain_paddle(
@@ -238,7 +241,7 @@ int main(void) {
             right_paddle_max_y
         );
         if(rohr_error_check(right_constraint_result)) {
-            PRINT_ENGINE_ERROR(right_constraint_result);
+            rohr_error_print_stderr(right_constraint_result.result.error);
             goto fail;
         }
 
@@ -249,7 +252,7 @@ int main(void) {
             printf("Left: %d  Right: %d\n", left_score, right_score);
             EngineResult reset_result = pong_reset_ball(ball, serve_direction);
             if(rohr_error_check(reset_result)) {
-                PRINT_ENGINE_ERROR(reset_result);
+                rohr_error_print_stderr(reset_result.result.error);
                 goto fail;
             }
         } else if(positions[ball_index].y < -goal_y) {
@@ -258,7 +261,7 @@ int main(void) {
             printf("Left: %d  Right: %d\n", left_score, right_score);
             EngineResult reset_result = pong_reset_ball(ball, serve_direction);
             if(rohr_error_check(reset_result)) {
-                PRINT_ENGINE_ERROR(reset_result);
+                rohr_error_print_stderr(reset_result.result.error);
                 goto fail;
             }
         }

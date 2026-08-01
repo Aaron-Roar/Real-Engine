@@ -23,6 +23,7 @@ EngineResult rohr_error_result_value(bool value) { return error_result_value(val
 EngineResult rohr_error_result_error(EngineError error) { return error_result_error(error); }
 const char *rohr_error_default_message(EngineError error) { return error_default_message(error); }
 const char *rohr_error_string(EngineError error) { return error_string(error); }
+void rohr_error_print_stderr(EngineError error) { error_print_stderr(error); }
 
 void rohr_console_print_logs(void) { console_print_logs(); }
 void rohr_console_init(void) { console_init(); }

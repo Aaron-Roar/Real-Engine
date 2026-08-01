@@ -120,7 +120,7 @@ output directory and all strings referenced by the registry.
 ### `RE_entity_find_by_name`
 
 ```c
-EngineResult RE_entity_find_by_name(const char *name, Entity *entity);
+EntityResult RE_entity_find_by_name(const char *name);
 ```
 
 Find a named game-state entity and write its handle for editor-authored code.
@@ -128,9 +128,8 @@ Find a named game-state entity and write its handle for editor-authored code.
 | Parameter | Description |
 | --- | --- |
 | `name` | Entity name stored in the loaded game state. |
-| `entity` | Destination for the live entity handle. |
 
-**Returns:** EngineResult describing success or the lookup failure.
+**Returns:** EntityResult containing the live entity handle or lookup failure.
 
 ### `RE_init`
 
