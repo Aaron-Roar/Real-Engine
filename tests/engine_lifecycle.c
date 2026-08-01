@@ -45,6 +45,16 @@ int main(void) {
         rohr_engine_shutdown();
         return 1;
     }
+    if(rohr_error_check(rohr_physics_position_set(first.result.value, (Position){0.0f, 0.0f})) ||
+            rohr_error_check(rohr_physics_position_set(second.result.value, (Position){0.0f, 0.0f}))) {
+        rohr_engine_shutdown();
+        return 1;
+    }
+    rohr_system_update_physics(0.0);
+    if(!rohr_physics_collision_report_get(first.result.value, second.result.value)) {
+        rohr_engine_shutdown();
+        return 1;
+    }
 
     rohr_engine_shutdown();
     return 0;

@@ -23,6 +23,8 @@ static const float right_paddle_max_y = -20.0f;
 static const Time camera_approach_duration = 0.5;
 static const Time camera_return_duration = 0.25;
 static const float camera_ball_scale = 1.5f;
+static const RohrCollisionCategoryMask pong_collision_category_paddle = UINT64_C(1) << 1;
+static const RohrCollisionCategoryMask pong_collision_category_ball = UINT64_C(1) << 2;
 
 typedef enum PongCameraState {
     PONG_CAMERA_HOME,
@@ -287,6 +289,32 @@ int main(void) {
         goto fail;
     }
     ball = ball_result.result.value;
+    if(rohr_error_check(rohr_physics_collision_category_set(
+                paddle_left,
+                pong_collision_category_paddle
+            )) ||
+            rohr_error_check(rohr_physics_collision_with_set(
+                paddle_left,
+                pong_collision_category_ball
+            )) ||
+            rohr_error_check(rohr_physics_collision_category_set(
+                paddle_right,
+                pong_collision_category_paddle
+            )) ||
+            rohr_error_check(rohr_physics_collision_with_set(
+                paddle_right,
+                pong_collision_category_ball
+            )) ||
+            rohr_error_check(rohr_physics_collision_category_set(
+                ball,
+                pong_collision_category_ball
+            )) ||
+            rohr_error_check(rohr_physics_collision_with_set(
+                ball,
+                pong_collision_category_paddle | ROHR_COLLISION_CATEGORY_DEFAULT
+            ))) {
+        goto fail;
+    }
     render_context = (PongRenderContext){
         .wall_bottom = wall_bottom,
         .wall_top = wall_top,

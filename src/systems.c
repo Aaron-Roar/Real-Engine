@@ -697,13 +697,19 @@ void system_apply_collisions_tuned(void) {
                             continue;
                         }
                         if(grid.cells[row][col].entity_present[j]) {
-                            Entity entity_1 = grid.cells[row][col].entities[i];
-                            Entity entity_2 = grid.cells[row][col].entities[j];
+                            EntityIndex entity_1 = grid.cells[row][col].entities[i];
+                            EntityIndex entity_2 = grid.cells[row][col].entities[j];
+                            Entity entity_1_id;
+                            Entity entity_2_id;
                             if(grid_pair_checked_is(entity_1,entity_2)) {
                                 continue;
                             }
                             add_pair(entity_1,entity_2);
-                            if(!physics_collision_between_is(entity_1, entity_2)) {
+                            if(!system_entity_from_index(entity_1, &entity_1_id) ||
+                                    !system_entity_from_index(entity_2, &entity_2_id)) {
+                                continue;
+                            }
+                            if(!physics_collision_between_is(entity_1_id, entity_2_id)) {
                                 system_collision_report_by_index_set(entity_1, entity_2, false);
                                 system_collision_report_by_index_set(entity_2, entity_1, false);
                                 continue;
