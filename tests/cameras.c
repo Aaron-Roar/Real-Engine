@@ -25,7 +25,7 @@ int main(void) {
     }
     original = rohr_camera_get_active();
     config.position = (Position){10.0f, 20.0f};
-    config.scale = 2.0f;
+    config.zoom = 2.0f;
     first_result = rohr_camera_create(config);
     second_result = rohr_camera_create(rohr_camera_default_config());
     if(rohr_error_check(first_result) || rohr_error_check(second_result) ||
@@ -35,7 +35,7 @@ int main(void) {
     }
     camera_result = rohr_camera_get(first_result.result.value);
     screen = rohr_graphics_world_to_screen((Position){11.0f, 20.0f});
-    if(rohr_error_check(camera_result) || camera_result.result.value.scale != 2.0f ||
+    if(rohr_error_check(camera_result) || camera_result.result.value.zoom != 2.0f ||
             screen.x != 322.0f || screen.y != 240.0f ||
             !rohr_error_check(rohr_camera_destroy(first_result.result.value)) ||
             rohr_error_check(rohr_camera_set_active(second_result.result.value)) ||
@@ -80,11 +80,49 @@ int main(void) {
                 original,
                 (Position){0.0f, 0.0f},
                 0.0
-            ))
-            || rohr_error_check(rohr_entity_delete(target_entity_result.result.value))) {
+            ))) {
         rohr_graphics_end();
         rohr_engine_shutdown();
         return 1;
+    }
+    {
+        EngineResult moving_result;
+        CameraZoomResult zoom_result;
+        if(rohr_error_check(rohr_camera_move_to(
+                original,
+                (Position){10.0f, 10.0f},
+                0.5
+            ))) {
+            rohr_graphics_end();
+            rohr_engine_shutdown();
+            return 1;
+        }
+        moving_result = rohr_camera_is_moving(original);
+        if(rohr_error_check(moving_result) || !moving_result.result.value
+                || rohr_error_check(rohr_camera_move(
+                    original,
+                    (Vec2D){0.0f, 0.0f},
+                    0.0
+                ))) {
+            rohr_graphics_end();
+            rohr_engine_shutdown();
+            return 1;
+        }
+        moving_result = rohr_camera_is_moving(original);
+        if(rohr_error_check(moving_result) || moving_result.result.value
+            || rohr_error_check(rohr_camera_set_zoom(original, 1.5f, -1.0))) {
+            rohr_graphics_end();
+            rohr_engine_shutdown();
+            return 1;
+        }
+        zoom_result = rohr_camera_get_zoom(original);
+        if(rohr_error_check(zoom_result) || zoom_result.result.value != 1.5f
+            || !rohr_error_check(rohr_camera_set_zoom(original, 0.0f, 0.0))
+            || rohr_error_check(rohr_entity_delete(target_entity_result.result.value))) {
+            rohr_graphics_end();
+            rohr_engine_shutdown();
+            return 1;
+        }
     }
     {
         ViewportConfig viewport_config = rohr_viewport_default_config();

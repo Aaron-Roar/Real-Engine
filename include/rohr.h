@@ -1123,7 +1123,7 @@ bool rohr_graphics_camera_is_attached(void);
  */
 CameraAttachmentResult rohr_graphics_get_camera_attachment(void);
 
-/** Returns defaults for a full-screen, unit-scale camera. */
+/** Returns defaults for a full-screen camera with unit zoom. */
 CameraConfig rohr_camera_default_config(void);
 /** Creates an engine-owned camera. */
 CameraIdResult rohr_camera_create(CameraConfig config);
@@ -1162,6 +1162,9 @@ EngineResult rohr_camera_move(CameraId camera, Vec2D translation, Time duration)
 EngineResult rohr_camera_move_to(CameraId camera, Position position, Time duration);
 EngineResult rohr_camera_move_to_entity(CameraId camera, Entity entity, Time duration);
 EngineResult rohr_camera_attach_to_entity(CameraId camera, Entity entity);
+EngineResult rohr_camera_is_moving(CameraId camera);
+EngineResult rohr_camera_set_zoom(CameraId camera, float zoom, Time duration);
+CameraZoomResult rohr_camera_get_zoom(CameraId camera);
 
 ViewportConfig rohr_viewport_default_config(void);
 ViewportIdResult rohr_viewport_create(ViewportConfig config);

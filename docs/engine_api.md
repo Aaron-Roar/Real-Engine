@@ -2976,7 +2976,7 @@ EngineResult rohr_game_state_save_template_file(const char *path);
 CameraConfig rohr_camera_default_config(void);
 ```
 
- Returns defaults for a full-screen, unit-scale camera.
+ Returns defaults for a full-screen camera with unit zoom.
 
 ### `rohr_camera_create`
 

@@ -55,8 +55,7 @@ typedef struct {
     /** Logical world-view dimensions before magnification. */
     Vec2D dimensions;
     /** Magnification where values above one zoom in. */
-    float scale;
-    /** Logical output rectangle used for rendering and clipping. */
+    float zoom;
 } Camera;
 
 /** Defaults used when creating an engine-owned camera. */
@@ -64,11 +63,12 @@ typedef struct CameraConfig {
     Position position;
     Orientation orientation;
     Vec2D dimensions;
-    float scale;
+    float zoom;
 } CameraConfig;
 
 ERROR_DECLARE_RESULT_TYPE(CameraIdResult, CameraId);
 ERROR_DECLARE_RESULT_TYPE(CameraResult, Camera);
+ERROR_DECLARE_RESULT_TYPE(CameraZoomResult, float);
 
 /** Non-owning description of an entity-following camera attachment. */
 typedef struct {
@@ -416,6 +416,11 @@ EngineResult graphics_camera_move_to(CameraId camera, Position position, Time du
 EngineResult graphics_camera_move_to_entity(CameraId camera, Entity entity, Time duration);
 /** Immediately attach to and follow an entity's position. */
 EngineResult graphics_camera_attach_to_entity(CameraId camera, Entity entity);
+/** Return success with true while a timed movement is active. */
+EngineResult graphics_camera_is_moving(CameraId camera);
+/** Scale over engine-tick time; non-positive duration is immediate. */
+EngineResult graphics_camera_set_zoom(CameraId camera, float zoom, Time duration);
+CameraZoomResult graphics_camera_get_zoom(CameraId camera);
 
 /** Return a disabled, full-window viewport using contain fitting. */
 ViewportConfig graphics_viewport_default_config(void);

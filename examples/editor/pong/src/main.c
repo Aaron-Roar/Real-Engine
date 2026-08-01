@@ -20,6 +20,16 @@ static const float left_paddle_min_y = 20.0f;
 static const float left_paddle_max_y = 312.0f;
 static const float right_paddle_min_y = -312.0f;
 static const float right_paddle_max_y = -20.0f;
+static const Time camera_move_to_ball_duration = 0.5;
+static const Time camera_return_duration = 0.25;
+static const float camera_ball_scale = 1.5f;
+
+typedef enum PongCameraState {
+    PONG_CAMERA_HOME,
+    PONG_CAMERA_MOVING_TO_BALL,
+    PONG_CAMERA_FOLLOWING_BALL,
+    PONG_CAMERA_RETURNING_HOME,
+} PongCameraState;
 
 typedef struct PongRenderContext {
     Entity wall_bottom;
@@ -65,6 +75,50 @@ static void pong_render_camera(CameraId camera, void *context_value) {
         context->ball,
         context->ball_on_fire
     );
+}
+
+static EngineResult pong_update_camera(
+    CameraId camera,
+    Entity ball,
+    bool ball_behind_paddle,
+    Position home,
+    PongCameraState *state
+) {
+    EngineResult result;
+    if(state == NULL) return rohr_error_result_error(ERROR_ENGINE_STATE_INVALID);
+    if(ball_behind_paddle) {
+        if(*state == PONG_CAMERA_HOME || *state == PONG_CAMERA_RETURNING_HOME) {
+            result = rohr_camera_set_zoom(
+                camera,
+                camera_ball_scale,
+                camera_move_to_ball_duration
+            );
+            if(rohr_error_check(result)) return result;
+            result = rohr_camera_move_to_entity(camera, ball, camera_move_to_ball_duration);
+            if(rohr_error_check(result)) return result;
+            *state = PONG_CAMERA_MOVING_TO_BALL;
+        } else if(*state == PONG_CAMERA_MOVING_TO_BALL) {
+            result = rohr_camera_is_moving(camera);
+            if(rohr_error_check(result)) return result;
+            if(!result.result.value) {
+                result = rohr_camera_attach_to_entity(camera, ball);
+                if(rohr_error_check(result)) return result;
+                *state = PONG_CAMERA_FOLLOWING_BALL;
+            }
+        }
+    } else if(*state == PONG_CAMERA_MOVING_TO_BALL
+            || *state == PONG_CAMERA_FOLLOWING_BALL) {
+        result = rohr_camera_set_zoom(camera, 1.0f, camera_return_duration);
+        if(rohr_error_check(result)) return result;
+        result = rohr_camera_move_to(camera, home, camera_return_duration);
+        if(rohr_error_check(result)) return result;
+        *state = PONG_CAMERA_RETURNING_HOME;
+    } else if(*state == PONG_CAMERA_RETURNING_HOME) {
+        result = rohr_camera_is_moving(camera);
+        if(rohr_error_check(result)) return result;
+        if(!result.result.value) *state = PONG_CAMERA_HOME;
+    }
+    return rohr_error_result_value(true);
 }
 
 static EngineResult pong_reset_ball(Entity ball, int serve_direction) {
@@ -140,12 +194,13 @@ int main(void) {
     Entity ball;
     CameraId left_camera = CAMERA_INVALID;
     CameraId right_camera = CAMERA_INVALID;
-    CameraId ball_camera = CAMERA_INVALID;
     ViewportId left_viewport = VIEWPORT_INVALID;
     ViewportId right_viewport = VIEWPORT_INVALID;
     PongRenderContext render_context = {0};
     bool ball_behind_left = false;
     bool ball_behind_right = false;
+    PongCameraState left_camera_state = PONG_CAMERA_HOME;
+    PongCameraState right_camera_state = PONG_CAMERA_HOME;
     int left_score = 0;
     int right_score = 0;
     int serve_direction = 1;
@@ -247,7 +302,7 @@ int main(void) {
             .position = {0.0f, field_camera_center_y},
             .orientation = -PI_F * 0.5f,
             .dimensions = {340.0f, 500.0f},
-            .scale = 1.0f,
+            .zoom = 1.0f,
         };
         EngineResult camera_result = rohr_camera_set(left_camera, left_camera_value);
         if(rohr_error_check(camera_result)) {
@@ -267,32 +322,6 @@ int main(void) {
             goto fail;
         }
         right_camera = camera_result.result.value;
-    }
-    {
-        CameraConfig config = rohr_camera_default_config();
-        CameraIdResult camera_result;
-        config.orientation = -PI_F * 0.5f;
-        config.dimensions = (Vec2D){180.0f, 180.0f};
-        camera_result = rohr_camera_create(config);
-        if(rohr_error_check(camera_result)) {
-            rohr_error_print_stderr(camera_result.result.error);
-            goto fail;
-        }
-        ball_camera = camera_result.result.value;
-        {
-            EngineResult attach_result = rohr_camera_attach(
-                ball_camera,
-                ball,
-                (Vec2D){0.0f, 0.0f},
-                -PI_F * 0.5f,
-                true,
-                false
-            );
-            if(rohr_error_check(attach_result)) {
-                rohr_error_print_stderr(attach_result.result.error);
-                goto fail;
-            }
-        }
     }
     {
         ViewportConfig config = rohr_viewport_default_config();
@@ -316,10 +345,6 @@ int main(void) {
             &render_context
         )) || rohr_error_check(rohr_camera_set_render_callback(
             right_camera,
-            pong_render_camera,
-            &render_context
-        )) || rohr_error_check(rohr_camera_set_render_callback(
-            ball_camera,
             pong_render_camera,
             &render_context
         ))) goto fail;
@@ -443,6 +468,19 @@ int main(void) {
                     goto fail;
                 }
             }
+            if(rohr_error_check(pong_update_camera(
+                    left_camera,
+                    ball,
+                    ball_behind_left,
+                    (Position){0.0f, field_camera_center_y},
+                    &left_camera_state
+                )) || rohr_error_check(pong_update_camera(
+                    right_camera,
+                    ball,
+                    ball_behind_right,
+                    (Position){0.0f, -field_camera_center_y},
+                    &right_camera_state
+                ))) goto fail;
         }
 
         {
@@ -450,13 +488,6 @@ int main(void) {
             render_context.ball_on_fire = rohr_error_check(fire_result)
                 ? false
                 : fire_result.result.value;
-            if(rohr_error_check(rohr_viewport_set_camera(
-                    left_viewport,
-                    ball_behind_left ? ball_camera : left_camera
-                )) || rohr_error_check(rohr_viewport_set_camera(
-                    right_viewport,
-                    ball_behind_right ? ball_camera : right_camera
-                ))) goto fail;
         }
         rohr_graphics_show();
     }
@@ -464,7 +495,6 @@ int main(void) {
     (void)rohr_viewport_destroy(right_viewport);
     (void)rohr_viewport_destroy(left_viewport);
     (void)rohr_camera_set_active(left_camera);
-    (void)rohr_camera_destroy(ball_camera);
     (void)rohr_camera_destroy(right_camera);
     game_components_clear(ball);
     game_components_shutdown();
@@ -476,7 +506,6 @@ fail:
     if(right_viewport != VIEWPORT_INVALID) (void)rohr_viewport_destroy(right_viewport);
     if(left_viewport != VIEWPORT_INVALID) (void)rohr_viewport_destroy(left_viewport);
     if(left_camera != CAMERA_INVALID) (void)rohr_camera_set_active(left_camera);
-    if(ball_camera != CAMERA_INVALID) (void)rohr_camera_destroy(ball_camera);
     if(right_camera != CAMERA_INVALID) (void)rohr_camera_destroy(right_camera);
     game_components_shutdown();
     rohr_graphics_end();
