@@ -23,6 +23,8 @@ EngineResult physics_tables_init(void);
 EngineResult physics_tables_ensure_capacity(size_t capacity);
 /** Destroy physics tables. */
 void physics_tables_destroy(void);
+/** Clear joints and anchors owned by or connected to a deleted entity. */
+void physics_entity_clear(Entity entity, EntityIndex index);
 
 /** Initialize graphics tables. */
 EngineResult graphics_tables_init(void);

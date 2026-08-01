@@ -1,0 +1,11 @@
+cmake_minimum_required(VERSION 3.20)
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    project(rohr_joints LANGUAGES C)
+endif()
+include(${CMAKE_CURRENT_LIST_DIR}/../../cmake/RohrExample.cmake)
+rohr_example_bootstrap()
+
+add_executable(joints src/main.c)
+rohr_add_example_runtime(joints)
+target_link_libraries(joints PRIVATE rohr_engine)
+rohr_stage_example_assets(joints engine-core/joints)

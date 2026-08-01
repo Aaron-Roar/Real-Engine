@@ -128,6 +128,7 @@ if(ROHR_BUILD_EXAMPLES)
         fly_to_finish
         game_state
         user_interface
+        joints
     )
 
     add_custom_target(editor_examples)
@@ -171,6 +172,11 @@ if(ROHR_BUILD_TESTS)
     target_link_libraries(timing_test PRIVATE rohr_engine)
     set_target_properties(timing_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
     add_test(NAME timing COMMAND timing_test)
+
+    add_executable(joints_test tests/joints.c)
+    target_link_libraries(joints_test PRIVATE rohr_engine)
+    set_target_properties(joints_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+    add_test(NAME joints COMMAND joints_test)
 
     add_executable(editor_component_registry_test
         tests/editor_component_registry.c
@@ -248,6 +254,7 @@ if(ROHR_BUILD_TESTS)
         controller_mappings_test
         cameras_test
         timing_test
+        joints_test
         editor_component_registry_test
         generated_components_test
     )

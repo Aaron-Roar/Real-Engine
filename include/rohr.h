@@ -885,6 +885,79 @@ EngineResult rohr_physics_target_set(Entity entity, Entity target);
 EngineResult rohr_physics_joint_component_set(Entity entity, Joint joint);
 
 /**
+ * @brief Creates an anchor owned by an entity.
+ * @param entity Entity that owns and moves the anchor.
+ * @param centroid_offset Anchor offset from the hitbox centroid, or entity position without a hitbox.
+ * @return JointAnchorIdResult containing the stable anchor handle, or an error.
+ */
+JointAnchorIdResult rohr_physics_joint_anchor_create(Entity entity, Vec2D centroid_offset);
+/**
+ * @brief Returns the anchors owned by an entity.
+ * @param entity Entity whose anchors should be listed.
+ * @return JointAnchorListResult containing the anchor handles, or an error.
+ */
+JointAnchorListResult rohr_physics_joint_anchors_get(Entity entity);
+/**
+ * @brief Returns an anchor offset relative to its owner's centroid.
+ * @param anchor Anchor to inspect.
+ * @return JointAnchorPositionResult containing the centroid-relative offset, or an error.
+ */
+JointAnchorPositionResult rohr_physics_joint_anchor_position_get(JointAnchorId anchor);
+/**
+ * @brief Returns the current world position of an anchor.
+ * @param anchor Anchor to resolve.
+ * @return JointAnchorPositionResult containing its world position, or an error.
+ */
+JointAnchorPositionResult rohr_physics_joint_anchor_world_position_get(JointAnchorId anchor);
+/**
+ * @brief Sets an anchor offset relative to its owner's centroid.
+ * @param anchor Anchor to modify.
+ * @param centroid_offset New centroid-relative offset.
+ * @return EngineResult describing success or failure.
+ */
+EngineResult rohr_physics_joint_anchor_position_set(JointAnchorId anchor, Vec2D centroid_offset);
+/**
+ * @brief Removes an anchor and its connected joint entities.
+ * @param anchor Anchor to remove.
+ * @return EngineResult describing success or failure.
+ */
+EngineResult rohr_physics_joint_anchor_remove(JointAnchorId anchor);
+/**
+ * @brief Configures a joint entity as a rigid pin between two anchors.
+ * @param joint Entity that owns the joint component.
+ * @param anchor_a First anchor.
+ * @param anchor_b Second anchor.
+ * @return EngineResult describing success or failure.
+ */
+EngineResult rohr_physics_joint_pin_set(Entity joint, JointAnchorId anchor_a, JointAnchorId anchor_b);
+/**
+ * @brief Configures a joint entity as a rigid weld between two anchors.
+ * @param joint Entity that owns the joint component.
+ * @param anchor_a First anchor.
+ * @param anchor_b Second anchor.
+ * @return EngineResult describing success or failure.
+ */
+EngineResult rohr_physics_joint_weld_set(Entity joint, JointAnchorId anchor_a, JointAnchorId anchor_b);
+/**
+ * @brief Configures a joint entity as a damped spring between two anchors.
+ * @param joint Entity that owns the joint component.
+ * @param anchor_a First anchor.
+ * @param anchor_b Second anchor.
+ * @param rest_length Unstretched anchor distance.
+ * @param stiffness Spring stiffness.
+ * @param damping Relative-motion damping.
+ * @return EngineResult describing success or failure.
+ */
+EngineResult rohr_physics_joint_spring_set(
+    Entity joint,
+    JointAnchorId anchor_a,
+    JointAnchorId anchor_b,
+    float rest_length,
+    float stiffness,
+    float damping
+);
+
+/**
  * @brief Creates a joint between two entities.
  * @param a First entity.
  * @param b Second entity.
@@ -994,6 +1067,20 @@ void rohr_graphics_draw_hit_box_colored(Entity entity, Fill fill_type, Color col
  * @brief Draws hitboxes for all renderable hitbox entities.
  */
 void rohr_graphics_draw_hit_boxes(void);
+
+/**
+ * @brief Draws one joint using an engineering-style debug symbol.
+ * @param joint Joint entity to draw.
+ * @param color Symbol color.
+ * @return true when the symbol was drawn successfully.
+ */
+bool rohr_graphics_draw_joint(Entity joint, Color color);
+
+/**
+ * @brief Draws all live joints using engineering-style debug symbols.
+ * @param color Symbol color.
+ */
+void rohr_graphics_draw_joints(Color color);
 
 /**
  * @brief Loads a texture asset.

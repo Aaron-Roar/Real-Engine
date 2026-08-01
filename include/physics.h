@@ -103,18 +103,45 @@ typedef struct TransformLock {
 
 /** Joint behavior type. */
 typedef enum JointType {
-    /** Maintain distance between anchor points. */
-    JOINT_DISTANCE,
-    /** Reserved weld joint type. */
+    /** Apply a damped spring between anchor points. */
+    JOINT_SPRING,
+    /** Preserve relative position and orientation. */
     JOINT_WELD,
-    /** Pin one entity to another. */
+    /** Keep anchor points together while allowing relative rotation. */
     JOINT_PIN
 } JointType;
+
+/** Stable handle for an entity-owned joint anchor. */
+typedef uint64_t JointAnchorId;
+#define JOINT_ANCHOR_INVALID UINT64_C(0)
+#define MAX_JOINT_ANCHORS 10000
+#define MAX_JOINT_ANCHORS_PER_ENTITY 32
+
+/** Entity-owned point stored relative to the entity's centroid. */
+typedef struct JointAnchor {
+    Entity entity;
+    Vec2D centroid_offset;
+} JointAnchor;
+
+typedef struct JointAnchorList {
+    JointAnchorId values[MAX_JOINT_ANCHORS_PER_ENTITY];
+    uint32_t count;
+} JointAnchorList;
+
+ERROR_DECLARE_RESULT_TYPE(JointAnchorIdResult, JointAnchorId);
+ERROR_DECLARE_RESULT_TYPE(JointAnchorResult, JointAnchor);
+ERROR_DECLARE_RESULT_TYPE(JointAnchorListResult, JointAnchorList);
+ERROR_DECLARE_RESULT_TYPE(JointAnchorPositionResult, Position);
 
 /** Joint component data stored on a joint entity. */
 typedef struct Joint {
     /** Joint behavior type. */
     JointType type;
+
+    /** First explicit anchor handle, when configured through the anchor API. */
+    JointAnchorId anchor_a;
+    /** Second explicit anchor handle, when configured through the anchor API. */
+    JointAnchorId anchor_b;
 
     /** First constrained entity. */
     Entity a;
@@ -126,7 +153,7 @@ typedef struct Joint {
     /** Anchor point local to entity b. */
     Vec2D local_anchor_b;
 
-    /** Resting distance for distance joints. */
+    /** Resting distance for spring joints. */
     float rest_length;
 
     /** Linear spring stiffness. */
@@ -407,6 +434,24 @@ EngineResult physics_target_set(Entity entity, Entity target);
 
 /** Add or replace complete joint component data on an existing entity. */
 EngineResult physics_joint_component_set(Entity entity, Joint joint);
+
+JointAnchorIdResult physics_joint_anchor_create(Entity entity, Vec2D centroid_offset);
+JointAnchorListResult physics_joint_anchors_get(Entity entity);
+JointAnchorPositionResult physics_joint_anchor_position_get(JointAnchorId anchor);
+JointAnchorPositionResult physics_joint_anchor_world_position_get(JointAnchorId anchor);
+EngineResult physics_joint_anchor_position_set(JointAnchorId anchor, Vec2D centroid_offset);
+EngineResult physics_joint_anchor_remove(JointAnchorId anchor);
+
+EngineResult physics_joint_pin_set(Entity joint, JointAnchorId anchor_a, JointAnchorId anchor_b);
+EngineResult physics_joint_weld_set(Entity joint, JointAnchorId anchor_a, JointAnchorId anchor_b);
+EngineResult physics_joint_spring_set(
+    Entity joint,
+    JointAnchorId anchor_a,
+    JointAnchorId anchor_b,
+    float rest_length,
+    float stiffness,
+    float damping
+);
 
 /**
  * Create a joint entity connecting two live entities.

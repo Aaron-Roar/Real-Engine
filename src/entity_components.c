@@ -721,6 +721,7 @@ EngineResult entity_delete(Entity entity) {
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
+    physics_entity_clear(entity, index);
     entity_clear_index(index);
     slot = entity_slot(entity);
     removed_alive_position = entity_alive_positions[slot];

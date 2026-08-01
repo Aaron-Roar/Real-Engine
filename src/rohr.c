@@ -194,6 +194,15 @@ EngineResult rohr_physics_target_set(Entity entity, Entity target) {
 EngineResult rohr_physics_joint_component_set(Entity entity, Joint joint) {
     return physics_joint_component_set(entity, joint);
 }
+JointAnchorIdResult rohr_physics_joint_anchor_create(Entity entity, Vec2D centroid_offset) { return physics_joint_anchor_create(entity, centroid_offset); }
+JointAnchorListResult rohr_physics_joint_anchors_get(Entity entity) { return physics_joint_anchors_get(entity); }
+JointAnchorPositionResult rohr_physics_joint_anchor_position_get(JointAnchorId anchor) { return physics_joint_anchor_position_get(anchor); }
+JointAnchorPositionResult rohr_physics_joint_anchor_world_position_get(JointAnchorId anchor) { return physics_joint_anchor_world_position_get(anchor); }
+EngineResult rohr_physics_joint_anchor_position_set(JointAnchorId anchor, Vec2D centroid_offset) { return physics_joint_anchor_position_set(anchor, centroid_offset); }
+EngineResult rohr_physics_joint_anchor_remove(JointAnchorId anchor) { return physics_joint_anchor_remove(anchor); }
+EngineResult rohr_physics_joint_pin_set(Entity joint, JointAnchorId anchor_a, JointAnchorId anchor_b) { return physics_joint_pin_set(joint, anchor_a, anchor_b); }
+EngineResult rohr_physics_joint_weld_set(Entity joint, JointAnchorId anchor_a, JointAnchorId anchor_b) { return physics_joint_weld_set(joint, anchor_a, anchor_b); }
+EngineResult rohr_physics_joint_spring_set(Entity joint, JointAnchorId anchor_a, JointAnchorId anchor_b, float rest_length, float stiffness, float damping) { return physics_joint_spring_set(joint, anchor_a, anchor_b, rest_length, stiffness, damping); }
 EntityResult rohr_physics_joint_create(Entity a, Entity b, JointType type, Vec2D local_anchor_a, Vec2D local_anchor_b, float stiffness, float damping) {
     return physics_joint_create(a, b, type, local_anchor_a, local_anchor_b, stiffness, damping);
 }
@@ -212,6 +221,8 @@ void rohr_graphics_show(void) { graphics_show(); }
 void rohr_graphics_draw_hit_box(Entity entity, Fill fill_type) { graphics_draw_hit_box(entity, fill_type); }
 void rohr_graphics_draw_hit_box_colored(Entity entity, Fill fill_type, Color color) { graphics_draw_hit_box_colored(entity, fill_type, color); }
 void rohr_graphics_draw_hit_boxes(void) { graphics_draw_hit_boxes(); }
+bool rohr_graphics_draw_joint(Entity joint, Color color) { return graphics_draw_joint(joint, color); }
+void rohr_graphics_draw_joints(Color color) { graphics_draw_joints(color); }
 TextureAssetResult rohr_graphics_load_texture(TextureDescriptor text_desc) { return graphics_load_texture(text_desc); }
 FontAssetResult rohr_graphics_load_font(FontDescriptor descriptor) { return graphics_load_font(descriptor); }
 void rohr_graphics_destroy_font(FontAsset *font) { graphics_destroy_font(font); }

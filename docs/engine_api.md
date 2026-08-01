@@ -1618,6 +1618,143 @@ Adds or replaces complete joint data on an existing entity.
 
 **Returns:** EngineResult describing success or failure.
 
+### `rohr_physics_joint_anchor_create`
+
+```c
+JointAnchorIdResult rohr_physics_joint_anchor_create(Entity entity, Vec2D centroid_offset);
+```
+
+Creates an anchor owned by an entity.
+
+| Parameter | Description |
+| --- | --- |
+| `entity` | Entity that owns and moves the anchor. |
+| `centroid_offset` | Anchor offset from the hitbox centroid, or entity position without a hitbox. |
+
+**Returns:** JointAnchorIdResult containing the stable anchor handle, or an error.
+
+### `rohr_physics_joint_anchors_get`
+
+```c
+JointAnchorListResult rohr_physics_joint_anchors_get(Entity entity);
+```
+
+Returns the anchors owned by an entity.
+
+| Parameter | Description |
+| --- | --- |
+| `entity` | Entity whose anchors should be listed. |
+
+**Returns:** JointAnchorListResult containing the anchor handles, or an error.
+
+### `rohr_physics_joint_anchor_position_get`
+
+```c
+JointAnchorPositionResult rohr_physics_joint_anchor_position_get(JointAnchorId anchor);
+```
+
+Returns an anchor offset relative to its owner's centroid.
+
+| Parameter | Description |
+| --- | --- |
+| `anchor` | Anchor to inspect. |
+
+**Returns:** JointAnchorPositionResult containing the centroid-relative offset, or an error.
+
+### `rohr_physics_joint_anchor_world_position_get`
+
+```c
+JointAnchorPositionResult rohr_physics_joint_anchor_world_position_get(JointAnchorId anchor);
+```
+
+Returns the current world position of an anchor.
+
+| Parameter | Description |
+| --- | --- |
+| `anchor` | Anchor to resolve. |
+
+**Returns:** JointAnchorPositionResult containing its world position, or an error.
+
+### `rohr_physics_joint_anchor_position_set`
+
+```c
+EngineResult rohr_physics_joint_anchor_position_set(JointAnchorId anchor, Vec2D centroid_offset);
+```
+
+Sets an anchor offset relative to its owner's centroid.
+
+| Parameter | Description |
+| --- | --- |
+| `anchor` | Anchor to modify. |
+| `centroid_offset` | New centroid-relative offset. |
+
+**Returns:** EngineResult describing success or failure.
+
+### `rohr_physics_joint_anchor_remove`
+
+```c
+EngineResult rohr_physics_joint_anchor_remove(JointAnchorId anchor);
+```
+
+Removes an anchor and its connected joint entities.
+
+| Parameter | Description |
+| --- | --- |
+| `anchor` | Anchor to remove. |
+
+**Returns:** EngineResult describing success or failure.
+
+### `rohr_physics_joint_pin_set`
+
+```c
+EngineResult rohr_physics_joint_pin_set(Entity joint, JointAnchorId anchor_a, JointAnchorId anchor_b);
+```
+
+Configures a joint entity as a rigid pin between two anchors.
+
+| Parameter | Description |
+| --- | --- |
+| `joint` | Entity that owns the joint component. |
+| `anchor_a` | First anchor. |
+| `anchor_b` | Second anchor. |
+
+**Returns:** EngineResult describing success or failure.
+
+### `rohr_physics_joint_weld_set`
+
+```c
+EngineResult rohr_physics_joint_weld_set(Entity joint, JointAnchorId anchor_a, JointAnchorId anchor_b);
+```
+
+Configures a joint entity as a rigid weld between two anchors.
+
+| Parameter | Description |
+| --- | --- |
+| `joint` | Entity that owns the joint component. |
+| `anchor_a` | First anchor. |
+| `anchor_b` | Second anchor. |
+
+**Returns:** EngineResult describing success or failure.
+
+### `rohr_physics_joint_spring_set`
+
+```c
+EngineResult rohr_physics_joint_spring_set( Entity joint, JointAnchorId anchor_a, JointAnchorId anchor_b, float rest_length, float stiffness, float damping );
+```
+
+Configures a joint entity as a damped spring between two anchors.
+
+| Parameter | Description |
+| --- | --- |
+| `joint` | Entity that owns the joint component. |
+| `anchor_a` | First anchor. |
+| `anchor_b` | Second anchor. |
+| `rest_length` | Unstretched anchor distance. |
+| `stiffness` | Spring stiffness. |
+| `damping` | Relative-motion damping. |
+
+**Returns:** EngineResult describing success or failure.
+
 ### `rohr_physics_joint_create`
 
 ```c
@@ -1804,6 +1941,33 @@ void rohr_graphics_draw_hit_boxes(void);
 ```
 
 Draws hitboxes for all renderable hitbox entities.
+
+### `rohr_graphics_draw_joint`
+
+```c
+bool rohr_graphics_draw_joint(Entity joint, Color color);
+```
+
+Draws one joint using an engineering-style debug symbol.
+
+| Parameter | Description |
+| --- | --- |
+| `joint` | Joint entity to draw. |
+| `color` | Symbol color. |
+
+**Returns:** true when the symbol was drawn successfully.
+
+### `rohr_graphics_draw_joints`
+
+```c
+void rohr_graphics_draw_joints(Color color);
+```
+
+Draws all live joints using engineering-style debug symbols.
+
+| Parameter | Description |
+| --- | --- |
+| `color` | Symbol color. |
 
 ### `rohr_graphics_load_texture`
 

@@ -2179,3 +2179,122 @@ void graphics_draw_local_origins(void) {
         }
     }
 }
+
+static bool graphics_joint_world_anchors_get(Joint joint, Position *anchor_a, Position *anchor_b) {
+    EntityIndex a_index;
+    EntityIndex b_index;
+
+    if(anchor_a == NULL || anchor_b == NULL) return false;
+    if(joint.anchor_a != JOINT_ANCHOR_INVALID && joint.anchor_b != JOINT_ANCHOR_INVALID) {
+        JointAnchorPositionResult first = physics_joint_anchor_world_position_get(joint.anchor_a);
+        JointAnchorPositionResult second = physics_joint_anchor_world_position_get(joint.anchor_b);
+        if(first.kind == ERROR_RESULT_ERROR || second.kind == ERROR_RESULT_ERROR) return false;
+        *anchor_a = first.result.value;
+        *anchor_b = second.result.value;
+        return true;
+    }
+    if(!entity_index_get(joint.a, &a_index) || !entity_index_alive_is(a_index) ||
+            !entity_index_get(joint.b, &b_index) || !entity_index_alive_is(b_index)) return false;
+    {
+        Vec2D offset_a = math_rotate_vector(joint.local_anchor_a, orientations[a_index]);
+        Vec2D offset_b = math_rotate_vector(joint.local_anchor_b, orientations[b_index]);
+        *anchor_a = (Position){positions[a_index].x + offset_a.x, positions[a_index].y + offset_a.y};
+        *anchor_b = (Position){positions[b_index].x + offset_b.x, positions[b_index].y + offset_b.y};
+    }
+    return true;
+}
+
+static bool graphics_joint_pin_symbol_draw(Position center) {
+    SDL_FPoint ring[17];
+    SDL_FRect dot = {.x = center.x - 3.0f, .y = center.y - 3.0f, .w = 6.0f, .h = 6.0f};
+
+    for(uint32_t i = 0; i < 16; i += 1) {
+        float angle = (2.0f * PI_F * (float)i) / 16.0f;
+        ring[i] = (SDL_FPoint){center.x + cosf(angle) * 9.0f, center.y + sinf(angle) * 9.0f};
+    }
+    ring[16] = ring[0];
+    return SDL_RenderFillRect(sdl_renderer, &dot) && SDL_RenderLines(sdl_renderer, ring, 17);
+}
+
+static bool graphics_joint_weld_symbol_draw(Position center) {
+    const float radius = 9.0f;
+    SDL_FPoint box[] = {
+        {center.x - radius, center.y - radius},
+        {center.x + radius, center.y - radius},
+        {center.x + radius, center.y + radius},
+        {center.x - radius, center.y + radius},
+        {center.x - radius, center.y - radius}
+    };
+    SDL_FPoint diagonal_a[] = {
+        {center.x - radius, center.y - radius},
+        {center.x + radius, center.y + radius}
+    };
+    SDL_FPoint diagonal_b[] = {
+        {center.x + radius, center.y - radius},
+        {center.x - radius, center.y + radius}
+    };
+
+    return SDL_RenderLines(sdl_renderer, box, 5) &&
+        SDL_RenderLines(sdl_renderer, diagonal_a, 2) &&
+        SDL_RenderLines(sdl_renderer, diagonal_b, 2);
+}
+
+static bool graphics_joint_spring_symbol_draw(Position start, Position end) {
+    SDL_FPoint points[10];
+    Vec2D delta = {.x = end.x - start.x, .y = end.y - start.y};
+    float length = math_vector_magnitude(delta);
+    Vec2D perpendicular;
+
+    if(length <= 0.001f) return graphics_joint_pin_symbol_draw(start);
+    perpendicular = (Vec2D){.x = -delta.y / length, .y = delta.x / length};
+    for(uint32_t i = 0; i < 10; i += 1) {
+        float t = (float)i / 9.0f;
+        float offset = i == 0 || i == 9 ? 0.0f : (i % 2 == 0 ? 7.0f : -7.0f);
+        points[i] = (SDL_FPoint){
+            .x = start.x + delta.x * t + perpendicular.x * offset,
+            .y = start.y + delta.y * t + perpendicular.y * offset
+        };
+    }
+    return SDL_RenderLines(sdl_renderer, points, 10);
+}
+
+bool graphics_draw_joint(Entity joint_entity, Color color) {
+    EntityIndex index;
+    Joint joint;
+    Position world_a;
+    Position world_b;
+    Position screen_a;
+    Position screen_b;
+    Position center;
+
+    if(sdl_renderer == NULL || !entity_index_get(joint_entity, &index) ||
+            !entity_index_alive_is(index) || !entity_index_components_has(index, JOINT) ||
+            index >= joints_pool.capacity || !joints_pool.used[index]) return false;
+    joint = joints[index];
+    if(!graphics_joint_world_anchors_get(joint, &world_a, &world_b)) return false;
+    screen_a = graphics_world_to_screen(world_a);
+    screen_b = graphics_world_to_screen(world_b);
+    center = (Position){(screen_a.x + screen_b.x) * 0.5f, (screen_a.y + screen_b.y) * 0.5f};
+    if(!SDL_SetRenderDrawColor(sdl_renderer, color.red, color.green, color.blue, color.alpha)) return false;
+    switch(joint.type) {
+        case JOINT_SPRING:
+            return graphics_joint_spring_symbol_draw(screen_a, screen_b);
+        case JOINT_PIN:
+            return graphics_joint_pin_symbol_draw(center);
+        case JOINT_WELD:
+            return graphics_joint_weld_symbol_draw(center);
+        default:
+            return false;
+    }
+}
+
+void graphics_draw_joints(Color color) {
+    for(EntityIndex index = 0; index < joints_pool.capacity; index += 1) {
+        EntityResult joint;
+
+        if(!joints_pool.used[index] || !entity_index_alive_is(index) ||
+                !entity_index_components_has(index, JOINT)) continue;
+        joint = entity_from_index(index);
+        if(joint.kind == ERROR_RESULT_VALUE) (void)graphics_draw_joint(joint.result.value, color);
+    }
+}

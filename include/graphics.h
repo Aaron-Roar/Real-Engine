@@ -458,4 +458,8 @@ void graphics_draw_particles(void);
 
 /** Draw local origin axes for all live hitbox entities. */
 void graphics_draw_local_origins(void);
+/** Draw one joint using its engineering-style debug symbol. */
+bool graphics_draw_joint(Entity joint, Color color);
+/** Draw every live joint using engineering-style debug symbols. */
+void graphics_draw_joints(Color color);
 #endif

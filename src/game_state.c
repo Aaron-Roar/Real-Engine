@@ -1342,7 +1342,7 @@ static EngineResult state_load_components(
                 || !state_number(value, "rest_length", &number))
             return error_result_error(ERROR_ENGINE_STATE_INVALID);
         joint.rest_length = (float)number;
-        if(strcmp(yyjson_get_str(type), "distance") == 0) joint.type = JOINT_DISTANCE;
+        if(strcmp(yyjson_get_str(type), "spring") == 0) joint.type = JOINT_SPRING;
         else if(strcmp(yyjson_get_str(type), "weld") == 0) joint.type = JOINT_WELD;
         else if(strcmp(yyjson_get_str(type), "pin") == 0) joint.type = JOINT_PIN;
         else return error_result_error(ERROR_ENGINE_STATE_INVALID);
@@ -2309,7 +2309,7 @@ EngineResult game_state_save_file(const char *path) {
             EntityNameResult a = entity_name_get(joints[index].a);
             EntityNameResult b = entity_name_get(joints[index].b);
             if(a.kind == ERROR_RESULT_VALUE && b.kind == ERROR_RESULT_VALUE) {
-                const char *type = joints[index].type == JOINT_DISTANCE ? "distance"
+                const char *type = joints[index].type == JOINT_SPRING ? "spring"
                     : joints[index].type == JOINT_WELD ? "weld" : "pin";
                 yyjson_mut_val *joint = yyjson_mut_obj(document);
                 yyjson_mut_obj_add_str(document, joint, "type", type);
