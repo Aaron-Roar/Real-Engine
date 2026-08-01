@@ -9,14 +9,63 @@ static const Color left_color = {70, 170, 255, 255};
 static const Color right_color = {255, 105, 120, 255};
 static const Color fire_color = {255, 105, 20, 255};
 static const Time fire_duration = 0.2;
+static const Time normal_physics_dt = 1.0 / 120.0;
+static const Time slow_motion_physics_dt = 1.0 / 480.0;
 static const float paddle_speed = 280.0f;
 static const float goal_y = 330.0f;
+static const float field_camera_center_y = 170.0f;
 static const float paddle_min_x = -190.0f;
 static const float paddle_max_x = 190.0f;
 static const float left_paddle_min_y = 20.0f;
 static const float left_paddle_max_y = 312.0f;
 static const float right_paddle_min_y = -312.0f;
 static const float right_paddle_max_y = -20.0f;
+
+static void pong_draw_field(
+    Entity wall_bottom,
+    Entity wall_top,
+    Entity center_line,
+    Entity paddle_left,
+    Entity paddle_right,
+    Entity ball,
+    bool ball_on_fire
+) {
+    rohr_graphics_draw_hit_box_colored(center_line, GRAPHICS_FILLED, foreground_color);
+    rohr_graphics_draw_hit_box_colored(wall_bottom, GRAPHICS_FILLED, foreground_color);
+    rohr_graphics_draw_hit_box_colored(wall_top, GRAPHICS_FILLED, foreground_color);
+    rohr_graphics_draw_hit_box_colored(paddle_left, GRAPHICS_FILLED, left_color);
+    rohr_graphics_draw_hit_box_colored(paddle_right, GRAPHICS_FILLED, right_color);
+    rohr_graphics_draw_hit_box_colored(
+        ball,
+        GRAPHICS_FILLED,
+        ball_on_fire ? fire_color : foreground_color
+    );
+}
+
+static EngineResult pong_draw_screen(
+    ScreenId screen,
+    Entity wall_bottom,
+    Entity wall_top,
+    Entity center_line,
+    Entity paddle_left,
+    Entity paddle_right,
+    Entity ball,
+    bool ball_on_fire
+) {
+    EngineResult result = rohr_screen_begin(screen);
+    if(rohr_error_check(result)) return result;
+    rohr_graphics_draw_background(background_color);
+    pong_draw_field(
+        wall_bottom,
+        wall_top,
+        center_line,
+        paddle_left,
+        paddle_right,
+        ball,
+        ball_on_fire
+    );
+    return rohr_screen_end();
+}
 
 static EngineResult pong_reset_ball(Entity ball, int serve_direction) {
     EngineResult position_result = rohr_physics_set_position(ball, (Position){0.0f, 0.0f});
@@ -89,6 +138,16 @@ int main(void) {
     Entity paddle_left;
     Entity paddle_right;
     Entity ball;
+    CameraId left_camera = CAMERA_INVALID;
+    CameraId right_camera = CAMERA_INVALID;
+    CameraId ball_camera = CAMERA_INVALID;
+    ScreenId left_screen = SCREEN_INVALID;
+    ScreenId right_screen = SCREEN_INVALID;
+    ScreenId ball_screen = SCREEN_INVALID;
+    ViewportId left_viewport = VIEWPORT_INVALID;
+    ViewportId right_viewport = VIEWPORT_INVALID;
+    bool ball_behind_left = false;
+    bool ball_behind_right = false;
     int left_score = 0;
     int right_score = 0;
     int serve_direction = 1;
@@ -175,6 +234,94 @@ int main(void) {
         goto fail;
     }
     ball = ball_result.result.value;
+
+    left_camera = rohr_camera_get_active();
+    {
+        Camera left_camera_value = {
+            .position = {0.0f, field_camera_center_y},
+            .orientation = -PI_F * 0.5f,
+            .dimensions = {340.0f, 500.0f},
+            .scale = 1.0f,
+        };
+        EngineResult camera_result = rohr_camera_set(left_camera, left_camera_value);
+        if(rohr_error_check(camera_result)) {
+            rohr_error_print_stderr(camera_result.result.error);
+            goto fail;
+        }
+    }
+    {
+        CameraConfig config = rohr_camera_default_config();
+        CameraIdResult camera_result;
+        config.position = (Position){0.0f, -field_camera_center_y};
+        config.orientation = -PI_F * 0.5f;
+        config.dimensions = (Vec2D){340.0f, 500.0f};
+        camera_result = rohr_camera_create(config);
+        if(rohr_error_check(camera_result)) {
+            rohr_error_print_stderr(camera_result.result.error);
+            goto fail;
+        }
+        right_camera = camera_result.result.value;
+    }
+    {
+        CameraConfig config = rohr_camera_default_config();
+        CameraIdResult camera_result;
+        config.orientation = -PI_F * 0.5f;
+        config.dimensions = (Vec2D){180.0f, 180.0f};
+        camera_result = rohr_camera_create(config);
+        if(rohr_error_check(camera_result)) {
+            rohr_error_print_stderr(camera_result.result.error);
+            goto fail;
+        }
+        ball_camera = camera_result.result.value;
+        {
+            EngineResult attach_result = rohr_camera_attach(
+                ball_camera,
+                ball,
+                (Vec2D){0.0f, 0.0f},
+                -PI_F * 0.5f,
+                true,
+                false
+            );
+            if(rohr_error_check(attach_result)) {
+                rohr_error_print_stderr(attach_result.result.error);
+                goto fail;
+            }
+        }
+    }
+    {
+        ScreenConfig config = rohr_screen_default_config();
+        ScreenIdResult result;
+        config.width = WINDOW_WIDTH / 2;
+        config.height = WINDOW_HEIGHT;
+        config.camera = left_camera;
+        result = rohr_screen_create(config);
+        if(rohr_error_check(result)) goto fail;
+        left_screen = result.result.value;
+        config.camera = right_camera;
+        result = rohr_screen_create(config);
+        if(rohr_error_check(result)) goto fail;
+        right_screen = result.result.value;
+        config.camera = ball_camera;
+        result = rohr_screen_create(config);
+        if(rohr_error_check(result)) goto fail;
+        ball_screen = result.result.value;
+    }
+    {
+        ViewportConfig config = rohr_viewport_default_config();
+        ViewportIdResult result;
+        config.rectangle = (ViewportRectangle){0.0f, 0.0f, WINDOW_WIDTH * 0.5f, WINDOW_HEIGHT};
+        result = rohr_viewport_create(config);
+        if(rohr_error_check(result)) goto fail;
+        left_viewport = result.result.value;
+        config.rectangle.x = WINDOW_WIDTH * 0.5f;
+        result = rohr_viewport_create(config);
+        if(rohr_error_check(result)) goto fail;
+        right_viewport = result.result.value;
+        if(rohr_error_check(rohr_viewport_set_screen(left_viewport, left_screen))
+                || rohr_error_check(rohr_viewport_set_screen(right_viewport, right_screen))
+                || rohr_error_check(rohr_viewport_set_enable(left_viewport))
+                || rohr_error_check(rohr_viewport_set_enable(right_viewport))) goto fail;
+    }
 
     rohr_engine_reset_clock();
     while(true) {
@@ -276,46 +423,79 @@ int main(void) {
             }
         }
 
-        rohr_graphics_draw_background(background_color);
-        rohr_graphics_draw_hit_box_colored(
-            center_line,
-            GRAPHICS_FILLED,
-            foreground_color
-        );
-        rohr_graphics_draw_hit_box_colored(
-            wall_bottom,
-            GRAPHICS_FILLED,
-            foreground_color
-        );
-        rohr_graphics_draw_hit_box_colored(
-            wall_top,
-            GRAPHICS_FILLED,
-            foreground_color
-        );
-        rohr_graphics_draw_hit_box_colored(
-            paddle_left,
-            GRAPHICS_FILLED,
-            left_color
-        );
-        rohr_graphics_draw_hit_box_colored(
-            paddle_right,
-            GRAPHICS_FILLED,
-            right_color
-        );
+        {
+            EntityIndexResult left_index_result = rohr_entity_get_index(paddle_left);
+            EntityIndexResult right_index_result = rohr_entity_get_index(paddle_right);
+            bool was_behind_left = ball_behind_left;
+            bool was_behind_right = ball_behind_right;
+            if(rohr_error_check(left_index_result) || rohr_error_check(right_index_result)) {
+                goto fail;
+            }
+            ball_behind_left = positions[ball_index].y > positions[left_index_result.result.value].y;
+            ball_behind_right = positions[ball_index].y < positions[right_index_result.result.value].y;
+            if(ball_behind_left != was_behind_left || ball_behind_right != was_behind_right) {
+                EngineResult dt_result = (ball_behind_left || ball_behind_right)
+                    ? rohr_physics_set_dt_per_tick(slow_motion_physics_dt)
+                    : rohr_physics_set_dt_per_tick(normal_physics_dt);
+                if(rohr_error_check(dt_result)) {
+                    rohr_error_print_stderr(dt_result.result.error);
+                    goto fail;
+                }
+            }
+        }
+
         {
             GameBallOnFireResult fire_result = game_ball_on_fire_get(ball);
             BallOnFire ball_on_fire = rohr_error_check(fire_result)
                 ? false
                 : fire_result.result.value;
-            rohr_graphics_draw_hit_box_colored(
+            if(rohr_error_check(pong_draw_screen(
+                left_screen,
+                wall_bottom,
+                wall_top,
+                center_line,
+                paddle_left,
+                paddle_right,
                 ball,
-                GRAPHICS_FILLED,
-                ball_on_fire ? fire_color : foreground_color
-            );
+                ball_on_fire
+            )) || rohr_error_check(pong_draw_screen(
+                right_screen,
+                wall_bottom,
+                wall_top,
+                center_line,
+                paddle_left,
+                paddle_right,
+                ball,
+                ball_on_fire
+            )) || rohr_error_check(pong_draw_screen(
+                ball_screen,
+                wall_bottom,
+                wall_top,
+                center_line,
+                paddle_left,
+                paddle_right,
+                ball,
+                ball_on_fire
+            ))) goto fail;
+            if(rohr_error_check(rohr_viewport_set_screen(
+                    left_viewport,
+                    ball_behind_left ? ball_screen : left_screen
+                )) || rohr_error_check(rohr_viewport_set_screen(
+                    right_viewport,
+                    ball_behind_right ? ball_screen : right_screen
+                ))) goto fail;
         }
         rohr_graphics_show();
     }
 
+    (void)rohr_viewport_destroy(right_viewport);
+    (void)rohr_viewport_destroy(left_viewport);
+    (void)rohr_screen_destroy(ball_screen);
+    (void)rohr_screen_destroy(right_screen);
+    (void)rohr_screen_destroy(left_screen);
+    (void)rohr_camera_set_active(left_camera);
+    (void)rohr_camera_destroy(ball_camera);
+    (void)rohr_camera_destroy(right_camera);
     game_components_clear(ball);
     game_components_shutdown();
     rohr_graphics_end();
@@ -323,6 +503,14 @@ int main(void) {
     return 0;
 
 fail:
+    if(right_viewport != VIEWPORT_INVALID) (void)rohr_viewport_destroy(right_viewport);
+    if(left_viewport != VIEWPORT_INVALID) (void)rohr_viewport_destroy(left_viewport);
+    if(ball_screen != SCREEN_INVALID) (void)rohr_screen_destroy(ball_screen);
+    if(right_screen != SCREEN_INVALID) (void)rohr_screen_destroy(right_screen);
+    if(left_screen != SCREEN_INVALID) (void)rohr_screen_destroy(left_screen);
+    if(left_camera != CAMERA_INVALID) (void)rohr_camera_set_active(left_camera);
+    if(ball_camera != CAMERA_INVALID) (void)rohr_camera_destroy(ball_camera);
+    if(right_camera != CAMERA_INVALID) (void)rohr_camera_destroy(right_camera);
     game_components_shutdown();
     rohr_graphics_end();
     rohr_engine_shutdown();

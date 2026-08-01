@@ -17,6 +17,8 @@
 #define MAX_ANIMATIONS_FRAMES 20
 #define MAX_ANIMATION_SETS 10
 #define MAX_CAMERAS 16
+#define MAX_SCREENS 16
+#define MAX_VIEWPORTS 16
 
 #define RECORDING_WIDTH  WINDOW_WIDTH
 #define RECORDING_HEIGHT WINDOW_HEIGHT
@@ -35,13 +37,13 @@ typedef uint32_t CameraId;
 /** Invalid camera handle. */
 #define CAMERA_INVALID 0
 
-/** Logical output rectangle occupied by a camera. */
-typedef struct CameraViewport {
+/** Logical window rectangle occupied by a viewport. */
+typedef struct ViewportRectangle {
     float x;
     float y;
     float width;
     float height;
-} CameraViewport;
+} ViewportRectangle;
 
 /** World-space camera transform used by the renderer. */
 typedef struct {
@@ -54,7 +56,6 @@ typedef struct {
     /** Magnification where values above one zoom in. */
     float scale;
     /** Logical output rectangle used for rendering and clipping. */
-    CameraViewport viewport;
 } Camera;
 
 /** Defaults used when creating an engine-owned camera. */
@@ -63,7 +64,6 @@ typedef struct CameraConfig {
     Orientation orientation;
     Vec2D dimensions;
     float scale;
-    CameraViewport viewport;
 } CameraConfig;
 
 ERROR_DECLARE_RESULT_TYPE(CameraIdResult, CameraId);
@@ -88,6 +88,37 @@ typedef struct {
 
 /** Result type for functions that return a CameraAttachment. */
 ERROR_DECLARE_RESULT_TYPE(CameraAttachmentResult, CameraAttachment);
+
+typedef uint32_t ScreenId;
+typedef uint32_t ViewportId;
+
+#define SCREEN_INVALID 0
+#define VIEWPORT_INVALID 0
+
+typedef enum ScreenFit {
+    SCREEN_FIT_NONE,
+    SCREEN_FIT_STRETCH,
+    SCREEN_FIT_CONTAIN,
+    SCREEN_FIT_COVER,
+} ScreenFit;
+
+typedef struct ScreenConfig {
+    /** Camera used while rendering this screen. */
+    CameraId camera;
+    /** Render-target size; non-positive values use the engine resolution. */
+    int width;
+    int height;
+} ScreenConfig;
+
+typedef struct ViewportConfig {
+    /** Window-space destination and clipping rectangle. */
+    ViewportRectangle rectangle;
+    /** How assigned screen content is fitted into the rectangle. */
+    ScreenFit fit;
+} ViewportConfig;
+
+ERROR_DECLARE_RESULT_TYPE(ScreenIdResult, ScreenId);
+ERROR_DECLARE_RESULT_TYPE(ViewportIdResult, ViewportId);
 
 /** Descriptor for loading a texture from disk. */
 typedef struct {
@@ -374,6 +405,27 @@ EngineResult graphics_camera_attach_to(
     bool follow_orientation
 );
 EngineResult graphics_camera_detach_from(CameraId camera);
+
+/** Return engine-resolution screen defaults using the current camera. */
+ScreenConfig graphics_screen_default_config(void);
+/** Create an explicitly owned off-screen render target. */
+ScreenIdResult graphics_screen_create(ScreenConfig config);
+/** Destroy a screen and clear all non-owning viewport assignments to it. */
+EngineResult graphics_screen_destroy(ScreenId screen);
+/** Begin directing drawing commands to a screen. */
+EngineResult graphics_screen_begin(ScreenId screen);
+/** Finish drawing the current screen and return to the window target. */
+EngineResult graphics_screen_end(void);
+
+/** Return a disabled, full-window viewport using contain fitting. */
+ViewportConfig graphics_viewport_default_config(void);
+ViewportIdResult graphics_viewport_create(ViewportConfig config);
+EngineResult graphics_viewport_destroy(ViewportId viewport);
+/** Assign a screen without transferring ownership. */
+EngineResult graphics_viewport_set_screen(ViewportId viewport, ScreenId screen);
+EngineResult graphics_viewport_clear_screen(ViewportId viewport);
+EngineResult graphics_viewport_set_enable(ViewportId viewport);
+EngineResult graphics_viewport_set_disable(ViewportId viewport);
 
 /** Convert world coordinates to logical screen coordinates. */
 Position graphics_world_to_screen(Position pos);

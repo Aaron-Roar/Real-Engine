@@ -165,6 +165,7 @@ if(ROHR_BUILD_TESTS)
     target_link_libraries(cameras_test PRIVATE rohr_engine)
     set_target_properties(cameras_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
     add_test(NAME cameras COMMAND cameras_test)
+    set_tests_properties(cameras PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy")
 
     add_executable(timing_test tests/timing.c)
     target_link_libraries(timing_test PRIVATE rohr_engine)

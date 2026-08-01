@@ -28,6 +28,53 @@ static bool cameras_used[MAX_CAMERAS] = {0};
 static CameraId active_camera = CAMERA_INVALID;
 static bool graphics_resolve_camera_attachment(void);
 
+typedef struct GraphicsScreen {
+    CameraId camera;
+    int width;
+    int height;
+    SDL_Texture *texture;
+} GraphicsScreen;
+
+typedef struct GraphicsViewport {
+    ViewportRectangle rectangle;
+    ScreenFit fit;
+    ScreenId screen;
+    bool enabled;
+} GraphicsViewport;
+
+static GraphicsScreen screens[MAX_SCREENS] = {0};
+static GraphicsViewport viewports[MAX_VIEWPORTS] = {0};
+static uint32_t screen_generations[MAX_SCREENS] = {0};
+static uint32_t viewport_generations[MAX_VIEWPORTS] = {0};
+static bool screens_used[MAX_SCREENS] = {0};
+static bool viewports_used[MAX_VIEWPORTS] = {0};
+static ScreenId drawing_screen = SCREEN_INVALID;
+static CameraId camera_before_screen = CAMERA_INVALID;
+
+static uint32_t graphics_resource_id(uint32_t generation, size_t slot) {
+    return (generation << 8) | (uint32_t)(slot + 1);
+}
+
+static bool graphics_screen_slot(ScreenId id, size_t *slot) {
+    size_t value;
+    if(id == SCREEN_INVALID || slot == NULL) return false;
+    value = (size_t)((id & 0xffu) - 1u);
+    if(value >= MAX_SCREENS || !screens_used[value]
+            || graphics_resource_id(screen_generations[value], value) != id) return false;
+    *slot = value;
+    return true;
+}
+
+static bool graphics_viewport_slot(ViewportId id, size_t *slot) {
+    size_t value;
+    if(id == VIEWPORT_INVALID || slot == NULL) return false;
+    value = (size_t)((id & 0xffu) - 1u);
+    if(value >= MAX_VIEWPORTS || !viewports_used[value]
+            || graphics_resource_id(viewport_generations[value], value) != id) return false;
+    *slot = value;
+    return true;
+}
+
 static CameraId graphics_camera_id(size_t slot) {
     return (CameraId)((camera_generations[slot] << 8) | (uint32_t)(slot + 1));
 }
@@ -45,7 +92,6 @@ CameraConfig graphics_camera_default_config(void) {
     return (CameraConfig){
         .dimensions = {WINDOW_WIDTH, WINDOW_HEIGHT},
         .scale = 1.0f,
-        .viewport = {0.0f, 0.0f, WINDOW_WIDTH, WINDOW_HEIGHT},
     };
 }
 
@@ -54,14 +100,11 @@ static Camera graphics_camera_from_config(CameraConfig config) {
     if(config.dimensions.x <= 0.0f) config.dimensions.x = defaults.dimensions.x;
     if(config.dimensions.y <= 0.0f) config.dimensions.y = defaults.dimensions.y;
     if(config.scale <= 0.0f) config.scale = defaults.scale;
-    if(config.viewport.width <= 0.0f) config.viewport.width = defaults.viewport.width;
-    if(config.viewport.height <= 0.0f) config.viewport.height = defaults.viewport.height;
     return (Camera){
         .position = config.position,
         .orientation = config.orientation,
         .dimensions = config.dimensions,
         .scale = config.scale,
-        .viewport = config.viewport,
     };
 }
 
@@ -110,6 +153,14 @@ EngineResult graphics_tables_init(void) {
     camera = graphics_camera_from_config(default_config);
     cameras[0] = camera;
     camera_attachment = (ActiveCameraAttachment){0};
+    memset(screens, 0, sizeof(screens));
+    memset(viewports, 0, sizeof(viewports));
+    memset(screen_generations, 0, sizeof(screen_generations));
+    memset(viewport_generations, 0, sizeof(viewport_generations));
+    memset(screens_used, 0, sizeof(screens_used));
+    memset(viewports_used, 0, sizeof(viewports_used));
+    drawing_screen = SCREEN_INVALID;
+    camera_before_screen = CAMERA_INVALID;
     if(AnimatedSpritePool_init(&animated_sprites_pool, 0).kind == ERROR_RESULT_ERROR) {
         graphics_tables_destroy();
         return error_result_error(ERROR_ENGINE_GRAPHICS_TABLES_INIT_FAILED);
@@ -487,7 +538,6 @@ CameraIdResult graphics_camera_create(CameraConfig config) {
 
 EngineResult graphics_camera_set_active(CameraId id) {
     size_t slot;
-    SDL_Rect viewport;
     if(!graphics_camera_slot(id, &slot)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
     }
@@ -496,13 +546,8 @@ EngineResult graphics_camera_set_active(CameraId id) {
     camera = cameras[slot];
     camera_attachment = camera_attachments[slot];
     if(sdl_renderer != NULL) {
-        viewport = (SDL_Rect){
-            (int)camera.viewport.x,
-            (int)camera.viewport.y,
-            (int)camera.viewport.width,
-            (int)camera.viewport.height,
-        };
-        (void)SDL_SetRenderViewport(sdl_renderer, &viewport);
+        (void)SDL_SetRenderViewport(sdl_renderer, NULL);
+        (void)SDL_SetRenderClipRect(sdl_renderer, NULL);
     }
     return error_result_value(true);
 }
@@ -533,7 +578,6 @@ EngineResult graphics_camera_set(CameraId id, Camera value) {
         .orientation = value.orientation,
         .dimensions = value.dimensions,
         .scale = value.scale,
-        .viewport = value.viewport,
     });
     cameras[slot] = value;
     camera_attachments[slot] = (ActiveCameraAttachment){0};
@@ -547,11 +591,17 @@ EngineResult graphics_camera_set(CameraId id, Camera value) {
 
 EngineResult graphics_camera_destroy(CameraId id) {
     size_t slot;
+    size_t screen_slot;
     if(!graphics_camera_slot(id, &slot)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
     }
     if(id == active_camera) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    for(screen_slot = 0; screen_slot < MAX_SCREENS; screen_slot += 1) {
+        if(screens_used[screen_slot] && screens[screen_slot].camera == id) {
+            return error_result_error(ERROR_ENGINE_STATE_INVALID);
+        }
     }
     cameras_used[slot] = false;
     cameras[slot] = (Camera){0};
@@ -604,7 +654,6 @@ void graphics_set_camera(Camera value) {
         .orientation = value.orientation,
         .dimensions = value.dimensions,
         .scale = value.scale,
-        .viewport = value.viewport,
     });
     graphics_camera_store_active();
 }
@@ -739,29 +788,234 @@ EngineResult graphics_camera_detach_from(CameraId id) {
     return error_result_value(true);
 }
 
+ScreenConfig graphics_screen_default_config(void) {
+    return (ScreenConfig){
+        .camera = active_camera,
+        .width = WINDOW_WIDTH,
+        .height = WINDOW_HEIGHT,
+    };
+}
+
+ScreenIdResult graphics_screen_create(ScreenConfig config) {
+    size_t slot;
+    if(sdl_renderer == NULL) {
+        return ERROR_RESULT_MAKE_ERROR(ScreenIdResult, ERROR_ENGINE_GRAPHICS_INIT_FAILED);
+    }
+    if(!graphics_camera_slot(config.camera, &slot)) {
+        return ERROR_RESULT_MAKE_ERROR(ScreenIdResult, ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    if(config.width <= 0) config.width = WINDOW_WIDTH;
+    if(config.height <= 0) config.height = WINDOW_HEIGHT;
+    for(slot = 0; slot < MAX_SCREENS; slot += 1) {
+        SDL_Texture *texture;
+        if(screens_used[slot]) continue;
+        texture = SDL_CreateTexture(
+            sdl_renderer,
+            SDL_PIXELFORMAT_RGBA8888,
+            SDL_TEXTUREACCESS_TARGET,
+            config.width,
+            config.height
+        );
+        if(texture == NULL) {
+            return ERROR_RESULT_MAKE_ERROR(ScreenIdResult, ERROR_ENGINE_GRAPHICS_INIT_FAILED);
+        }
+        (void)SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_NONE);
+        screen_generations[slot] += 1;
+        if(screen_generations[slot] == 0) screen_generations[slot] = 1;
+        screens_used[slot] = true;
+        screens[slot] = (GraphicsScreen){
+            .camera = config.camera,
+            .width = config.width,
+            .height = config.height,
+            .texture = texture,
+        };
+        return ERROR_RESULT_MAKE_VALUE(
+            ScreenIdResult,
+            graphics_resource_id(screen_generations[slot], slot)
+        );
+    }
+    return ERROR_RESULT_MAKE_ERROR(ScreenIdResult, ERROR_MEMORY_POOL_FULL);
+}
+
+EngineResult graphics_screen_destroy(ScreenId id) {
+    size_t slot;
+    size_t viewport_slot;
+    if(!graphics_screen_slot(id, &slot) || id == drawing_screen) {
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    for(viewport_slot = 0; viewport_slot < MAX_VIEWPORTS; viewport_slot += 1) {
+        if(viewports_used[viewport_slot] && viewports[viewport_slot].screen == id) {
+            viewports[viewport_slot].screen = SCREEN_INVALID;
+        }
+    }
+    SDL_DestroyTexture(screens[slot].texture);
+    screens[slot] = (GraphicsScreen){0};
+    screens_used[slot] = false;
+    return error_result_value(true);
+}
+
+EngineResult graphics_screen_begin(ScreenId id) {
+    size_t slot;
+    if(drawing_screen != SCREEN_INVALID || !graphics_screen_slot(id, &slot)) {
+        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
+    camera_before_screen = active_camera;
+    {
+        EngineResult result = graphics_camera_set_active(screens[slot].camera);
+        if(result.kind == ERROR_RESULT_ERROR) return result;
+    }
+    if(!SDL_SetRenderTarget(sdl_renderer, screens[slot].texture)) {
+        (void)graphics_camera_set_active(camera_before_screen);
+        camera_before_screen = CAMERA_INVALID;
+        return error_result_error(ERROR_ENGINE_GRAPHICS_INIT_FAILED);
+    }
+    (void)SDL_SetRenderViewport(sdl_renderer, NULL);
+    (void)SDL_SetRenderClipRect(sdl_renderer, NULL);
+    drawing_screen = id;
+    return error_result_value(true);
+}
+
+EngineResult graphics_screen_end(void) {
+    if(drawing_screen == SCREEN_INVALID) {
+        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
+    (void)SDL_SetRenderTarget(sdl_renderer, NULL);
+    drawing_screen = SCREEN_INVALID;
+    if(camera_before_screen != CAMERA_INVALID) {
+        (void)graphics_camera_set_active(camera_before_screen);
+    }
+    camera_before_screen = CAMERA_INVALID;
+    (void)SDL_SetRenderViewport(sdl_renderer, NULL);
+    (void)SDL_SetRenderClipRect(sdl_renderer, NULL);
+    return error_result_value(true);
+}
+
+ViewportConfig graphics_viewport_default_config(void) {
+    return (ViewportConfig){
+        .rectangle = {0.0f, 0.0f, WINDOW_WIDTH, WINDOW_HEIGHT},
+        .fit = SCREEN_FIT_CONTAIN,
+    };
+}
+
+ViewportIdResult graphics_viewport_create(ViewportConfig config) {
+    size_t slot;
+    ViewportConfig defaults = graphics_viewport_default_config();
+    if(config.rectangle.width <= 0.0f) config.rectangle.width = defaults.rectangle.width;
+    if(config.rectangle.height <= 0.0f) config.rectangle.height = defaults.rectangle.height;
+    if(config.fit < SCREEN_FIT_NONE || config.fit > SCREEN_FIT_COVER) {
+        config.fit = defaults.fit;
+    }
+    for(slot = 0; slot < MAX_VIEWPORTS; slot += 1) {
+        if(viewports_used[slot]) continue;
+        viewport_generations[slot] += 1;
+        if(viewport_generations[slot] == 0) viewport_generations[slot] = 1;
+        viewports_used[slot] = true;
+        viewports[slot] = (GraphicsViewport){
+            .rectangle = config.rectangle,
+            .fit = config.fit,
+            .screen = SCREEN_INVALID,
+            .enabled = false,
+        };
+        return ERROR_RESULT_MAKE_VALUE(
+            ViewportIdResult,
+            graphics_resource_id(viewport_generations[slot], slot)
+        );
+    }
+    return ERROR_RESULT_MAKE_ERROR(ViewportIdResult, ERROR_MEMORY_POOL_FULL);
+}
+
+EngineResult graphics_viewport_destroy(ViewportId id) {
+    size_t slot;
+    if(!graphics_viewport_slot(id, &slot)) {
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    viewports[slot] = (GraphicsViewport){0};
+    viewports_used[slot] = false;
+    return error_result_value(true);
+}
+
+EngineResult graphics_viewport_set_screen(ViewportId id, ScreenId screen) {
+    size_t slot;
+    size_t screen_slot;
+    if(!graphics_viewport_slot(id, &slot) || !graphics_screen_slot(screen, &screen_slot)) {
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    viewports[slot].screen = screen;
+    return error_result_value(true);
+}
+
+EngineResult graphics_viewport_clear_screen(ViewportId id) {
+    size_t slot;
+    if(!graphics_viewport_slot(id, &slot)) {
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    viewports[slot].screen = SCREEN_INVALID;
+    return error_result_value(true);
+}
+
+EngineResult graphics_viewport_set_enable(ViewportId id) {
+    size_t slot;
+    if(!graphics_viewport_slot(id, &slot)) {
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    viewports[slot].enabled = true;
+    return error_result_value(true);
+}
+
+EngineResult graphics_viewport_set_disable(ViewportId id) {
+    size_t slot;
+    if(!graphics_viewport_slot(id, &slot)) {
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    viewports[slot].enabled = false;
+    return error_result_value(true);
+}
+
 Position graphics_world_to_screen(Position world) {
+    float output_x = 0.0f;
+    float output_y = 0.0f;
+    float output_width = WINDOW_WIDTH;
+    float output_height = WINDOW_HEIGHT;
+    size_t screen_slot;
     (void)graphics_resolve_camera_attachment();
+    if(graphics_screen_slot(drawing_screen, &screen_slot)) {
+        output_x = 0.0f;
+        output_y = 0.0f;
+        output_width = (float)screens[screen_slot].width;
+        output_height = (float)screens[screen_slot].height;
+    }
     Vec2D relative = {
         .x = world.x - camera.position.x,
         .y = world.y - camera.position.y
     };
     Vec2D camera_space = math_rotate_vector(relative, -camera.orientation);
-    float scale_x = camera.scale * camera.viewport.width / camera.dimensions.x;
-    float scale_y = camera.scale * camera.viewport.height / camera.dimensions.y;
+    float scale_x = camera.scale * output_width / camera.dimensions.x;
+    float scale_y = camera.scale * output_height / camera.dimensions.y;
 
     return (Position){
-        .x = camera.viewport.x + camera.viewport.width * 0.5f + camera_space.x * scale_x,
-        .y = camera.viewport.y + camera.viewport.height * 0.5f - camera_space.y * scale_y
+        .x = output_x + output_width * 0.5f + camera_space.x * scale_x,
+        .y = output_y + output_height * 0.5f - camera_space.y * scale_y
     };
 }
 
 Position graphics_screen_to_world(Position screen) {
+    float output_x = 0.0f;
+    float output_y = 0.0f;
+    float output_width = WINDOW_WIDTH;
+    float output_height = WINDOW_HEIGHT;
+    size_t screen_slot;
     (void)graphics_resolve_camera_attachment();
+    if(graphics_screen_slot(drawing_screen, &screen_slot)) {
+        output_x = 0.0f;
+        output_y = 0.0f;
+        output_width = (float)screens[screen_slot].width;
+        output_height = (float)screens[screen_slot].height;
+    }
     Vec2D camera_space = {
-        .x = (screen.x - camera.viewport.x - camera.viewport.width * 0.5f)
-            * camera.dimensions.x / (camera.scale * camera.viewport.width),
-        .y = (camera.viewport.y + camera.viewport.height * 0.5f - screen.y)
-            * camera.dimensions.y / (camera.scale * camera.viewport.height)
+        .x = (screen.x - output_x - output_width * 0.5f)
+            * camera.dimensions.x / (camera.scale * output_width),
+        .y = (output_y + output_height * 0.5f - screen.y)
+            * camera.dimensions.y / (camera.scale * output_height)
     };
     Vec2D relative = math_rotate_vector(camera_space, camera.orientation);
 
@@ -853,6 +1107,17 @@ EngineResult graphics_start(void) {
 }
 
 void graphics_renderer_end(void) {
+    size_t screen_slot;
+    for(screen_slot = 0; screen_slot < MAX_SCREENS; screen_slot += 1) {
+        if(screens_used[screen_slot]) {
+            SDL_DestroyTexture(screens[screen_slot].texture);
+            screens[screen_slot] = (GraphicsScreen){0};
+            screens_used[screen_slot] = false;
+        }
+    }
+    memset(viewports, 0, sizeof(viewports));
+    memset(viewports_used, 0, sizeof(viewports_used));
+    drawing_screen = SCREEN_INVALID;
     if(ttf_text_engine != NULL) {
         TTF_DestroyRendererTextEngine(ttf_text_engine);
         ttf_text_engine = NULL;
@@ -971,7 +1236,104 @@ void graphics_draw_rect(Shape rect, Position pos) {
     SDL_RenderFillRect(sdl_renderer, &sdl_rect);
 }
 
+static void graphics_draw_empty_viewport(ViewportRectangle rectangle) {
+    SDL_FRect background = {
+        rectangle.x,
+        rectangle.y,
+        rectangle.width,
+        rectangle.height,
+    };
+    float offset;
+    SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+    (void)SDL_RenderFillRect(sdl_renderer, &background);
+    SDL_SetRenderDrawColor(sdl_renderer, 45, 45, 45, SDL_ALPHA_OPAQUE);
+    for(offset = -rectangle.height; offset < rectangle.width; offset += 24.0f) {
+        float start_x = rectangle.x + (offset < 0.0f ? 0.0f : offset);
+        float start_y = rectangle.y + rectangle.height + (offset < 0.0f ? offset : 0.0f);
+        float end_x = rectangle.x + (offset + rectangle.height > rectangle.width
+            ? rectangle.width
+            : offset + rectangle.height);
+        float end_y = rectangle.y + rectangle.height
+            - (end_x - rectangle.x - offset);
+        (void)SDL_RenderLine(sdl_renderer, start_x, start_y, end_x, end_y);
+    }
+}
+
+static void graphics_draw_viewports(void) {
+    size_t viewport_slot;
+    bool has_enabled_viewport = false;
+    (void)SDL_SetRenderTarget(sdl_renderer, NULL);
+    (void)SDL_SetRenderViewport(sdl_renderer, NULL);
+    (void)SDL_SetRenderClipRect(sdl_renderer, NULL);
+    for(viewport_slot = 0; viewport_slot < MAX_VIEWPORTS; viewport_slot += 1) {
+        if(viewports_used[viewport_slot] && viewports[viewport_slot].enabled) {
+            has_enabled_viewport = true;
+            break;
+        }
+    }
+    if(!has_enabled_viewport) return;
+    SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+    (void)SDL_RenderClear(sdl_renderer);
+    for(viewport_slot = 0; viewport_slot < MAX_VIEWPORTS; viewport_slot += 1) {
+        GraphicsViewport *viewport;
+        GraphicsScreen *screen;
+        SDL_Rect clip;
+        SDL_FRect destination;
+        size_t screen_slot;
+        float scale_x;
+        float scale_y;
+        float scale;
+        if(!viewports_used[viewport_slot] || !viewports[viewport_slot].enabled) continue;
+        viewport = &viewports[viewport_slot];
+        clip = (SDL_Rect){
+            (int)viewport->rectangle.x,
+            (int)viewport->rectangle.y,
+            (int)viewport->rectangle.width,
+            (int)viewport->rectangle.height,
+        };
+        (void)SDL_SetRenderClipRect(sdl_renderer, &clip);
+        if(!graphics_screen_slot(viewport->screen, &screen_slot)) {
+            graphics_draw_empty_viewport(viewport->rectangle);
+            continue;
+        }
+        SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+        {
+            SDL_FRect background = {
+                viewport->rectangle.x,
+                viewport->rectangle.y,
+                viewport->rectangle.width,
+                viewport->rectangle.height,
+            };
+            (void)SDL_RenderFillRect(sdl_renderer, &background);
+        }
+        screen = &screens[screen_slot];
+        destination = (SDL_FRect){
+            viewport->rectangle.x,
+            viewport->rectangle.y,
+            viewport->rectangle.width,
+            viewport->rectangle.height,
+        };
+        scale_x = viewport->rectangle.width / (float)screen->width;
+        scale_y = viewport->rectangle.height / (float)screen->height;
+        if(viewport->fit == SCREEN_FIT_NONE) {
+            destination.w = (float)screen->width;
+            destination.h = (float)screen->height;
+        } else if(viewport->fit != SCREEN_FIT_STRETCH) {
+            scale = viewport->fit == SCREEN_FIT_COVER
+                ? fmaxf(scale_x, scale_y)
+                : fminf(scale_x, scale_y);
+            destination.w = (float)screen->width * scale;
+            destination.h = (float)screen->height * scale;
+        }
+        destination.x += (viewport->rectangle.width - destination.w) * 0.5f;
+        destination.y += (viewport->rectangle.height - destination.h) * 0.5f;
+        (void)SDL_RenderTexture(sdl_renderer, screen->texture, NULL, &destination);
+    }
+    (void)SDL_SetRenderClipRect(sdl_renderer, NULL);
+}
+
 void graphics_show(void) {
+    graphics_draw_viewports();
       if(screen_recorder.recording) {
         if(!graphics_record_frame()) {
             graphics_recording_stop();
@@ -1251,12 +1613,19 @@ void graphics_update_sprite_frame(AnimatedSprite *sprite, Tick current_tick, Tim
 
 void graphics_draw_texture(TextureAsset texture_asset, Position pos, Orientation ort) {
     SDL_FRect dst_rect = {0};
+    float output_width = WINDOW_WIDTH;
+    float output_height = WINDOW_HEIGHT;
+    size_t screen_slot;
     (void)graphics_resolve_camera_attachment();
+    if(graphics_screen_slot(drawing_screen, &screen_slot)) {
+        output_width = (float)screens[screen_slot].width;
+        output_height = (float)screens[screen_slot].height;
+    }
     Position screen_loc = graphics_world_to_screen(pos);
     dst_rect.w = texture_asset.size.x * camera.scale
-        * camera.viewport.width / camera.dimensions.x;
+        * output_width / camera.dimensions.x;
     dst_rect.h = texture_asset.size.y * camera.scale
-        * camera.viewport.height / camera.dimensions.y;
+        * output_height / camera.dimensions.y;
     dst_rect.x = screen_loc.x - dst_rect.w * 0.5f;//(float) texture_width;
     dst_rect.y = screen_loc.y - dst_rect.h * 0.5f;//(float) texture_height;
 

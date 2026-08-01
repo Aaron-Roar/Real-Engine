@@ -1149,6 +1149,20 @@ EngineResult rohr_camera_attach(
 /** Detaches a camera while preserving its resolved transform. */
 EngineResult rohr_camera_detach(CameraId camera);
 
+ScreenConfig rohr_screen_default_config(void);
+ScreenIdResult rohr_screen_create(ScreenConfig config);
+EngineResult rohr_screen_destroy(ScreenId screen);
+EngineResult rohr_screen_begin(ScreenId screen);
+EngineResult rohr_screen_end(void);
+
+ViewportConfig rohr_viewport_default_config(void);
+ViewportIdResult rohr_viewport_create(ViewportConfig config);
+EngineResult rohr_viewport_destroy(ViewportId viewport);
+EngineResult rohr_viewport_set_screen(ViewportId viewport, ScreenId screen);
+EngineResult rohr_viewport_clear_screen(ViewportId viewport);
+EngineResult rohr_viewport_set_enable(ViewportId viewport);
+EngineResult rohr_viewport_set_disable(ViewportId viewport);
+
 /**
  * @brief Converts a world position to screen coordinates.
  * @param pos World position.

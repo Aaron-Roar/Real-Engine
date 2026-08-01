@@ -256,6 +256,18 @@ EngineResult rohr_camera_attach(
     );
 }
 EngineResult rohr_camera_detach(CameraId camera_id) { return graphics_camera_detach_from(camera_id); }
+ScreenConfig rohr_screen_default_config(void) { return graphics_screen_default_config(); }
+ScreenIdResult rohr_screen_create(ScreenConfig config) { return graphics_screen_create(config); }
+EngineResult rohr_screen_destroy(ScreenId screen) { return graphics_screen_destroy(screen); }
+EngineResult rohr_screen_begin(ScreenId screen) { return graphics_screen_begin(screen); }
+EngineResult rohr_screen_end(void) { return graphics_screen_end(); }
+ViewportConfig rohr_viewport_default_config(void) { return graphics_viewport_default_config(); }
+ViewportIdResult rohr_viewport_create(ViewportConfig config) { return graphics_viewport_create(config); }
+EngineResult rohr_viewport_destroy(ViewportId viewport) { return graphics_viewport_destroy(viewport); }
+EngineResult rohr_viewport_set_screen(ViewportId viewport, ScreenId screen) { return graphics_viewport_set_screen(viewport, screen); }
+EngineResult rohr_viewport_clear_screen(ViewportId viewport) { return graphics_viewport_clear_screen(viewport); }
+EngineResult rohr_viewport_set_enable(ViewportId viewport) { return graphics_viewport_set_enable(viewport); }
+EngineResult rohr_viewport_set_disable(ViewportId viewport) { return graphics_viewport_set_disable(viewport); }
 Position rohr_graphics_world_to_screen(Position pos) { return graphics_world_to_screen(pos); }
 Position rohr_graphics_screen_to_world(Position screen) { return graphics_screen_to_world(screen); }
 Position rohr_graphics_get_mouse_screen_position(void) { return graphics_get_mouse_screen_position(); }
