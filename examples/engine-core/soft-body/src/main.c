@@ -4,8 +4,10 @@
 #include <math.h>
 #include <stdio.h>
 
-#define SEGMENT_COUNT 10
-#define NODE_COUNT (SEGMENT_COUNT * 2)
+#define ANCHOR_NODE_COUNT 10
+#define OUTER_NODE_COUNT 20
+#define OUTER_NODE_START ANCHOR_NODE_COUNT
+#define NODE_COUNT (ANCHOR_NODE_COUNT + OUTER_NODE_COUNT)
 
 static const Color background_color = {18, 22, 30, 255};
 static const Color wall_color = {90, 100, 115, 255};
@@ -63,7 +65,8 @@ int main(void) {
                 !result_ok(rohr_physics_acceleration_set(disk, (Acceleration){0.0f, -175.0f})) ||
                 !result_ok(rohr_physics_dynamic_set(disk)) ||
                 !result_ok(rohr_physics_collision_category_set(disk, disk_category)) ||
-                !result_ok(rohr_physics_collision_with_set(disk, room_category))) goto fail;
+                !result_ok(rohr_physics_collision_with_set(
+                    disk, room_category | soft_node_category))) goto fail;
     }
 
     {
@@ -73,55 +76,67 @@ int main(void) {
     }
     {
         const Position center = {0.0f, 105.0f};
-        const float inner_radius = 30.0f;
+        const float inner_radius = 35.0f;
         const float outer_radius = 62.0f;
-        for(uint32_t ring = 0; ring < 2; ring += 1) {
-            float radius = ring == 0 ? inner_radius : outer_radius;
-            for(uint32_t i = 0; i < SEGMENT_COUNT; i += 1) {
-                uint32_t node_index = ring * SEGMENT_COUNT + i;
-                float angle = 2.0f * PI_F * (float)i / (float)SEGMENT_COUNT;
-                Vec2D offset = {cosf(angle) * radius, sinf(angle) * radius};
-                EntityResult result = rohr_physics_soft_body_node_create(
-                    soft_body,
-                    (Position){center.x + offset.x, center.y + offset.y},
-                    1.0f,
-                    ring == 0 ? 4.0f : 7.0f
-                );
-                if(rohr_error_check(result)) goto fail;
-                nodes[node_index] = result.result.value;
-                if(!result_ok(rohr_physics_acceleration_set(
-                            nodes[node_index], (Acceleration){0.0f, -175.0f})) ||
-                        !result_ok(rohr_physics_soft_body_node_collision_filter_set(
-                            nodes[node_index], soft_node_category,
-                            ring == 0 ? ROHR_COLLISION_CATEGORY_NONE : room_category))) goto fail;
-                if(ring == 0) {
-                    JointAnchorIdResult anchor = rohr_physics_joint_anchor_create(disk, offset);
-                    SoftBodyNodeAnchorPinResult connection;
-                    if(rohr_error_check(anchor)) goto fail;
-                    connection = rohr_physics_soft_body_node_to_anchor_pin_create(
-                        nodes[node_index], anchor.result.value);
-                    if(rohr_error_check(connection)) goto fail;
-                }
+        for(uint32_t i = 0; i < NODE_COUNT; i += 1) {
+            bool anchored = i < ANCHOR_NODE_COUNT;
+            uint32_t ring_index = anchored ? i : i - OUTER_NODE_START;
+            uint32_t ring_count = anchored ? ANCHOR_NODE_COUNT : OUTER_NODE_COUNT;
+            float radius = anchored ? inner_radius : outer_radius;
+            float angle = 2.0f * PI_F * (float)ring_index / (float)ring_count;
+            Vec2D offset = {cosf(angle) * radius, sinf(angle) * radius};
+            EntityResult result = rohr_physics_soft_body_node_create(
+                soft_body,
+                (Position){center.x + offset.x, center.y + offset.y},
+                1.0f,
+                anchored ? 4.0f : 5.0f
+            );
+            if(rohr_error_check(result)) goto fail;
+            nodes[i] = result.result.value;
+            if(!result_ok(rohr_physics_acceleration_set(
+                        nodes[i], (Acceleration){0.0f, -175.0f})) ||
+                    !result_ok(rohr_physics_soft_body_node_collision_filter_set(
+                        nodes[i], soft_node_category,
+                        room_category | disk_category))) goto fail;
+            if(anchored) {
+                JointAnchorIdResult anchor = rohr_physics_joint_anchor_create(disk, offset);
+                SoftBodyNodeAnchorPinResult connection;
+                if(rohr_error_check(anchor)) goto fail;
+                connection = rohr_physics_soft_body_node_to_anchor_pin_create(
+                    nodes[i], anchor.result.value);
+                if(rohr_error_check(connection)) goto fail;
             }
         }
     }
-    for(uint32_t i = 0; i < SEGMENT_COUNT; i += 1) {
-        uint32_t next = (i + 1) % SEGMENT_COUNT;
+    for(uint32_t i = 0; i < ANCHOR_NODE_COUNT; i += 1) {
+        uint32_t next = (i + 1) % ANCHOR_NODE_COUNT;
         EntityResult inner_perimeter = rohr_physics_soft_body_beam_create(
-            soft_body, nodes[i], nodes[next], 240.0f, 10.0f);
+            soft_body, nodes[i], nodes[next], 1200.0f, 10.0f);
+        if(rohr_error_check(inner_perimeter)) goto fail;
+    }
+    for(uint32_t i = 0; i < OUTER_NODE_COUNT; i += 1) {
+        uint32_t next = (i + 1) % OUTER_NODE_COUNT;
+        uint32_t anchor = i / 2;
+        uint32_t next_anchor = (anchor + 1) % ANCHOR_NODE_COUNT;
         EntityResult outer_perimeter = rohr_physics_soft_body_beam_create(
-            soft_body, nodes[SEGMENT_COUNT + i], nodes[SEGMENT_COUNT + next], 170.0f, 8.0f);
-        EntityResult radial = rohr_physics_soft_body_beam_create(
-            soft_body, nodes[i], nodes[SEGMENT_COUNT + i], 125.0f, 7.0f);
-        EntityResult diagonal = rohr_physics_soft_body_beam_create(
-            soft_body, nodes[i], nodes[SEGMENT_COUNT + next], 100.0f, 7.0f);
-        EntityResult surface_a = rohr_physics_soft_body_triangle_create(
-            soft_body, nodes[i], nodes[SEGMENT_COUNT + i], nodes[SEGMENT_COUNT + next]);
-        EntityResult surface_b = rohr_physics_soft_body_triangle_create(
-            soft_body, nodes[i], nodes[SEGMENT_COUNT + next], nodes[next]);
-        if(rohr_error_check(inner_perimeter) || rohr_error_check(outer_perimeter) ||
-                rohr_error_check(radial) || rohr_error_check(diagonal) ||
-                rohr_error_check(surface_a) || rohr_error_check(surface_b)) goto fail;
+            soft_body, nodes[OUTER_NODE_START + i], nodes[OUTER_NODE_START + next],
+            850.0f, 8.0f);
+        EntityResult support_a = rohr_physics_soft_body_beam_create(
+            soft_body, nodes[anchor], nodes[OUTER_NODE_START + i], 625.0f, 7.0f);
+        EntityResult support_b = rohr_physics_soft_body_beam_create(
+            soft_body, nodes[next_anchor], nodes[OUTER_NODE_START + i], 625.0f, 7.0f);
+        EntityResult surface = rohr_physics_soft_body_triangle_create(
+            soft_body, nodes[anchor], nodes[OUTER_NODE_START + i],
+            nodes[OUTER_NODE_START + next]);
+        if(rohr_error_check(outer_perimeter) || rohr_error_check(support_a) ||
+                rohr_error_check(support_b) || rohr_error_check(surface)) goto fail;
+    }
+    for(uint32_t i = 0; i < ANCHOR_NODE_COUNT; i += 1) {
+        uint32_t next_anchor = (i + 1) % ANCHOR_NODE_COUNT;
+        uint32_t outer = OUTER_NODE_START + ((i * 2 + 2) % OUTER_NODE_COUNT);
+        EntityResult surface = rohr_physics_soft_body_triangle_create(
+            soft_body, nodes[i], nodes[outer], nodes[next_anchor]);
+        if(rohr_error_check(surface)) goto fail;
     }
 
     rohr_engine_reset_clock();
