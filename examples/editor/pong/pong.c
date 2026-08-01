@@ -1,4 +1,4 @@
-#include "rohr.h"
+#include "rohr_editor.h"
 #include "game_components.h"
 #include <stdio.h>
 
@@ -19,18 +19,6 @@ static const float left_paddle_min_y = 20.0f;
 static const float left_paddle_max_y = 312.0f;
 static const float right_paddle_min_y = -312.0f;
 static const float right_paddle_max_y = -20.0f;
-
-static EngineResult pong_find_entity(const char *name, Entity *entity) {
-    if(name == NULL || entity == NULL) {
-        return rohr_error_result_error(ERROR_MEMORY_POOL_NULL_POINTER);
-    }
-    EntityResult find_result = rohr_entity_find_by_name(name);
-    if(rohr_error_check(find_result)) {
-        return rohr_error_result_error(find_result.result.error);
-    }
-    *entity = find_result.result.value;
-    return rohr_error_result_value(true);
-}
 
 static EngineResult pong_reset_ball(Entity ball, int serve_direction) {
     EngineResult position_result = rohr_physics_set_position(ball, (Position){0.0f, 0.0f});
@@ -90,6 +78,8 @@ static EngineResult pong_constrain_paddle(
 
 int main(void) {
     KeyboardState keyboard = {0};
+    Controller left_controller = rohr_controller_default_wasd();
+    Controller right_controller = rohr_controller_default_arrows();
     Entity wall_bottom;
     Entity wall_top;
     Entity center_line;
@@ -100,6 +90,27 @@ int main(void) {
     int right_score = 0;
     int serve_direction = 1;
     Time fire_expires_at = 0.0;
+
+    if(!rohr_controller_add_axis(
+        &left_controller,
+        "movement",
+        (ControllerAxisBinding){
+            .positive_x = SDLK_W,
+            .negative_x = SDLK_S,
+            .positive_y = SDLK_A,
+            .negative_y = SDLK_D,
+        }
+    )) return 1;
+    if(!rohr_controller_add_axis(
+        &right_controller,
+        "movement",
+        (ControllerAxisBinding){
+            .positive_x = SDLK_UP,
+            .negative_x = SDLK_DOWN,
+            .positive_y = SDLK_LEFT,
+            .negative_y = SDLK_RIGHT,
+        }
+    )) return 1;
 
     {
         EngineResult init_result = rohr_engine_init();
@@ -125,32 +136,32 @@ int main(void) {
         PRINT_ENGINE_ERROR(load_result);
         goto fail;
     }
-    EngineResult wall_bottom_result = pong_find_entity("wall_bottom", &wall_bottom);
+    EngineResult wall_bottom_result = RE_entity_find_by_name("wall_bottom", &wall_bottom);
     if(rohr_error_check(wall_bottom_result)) {
         PRINT_ENGINE_ERROR(wall_bottom_result);
         goto fail;
     }
-    EngineResult wall_top_result = pong_find_entity("wall_top", &wall_top);
+    EngineResult wall_top_result = RE_entity_find_by_name("wall_top", &wall_top);
     if(rohr_error_check(wall_top_result)) {
         PRINT_ENGINE_ERROR(wall_top_result);
         goto fail;
     }
-    EngineResult center_line_result = pong_find_entity("center_line", &center_line);
+    EngineResult center_line_result = RE_entity_find_by_name("center_line", &center_line);
     if(rohr_error_check(center_line_result)) {
         PRINT_ENGINE_ERROR(center_line_result);
         goto fail;
     }
-    EngineResult paddle_left_result = pong_find_entity("paddle_left", &paddle_left);
+    EngineResult paddle_left_result = RE_entity_find_by_name("paddle_left", &paddle_left);
     if(rohr_error_check(paddle_left_result)) {
         PRINT_ENGINE_ERROR(paddle_left_result);
         goto fail;
     }
-    EngineResult paddle_right_result = pong_find_entity("paddle_right", &paddle_right);
+    EngineResult paddle_right_result = RE_entity_find_by_name("paddle_right", &paddle_right);
     if(rohr_error_check(paddle_right_result)) {
         PRINT_ENGINE_ERROR(paddle_right_result);
         goto fail;
     }
-    EngineResult ball_result = pong_find_entity("ball", &ball);
+    EngineResult ball_result = RE_entity_find_by_name("ball", &ball);
     if(rohr_error_check(ball_result)) {
         PRINT_ENGINE_ERROR(ball_result);
         goto fail;
@@ -169,20 +180,8 @@ int main(void) {
             &keyboard,
             rohr_controller_capture_keyboard_event(&event)
         );
-        left_axis = rohr_controller_axis_from_keycodes(
-            &keyboard,
-            SDLK_A,
-            SDLK_S,
-            SDLK_D,
-            SDLK_W
-        );
-        right_axis = rohr_controller_axis_from_keycodes(
-            &keyboard,
-            SDLK_LEFT,
-            SDLK_DOWN,
-            SDLK_RIGHT,
-            SDLK_UP
-        );
+        left_axis = rohr_controller_get_axis(&keyboard, &left_controller, "movement");
+        right_axis = rohr_controller_get_axis(&keyboard, &right_controller, "movement");
         EngineResult left_velocity_result = rohr_physics_set_velocity(
             paddle_left,
             (Velocity){

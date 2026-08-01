@@ -1438,6 +1438,87 @@ Vec2D rohr_controller_wasd_axis(const KeyboardState *keyboard);
 Vec2D rohr_controller_arrow_axis(const KeyboardState *keyboard);
 
 /**
+ * @brief Returns an enabled, empty, game-owned controller.
+ * @return Controller ready for named axes and buttons.
+ */
+Controller rohr_controller_default(void);
+
+/**
+ * @brief Returns a game-owned controller with W/A/S/D axis bindings.
+ * @return Default enabled W/A/S/D controller.
+ */
+Controller rohr_controller_default_wasd(void);
+
+/**
+ * @brief Returns a game-owned controller with arrow-key axis bindings.
+ * @return Default enabled arrow-key controller.
+ */
+Controller rohr_controller_default_arrows(void);
+
+/**
+ * @brief Replaces the axis mapping on a caller-owned controller.
+ * @param controller Controller to modify. NULL is ignored.
+ * @param binding New positive/negative X/Y key mapping.
+ */
+void rohr_controller_set_axis_binding(
+    Controller *controller,
+    ControllerAxisBinding binding
+);
+
+/**
+ * @brief Reads a game-owned controller from shared keyboard state.
+ * @param keyboard Shared keyboard state captured for the frame.
+ * @param controller Game-owned mapping to read.
+ * @return Normalized axis, or zero for NULL or disabled controllers.
+ */
+Vec2D rohr_controller_axis(
+    const KeyboardState *keyboard,
+    const Controller *controller
+);
+
+/** @brief Adds or replaces a named axis without allocating memory. */
+bool rohr_controller_add_axis(
+    Controller *controller,
+    const char *name,
+    ControllerAxisBinding binding
+);
+
+/** @brief Adds or replaces a named button without allocating memory. */
+bool rohr_controller_add_button(
+    Controller *controller,
+    const char *name,
+    SDL_Keycode keycode
+);
+
+/** @brief Reads a named axis, returning zero when unavailable or disabled. */
+Vec2D rohr_controller_get_axis(
+    const KeyboardState *keyboard,
+    const Controller *controller,
+    const char *name
+);
+
+/** @brief Checks whether a named button is held or newly pressed. */
+bool rohr_controller_button_down(
+    const KeyboardState *keyboard,
+    const Controller *controller,
+    const char *name
+);
+
+/** @brief Checks whether a named button was pressed this frame. */
+bool rohr_controller_button_pressed(
+    const KeyboardState *keyboard,
+    const Controller *controller,
+    const char *name
+);
+
+/** @brief Checks whether a named button was released this frame. */
+bool rohr_controller_button_released(
+    const KeyboardState *keyboard,
+    const Controller *controller,
+    const char *name
+);
+
+/**
  * @brief Prints a mouse event for debugging.
  * @param event Mouse event to print.
  */

@@ -117,6 +117,21 @@ output directory and all strings referenced by the registry.
 
 **Returns:** true when both files were written successfully.
 
+### `RE_entity_find_by_name`
+
+```c
+EngineResult RE_entity_find_by_name(const char *name, Entity *entity);
+```
+
+Find a named game-state entity and write its handle for editor-authored code.
+
+| Parameter | Description |
+| --- | --- |
+| `name` | Entity name stored in the loaded game state. |
+| `entity` | Destination for the live entity handle. |
+
+**Returns:** EngineResult describing success or the lookup failure.
+
 ### `RE_init`
 
 ```c

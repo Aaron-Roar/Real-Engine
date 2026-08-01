@@ -267,6 +267,49 @@ Vec2D rohr_controller_axis_from_keycodes(
 }
 Vec2D rohr_controller_wasd_axis(const KeyboardState *keyboard) { return controller_wasd_axis(keyboard); }
 Vec2D rohr_controller_arrow_axis(const KeyboardState *keyboard) { return controller_arrow_axis(keyboard); }
+Controller rohr_controller_default(void) { return controller_default(); }
+Controller rohr_controller_default_wasd(void) { return controller_default_wasd(); }
+Controller rohr_controller_default_arrows(void) { return controller_default_arrows(); }
+void rohr_controller_set_axis_binding(Controller *controller, ControllerAxisBinding binding) {
+    controller_set_axis_binding(controller, binding);
+}
+Vec2D rohr_controller_axis(const KeyboardState *keyboard, const Controller *controller) {
+    return controller_axis(keyboard, controller);
+}
+bool rohr_controller_add_axis(Controller *controller, const char *name, ControllerAxisBinding binding) {
+    return controller_add_axis(controller, name, binding);
+}
+bool rohr_controller_add_button(Controller *controller, const char *name, SDL_Keycode keycode) {
+    return controller_add_button(controller, name, keycode);
+}
+Vec2D rohr_controller_get_axis(
+        const KeyboardState *keyboard,
+        const Controller *controller,
+        const char *name
+        ) {
+    return controller_get_axis(keyboard, controller, name);
+}
+bool rohr_controller_button_down(
+        const KeyboardState *keyboard,
+        const Controller *controller,
+        const char *name
+        ) {
+    return controller_button_down(keyboard, controller, name);
+}
+bool rohr_controller_button_pressed(
+        const KeyboardState *keyboard,
+        const Controller *controller,
+        const char *name
+        ) {
+    return controller_button_pressed(keyboard, controller, name);
+}
+bool rohr_controller_button_released(
+        const KeyboardState *keyboard,
+        const Controller *controller,
+        const char *name
+        ) {
+    return controller_button_released(keyboard, controller, name);
+}
 void rohr_controller_print_mouse_event(MouseEvent event) { print_mouse_event(event); }
 void rohr_controller_update_mouse_states(MouseState *mouse) { update_mouse_states(mouse); }
 void rohr_controller_add_mouse_event(MouseState *mouse, MouseEvent mouse_event) { add_mouse_event(mouse, mouse_event); }

@@ -2548,6 +2548,112 @@ Returns normalized movement input from arrow keys.
 
 **Returns:** Direction vector where up is positive Y and right is positive X.
 
+### `rohr_controller_default`
+
+```c
+Controller rohr_controller_default(void);
+```
+
+Returns an enabled, empty, game-owned controller.
+
+**Returns:** Controller ready for named axes and buttons.
+
+### `rohr_controller_default_wasd`
+
+```c
+Controller rohr_controller_default_wasd(void);
+```
+
+Returns a game-owned controller with W/A/S/D axis bindings.
+
+**Returns:** Default enabled W/A/S/D controller.
+
+### `rohr_controller_default_arrows`
+
+```c
+Controller rohr_controller_default_arrows(void);
+```
+
+Returns a game-owned controller with arrow-key axis bindings.
+
+**Returns:** Default enabled arrow-key controller.
+
+### `rohr_controller_set_axis_binding`
+
+```c
+void rohr_controller_set_axis_binding( Controller *controller, ControllerAxisBinding binding );
+```
+
+Replaces the axis mapping on a caller-owned controller.
+
+| Parameter | Description |
+| --- | --- |
+| `controller` | Controller to modify. NULL is ignored. |
+| `binding` | New positive/negative X/Y key mapping. |
+
+### `rohr_controller_axis`
+
+```c
+Vec2D rohr_controller_axis( const KeyboardState *keyboard, const Controller *controller );
+```
+
+Reads a game-owned controller from shared keyboard state.
+
+| Parameter | Description |
+| --- | --- |
+| `keyboard` | Shared keyboard state captured for the frame. |
+| `controller` | Game-owned mapping to read. |
+
+**Returns:** Normalized axis, or zero for NULL or disabled controllers.
+
+### `rohr_controller_add_axis`
+
+```c
+bool rohr_controller_add_axis( Controller *controller, const char *name, ControllerAxisBinding binding );
+```
+
+ @brief Adds or replaces a named axis without allocating memory.
+
+### `rohr_controller_add_button`
+
+```c
+bool rohr_controller_add_button( Controller *controller, const char *name, SDL_Keycode keycode );
+```
+
+ @brief Adds or replaces a named button without allocating memory.
+
+### `rohr_controller_get_axis`
+
+```c
+Vec2D rohr_controller_get_axis( const KeyboardState *keyboard, const Controller *controller, const char *name );
+```
+
+ @brief Reads a named axis, returning zero when unavailable or disabled.
+
+### `rohr_controller_button_down`
+
+```c
+bool rohr_controller_button_down( const KeyboardState *keyboard, const Controller *controller, const char *name );
+```
+
+ @brief Checks whether a named button is held or newly pressed.
+
+### `rohr_controller_button_pressed`
+
+```c
+bool rohr_controller_button_pressed( const KeyboardState *keyboard, const Controller *controller, const char *name );
+```
+
+ @brief Checks whether a named button was pressed this frame.
+
+### `rohr_controller_button_released`
+
+```c
+bool rohr_controller_button_released( const KeyboardState *keyboard, const Controller *controller, const char *name );
+```
+
+ @brief Checks whether a named button was released this frame.
+
 ### `rohr_controller_print_mouse_event`
 
 ```c

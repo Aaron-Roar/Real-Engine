@@ -179,7 +179,7 @@ if(ROHR_BUILD_EXAMPLES)
         ${ROHR_PONG_GENERATED_SOURCE}
     )
     target_include_directories(pong PRIVATE ${ROHR_PONG_GENERATED_DIR})
-    target_link_libraries(pong PRIVATE rohr_engine)
+    target_link_libraries(pong PRIVATE rohr_editor)
     set_target_properties(pong
         PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/examples/editor
@@ -214,6 +214,14 @@ if(ROHR_BUILD_TESTS)
         PROPERTIES
             ENVIRONMENT "SDL_VIDEODRIVER=dummy"
     )
+
+    add_executable(controller_mappings_test tests/controller_mappings.c)
+    target_link_libraries(controller_mappings_test PRIVATE rohr_engine)
+    set_target_properties(controller_mappings_test
+        PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests
+    )
+    add_test(NAME controller_mappings COMMAND controller_mappings_test)
 
     add_executable(editor_component_registry_test
         tests/editor_component_registry.c
@@ -288,6 +296,7 @@ if(ROHR_BUILD_TESTS)
     add_dependencies(
         rohr_tests
         engine_lifecycle_test
+        controller_mappings_test
         editor_component_registry_test
         generated_components_test
     )

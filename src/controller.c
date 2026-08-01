@@ -1,6 +1,7 @@
 #include "controller.h"
 #include "console.h"
 #include "graphics.h"
+#include <string.h>
 
 static bool controller_scancode_valid(SDL_Scancode scancode) {
     return scancode > SDL_SCANCODE_UNKNOWN && scancode < SDL_SCANCODE_COUNT;
@@ -110,6 +111,182 @@ Vec2D controller_wasd_axis(const KeyboardState *keyboard) {
 
 Vec2D controller_arrow_axis(const KeyboardState *keyboard) {
     return controller_axis_from_keycodes(keyboard, SDLK_UP, SDLK_LEFT, SDLK_DOWN, SDLK_RIGHT);
+}
+
+Controller controller_default(void) {
+    return (Controller){
+        .enabled = true,
+    };
+}
+
+Controller controller_default_wasd(void) {
+    Controller controller = controller_default();
+    (void)controller_add_axis(
+        &controller,
+        "movement",
+        (ControllerAxisBinding){
+            .positive_x = SDLK_D,
+            .negative_x = SDLK_A,
+            .positive_y = SDLK_W,
+            .negative_y = SDLK_S,
+        }
+    );
+    return controller;
+}
+
+Controller controller_default_arrows(void) {
+    Controller controller = controller_default();
+    (void)controller_add_axis(
+        &controller,
+        "movement",
+        (ControllerAxisBinding){
+            .positive_x = SDLK_RIGHT,
+            .negative_x = SDLK_LEFT,
+            .positive_y = SDLK_UP,
+            .negative_y = SDLK_DOWN,
+        }
+    );
+    return controller;
+}
+
+void controller_set_axis_binding(Controller *controller, ControllerAxisBinding binding) {
+    (void)controller_add_axis(controller, "movement", binding);
+}
+
+Vec2D controller_axis(const KeyboardState *keyboard, const Controller *controller) {
+    return controller_get_axis(keyboard, controller, "movement");
+}
+
+bool controller_add_axis(
+        Controller *controller,
+        const char *name,
+        ControllerAxisBinding binding
+        ) {
+    size_t i;
+    if(controller == NULL || name == NULL || name[0] == '\0') {
+        return false;
+    }
+    for(i = 0; i < controller->axis_count; i += 1) {
+        if(strcmp(controller->axes[i].name, name) == 0) {
+            controller->axes[i].binding = binding;
+            return true;
+        }
+    }
+    if(controller->axis_count >= CONTROLLER_AXIS_LIMIT) {
+        return false;
+    }
+    controller->axes[controller->axis_count] = (ControllerAxis){
+        .name = name,
+        .binding = binding,
+    };
+    controller->axis_count += 1;
+    return true;
+}
+
+bool controller_add_button(
+        Controller *controller,
+        const char *name,
+        SDL_Keycode keycode
+        ) {
+    size_t i;
+    if(controller == NULL || name == NULL || name[0] == '\0' || keycode == SDLK_UNKNOWN) {
+        return false;
+    }
+    for(i = 0; i < controller->button_count; i += 1) {
+        if(strcmp(controller->buttons[i].name, name) == 0) {
+            controller->buttons[i].keycode = keycode;
+            return true;
+        }
+    }
+    if(controller->button_count >= CONTROLLER_BUTTON_LIMIT) {
+        return false;
+    }
+    controller->buttons[controller->button_count] = (ControllerButton){
+        .name = name,
+        .keycode = keycode,
+    };
+    controller->button_count += 1;
+    return true;
+}
+
+static const ControllerAxis *controller_find_axis(
+        const Controller *controller,
+        const char *name
+        ) {
+    size_t i;
+    if(controller == NULL || name == NULL) {
+        return NULL;
+    }
+    for(i = 0; i < controller->axis_count; i += 1) {
+        if(strcmp(controller->axes[i].name, name) == 0) {
+            return &controller->axes[i];
+        }
+    }
+    return NULL;
+}
+
+static const ControllerButton *controller_find_button(
+        const Controller *controller,
+        const char *name
+        ) {
+    size_t i;
+    if(controller == NULL || name == NULL) {
+        return NULL;
+    }
+    for(i = 0; i < controller->button_count; i += 1) {
+        if(strcmp(controller->buttons[i].name, name) == 0) {
+            return &controller->buttons[i];
+        }
+    }
+    return NULL;
+}
+
+Vec2D controller_get_axis(
+        const KeyboardState *keyboard,
+        const Controller *controller,
+        const char *name
+        ) {
+    const ControllerAxis *axis = controller_find_axis(controller, name);
+    if(controller == NULL || !controller->enabled || axis == NULL) {
+        return (Vec2D){0};
+    }
+    return controller_axis_from_keycodes(
+        keyboard,
+        axis->binding.positive_y,
+        axis->binding.negative_x,
+        axis->binding.negative_y,
+        axis->binding.positive_x
+    );
+}
+
+bool controller_button_down(
+        const KeyboardState *keyboard,
+        const Controller *controller,
+        const char *name
+        ) {
+    const ControllerButton *button = controller_find_button(controller, name);
+    return controller != NULL && controller->enabled && button != NULL &&
+        controller_key_down(keyboard, button->keycode);
+}
+
+bool controller_button_pressed(
+        const KeyboardState *keyboard,
+        const Controller *controller,
+        const char *name
+        ) {
+    const ControllerButton *button = controller_find_button(controller, name);
+    return controller != NULL && controller->enabled && button != NULL &&
+        controller_key_pressed(keyboard, button->keycode);
+}
+
+bool controller_button_released(
+        const KeyboardState *keyboard,
+        const Controller *controller,
+        const char *name
+        ) {
+    const ControllerButton *button = controller_find_button(controller, name);
+    return controller != NULL && controller->enabled && button != NULL &&
+        controller_key_released(keyboard, button->keycode);
 }
 
 void add_key_event(KeyboardState *keyboard, KeyboardEvent key_event) {

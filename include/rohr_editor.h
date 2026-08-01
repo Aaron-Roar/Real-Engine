@@ -85,6 +85,15 @@ bool RE_component_registry_generate(
 );
 
 /**
+ * Find a named game-state entity and write its handle for editor-authored code.
+ *
+ * @param name Entity name stored in the loaded game state.
+ * @param entity Destination for the live entity handle.
+ * @return EngineResult describing success or the lookup failure.
+ */
+EngineResult RE_entity_find_by_name(const char *name, Entity *entity);
+
+/**
  * Initialize editor-owned state.
  *
  * The engine must be initialized before this function is called.
