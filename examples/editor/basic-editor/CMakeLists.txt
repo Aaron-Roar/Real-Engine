@@ -1,3 +1,10 @@
+cmake_minimum_required(VERSION 3.20)
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    project(rohr_basic_editor LANGUAGES C)
+endif()
+include(${CMAKE_CURRENT_LIST_DIR}/../../cmake/RohrExample.cmake)
+rohr_example_bootstrap()
+
 add_executable(basic_editor src/main.c)
 rohr_add_example_runtime(basic_editor)
 target_link_libraries(basic_editor PRIVATE rohr_editor)

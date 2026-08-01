@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
-#include "elder-fly/elderfly_descriptors.h"
+#include "elderfly_descriptors.h"
 
 const Color background_color = (Color){255,255,255,255};
 const int amount_of_entities = 20;
@@ -106,7 +106,7 @@ int main(void) {
 
     //Game Loop
     rohr_engine_reset_clock();
-    rohr_graphics_recording_start("recording.mp4", 60);
+    rohr_graphics_recording_start("flies_around_ball_recording.mp4", 60);
     bool phase_1 = false;
     bool phase_2 = false;
     bool phase_3 = false;

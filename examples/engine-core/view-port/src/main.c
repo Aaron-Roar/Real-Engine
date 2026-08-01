@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
-#include "elder-fly/elderfly_descriptors.h"
+#include "elderfly_descriptors.h"
 
 const Color background_color = (Color){255,255,255,255};
 AnimationAsset animation_elderfly = {0};

@@ -269,84 +269,84 @@
                 "time_per_frame": 0.05,
                 "frames": [
                     {
-                        "file": "assets/elder-fly/flying/f1.png",
+                        "file": "assets/flies-in-pit/elder-fly/flying/f1.png",
                         "size": {
                             "x": 50.0,
                             "y": 50.0
                         }
                     },
                     {
-                        "file": "assets/elder-fly/flying/f2.png",
+                        "file": "assets/flies-in-pit/elder-fly/flying/f2.png",
                         "size": {
                             "x": 50.0,
                             "y": 50.0
                         }
                     },
                     {
-                        "file": "assets/elder-fly/flying/f3.png",
+                        "file": "assets/flies-in-pit/elder-fly/flying/f3.png",
                         "size": {
                             "x": 50.0,
                             "y": 50.0
                         }
                     },
                     {
-                        "file": "assets/elder-fly/flying/f4.png",
+                        "file": "assets/flies-in-pit/elder-fly/flying/f4.png",
                         "size": {
                             "x": 50.0,
                             "y": 50.0
                         }
                     },
                     {
-                        "file": "assets/elder-fly/flying/f5.png",
+                        "file": "assets/flies-in-pit/elder-fly/flying/f5.png",
                         "size": {
                             "x": 50.0,
                             "y": 50.0
                         }
                     },
                     {
-                        "file": "assets/elder-fly/flying/f6.png",
+                        "file": "assets/flies-in-pit/elder-fly/flying/f6.png",
                         "size": {
                             "x": 50.0,
                             "y": 50.0
                         }
                     },
                     {
-                        "file": "assets/elder-fly/flying/f7.png",
+                        "file": "assets/flies-in-pit/elder-fly/flying/f7.png",
                         "size": {
                             "x": 50.0,
                             "y": 50.0
                         }
                     },
                     {
-                        "file": "assets/elder-fly/flying/f8.png",
+                        "file": "assets/flies-in-pit/elder-fly/flying/f8.png",
                         "size": {
                             "x": 50.0,
                             "y": 50.0
                         }
                     },
                     {
-                        "file": "assets/elder-fly/flying/f9.png",
+                        "file": "assets/flies-in-pit/elder-fly/flying/f9.png",
                         "size": {
                             "x": 50.0,
                             "y": 50.0
                         }
                     },
                     {
-                        "file": "assets/elder-fly/flying/f10.png",
+                        "file": "assets/flies-in-pit/elder-fly/flying/f10.png",
                         "size": {
                             "x": 50.0,
                             "y": 50.0
                         }
                     },
                     {
-                        "file": "assets/elder-fly/flying/f11.png",
+                        "file": "assets/flies-in-pit/elder-fly/flying/f11.png",
                         "size": {
                             "x": 50.0,
                             "y": 50.0
                         }
                     },
                     {
-                        "file": "assets/elder-fly/flying/f12.png",
+                        "file": "assets/flies-in-pit/elder-fly/flying/f12.png",
                         "size": {
                             "x": 50.0,
                             "y": 50.0

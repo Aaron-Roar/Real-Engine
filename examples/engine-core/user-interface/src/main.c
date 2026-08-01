@@ -44,7 +44,7 @@ int main(void) {
     }
     {
         EngineResult state_result = rohr_game_state_load_file(
-            "assets/game.json"
+            "assets/user-interface/game.json"
         );
         if(rohr_error_check(state_result)) {
             PRINT_ENGINE_ERROR(state_result);

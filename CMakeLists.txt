@@ -132,6 +132,9 @@ if(ROHR_BUILD_EXAMPLES)
 
     add_custom_target(editor_examples)
     add_dependencies(editor_examples basic_editor pong)
+
+    add_custom_target(examples)
+    add_dependencies(examples core_examples editor_examples)
 endif()
 
 if(ROHR_BUILD_TESTS)
@@ -237,6 +240,7 @@ if(ROHR_BUILD_TESTS)
         rohr_tests
         engine_lifecycle_test
         controller_mappings_test
+        cameras_test
         editor_component_registry_test
         generated_components_test
     )

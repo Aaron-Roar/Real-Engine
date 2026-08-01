@@ -120,57 +120,56 @@ cmake --list-presets=build
 cmake --list-presets=test
 ```
 
-Configure and build everything in debug mode:
+Configure the engine development build:
 
 ```sh
-cmake --preset debug
-cmake --build --preset debug --parallel
+cmake --preset default
+cmake --build --preset default --parallel
 ```
 
-Configure and build everything in release mode:
+Build all examples with development settings:
 
 ```sh
-cmake --preset release
-cmake --build --preset release --parallel
+cmake --build build --target examples --parallel
 ```
 
-Build only the core or editor examples:
+Build one example from the engine root:
 
 ```sh
-cmake --build --preset core-examples --parallel
-cmake --build --preset editor-examples --parallel
+cmake --build build --target pong
 ```
 
-Build one example by its CMake target name:
+Build an example independently in release mode:
 
 ```sh
-cmake --build build/debug --target pong
-cmake --build build/debug --target basic_editor
+cmake -S examples/editor/pong -B examples/editor/pong/build/release \
+  -DCMAKE_BUILD_TYPE=Release
+cmake --build examples/editor/pong/build/release --parallel
 ```
 
 List every available target:
 
 ```sh
-cmake --build build/debug --target help
+cmake --build build --target help
 ```
 
 Build and run the tests:
 
 ```sh
 cmake --build --preset tests --parallel
-ctest --preset debug
+ctest --preset default
 ```
 
-Clean compiled debug outputs while preserving the CMake configuration:
+Clean compiled engine-development outputs while preserving configuration:
 
 ```sh
-cmake --build --preset debug --target clean
+cmake --build build --target clean
 ```
 
-Recreate the debug configuration when the cache needs to be reset:
+Recreate the engine-development configuration when the cache needs resetting:
 
 ```sh
-cmake --preset debug --fresh
+cmake --preset default --fresh
 ```
 
 Examples and tests can be disabled for library-only builds with
@@ -191,8 +190,8 @@ nix develop
 Then use the CMake commands above. For example:
 
 ```sh
-cmake --preset debug
-cmake --build --preset debug --parallel
+cmake --preset default
+cmake --build --preset default --parallel
 ```
 
 ## Documentation
@@ -210,7 +209,7 @@ Readable Markdown docs are committed in the repo:
 Generate the Doxygen docs with:
 
 ```sh
-cmake --build --preset debug --target docs
+cmake --build build --target docs
 ```
 
 The generated HTML is written to:
@@ -224,7 +223,7 @@ Documentation source lives in `docs/`, and API comments live mainly in `include/
 For a movable standalone README preview, run:
 
 ```sh
-cmake --build --preset debug --target static_readme
+cmake --build build --target static_readme
 ```
 
 That writes `build/static/readme.html` and stages linked video assets under
@@ -243,9 +242,11 @@ Current examples:
 Build output is separated the same way:
 
 ```text
-build/debug/example-projects/
-├── engine-core/<project>/
-└── editor/<project>/
+build/examples/
+├── pong
+├── fly_to_finish
+├── assets/<example>/
+└── ...
 ```
 
 Each example is a small project with its own `CMakeLists.txt`, `src/`, and
@@ -253,8 +254,7 @@ optional `assets/` directory. Run an example from its output directory so its
 staged assets are the current working directory:
 
 ```sh
-cd build/debug/example-projects/editor/pong
-./pong
+./build/examples/pong
 ```
 
 ## Contributing

@@ -24,8 +24,8 @@ From the project root:
 
 ```sh
 nix develop
-cmake --preset debug
-cmake --build --preset debug --target docs
+cmake --preset default
+cmake --build build --target docs
 ```
 
 The generated HTML is written to:

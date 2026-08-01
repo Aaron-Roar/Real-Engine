@@ -5,8 +5,8 @@
 int main(void) {
     if(!example_use_executable_directory()) return 1;
     const char *paths[] = {
-        "assets/world.json",
-        "assets/relationships.json"
+        "assets/game-state/world.json",
+        "assets/game-state/relationships.json"
     };
     EntityIndex seeker_index;
     CameraAttachment camera_attachment;

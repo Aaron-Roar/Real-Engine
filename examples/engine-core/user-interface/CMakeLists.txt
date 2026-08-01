@@ -1,3 +1,10 @@
+cmake_minimum_required(VERSION 3.20)
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    project(rohr_user_interface LANGUAGES C)
+endif()
+include(${CMAKE_CURRENT_LIST_DIR}/../../cmake/RohrExample.cmake)
+rohr_example_bootstrap()
+
 add_executable(user_interface src/main.c)
 rohr_add_example_runtime(user_interface)
 target_link_libraries(user_interface PRIVATE rohr_engine)
