@@ -227,6 +227,31 @@ CameraAttachmentResult rohr_graphics_get_camera_attachment(void) {
     }
     return ERROR_RESULT_MAKE_VALUE(CameraAttachmentResult, attachment);
 }
+CameraConfig rohr_camera_default_config(void) { return graphics_camera_default_config(); }
+CameraIdResult rohr_camera_create(CameraConfig config) { return graphics_camera_create(config); }
+EngineResult rohr_camera_destroy(CameraId camera_id) { return graphics_camera_destroy(camera_id); }
+EngineResult rohr_camera_set_active(CameraId camera_id) { return graphics_camera_set_active(camera_id); }
+CameraId rohr_camera_get_active(void) { return graphics_camera_get_active(); }
+CameraResult rohr_camera_get(CameraId camera_id) { return graphics_camera_get(camera_id); }
+EngineResult rohr_camera_set(CameraId camera_id, Camera value) { return graphics_camera_set(camera_id, value); }
+EngineResult rohr_camera_attach(
+        CameraId camera_id,
+        Entity entity,
+        Vec2D position_offset,
+        Orientation orientation_offset,
+        bool follow_position,
+        bool follow_orientation
+        ) {
+    return graphics_camera_attach_to(
+        camera_id,
+        entity,
+        position_offset,
+        orientation_offset,
+        follow_position,
+        follow_orientation
+    );
+}
+EngineResult rohr_camera_detach(CameraId camera_id) { return graphics_camera_detach_from(camera_id); }
 Position rohr_graphics_world_to_screen(Position pos) { return graphics_world_to_screen(pos); }
 Position rohr_graphics_screen_to_world(Position screen) { return graphics_screen_to_world(screen); }
 Position rohr_graphics_get_mouse_screen_position(void) { return graphics_get_mouse_screen_position(); }

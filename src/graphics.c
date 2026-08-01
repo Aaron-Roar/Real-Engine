@@ -6,6 +6,7 @@
 #include "physics.h"
 #include "platform_process.h"
 #include <stdio.h>
+#include <string.h>
 #include "grid.h"
 
 static SDL_Renderer *sdl_renderer = NULL;
@@ -20,6 +21,49 @@ typedef struct ActiveCameraAttachment {
 } ActiveCameraAttachment;
 
 static ActiveCameraAttachment camera_attachment = {0};
+static Camera cameras[MAX_CAMERAS] = {0};
+static ActiveCameraAttachment camera_attachments[MAX_CAMERAS] = {0};
+static uint32_t camera_generations[MAX_CAMERAS] = {0};
+static bool cameras_used[MAX_CAMERAS] = {0};
+static CameraId active_camera = CAMERA_INVALID;
+static bool graphics_resolve_camera_attachment(void);
+
+static CameraId graphics_camera_id(size_t slot) {
+    return (CameraId)((camera_generations[slot] << 8) | (uint32_t)(slot + 1));
+}
+
+static bool graphics_camera_slot(CameraId id, size_t *slot) {
+    size_t value;
+    if(id == CAMERA_INVALID || slot == NULL) return false;
+    value = (size_t)((id & 0xffu) - 1u);
+    if(value >= MAX_CAMERAS || !cameras_used[value] || graphics_camera_id(value) != id) return false;
+    *slot = value;
+    return true;
+}
+
+CameraConfig graphics_camera_default_config(void) {
+    return (CameraConfig){
+        .dimensions = {WINDOW_WIDTH, WINDOW_HEIGHT},
+        .scale = 1.0f,
+        .viewport = {0.0f, 0.0f, WINDOW_WIDTH, WINDOW_HEIGHT},
+    };
+}
+
+static Camera graphics_camera_from_config(CameraConfig config) {
+    CameraConfig defaults = graphics_camera_default_config();
+    if(config.dimensions.x <= 0.0f) config.dimensions.x = defaults.dimensions.x;
+    if(config.dimensions.y <= 0.0f) config.dimensions.y = defaults.dimensions.y;
+    if(config.scale <= 0.0f) config.scale = defaults.scale;
+    if(config.viewport.width <= 0.0f) config.viewport.width = defaults.viewport.width;
+    if(config.viewport.height <= 0.0f) config.viewport.height = defaults.viewport.height;
+    return (Camera){
+        .position = config.position,
+        .orientation = config.orientation,
+        .dimensions = config.dimensions,
+        .scale = config.scale,
+        .viewport = config.viewport,
+    };
+}
 
 MEMORY_DEFINE_OBJECT_POOL(AnimatedSpritePool, AnimatedSprite)
 
@@ -28,7 +72,6 @@ const Color hit_box_color = (Color){255,0,0,255};
 const Color particle_color = (Color){0,0,255,255};
 
 #include <stdint.h>
-#include <string.h>
 
 typedef struct ScreenRecorder {
     FILE *ffmpeg_pipe;
@@ -56,7 +99,16 @@ static void graphics_recording_disable(const char *reason) {
 }
 
 EngineResult graphics_tables_init(void) {
-    camera = (Camera){0};
+    CameraConfig default_config = graphics_camera_default_config();
+    memset(cameras, 0, sizeof(cameras));
+    memset(camera_attachments, 0, sizeof(camera_attachments));
+    memset(camera_generations, 0, sizeof(camera_generations));
+    memset(cameras_used, 0, sizeof(cameras_used));
+    cameras_used[0] = true;
+    camera_generations[0] = 1;
+    active_camera = graphics_camera_id(0);
+    camera = graphics_camera_from_config(default_config);
+    cameras[0] = camera;
     camera_attachment = (ActiveCameraAttachment){0};
     if(AnimatedSpritePool_init(&animated_sprites_pool, 0).kind == ERROR_RESULT_ERROR) {
         graphics_tables_destroy();
@@ -410,6 +462,103 @@ Color graphics_create_color_rgba(uint8_t red, uint8_t green, uint8_t blue, uint8
   };
 }
 
+static void graphics_camera_store_active(void) {
+    size_t slot;
+    if(graphics_camera_slot(active_camera, &slot)) {
+        cameras[slot] = camera;
+        camera_attachments[slot] = camera_attachment;
+    }
+}
+
+CameraIdResult graphics_camera_create(CameraConfig config) {
+    size_t slot;
+    for(slot = 0; slot < MAX_CAMERAS; slot += 1) {
+        if(!cameras_used[slot]) {
+            camera_generations[slot] += 1;
+            if(camera_generations[slot] == 0) camera_generations[slot] = 1;
+            cameras_used[slot] = true;
+            cameras[slot] = graphics_camera_from_config(config);
+            camera_attachments[slot] = (ActiveCameraAttachment){0};
+            return ERROR_RESULT_MAKE_VALUE(CameraIdResult, graphics_camera_id(slot));
+        }
+    }
+    return ERROR_RESULT_MAKE_ERROR(CameraIdResult, ERROR_MEMORY_POOL_FULL);
+}
+
+EngineResult graphics_camera_set_active(CameraId id) {
+    size_t slot;
+    SDL_Rect viewport;
+    if(!graphics_camera_slot(id, &slot)) {
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    graphics_camera_store_active();
+    active_camera = id;
+    camera = cameras[slot];
+    camera_attachment = camera_attachments[slot];
+    if(sdl_renderer != NULL) {
+        viewport = (SDL_Rect){
+            (int)camera.viewport.x,
+            (int)camera.viewport.y,
+            (int)camera.viewport.width,
+            (int)camera.viewport.height,
+        };
+        (void)SDL_SetRenderViewport(sdl_renderer, &viewport);
+    }
+    return error_result_value(true);
+}
+
+CameraId graphics_camera_get_active(void) {
+    return active_camera;
+}
+
+CameraResult graphics_camera_get(CameraId id) {
+    size_t slot;
+    if(!graphics_camera_slot(id, &slot)) {
+        return ERROR_RESULT_MAKE_ERROR(CameraResult, ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    if(id == active_camera) {
+        (void)graphics_resolve_camera_attachment();
+        graphics_camera_store_active();
+    }
+    return ERROR_RESULT_MAKE_VALUE(CameraResult, cameras[slot]);
+}
+
+EngineResult graphics_camera_set(CameraId id, Camera value) {
+    size_t slot;
+    if(!graphics_camera_slot(id, &slot)) {
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    value = graphics_camera_from_config((CameraConfig){
+        .position = value.position,
+        .orientation = value.orientation,
+        .dimensions = value.dimensions,
+        .scale = value.scale,
+        .viewport = value.viewport,
+    });
+    cameras[slot] = value;
+    camera_attachments[slot] = (ActiveCameraAttachment){0};
+    if(id == active_camera) {
+        camera = value;
+        camera_attachment = (ActiveCameraAttachment){0};
+        return graphics_camera_set_active(id);
+    }
+    return error_result_value(true);
+}
+
+EngineResult graphics_camera_destroy(CameraId id) {
+    size_t slot;
+    if(!graphics_camera_slot(id, &slot)) {
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    if(id == active_camera) {
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    cameras_used[slot] = false;
+    cameras[slot] = (Camera){0};
+    camera_attachments[slot] = (ActiveCameraAttachment){0};
+    return error_result_value(true);
+}
+
 static bool graphics_resolve_camera_attachment(void) {
     EntityIndex index;
     Vec2D world_offset = camera_attachment.value.position_offset;
@@ -434,24 +583,30 @@ static bool graphics_resolve_camera_attachment(void) {
             orientations[index]
         );
     }
-    camera = (Camera){
-        .position = camera_attachment.value.follow_position
+    camera.position = camera_attachment.value.follow_position
             ? (Position){
                 .x = positions[index].x + world_offset.x,
                 .y = positions[index].y + world_offset.y
             }
-            : camera_attachment.value.position_offset,
-        .orientation = camera_attachment.value.follow_orientation
+            : camera_attachment.value.position_offset;
+    camera.orientation = camera_attachment.value.follow_orientation
             ? orientations[index]
                 + camera_attachment.value.orientation_offset
-            : camera_attachment.value.orientation_offset
-    };
+            : camera_attachment.value.orientation_offset;
+    graphics_camera_store_active();
     return true;
 }
 
 void graphics_set_camera(Camera value) {
     camera_attachment = (ActiveCameraAttachment){0};
-    camera = value;
+    camera = graphics_camera_from_config((CameraConfig){
+        .position = value.position,
+        .orientation = value.orientation,
+        .dimensions = value.dimensions,
+        .scale = value.scale,
+        .viewport = value.viewport,
+    });
+    graphics_camera_store_active();
 }
 
 Camera graphics_get_camera(void) {
@@ -472,6 +627,7 @@ void graphics_move_camera(Vec2D translation) {
     }
     camera.position.x += translation.x;
     camera.position.y += translation.y;
+    graphics_camera_store_active();
 }
 
 void graphics_rotate_camera(Orientation radians) {
@@ -479,6 +635,7 @@ void graphics_rotate_camera(Orientation radians) {
         camera_attachment.value.orientation_offset += radians;
     }
     camera.orientation += radians;
+    graphics_camera_store_active();
 }
 
 EngineResult graphics_attach_camera(
@@ -527,12 +684,14 @@ EngineResult graphics_attach_camera_with_options(
         .attached = true
     };
     (void)graphics_resolve_camera_attachment();
+    graphics_camera_store_active();
     return error_result_value(true);
 }
 
 void graphics_detach_camera(void) {
     (void)graphics_resolve_camera_attachment();
     camera_attachment = (ActiveCameraAttachment){0};
+    graphics_camera_store_active();
 }
 
 bool graphics_camera_is_attached(void) {
@@ -547,6 +706,39 @@ bool graphics_get_camera_attachment(CameraAttachment *attachment) {
     return true;
 }
 
+EngineResult graphics_camera_attach_to(
+        CameraId id,
+        Entity entity,
+        Vec2D position_offset,
+        Orientation orientation_offset,
+        bool follow_position,
+        bool follow_orientation
+        ) {
+    CameraId previous = active_camera;
+    EngineResult result = graphics_camera_set_active(id);
+    if(error_check(result)) return result;
+    result = graphics_attach_camera_with_options(
+        entity,
+        position_offset,
+        orientation_offset,
+        follow_position,
+        follow_orientation
+    );
+    graphics_camera_store_active();
+    if(previous != id) (void)graphics_camera_set_active(previous);
+    return result;
+}
+
+EngineResult graphics_camera_detach_from(CameraId id) {
+    CameraId previous = active_camera;
+    EngineResult result = graphics_camera_set_active(id);
+    if(error_check(result)) return result;
+    graphics_detach_camera();
+    graphics_camera_store_active();
+    if(previous != id) (void)graphics_camera_set_active(previous);
+    return error_result_value(true);
+}
+
 Position graphics_world_to_screen(Position world) {
     (void)graphics_resolve_camera_attachment();
     Vec2D relative = {
@@ -554,18 +746,22 @@ Position graphics_world_to_screen(Position world) {
         .y = world.y - camera.position.y
     };
     Vec2D camera_space = math_rotate_vector(relative, -camera.orientation);
+    float scale_x = camera.scale * camera.viewport.width / camera.dimensions.x;
+    float scale_y = camera.scale * camera.viewport.height / camera.dimensions.y;
 
     return (Position){
-        .x = camera_space.x + WINDOW_WIDTH * 0.5f,
-        .y = WINDOW_HEIGHT * 0.5f - camera_space.y
+        .x = camera.viewport.x + camera.viewport.width * 0.5f + camera_space.x * scale_x,
+        .y = camera.viewport.y + camera.viewport.height * 0.5f - camera_space.y * scale_y
     };
 }
 
 Position graphics_screen_to_world(Position screen) {
     (void)graphics_resolve_camera_attachment();
     Vec2D camera_space = {
-        .x = screen.x - WINDOW_WIDTH * 0.5f,
-        .y = WINDOW_HEIGHT * 0.5f - screen.y
+        .x = (screen.x - camera.viewport.x - camera.viewport.width * 0.5f)
+            * camera.dimensions.x / (camera.scale * camera.viewport.width),
+        .y = (camera.viewport.y + camera.viewport.height * 0.5f - screen.y)
+            * camera.dimensions.y / (camera.scale * camera.viewport.height)
     };
     Vec2D relative = math_rotate_vector(camera_space, camera.orientation);
 
@@ -649,6 +845,7 @@ EngineResult graphics_start(void) {
         ttf_initialized = false;
         return error_result_error(ERROR_ENGINE_GRAPHICS_INIT_FAILED);
     }
+    (void)graphics_camera_set_active(active_camera);
 
     console_write(LOG_ENGINE, "Graphics initialization complete\n");
     console_write(LOG_ENGINE, "---Initializing Graphics---\n");
@@ -1056,8 +1253,10 @@ void graphics_draw_texture(TextureAsset texture_asset, Position pos, Orientation
     SDL_FRect dst_rect = {0};
     (void)graphics_resolve_camera_attachment();
     Position screen_loc = graphics_world_to_screen(pos);
-    dst_rect.w = texture_asset.size.x;//(float) texture_width;
-    dst_rect.h = texture_asset.size.y;//(float) texture_width;
+    dst_rect.w = texture_asset.size.x * camera.scale
+        * camera.viewport.width / camera.dimensions.x;
+    dst_rect.h = texture_asset.size.y * camera.scale
+        * camera.viewport.height / camera.dimensions.y;
     dst_rect.x = screen_loc.x - dst_rect.w * 0.5f;//(float) texture_width;
     dst_rect.y = screen_loc.y - dst_rect.h * 0.5f;//(float) texture_height;
 

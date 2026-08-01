@@ -16,6 +16,7 @@
 #define MAX_TEXTURES 50
 #define MAX_ANIMATIONS_FRAMES 20
 #define MAX_ANIMATION_SETS 10
+#define MAX_CAMERAS 16
 
 #define RECORDING_WIDTH  WINDOW_WIDTH
 #define RECORDING_HEIGHT WINDOW_HEIGHT
@@ -28,13 +29,45 @@ typedef struct {
     float y;
 } Scale;
 
+/** Stable handle for an engine-owned camera. */
+typedef uint32_t CameraId;
+
+/** Invalid camera handle. */
+#define CAMERA_INVALID 0
+
+/** Logical output rectangle occupied by a camera. */
+typedef struct CameraViewport {
+    float x;
+    float y;
+    float width;
+    float height;
+} CameraViewport;
+
 /** World-space camera transform used by the renderer. */
 typedef struct {
     /** World position shown at the center of the viewport. */
     Position position;
     /** Counterclockwise world orientation in radians. */
     Orientation orientation;
+    /** Logical world-view dimensions before magnification. */
+    Vec2D dimensions;
+    /** Magnification where values above one zoom in. */
+    float scale;
+    /** Logical output rectangle used for rendering and clipping. */
+    CameraViewport viewport;
 } Camera;
+
+/** Defaults used when creating an engine-owned camera. */
+typedef struct CameraConfig {
+    Position position;
+    Orientation orientation;
+    Vec2D dimensions;
+    float scale;
+    CameraViewport viewport;
+} CameraConfig;
+
+ERROR_DECLARE_RESULT_TYPE(CameraIdResult, CameraId);
+ERROR_DECLARE_RESULT_TYPE(CameraResult, Camera);
 
 /** Non-owning description of an entity-following camera attachment. */
 typedef struct {
@@ -324,6 +357,23 @@ bool graphics_camera_is_attached(void);
 
 /** Copy the active attachment description to the caller. */
 bool graphics_get_camera_attachment(CameraAttachment *attachment);
+
+CameraConfig graphics_camera_default_config(void);
+CameraIdResult graphics_camera_create(CameraConfig config);
+EngineResult graphics_camera_destroy(CameraId camera);
+EngineResult graphics_camera_set_active(CameraId camera);
+CameraId graphics_camera_get_active(void);
+CameraResult graphics_camera_get(CameraId camera);
+EngineResult graphics_camera_set(CameraId camera, Camera value);
+EngineResult graphics_camera_attach_to(
+    CameraId camera,
+    Entity entity,
+    Vec2D position_offset,
+    Orientation orientation_offset,
+    bool follow_position,
+    bool follow_orientation
+);
+EngineResult graphics_camera_detach_from(CameraId camera);
 
 /** Convert world coordinates to logical screen coordinates. */
 Position graphics_world_to_screen(Position pos);

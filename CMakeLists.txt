@@ -158,6 +158,11 @@ if(ROHR_BUILD_TESTS)
     )
     add_test(NAME controller_mappings COMMAND controller_mappings_test)
 
+    add_executable(cameras_test tests/cameras.c)
+    target_link_libraries(cameras_test PRIVATE rohr_engine)
+    set_target_properties(cameras_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+    add_test(NAME cameras COMMAND cameras_test)
+
     add_executable(editor_component_registry_test
         tests/editor_component_registry.c
     )

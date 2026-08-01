@@ -2942,6 +2942,78 @@ EngineResult rohr_game_state_save_template_file(const char *path);
 
  Saves retained authored definitions without expanding prototypes.
 
+### `rohr_camera_default_config`
+
+```c
+CameraConfig rohr_camera_default_config(void);
+```
+
+ Returns defaults for a full-screen, unit-scale camera.
+
+### `rohr_camera_create`
+
+```c
+CameraIdResult rohr_camera_create(CameraConfig config);
+```
+
+ Creates an engine-owned camera.
+
+### `rohr_camera_destroy`
+
+```c
+EngineResult rohr_camera_destroy(CameraId camera);
+```
+
+ Destroys a non-active camera.
+
+### `rohr_camera_set_active`
+
+```c
+EngineResult rohr_camera_set_active(CameraId camera);
+```
+
+ Selects the camera used by transforms and subsequent drawing.
+
+### `rohr_camera_get_active`
+
+```c
+CameraId rohr_camera_get_active(void);
+```
+
+ Returns the active camera handle.
+
+### `rohr_camera_get`
+
+```c
+CameraResult rohr_camera_get(CameraId camera);
+```
+
+ Returns an engine-owned camera value.
+
+### `rohr_camera_set`
+
+```c
+EngineResult rohr_camera_set(CameraId camera, Camera value);
+```
+
+ Replaces a camera value and detaches it.
+
+### `rohr_camera_attach`
+
+```c
+EngineResult rohr_camera_attach( CameraId camera, Entity entity, Vec2D position_offset, Orientation orientation_offset, bool follow_position, bool follow_orientation );
+```
+
+ Attaches a camera to an entity transform.
+
+### `rohr_camera_detach`
+
+```c
+EngineResult rohr_camera_detach(CameraId camera);
+```
+
+ Detaches a camera while preserving its resolved transform.
+
 ### `rohr_ui_begin_frame`
 
 ```c

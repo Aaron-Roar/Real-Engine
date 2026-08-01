@@ -1123,6 +1123,32 @@ bool rohr_graphics_camera_is_attached(void);
  */
 CameraAttachmentResult rohr_graphics_get_camera_attachment(void);
 
+/** Returns defaults for a full-screen, unit-scale camera. */
+CameraConfig rohr_camera_default_config(void);
+/** Creates an engine-owned camera. */
+CameraIdResult rohr_camera_create(CameraConfig config);
+/** Destroys a non-active camera. */
+EngineResult rohr_camera_destroy(CameraId camera);
+/** Selects the camera used by transforms and subsequent drawing. */
+EngineResult rohr_camera_set_active(CameraId camera);
+/** Returns the active camera handle. */
+CameraId rohr_camera_get_active(void);
+/** Returns an engine-owned camera value. */
+CameraResult rohr_camera_get(CameraId camera);
+/** Replaces a camera value and detaches it. */
+EngineResult rohr_camera_set(CameraId camera, Camera value);
+/** Attaches a camera to an entity transform. */
+EngineResult rohr_camera_attach(
+    CameraId camera,
+    Entity entity,
+    Vec2D position_offset,
+    Orientation orientation_offset,
+    bool follow_position,
+    bool follow_orientation
+);
+/** Detaches a camera while preserving its resolved transform. */
+EngineResult rohr_camera_detach(CameraId camera);
+
 /**
  * @brief Converts a world position to screen coordinates.
  * @param pos World position.
