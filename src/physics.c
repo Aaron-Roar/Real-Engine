@@ -3,6 +3,10 @@
 #include "float.h"
 #include <math.h>
 #include "console.h"
+#include "systems.h"
+
+static Time physics_dt_per_tick = 0.0;
+static bool physics_dt_overwritten = false;
 
 MEMORY_DEFINE_OBJECT_POOL(PositionPool, Position)
 MEMORY_DEFINE_OBJECT_POOL(VelocityPool, Velocity)
@@ -44,6 +48,8 @@ TransformLockPool transform_locks_pool = {0};
 JointPool joints_pool = {0};
 
 EngineResult physics_tables_init(void) {
+    physics_dt_per_tick = 0.0;
+    physics_dt_overwritten = false;
     if(PositionPool_init(&positions_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(OrientationPool_init(&orientations_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(VelocityPool_init(&velocities_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
@@ -1190,4 +1196,29 @@ bool physics_get_collision_report(Entity entity, Entity target) {
         return true;
     }
     return false;
+}
+
+EngineResult physics_set_dt_per_tick(Time dt) {
+    if(dt <= 0.0) return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    physics_dt_per_tick = dt;
+    physics_dt_overwritten = true;
+    return error_result_value(true);
+}
+
+Time physics_get_dt_per_tick(void) {
+    return physics_dt_overwritten ? physics_dt_per_tick : engine_get_time_per_tick();
+}
+
+void physics_use_engine_time_per_tick(void) {
+    physics_dt_per_tick = 0.0;
+    physics_dt_overwritten = false;
+}
+
+void physics_update(Tick ticks) {
+    if(ticks == 0) return;
+    system_update_physics(physics_get_dt_per_tick() * (Time)ticks);
+}
+
+void physics_update_dt(Time dt) {
+    if(dt > 0.0) system_update_physics(dt);
 }

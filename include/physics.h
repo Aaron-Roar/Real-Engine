@@ -396,4 +396,15 @@ EngineResult physics_set_collision_report(Entity entity, Entity target, bool sta
  * Get collision state between an entity and target entity.
  */
 bool physics_get_collision_report(Entity entity, Entity target);
+
+/** Set an explicit simulation delta for each engine tick. */
+EngineResult physics_set_dt_per_tick(Time dt);
+/** Return the explicit delta or the engine time per tick when using defaults. */
+Time physics_get_dt_per_tick(void);
+/** Return physics timing to the engine time-per-tick default. */
+void physics_use_engine_time_per_tick(void);
+/** Advance physics for a number of elapsed engine ticks. */
+void physics_update(Tick ticks);
+/** Advance physics once using an explicit exceptional delta. */
+void physics_update_dt(Time dt);
 #endif

@@ -57,10 +57,13 @@ void engine_pause(void);
  */
 void engine_resume(void);
 
-/**
- * Advance the engine tick count by one when the engine is running.
- */
-void engine_update_tick(void);
+/** Update elapsed time and consume every complete fixed tick. */
+Tick engine_update_tick(void);
+
+/** Set the real-time duration required for one engine tick. */
+EngineResult engine_set_time_per_tick(Time time_per_tick);
+/** Return the real-time duration required for one engine tick. */
+Time engine_get_time_per_tick(void);
 
 /**
  * Poll one SDL event.
@@ -75,25 +78,6 @@ SDL_Event engine_poll_event(void);
  * @return true when paused, false otherwise.
  */
 bool engine_is_paused(void);
-
-/**
- * Get the current engine delta time.
- *
- * @return Delta time in seconds from the last engine_update_time() call.
- */
-Time engine_get_dt(void);
-
-/**
- * Return delta time calculation to real elapsed time.
- */
-void engine_calculate_dt(void);
-
-/**
- * Override the engine delta time with a fixed value.
- *
- * @param dt Fixed delta time in seconds.
- */
-void engine_set_dt(Time dt);
 
 /**
  * Reset the internal timing baseline without advancing time.

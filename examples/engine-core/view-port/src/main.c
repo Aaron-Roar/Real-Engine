@@ -76,9 +76,9 @@ int main(void) {
         //rohr_level_editor_update(renderer);
 
         //physics
-        rohr_engine_update_time();
-        rohr_engine_update_tick();
-        rohr_system_update_physics(rohr_engine_get_dt());
+        Tick ticks_advanced = rohr_engine_update_tick();
+        Time tick_time = rohr_engine_get_time_per_tick() * (Time)ticks_advanced;
+        rohr_physics_update(ticks_advanced);
 
         //render
         rohr_graphics_draw_background(background_color);
@@ -115,11 +115,11 @@ int main(void) {
             .y = move_axis.y * 100.0f
         });
         rohr_graphics_move_camera((Vec2D){
-            .x = camera_move_axis.x * camera_move_speed * rohr_engine_get_dt(),
-            .y = camera_move_axis.y * camera_move_speed * rohr_engine_get_dt()
+            .x = camera_move_axis.x * camera_move_speed * tick_time,
+            .y = camera_move_axis.y * camera_move_speed * tick_time
         });
         rohr_graphics_rotate_camera(
-            camera_turn_axis.x * camera_turn_speed * rohr_engine_get_dt()
+            camera_turn_axis.x * camera_turn_speed * tick_time
         );
 
         rohr_controller_update_mouse_states(&mouse);

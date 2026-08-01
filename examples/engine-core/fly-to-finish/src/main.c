@@ -196,7 +196,7 @@ int main(void) {
             return 1;
         }
     }
-    rohr_engine_set_dt(1/(float)120);
+    if(rohr_error_check(rohr_engine_set_time_per_tick(1.0 / 120.0))) return 1;
     {
         EngineResult graphics_result = rohr_graphics_start();
         if(rohr_error_check(graphics_result)) {
@@ -353,11 +353,10 @@ int main(void) {
             animated_sprites[player_index].animation.time_per_frame = fmaxf(0.015f, 0.09f - speed * 0.0002f);
         }
 
-        rohr_engine_update_time();
-        rohr_engine_update_tick();
+        Tick ticks_advanced = rohr_engine_update_tick();
         if(level_active) {
-            rohr_system_update_physics(rohr_engine_get_dt());
-        } else {
+            rohr_physics_update(ticks_advanced);
+        } else if(ticks_advanced > 0) {
             rohr_system_clean_entities_past_lifetime();
         }
 

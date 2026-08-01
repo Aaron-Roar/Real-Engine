@@ -11,12 +11,11 @@ Time rohr_engine_get_time(void) { return engine_get_time(); }
 Tick rohr_engine_get_tick(void) { return engine_get_tick(); }
 void rohr_engine_pause(void) { engine_pause(); }
 void rohr_engine_resume(void) { engine_resume(); }
-void rohr_engine_update_tick(void) { engine_update_tick(); }
+Tick rohr_engine_update_tick(void) { return engine_update_tick(); }
+EngineResult rohr_engine_set_time_per_tick(Time value) { return engine_set_time_per_tick(value); }
+Time rohr_engine_get_time_per_tick(void) { return engine_get_time_per_tick(); }
 SDL_Event rohr_engine_poll_event(void) { return engine_poll_event(); }
 bool rohr_engine_is_paused(void) { return engine_is_paused(); }
-Time rohr_engine_get_dt(void) { return engine_get_dt(); }
-void rohr_engine_calculate_dt(void) { engine_calculate_dt(); }
-void rohr_engine_set_dt(Time dt) { engine_set_dt(dt); }
 void rohr_engine_reset_clock(void) { engine_reset_clock(); }
 
 EngineResult rohr_error_result_value(bool value) { return error_result_value(value); }
@@ -94,6 +93,11 @@ ParentResult rohr_entity_get_parent(Entity entity) { return entity_get_parent(en
 EngineResult rohr_entity_set_life_time(Entity entity, Time expirey_time, Tick expirey_tick) { return entity_set_life_time(entity, expirey_time, expirey_tick); }
 EngineResult rohr_entity_remove_life_time(Entity entity) { return entity_remove_life_time(entity); }
 
+EngineResult rohr_physics_set_dt_per_tick(Time dt) { return physics_set_dt_per_tick(dt); }
+Time rohr_physics_get_dt_per_tick(void) { return physics_get_dt_per_tick(); }
+void rohr_physics_use_engine_time_per_tick(void) { physics_use_engine_time_per_tick(); }
+void rohr_physics_update(Tick ticks) { physics_update(ticks); }
+void rohr_physics_update_dt(Time dt) { physics_update_dt(dt); }
 Shape rohr_physics_shape_world_translate(Shape shape, Position position, Orientation angle) { return physics_shape_world_translate(shape, position, angle); }
 float rohr_physics_polygon_moment_of_inertia(Shape shape, Mass mass_value) { return physics_polygon_moment_of_inertia(shape, mass_value); }
 Collision rohr_physics_sat_collision(Shape shape_1, Shape shape_2) { return physics_sat_collision(shape_1, shape_2); }

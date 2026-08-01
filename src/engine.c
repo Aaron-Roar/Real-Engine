@@ -16,10 +16,8 @@ bool engine_paused = false;
 Tick engine_tick_count = 0;
 
 Time engine_time = 0.0;   // simulated engine time in seconds
-Time engine_dt = 0.0;     // simulated delta time in seconds
-
-Time engine_override_dt = 0.0;
-bool engine_dt_overwritten = false;
+Time engine_time_per_tick = 1.0 / 60.0;
+Time engine_tick_accumulator = 0.0;
 
 SDLTime sdl_prev_counter = 0;
 SDLTime sdl_frequency = 0;
@@ -82,9 +80,8 @@ EngineResult engine_init(void) {
     sdl_prev_counter = SDL_GetPerformanceCounter();
 
     engine_time = 0.0;
-    engine_dt = 0.0;
-    engine_override_dt = 0.0;
-    engine_dt_overwritten = false;
+    engine_time_per_tick = 1.0 / 60.0;
+    engine_tick_accumulator = 0.0;
     engine_tick_count = 0;
 
     engine_paused = false;
@@ -103,6 +100,7 @@ bool engine_is_paused(void) {
 }
 
 void engine_resume(void) {
+    sdl_prev_counter = SDL_GetPerformanceCounter();
     engine_paused = false;
 }
 
@@ -116,24 +114,25 @@ void engine_update_time(void) {
     sdl_prev_counter = current_counter;
 
     if(engine_paused || !engine_running) {
-        engine_dt = 0.0;
         return;
     }
-
-    if(engine_dt_overwritten) {
-        engine_dt = engine_override_dt;
-    } else {
-        engine_dt = real_dt;
-    }
-    engine_time += engine_dt;
+    engine_time += real_dt;
+    engine_tick_accumulator += real_dt;
 }
 
-void engine_update_tick(void) {
+Tick engine_update_tick(void) {
+    Tick ticks_advanced;
+    engine_update_time();
     if(engine_paused || !engine_running) {
-        return;
+        return 0;
     }
-    engine_tick_count += 1;
-
+    ticks_advanced = (Tick)(engine_tick_accumulator / engine_time_per_tick);
+    if(ticks_advanced == 0) {
+        return 0;
+    }
+    engine_tick_accumulator -= (Time)ticks_advanced * engine_time_per_tick;
+    engine_tick_count += ticks_advanced;
+    return ticks_advanced;
 }
 
 Tick engine_get_tick(void) {
@@ -145,23 +144,16 @@ Time engine_get_time(void) {
 }
 void engine_reset_clock(void) {
     sdl_prev_counter = SDL_GetPerformanceCounter();
-    engine_dt = engine_dt_overwritten ? engine_override_dt : 0.0;
+    engine_tick_accumulator = 0.0;
 }
 
-void engine_set_dt(Time dt) {
-    engine_override_dt = dt;
-    engine_dt = dt;
-    engine_dt_overwritten = true;
+EngineResult engine_set_time_per_tick(Time value) {
+    if(value <= 0.0) return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    engine_time_per_tick = value;
+    return error_result_value(true);
 }
 
-void engine_calculate_dt(void) {
-    engine_override_dt = 0.0;
-    engine_dt_overwritten = false;
-}
-
-Time engine_get_dt(void) {
-    return engine_dt;
-}
+Time engine_get_time_per_tick(void) { return engine_time_per_tick; }
 
 void engine_shutdown(void) {
     game_state_runtime_reset();

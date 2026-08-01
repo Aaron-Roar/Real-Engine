@@ -93,10 +93,28 @@ Resumes engine time-dependent updates.
 ### `rohr_engine_update_tick`
 
 ```c
-void rohr_engine_update_tick(void);
+Tick rohr_engine_update_tick(void);
 ```
 
-Advances the engine tick counter.
+Updates elapsed time and consumes every complete fixed tick.
+
+**Returns:** Number of ticks consumed by this update.
+
+### `rohr_engine_set_time_per_tick`
+
+```c
+EngineResult rohr_engine_set_time_per_tick(Time time_per_tick);
+```
+
+ Sets the real-time duration required for one engine tick.
+
+### `rohr_engine_get_time_per_tick`
+
+```c
+Time rohr_engine_get_time_per_tick(void);
+```
+
+ Returns the real-time duration required for one engine tick.
 
 ### `rohr_engine_poll_event`
 
@@ -117,36 +135,6 @@ bool rohr_engine_is_paused(void);
 Checks whether the engine is paused.
 
 **Returns:** true when paused, false when running.
-
-### `rohr_engine_get_dt`
-
-```c
-Time rohr_engine_get_dt(void);
-```
-
-Returns the current fixed or calculated delta time.
-
-**Returns:** Delta time in seconds.
-
-### `rohr_engine_calculate_dt`
-
-```c
-void rohr_engine_calculate_dt(void);
-```
-
-Calculates delta time from elapsed engine time.
-
-### `rohr_engine_set_dt`
-
-```c
-void rohr_engine_set_dt(Time dt);
-```
-
-Sets the engine delta time manually.
-
-| Parameter | Description |
-| --- | --- |
-| `dt` | Delta time in seconds. |
 
 ### `rohr_engine_reset_clock`
 
@@ -763,6 +751,46 @@ Removes lifetime data from an entity.
 **Returns:** EngineResult describing success or failure.
 
 ## Physics
+
+### `rohr_physics_set_dt_per_tick`
+
+```c
+EngineResult rohr_physics_set_dt_per_tick(Time dt);
+```
+
+ Sets an explicit simulation delta per engine tick.
+
+### `rohr_physics_get_dt_per_tick`
+
+```c
+Time rohr_physics_get_dt_per_tick(void);
+```
+
+ Returns the current physics delta per tick.
+
+### `rohr_physics_use_engine_time_per_tick`
+
+```c
+void rohr_physics_use_engine_time_per_tick(void);
+```
+
+ Restores the engine time-per-tick default.
+
+### `rohr_physics_update`
+
+```c
+void rohr_physics_update(Tick ticks);
+```
+
+ Advances physics using the supplied number of elapsed engine ticks.
+
+### `rohr_physics_update_dt`
+
+```c
+void rohr_physics_update_dt(Time dt);
+```
+
+ Advances physics once with an explicit exceptional delta.
 
 ### `rohr_physics_shape_world_translate`
 

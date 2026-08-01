@@ -122,7 +122,7 @@ int main(void) {
             return 1;
         }
     }
-    rohr_engine_set_dt(1.0f / 120.0f);
+    if(rohr_error_check(rohr_engine_set_time_per_tick(1.0 / 120.0))) return 1;
     {
         EngineResult graphics_result = rohr_graphics_start();
         if(rohr_error_check(graphics_result)) {
@@ -182,6 +182,7 @@ int main(void) {
         Vec2D left_axis;
         Vec2D right_axis;
         EntityIndex ball_index;
+        Tick ticks_advanced;
 
         if(event.type == SDL_EVENT_QUIT) break;
         rohr_controller_update_key_states(&keyboard);
@@ -214,9 +215,8 @@ int main(void) {
             goto fail;
         }
 
-        rohr_engine_update_time();
-        rohr_engine_update_tick();
-        rohr_system_update_physics(rohr_engine_get_dt());
+        ticks_advanced = rohr_engine_update_tick();
+        rohr_physics_update(ticks_advanced);
         if(rohr_physics_get_collision_report(ball, paddle_left) ||
                 rohr_physics_get_collision_report(ball, paddle_right)) {
             if(!game_ball_on_fire_set(ball, true)) {

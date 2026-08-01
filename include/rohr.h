@@ -63,9 +63,15 @@ void rohr_engine_pause(void);
 void rohr_engine_resume(void);
 
 /**
- * @brief Advances the engine tick counter.
+ * @brief Updates elapsed time and consumes every complete fixed tick.
+ * @return Number of ticks consumed by this update.
  */
-void rohr_engine_update_tick(void);
+Tick rohr_engine_update_tick(void);
+
+/** Sets the real-time duration required for one engine tick. */
+EngineResult rohr_engine_set_time_per_tick(Time time_per_tick);
+/** Returns the real-time duration required for one engine tick. */
+Time rohr_engine_get_time_per_tick(void);
 
 /**
  * @brief Polls one SDL event.
@@ -78,23 +84,6 @@ SDL_Event rohr_engine_poll_event(void);
  * @return true when paused, false when running.
  */
 bool rohr_engine_is_paused(void);
-
-/**
- * @brief Returns the current fixed or calculated delta time.
- * @return Delta time in seconds.
- */
-Time rohr_engine_get_dt(void);
-
-/**
- * @brief Calculates delta time from elapsed engine time.
- */
-void rohr_engine_calculate_dt(void);
-
-/**
- * @brief Sets the engine delta time manually.
- * @param dt Delta time in seconds.
- */
-void rohr_engine_set_dt(Time dt);
 
 /**
  * @brief Resets the engine clock baseline.
@@ -437,6 +426,17 @@ EngineResult rohr_entity_set_life_time(Entity entity, Time expirey_time, Tick ex
  * @return EngineResult describing success or failure.
  */
 EngineResult rohr_entity_remove_life_time(Entity entity);
+
+/** Sets an explicit simulation delta per engine tick. */
+EngineResult rohr_physics_set_dt_per_tick(Time dt);
+/** Returns the current physics delta per tick. */
+Time rohr_physics_get_dt_per_tick(void);
+/** Restores the engine time-per-tick default. */
+void rohr_physics_use_engine_time_per_tick(void);
+/** Advances physics using the supplied number of elapsed engine ticks. */
+void rohr_physics_update(Tick ticks);
+/** Advances physics once with an explicit exceptional delta. */
+void rohr_physics_update_dt(Time dt);
 
 /**
  * @brief Translates a local shape into world space.
