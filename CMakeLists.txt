@@ -123,30 +123,64 @@ function(rohr_add_example target_name source_file)
     target_include_directories(${target_name}
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
-            ${CMAKE_CURRENT_SOURCE_DIR}/examples/test-assets
+            ${CMAKE_CURRENT_SOURCE_DIR}/examples/engine-core/test-assets
     )
     set_target_properties(${target_name}
         PROPERTIES
-            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/examples
+            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/examples/engine-core
     )
 endfunction()
 
 if(ROHR_BUILD_EXAMPLES)
     set(ROHR_EXAMPLE_ASSET_SOURCE
-        examples/test-assets/elder-fly/elderfly_descriptors.c
+        examples/engine-core/test-assets/elder-fly/elderfly_descriptors.c
     )
 
-    rohr_add_example(view_port examples/view-port/view_port.c ${ROHR_EXAMPLE_ASSET_SOURCE})
-    rohr_add_example(flies_in_pit examples/flies-in-pit/flies_in_pit.c ${ROHR_EXAMPLE_ASSET_SOURCE})
-    rohr_add_example(flies_around_ball examples/flies-around-ball/flies_around_ball.c ${ROHR_EXAMPLE_ASSET_SOURCE})
-    rohr_add_example(fly_to_finish examples/fly-to-finish/fly_to_finish.c)
-    rohr_add_example(game_state examples/game-state/game_state.c)
-    rohr_add_example(pong examples/pong/pong.c)
-    rohr_add_example(user_interface examples/user-interface/user_interface.c)
+    rohr_add_example(view_port examples/engine-core/view-port/view_port.c ${ROHR_EXAMPLE_ASSET_SOURCE})
+    rohr_add_example(flies_in_pit examples/engine-core/flies-in-pit/flies_in_pit.c ${ROHR_EXAMPLE_ASSET_SOURCE})
+    rohr_add_example(flies_around_ball examples/engine-core/flies-around-ball/flies_around_ball.c ${ROHR_EXAMPLE_ASSET_SOURCE})
+    rohr_add_example(fly_to_finish examples/engine-core/fly-to-finish/fly_to_finish.c)
+    rohr_add_example(game_state examples/engine-core/game-state/game_state.c)
+    rohr_add_example(user_interface examples/engine-core/user-interface/user_interface.c)
 
     add_executable(basic_editor examples/editor/basic_editor.c)
     target_link_libraries(basic_editor PRIVATE rohr_editor)
     set_target_properties(basic_editor
+        PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/examples/editor
+    )
+
+    set(ROHR_PONG_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated/editor/pong)
+    set(ROHR_PONG_GENERATED_HEADER ${ROHR_PONG_GENERATED_DIR}/game_components.h)
+    set(ROHR_PONG_GENERATED_SOURCE ${ROHR_PONG_GENERATED_DIR}/game_components.c)
+
+    add_executable(pong_component_generator
+        examples/editor/pong/generate_components.c
+    )
+    target_link_libraries(pong_component_generator PRIVATE rohr_editor)
+
+    add_custom_command(
+        OUTPUT
+            ${ROHR_PONG_GENERATED_HEADER}
+            ${ROHR_PONG_GENERATED_SOURCE}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${ROHR_PONG_GENERATED_DIR}
+        COMMAND
+            $<TARGET_FILE:pong_component_generator>
+            ${ROHR_PONG_GENERATED_HEADER}
+            ${ROHR_PONG_GENERATED_SOURCE}
+        DEPENDS pong_component_generator
+        COMMENT "Generating Pong app components"
+        VERBATIM
+    )
+
+    add_executable(pong
+        examples/editor/pong/pong.c
+        ${ROHR_PONG_GENERATED_HEADER}
+        ${ROHR_PONG_GENERATED_SOURCE}
+    )
+    target_include_directories(pong PRIVATE ${ROHR_PONG_GENERATED_DIR})
+    target_link_libraries(pong PRIVATE rohr_engine)
+    set_target_properties(pong
         PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/examples/editor
     )
@@ -158,12 +192,11 @@ if(ROHR_BUILD_EXAMPLES)
         flies_around_ball
         fly_to_finish
         game_state
-        pong
         user_interface
     )
 
     add_custom_target(editor_examples)
-    add_dependencies(editor_examples basic_editor)
+    add_dependencies(editor_examples basic_editor pong)
 endif()
 
 if(ROHR_BUILD_TESTS)

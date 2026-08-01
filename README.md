@@ -83,7 +83,9 @@ engine/
 ├── src/                   # Engine and editor implementations
 ├── docs/                  # Doxygen config and documentation source
 ├── docs/assets/           # README and documentation media
-├── examples/              # Core examples, editor examples, and assets
+├── examples/
+│   ├── engine-core/       # Games using only librohr_engine
+│   └── editor/            # Programs using librohr_editor
 ├── lib/                   # Generated engine and editor static libraries
 └── build/                 # Generated objects, binaries, and docs
 ```
@@ -235,12 +237,15 @@ Current examples:
 * `flies-in-pit`: physics, particles, animated sprites, collisions, grid drawing, and recording.
 * `flies-around-ball`: joints, attraction-style motion, particles, and animated sprites.
 * `view-port`: basic sprite movement and input handling.
-* `pong`: rotated JSON-authored arena, two-player WASD/arrow controls, collision paddles, and scoring.
+* `pong` (editor): generated app-owned fire component, rotated JSON-authored arena,
+  two-player WASD/arrow controls, collision paddles, and scoring.
 
-Build output goes to:
+Build output is separated the same way:
 
 ```text
-build/examples/
+build/debug/examples/
+├── engine-core/
+└── editor/
 ```
 
 ## Contributing

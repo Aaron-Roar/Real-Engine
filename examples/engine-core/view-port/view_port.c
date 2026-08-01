@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
-#include "examples/test-assets/elder-fly/elderfly_descriptors.h"
+#include "examples/engine-core/test-assets/elder-fly/elderfly_descriptors.h"
 
 const Color background_color = (Color){255,255,255,255};
 AnimationAsset animation_elderfly = {0};
@@ -68,7 +68,7 @@ int main(void) {
 
     rohr_engine_reset_clock();
     //Game Loop
-    //rohr_graphics_recording_start("examples/view-port/recording.mp4",60);
+    //rohr_graphics_recording_start("examples/engine-core/view-port/recording.mp4",60);
     while (rohr_engine_get_time() < demo_duration_seconds) {
         rohr_system_clean_entities_past_lifetime();
         //rohr_level_editor_update(renderer);

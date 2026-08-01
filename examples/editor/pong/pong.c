@@ -1,4 +1,5 @@
 #include "rohr.h"
+#include "game_components.h"
 #include <stdio.h>
 
 #define PRINT_ENGINE_ERROR(engine_result) \
@@ -8,6 +9,8 @@ static const Color background_color = {18, 22, 30, 255};
 static const Color foreground_color = {235, 240, 245, 255};
 static const Color left_color = {70, 170, 255, 255};
 static const Color right_color = {255, 105, 120, 255};
+static const Color fire_color = {255, 105, 20, 255};
+static const Time fire_duration = 0.2;
 static const float paddle_speed = 280.0f;
 static const float goal_y = 330.0f;
 static const float paddle_min_x = -190.0f;
@@ -40,11 +43,6 @@ static EngineResult pong_reset_ball(Entity ball, int serve_direction) {
         .x = serve_direction * 25.0f,
         .y = serve_direction * 45.0f
     });
-}
-
-static Vec2D pong_screen_axis_to_world(Vec2D screen_axis) {
-    Camera camera = rohr_graphics_get_camera();
-    return rohr_math_rotate_vector(screen_axis, camera.orientation);
 }
 
 static EngineResult pong_constrain_paddle(
@@ -101,6 +99,7 @@ int main(void) {
     int left_score = 0;
     int right_score = 0;
     int serve_direction = 1;
+    Time fire_expires_at = 0.0;
 
     {
         EngineResult init_result = rohr_engine_init();
@@ -118,7 +117,10 @@ int main(void) {
             return 1;
         }
     }
-    EngineResult load_result = rohr_game_state_load_file("examples/pong/pong.json");
+    if(!game_components_init()) {
+        goto fail;
+    }
+    EngineResult load_result = rohr_game_state_load_file("examples/editor/pong/pong.json");
     if(rohr_error_check(load_result)) {
         PRINT_ENGINE_ERROR(load_result);
         goto fail;
@@ -167,11 +169,19 @@ int main(void) {
             &keyboard,
             rohr_controller_capture_keyboard_event(&event)
         );
-        left_axis = pong_screen_axis_to_world(
-            rohr_controller_wasd_axis(&keyboard)
+        left_axis = rohr_controller_axis_from_keycodes(
+            &keyboard,
+            SDLK_A,
+            SDLK_S,
+            SDLK_D,
+            SDLK_W
         );
-        right_axis = pong_screen_axis_to_world(
-            rohr_controller_arrow_axis(&keyboard)
+        right_axis = rohr_controller_axis_from_keycodes(
+            &keyboard,
+            SDLK_LEFT,
+            SDLK_DOWN,
+            SDLK_RIGHT,
+            SDLK_UP
         );
         EngineResult left_velocity_result = rohr_physics_set_velocity(
             paddle_left,
@@ -199,6 +209,21 @@ int main(void) {
         rohr_engine_update_time();
         rohr_engine_update_tick();
         rohr_system_update_physics(rohr_engine_get_dt());
+        if(rohr_physics_get_collision_report(ball, paddle_left) ||
+                rohr_physics_get_collision_report(ball, paddle_right)) {
+            if(!game_ball_on_fire_set(ball, true)) {
+                goto fail;
+            }
+            fire_expires_at = rohr_engine_get_time() + fire_duration;
+        }
+        {
+            BallOnFire ball_on_fire = false;
+            if(game_ball_on_fire_get(ball, &ball_on_fire) && ball_on_fire &&
+                    rohr_engine_get_time() >= fire_expires_at &&
+                    !game_ball_on_fire_set(ball, false)) {
+                goto fail;
+            }
+        }
         EngineResult left_constraint_result = pong_constrain_paddle(
             paddle_left,
             left_paddle_min_y,
@@ -265,19 +290,26 @@ int main(void) {
             GRAPHICS_FILLED,
             right_color
         );
-        rohr_graphics_draw_hit_box_colored(
-            ball,
-            GRAPHICS_FILLED,
-            foreground_color
-        );
+        {
+            BallOnFire ball_on_fire = false;
+            (void)game_ball_on_fire_get(ball, &ball_on_fire);
+            rohr_graphics_draw_hit_box_colored(
+                ball,
+                GRAPHICS_FILLED,
+                ball_on_fire ? fire_color : foreground_color
+            );
+        }
         rohr_graphics_show();
     }
 
+    game_components_clear(ball);
+    game_components_shutdown();
     rohr_graphics_end();
     rohr_engine_shutdown();
     return 0;
 
 fail:
+    game_components_shutdown();
     rohr_graphics_end();
     rohr_engine_shutdown();
     return 1;

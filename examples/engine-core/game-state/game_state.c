@@ -3,8 +3,8 @@
 
 int main(void) {
     const char *paths[] = {
-        "examples/game-state/world.json",
-        "examples/game-state/relationships.json"
+        "examples/engine-core/game-state/world.json",
+        "examples/engine-core/game-state/relationships.json"
     };
     EntityIndex seeker_index;
     CameraAttachment camera_attachment;
