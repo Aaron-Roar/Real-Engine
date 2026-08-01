@@ -17,7 +17,7 @@ int main(void) {
     Entity first;
     Entity second;
     Entity third;
-    Health health;
+    GameHealthResult health_result;
     Health *health_addr;
     Inventory inventory = {0};
 
@@ -51,7 +51,8 @@ int main(void) {
             !game_health_set(third, (Health){30.0f, 100.0f})) {
         return 1;
     }
-    if(!game_health_get(second, &health) || health.current != 20.0f) {
+    health_result = game_health_get(second);
+    if(rohr_error_check(health_result) || health_result.result.value.current != 20.0f) {
         return 1;
     }
     health_addr = game_health_get_addr(first);
@@ -59,7 +60,8 @@ int main(void) {
         return 1;
     }
     health_addr->current = 5.0f;
-    if(!game_health_get(first, &health) || health.current != 5.0f) {
+    health_result = game_health_get(first);
+    if(rohr_error_check(health_result) || health_result.result.value.current != 5.0f) {
         return 1;
     }
 

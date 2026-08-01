@@ -14,6 +14,9 @@ typedef uint32_t Entity; //An id for an entity
 /** Index into component tables used by engine internals and compute loops. */
 typedef uint32_t EntityIndex; //An index into component tables
 
+/** Result type for functions that return an EntityIndex. */
+ERROR_DECLARE_RESULT_TYPE(EntityIndexResult, EntityIndex);
+
 /** Invalid entity id sentinel. */
 #define ENTITY_INVALID 0
 

@@ -50,7 +50,13 @@ bool rohr_entity_is_alive(Entity entity) { return entity_is_alive(entity); }
 bool rohr_entity_index_is_alive(EntityIndex index) { return entity_index_is_alive(index); }
 uint32_t rohr_entity_alive_count(void) { return entity_alive_count(); }
 EntityResult rohr_entity_alive_at(uint32_t position) { return entity_alive_at(position); }
-bool rohr_entity_get_index(Entity entity, EntityIndex *index) { return entity_get_index(entity, index); }
+EntityIndexResult rohr_entity_get_index(Entity entity) {
+    EntityIndex index;
+    if(!entity_get_index(entity, &index)) {
+        return ERROR_RESULT_MAKE_ERROR(EntityIndexResult, ERROR_ENGINE_INVALID_ENTITY);
+    }
+    return ERROR_RESULT_MAKE_VALUE(EntityIndexResult, index);
+}
 EntityResult rohr_entity_from_index(EntityIndex index) { return entity_from_index(index); }
 EntityResult rohr_entity_add(void) { return entity_add(); }
 EngineResult rohr_entity_set_name(Entity entity, const char *name) { return entity_set_name(entity, name); }
@@ -214,7 +220,13 @@ EngineResult rohr_graphics_attach_camera(Entity entity, Vec2D position_offset, O
 EngineResult rohr_graphics_attach_camera_with_options(Entity entity, Vec2D position_offset, Orientation orientation_offset, bool follow_position, bool follow_orientation) { return graphics_attach_camera_with_options(entity, position_offset, orientation_offset, follow_position, follow_orientation); }
 void rohr_graphics_detach_camera(void) { graphics_detach_camera(); }
 bool rohr_graphics_camera_is_attached(void) { return graphics_camera_is_attached(); }
-bool rohr_graphics_get_camera_attachment(CameraAttachment *attachment) { return graphics_get_camera_attachment(attachment); }
+CameraAttachmentResult rohr_graphics_get_camera_attachment(void) {
+    CameraAttachment attachment;
+    if(!graphics_get_camera_attachment(&attachment)) {
+        return ERROR_RESULT_MAKE_ERROR(CameraAttachmentResult, ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    return ERROR_RESULT_MAKE_VALUE(CameraAttachmentResult, attachment);
+}
 Position rohr_graphics_world_to_screen(Position pos) { return graphics_world_to_screen(pos); }
 Position rohr_graphics_screen_to_world(Position screen) { return graphics_screen_to_world(screen); }
 Position rohr_graphics_get_mouse_screen_position(void) { return graphics_get_mouse_screen_position(); }

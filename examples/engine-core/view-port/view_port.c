@@ -129,9 +129,9 @@ int main(void) {
             );
         }
         if(mouse.button_states[MOUSE_BUTTON_RIGHT] == MOUSE_BUTTON_STATE_DOWN) {
-            EntityIndex water_smash_index;
-            if(rohr_entity_get_index(water_smash, &water_smash_index)) {
-                rohr_physics_set_orientation(water_smash, orientations[water_smash_index] + 10*(2*PI_F/360));
+            EntityIndexResult index_result = rohr_entity_get_index(water_smash);
+            if(!rohr_error_check(index_result)) {
+                rohr_physics_set_orientation(water_smash, orientations[index_result.result.value] + 10*(2*PI_F/360));
             }
         }
 

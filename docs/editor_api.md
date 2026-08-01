@@ -123,7 +123,7 @@ output directory and all strings referenced by the registry.
 EntityResult RE_entity_find_by_name(const char *name);
 ```
 
-Find a named game-state entity and write its handle for editor-authored code.
+Find a named game-state entity for editor-authored code.
 
 | Parameter | Description |
 | --- | --- |

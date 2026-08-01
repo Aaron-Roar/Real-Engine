@@ -62,11 +62,11 @@ int main(void) {
         goto fail;
     }
     Entity large_fly = large_fly_result.result.value;
-    CameraAttachment camera_attachment;
-    if(!rohr_graphics_get_camera_attachment(&camera_attachment)
-            || camera_attachment.entity != large_fly
-            || !camera_attachment.follow_position
-            || camera_attachment.follow_orientation) {
+    CameraAttachmentResult attachment_result = rohr_graphics_get_camera_attachment();
+    if(rohr_error_check(attachment_result)
+            || attachment_result.result.value.entity != large_fly
+            || !attachment_result.result.value.follow_position
+            || attachment_result.result.value.follow_orientation) {
         fprintf(stderr, "Camera is not attached to large_fly\n");
         goto fail;
     }

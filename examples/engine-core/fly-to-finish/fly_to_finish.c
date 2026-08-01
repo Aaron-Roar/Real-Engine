@@ -240,8 +240,13 @@ int main(void) {
         goto fail;
     }
     wall_mid = wall_mid_result.result.value;
-    if(!rohr_entity_get_index(player, &player_index)
-            || !positions_pool.used[player_index]
+    EntityIndexResult player_index_result = rohr_entity_get_index(player);
+    if(rohr_error_check(player_index_result)) {
+        fprintf(stderr, "Invalid player state\n");
+        goto fail;
+    }
+    player_index = player_index_result.result.value;
+    if(!positions_pool.used[player_index]
             || !orientations_pool.used[player_index]
             || !mass_pool.used[player_index]) {
         fprintf(stderr, "Invalid player state\n");
@@ -303,9 +308,11 @@ int main(void) {
             next_spawn_time = rohr_engine_get_time() + spawn_interval_seconds;
         }
 
-        if(!rohr_entity_get_index(player, &player_index)) {
+        EntityIndexResult player_index_result = rohr_entity_get_index(player);
+        if(rohr_error_check(player_index_result)) {
             goto fail;
         }
+        player_index = player_index_result.result.value;
         player_velocity = velocities[player_index];
         speed = rohr_math_vector_magnitude(player_velocity);
 

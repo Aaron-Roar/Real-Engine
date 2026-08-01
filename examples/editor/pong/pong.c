@@ -39,9 +39,13 @@ static EngineResult pong_constrain_paddle(
     Position position;
     Velocity velocity;
     bool position_changed = false;
+    EntityIndexResult index_result = rohr_entity_get_index(paddle);
 
-    if(!rohr_entity_get_index(paddle, &index)
-            || !positions_pool.used[index]
+    if(rohr_error_check(index_result)) {
+        return rohr_error_result_error(index_result.result.error);
+    }
+    index = index_result.result.value;
+    if(!positions_pool.used[index]
             || !velocities_pool.used[index]) {
         return rohr_error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
     }
@@ -219,8 +223,8 @@ int main(void) {
             fire_expires_at = rohr_engine_get_time() + fire_duration;
         }
         {
-            BallOnFire ball_on_fire = false;
-            if(game_ball_on_fire_get(ball, &ball_on_fire) && ball_on_fire &&
+            GameBallOnFireResult fire_result = game_ball_on_fire_get(ball);
+            if(!rohr_error_check(fire_result) && fire_result.result.value &&
                     rohr_engine_get_time() >= fire_expires_at &&
                     !game_ball_on_fire_set(ball, false)) {
                 goto fail;
@@ -245,7 +249,11 @@ int main(void) {
             goto fail;
         }
 
-        if(!rohr_entity_get_index(ball, &ball_index)) goto fail;
+        {
+            EntityIndexResult ball_index_result = rohr_entity_get_index(ball);
+            if(rohr_error_check(ball_index_result)) goto fail;
+            ball_index = ball_index_result.result.value;
+        }
         if(positions[ball_index].y > goal_y) {
             right_score += 1;
             serve_direction = -1;
@@ -293,8 +301,10 @@ int main(void) {
             right_color
         );
         {
-            BallOnFire ball_on_fire = false;
-            (void)game_ball_on_fire_get(ball, &ball_on_fire);
+            GameBallOnFireResult fire_result = game_ball_on_fire_get(ball);
+            BallOnFire ball_on_fire = rohr_error_check(fire_result)
+                ? false
+                : fire_result.result.value;
             rohr_graphics_draw_hit_box_colored(
                 ball,
                 GRAPHICS_FILLED,

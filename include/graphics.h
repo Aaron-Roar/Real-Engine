@@ -53,6 +53,9 @@ typedef struct {
     bool follow_orientation;
 } CameraAttachment;
 
+/** Result type for functions that return a CameraAttachment. */
+ERROR_DECLARE_RESULT_TYPE(CameraAttachmentResult, CameraAttachment);
+
 /** Descriptor for loading a texture from disk. */
 typedef struct {
   /** Path to the texture file. */

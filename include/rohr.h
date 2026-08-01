@@ -224,10 +224,9 @@ EntityResult rohr_entity_alive_at(uint32_t position);
 /**
  * @brief Resolves a stable entity id to its current component table index.
  * @param entity Stable entity id to resolve.
- * @param index Destination for the resolved table index.
- * @return true when entity was resolved, false otherwise.
+ * @return EntityIndexResult containing the index or an invalid-entity error.
  */
-bool rohr_entity_get_index(Entity entity, EntityIndex *index);
+EntityIndexResult rohr_entity_get_index(Entity entity);
 
 /**
  * @brief Returns the stable entity id stored at a component table index.
@@ -1119,11 +1118,10 @@ void rohr_graphics_detach_camera(void);
 bool rohr_graphics_camera_is_attached(void);
 
 /**
- * @brief Copies the active camera attachment description.
- * @param attachment Destination owned by the caller.
- * @return true when the camera has a valid entity attachment.
+ * @brief Returns the active camera attachment description.
+ * @return CameraAttachmentResult containing the attachment or a missing-component error.
  */
-bool rohr_graphics_get_camera_attachment(CameraAttachment *attachment);
+CameraAttachmentResult rohr_graphics_get_camera_attachment(void);
 
 /**
  * @brief Converts a world position to screen coordinates.

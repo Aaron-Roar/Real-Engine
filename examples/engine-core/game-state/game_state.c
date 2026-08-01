@@ -28,9 +28,15 @@ int main(void) {
     }
     Entity seeker = seeker_result.result.value;
     Entity player = player_result.result.value;
-    if(!rohr_entity_get_index(seeker, &seeker_index)
-            || targets[seeker_index] != player
-            || !rohr_graphics_get_camera_attachment(&camera_attachment)
+    EntityIndexResult index_result = rohr_entity_get_index(seeker);
+    CameraAttachmentResult attachment_result = rohr_graphics_get_camera_attachment();
+    if(rohr_error_check(index_result) || rohr_error_check(attachment_result)) {
+        rohr_engine_shutdown();
+        return 1;
+    }
+    seeker_index = index_result.result.value;
+    camera_attachment = attachment_result.result.value;
+    if(targets[seeker_index] != player
             || camera_attachment.entity != player
             || camera_attachment.position_offset.x != 10.0f
             || camera_attachment.position_offset.y != -20.0f

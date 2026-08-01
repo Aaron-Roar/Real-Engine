@@ -192,18 +192,20 @@ static bool RE_generate_header(
         }
         if(fprintf(header,
                 "%s\n\n"
+                "ERROR_DECLARE_RESULT_TYPE(Game%sResult, %s);\n"
                 "typedef void (*Game%sDestroyHook)(Entity entity, %s *value);\n"
                 "void game_%s_set_destroy_hook(Game%sDestroyHook hook);\n"
                 "bool game_%s_set(Entity entity, %s value);\n"
-                "bool game_%s_get(Entity entity, %s *out_value);\n"
+                "Game%sResult game_%s_get(Entity entity);\n"
                 "%s *game_%s_get_addr(Entity entity);\n"
                 "bool game_%s_has(Entity entity);\n"
                 "void game_%s_remove(Entity entity);\n\n",
                 component->type_declaration,
                 component->type_name, component->type_name,
+                component->type_name, component->type_name,
                 lower_name, component->type_name,
                 lower_name, component->type_name,
-                lower_name, component->type_name,
+                component->type_name, lower_name,
                 component->type_name, lower_name,
                 lower_name,
                 lower_name) < 0) {
@@ -262,9 +264,17 @@ static bool RE_generate_source_prelude(FILE *source, const char *header_name) {
         "    }\n"
         "    return true;\n"
         "}\n\n"
+        "static bool game_entity_index(Entity entity, EntityIndex *entity_index) {\n"
+        "    EntityIndexResult result = rohr_entity_get_index(entity);\n"
+        "    if(rohr_error_check(result)) {\n"
+        "        return false;\n"
+        "    }\n"
+        "    *entity_index = result.result.value;\n"
+        "    return true;\n"
+        "}\n\n"
         "static bool game_entity_state_find(Entity entity, EntityIndex *entity_index, size_t *dense_index) {\n"
         "    uint32_t encoded;\n"
-        "    if(!rohr_entity_get_index(entity, entity_index) || *entity_index >= game_entity_states.sparse_capacity) {\n"
+        "    if(!game_entity_index(entity, entity_index) || *entity_index >= game_entity_states.sparse_capacity) {\n"
         "        return false;\n"
         "    }\n"
         "    encoded = game_entity_states.sparse[*entity_index];\n"
@@ -283,7 +293,7 @@ static bool RE_generate_source_prelude(FILE *source, const char *header_name) {
         "        game_entity_states.masks[dense_index] |= bit;\n"
         "        return true;\n"
         "    }\n"
-        "    if(!rohr_entity_get_index(entity, &entity_index)) {\n"
+        "    if(!game_entity_index(entity, &entity_index)) {\n"
         "        return false;\n"
         "    }\n"
         "    entity_capacity = game_entity_states.capacity;\n"
@@ -324,7 +334,7 @@ static bool RE_generate_source_prelude(FILE *source, const char *header_name) {
         "    if(dense_index != last_index) {\n"
         "        game_entity_states.entities[dense_index] = game_entity_states.entities[last_index];\n"
         "        game_entity_states.masks[dense_index] = game_entity_states.masks[last_index];\n"
-        "        if(rohr_entity_get_index(game_entity_states.entities[dense_index], &moved_index)) {\n"
+        "        if(game_entity_index(game_entity_states.entities[dense_index], &moved_index)) {\n"
         "            game_entity_states.sparse[moved_index] = (uint32_t)dense_index + 1;\n"
         "        }\n"
         "    }\n"
@@ -385,7 +395,7 @@ static bool RE_generate_component_source(
     if(fprintf(source,
             "static bool game_%s_find(Entity entity, EntityIndex *entity_index, size_t *dense_index) {\n"
             "    uint32_t encoded;\n"
-            "    if(!rohr_entity_get_index(entity, entity_index) || *entity_index >= game_%s_pool.sparse_capacity) {\n"
+            "    if(!game_entity_index(entity, entity_index) || *entity_index >= game_%s_pool.sparse_capacity) {\n"
             "        return false;\n"
             "    }\n"
             "    encoded = game_%s_pool.sparse[*entity_index];\n"
@@ -411,7 +421,7 @@ static bool RE_generate_component_source(
             "        game_%s_pool.values[dense_index] = value;\n"
             "        return game_entity_state_set_bit(entity, GAME_COMPONENT_%s);\n"
             "    }\n"
-            "    if(!rohr_entity_get_index(entity, &entity_index)) {\n"
+            "    if(!game_entity_index(entity, &entity_index)) {\n"
             "        return false;\n"
             "    }\n"
             "    entity_capacity = game_%s_pool.capacity;\n"
@@ -450,16 +460,15 @@ static bool RE_generate_component_source(
         return false;
     }
     if(fprintf(source,
-            "bool game_%s_get(Entity entity, %s *out_value) {\n"
+            "Game%sResult game_%s_get(Entity entity) {\n"
             "    EntityIndex entity_index;\n"
             "    size_t dense_index;\n"
-            "    if(out_value == NULL || !game_%s_find(entity, &entity_index, &dense_index)) {\n"
-            "        return false;\n"
+            "    if(!game_%s_find(entity, &entity_index, &dense_index)) {\n"
+            "        return ERROR_RESULT_MAKE_ERROR(Game%sResult, ERROR_ENGINE_COMPONENT_MISSING);\n"
             "    }\n"
-            "    *out_value = game_%s_pool.values[dense_index];\n"
-            "    return true;\n"
+            "    return ERROR_RESULT_MAKE_VALUE(Game%sResult, game_%s_pool.values[dense_index]);\n"
             "}\n\n",
-            name, type, name, name) < 0) {
+            type, name, name, type, type, name) < 0) {
         return false;
     }
     if(fprintf(source,
@@ -496,7 +505,7 @@ static bool RE_generate_component_source(
         "    if(dense_index != last_index) {\n"
         "        game_%s_pool.entities[dense_index] = game_%s_pool.entities[last_index];\n"
         "        game_%s_pool.values[dense_index] = game_%s_pool.values[last_index];\n"
-        "        if(rohr_entity_get_index(game_%s_pool.entities[dense_index], &moved_index)) {\n"
+        "        if(game_entity_index(game_%s_pool.entities[dense_index], &moved_index)) {\n"
         "            game_%s_pool.sparse[moved_index] = (uint32_t)dense_index + 1;\n"
         "        }\n"
         "    }\n"

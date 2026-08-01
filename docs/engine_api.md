@@ -389,7 +389,7 @@ deleted.
 ### `rohr_entity_get_index`
 
 ```c
-bool rohr_entity_get_index(Entity entity, EntityIndex *index);
+EntityIndexResult rohr_entity_get_index(Entity entity);
 ```
 
 Resolves a stable entity id to its current component table index.
@@ -397,9 +397,8 @@ Resolves a stable entity id to its current component table index.
 | Parameter | Description |
 | --- | --- |
 | `entity` | Stable entity id to resolve. |
-| `index` | Destination for the resolved table index. |
 
-**Returns:** true when entity was resolved, false otherwise.
+**Returns:** EntityIndexResult containing the index or an invalid-entity error.
 
 ### `rohr_entity_from_index`
 
@@ -1959,16 +1958,12 @@ Reports whether the camera is attached to a live entity transform.
 ### `rohr_graphics_get_camera_attachment`
 
 ```c
-bool rohr_graphics_get_camera_attachment(CameraAttachment *attachment);
+CameraAttachmentResult rohr_graphics_get_camera_attachment(void);
 ```
 
-Copies the active camera attachment description.
+Returns the active camera attachment description.
 
-| Parameter | Description |
-| --- | --- |
-| `attachment` | Destination owned by the caller. |
-
-**Returns:** true when the camera has a valid entity attachment.
+**Returns:** CameraAttachmentResult containing the attachment or a missing-component error.
 
 ### `rohr_graphics_world_to_screen`
 
