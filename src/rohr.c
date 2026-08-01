@@ -203,6 +203,19 @@ EngineResult rohr_physics_joint_anchor_remove(JointAnchorId anchor) { return phy
 EngineResult rohr_physics_joint_pin_set(Entity joint, JointAnchorId anchor_a, JointAnchorId anchor_b) { return physics_joint_pin_set(joint, anchor_a, anchor_b); }
 EngineResult rohr_physics_joint_weld_set(Entity joint, JointAnchorId anchor_a, JointAnchorId anchor_b) { return physics_joint_weld_set(joint, anchor_a, anchor_b); }
 EngineResult rohr_physics_joint_spring_set(Entity joint, JointAnchorId anchor_a, JointAnchorId anchor_b, float rest_length, float stiffness, float damping) { return physics_joint_spring_set(joint, anchor_a, anchor_b, rest_length, stiffness, damping); }
+EntityResult rohr_physics_soft_body_create(void) { return physics_soft_body_create(); }
+SoftBodyResult rohr_physics_soft_body_get(Entity soft_body) { return physics_soft_body_get(soft_body); }
+EntityResult rohr_physics_soft_body_node_create(Entity soft_body, Position position, Mass mass_value, float radius) { return physics_soft_body_node_create(soft_body, position, mass_value, radius); }
+SoftBodyNodeResult rohr_physics_soft_body_node_get(Entity node) { return physics_soft_body_node_get(node); }
+EngineResult rohr_physics_soft_body_node_collision_filter_set(Entity node, RohrCollisionCategoryMask category, RohrCollisionCategoryMask collides_with) { return physics_soft_body_node_collision_filter_set(node, category, collides_with); }
+EngineResult rohr_physics_soft_body_node_force_for_one_tick_apply(Entity node, Force force) { return physics_soft_body_node_force_for_one_tick_apply(node, force); }
+EngineResult rohr_physics_soft_body_node_impulse_apply(Entity node, Vec2D impulse) { return physics_soft_body_node_impulse_apply(node, impulse); }
+EngineResult rohr_physics_soft_body_force_for_one_tick_apply(Entity soft_body, Force force) { return physics_soft_body_force_for_one_tick_apply(soft_body, force); }
+EngineResult rohr_physics_soft_body_torque_for_one_tick_apply(Entity soft_body, Torque torque) { return physics_soft_body_torque_for_one_tick_apply(soft_body, torque); }
+EntityResult rohr_physics_soft_body_beam_create(Entity soft_body, Entity node_a, Entity node_b, float stiffness, float damping) { return physics_soft_body_beam_create(soft_body, node_a, node_b, stiffness, damping); }
+SoftBodyBeamResult rohr_physics_soft_body_beam_get(Entity beam) { return physics_soft_body_beam_get(beam); }
+EntityResult rohr_physics_soft_body_triangle_create(Entity soft_body, Entity node_a, Entity node_b, Entity node_c) { return physics_soft_body_triangle_create(soft_body, node_a, node_b, node_c); }
+SoftBodyTriangleResult rohr_physics_soft_body_triangle_get(Entity triangle) { return physics_soft_body_triangle_get(triangle); }
 EntityResult rohr_physics_joint_create(Entity a, Entity b, JointType type, Vec2D local_anchor_a, Vec2D local_anchor_b, float stiffness, float damping) {
     return physics_joint_create(a, b, type, local_anchor_a, local_anchor_b, stiffness, damping);
 }
@@ -223,6 +236,7 @@ void rohr_graphics_draw_hit_box_colored(Entity entity, Fill fill_type, Color col
 void rohr_graphics_draw_hit_boxes(void) { graphics_draw_hit_boxes(); }
 bool rohr_graphics_draw_joint(Entity joint, Color color) { return graphics_draw_joint(joint, color); }
 void rohr_graphics_draw_joints(Color color) { graphics_draw_joints(color); }
+bool rohr_graphics_draw_soft_body(Entity soft_body, Color surface, Color beam, Color node) { return graphics_draw_soft_body(soft_body, surface, beam, node); }
 TextureAssetResult rohr_graphics_load_texture(TextureDescriptor text_desc) { return graphics_load_texture(text_desc); }
 FontAssetResult rohr_graphics_load_font(FontDescriptor descriptor) { return graphics_load_font(descriptor); }
 void rohr_graphics_destroy_font(FontAsset *font) { graphics_destroy_font(font); }

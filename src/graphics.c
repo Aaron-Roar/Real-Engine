@@ -2298,3 +2298,47 @@ void graphics_draw_joints(Color color) {
         if(joint.kind == ERROR_RESULT_VALUE) (void)graphics_draw_joint(joint.result.value, color);
     }
 }
+
+bool graphics_draw_soft_body(Entity soft_body_entity, Color surface_color,
+        Color beam_color, Color node_color) {
+    SoftBodyResult body_result = physics_soft_body_get(soft_body_entity);
+    SoftBody body;
+
+    if(sdl_renderer == NULL || body_result.kind == ERROR_RESULT_ERROR) return false;
+    body = body_result.result.value;
+    for(uint32_t i = 0; i < body.triangle_count; i += 1) {
+        SoftBodyTriangleResult triangle = physics_soft_body_triangle_get(body.triangles[i]);
+        EntityIndex indices[3];
+        Shape shape = {.amount_of_vertices = 3};
+        if(triangle.kind == ERROR_RESULT_ERROR ||
+                !entity_index_get(triangle.result.value.node_a, &indices[0]) ||
+                !entity_index_get(triangle.result.value.node_b, &indices[1]) ||
+                !entity_index_get(triangle.result.value.node_c, &indices[2])) continue;
+        for(uint32_t vertex = 0; vertex < 3; vertex += 1) shape.vertices[vertex] = positions[indices[vertex]];
+        (void)graphics_draw_shape_filled(shape, surface_color);
+    }
+    if(!SDL_SetRenderDrawColor(sdl_renderer, beam_color.red, beam_color.green,
+            beam_color.blue, beam_color.alpha)) return false;
+    for(uint32_t i = 0; i < body.beam_count; i += 1) {
+        SoftBodyBeamResult beam = physics_soft_body_beam_get(body.beams[i]);
+        EntityIndex a;
+        EntityIndex b;
+        Position screen_a;
+        Position screen_b;
+        if(beam.kind == ERROR_RESULT_ERROR || !entity_index_get(beam.result.value.node_a, &a) ||
+                !entity_index_get(beam.result.value.node_b, &b)) continue;
+        screen_a = graphics_world_to_screen(positions[a]);
+        screen_b = graphics_world_to_screen(positions[b]);
+        (void)SDL_RenderLine(sdl_renderer, screen_a.x, screen_a.y, screen_b.x, screen_b.y);
+    }
+    for(uint32_t i = 0; i < body.node_count; i += 1) {
+        SoftBodyNodeResult node = physics_soft_body_node_get(body.nodes[i]);
+        EntityIndex index;
+        Shape shape;
+        if(node.kind == ERROR_RESULT_ERROR || !entity_index_get(body.nodes[i], &index)) continue;
+        shape = physics_shape_world_translate(math_create_circle(node.result.value.radius, 12),
+            positions[index], 0.0f);
+        (void)graphics_draw_shape_filled(shape, node_color);
+    }
+    return true;
+}

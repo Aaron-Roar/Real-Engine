@@ -957,6 +957,89 @@ EngineResult rohr_physics_joint_spring_set(
     float damping
 );
 
+/** @brief Creates an empty soft-body owner entity. @return EntityResult containing the owner. */
+EntityResult rohr_physics_soft_body_create(void);
+/** @brief Returns soft-body topology. @param soft_body Soft-body owner. @return SoftBodyResult. */
+SoftBodyResult rohr_physics_soft_body_get(Entity soft_body);
+/**
+ * @brief Creates a lightweight point-mass node.
+ * @param soft_body Owning soft body.
+ * @param position Initial world position.
+ * @param mass Node mass.
+ * @param radius Collision radius.
+ * @return EntityResult containing the node entity.
+ */
+EntityResult rohr_physics_soft_body_node_create(Entity soft_body, Position position, Mass mass_value, float radius);
+/** @brief Returns soft-body node data. @param node Node entity. @return SoftBodyNodeResult. */
+SoftBodyNodeResult rohr_physics_soft_body_node_get(Entity node);
+/**
+ * @brief Sets node-versus-rigid collision filtering.
+ * @param node Node entity.
+ * @param category Categories represented by the node.
+ * @param collides_with Rigid collider categories accepted by the node.
+ * @return EngineResult describing success or failure.
+ */
+EngineResult rohr_physics_soft_body_node_collision_filter_set(
+    Entity node,
+    RohrCollisionCategoryMask category,
+    RohrCollisionCategoryMask collides_with
+);
+/**
+ * @brief Applies a force to one soft-body node for the next physics tick.
+ * @param node Soft-body node entity.
+ * @param force Force to apply.
+ * @return EngineResult describing success or failure.
+ */
+EngineResult rohr_physics_soft_body_node_force_for_one_tick_apply(Entity node, Force force);
+/**
+ * @brief Applies an immediate impulse to one soft-body node.
+ * @param node Soft-body node entity.
+ * @param impulse Impulse to apply.
+ * @return EngineResult describing success or failure.
+ */
+EngineResult rohr_physics_soft_body_node_impulse_apply(Entity node, Vec2D impulse);
+/**
+ * @brief Distributes a total force across a soft body for the next physics tick.
+ * @param soft_body Soft-body owner entity.
+ * @param force Total force to distribute by node mass.
+ * @return EngineResult describing success or failure.
+ */
+EngineResult rohr_physics_soft_body_force_for_one_tick_apply(Entity soft_body, Force force);
+/**
+ * @brief Applies body-level torque as balanced node forces for the next physics tick.
+ * @param soft_body Soft-body owner entity.
+ * @param torque Total torque to distribute around the center of mass.
+ * @return EngineResult describing success or failure.
+ */
+EngineResult rohr_physics_soft_body_torque_for_one_tick_apply(Entity soft_body, Torque torque);
+/**
+ * @brief Creates an elastic beam between two nodes.
+ * @param soft_body Owning soft body.
+ * @param node_a First node.
+ * @param node_b Second node.
+ * @param stiffness Spring stiffness.
+ * @param damping Relative velocity damping.
+ * @return EntityResult containing the beam entity.
+ */
+EntityResult rohr_physics_soft_body_beam_create(
+    Entity soft_body, Entity node_a, Entity node_b, float stiffness, float damping
+);
+/** @brief Returns soft-body beam data. @param beam Beam entity. @return SoftBodyBeamResult. */
+SoftBodyBeamResult rohr_physics_soft_body_beam_get(Entity beam);
+/**
+ * @brief Creates a deforming triangular surface from three nodes.
+ * @param soft_body Owning soft body.
+ * @param node_a First node.
+ * @param node_b Second node.
+ * @param node_c Third node.
+ * @return EntityResult containing the triangle entity.
+ */
+EntityResult rohr_physics_soft_body_triangle_create(
+    Entity soft_body, Entity node_a, Entity node_b, Entity node_c
+);
+/** @brief Returns soft-body triangle data. @param triangle Triangle entity. @return SoftBodyTriangleResult. */
+SoftBodyTriangleResult rohr_physics_soft_body_triangle_get(Entity triangle);
+
 /**
  * @brief Creates a joint between two entities.
  * @param a First entity.
@@ -1081,6 +1164,16 @@ bool rohr_graphics_draw_joint(Entity joint, Color color);
  * @param color Symbol color.
  */
 void rohr_graphics_draw_joints(Color color);
+
+/**
+ * @brief Draws a soft body's current surfaces, beams, and collision nodes.
+ * @param soft_body Soft-body owner entity.
+ * @param surface Triangle surface color.
+ * @param beam Beam color.
+ * @param node Collision-node color.
+ * @return true when the soft body was drawn successfully.
+ */
+bool rohr_graphics_draw_soft_body(Entity soft_body, Color surface, Color beam, Color node);
 
 /**
  * @brief Loads a texture asset.

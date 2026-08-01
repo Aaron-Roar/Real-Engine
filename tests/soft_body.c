@@ -1,0 +1,72 @@
+#include "rohr.h"
+
+int main(void) {
+    EntityResult body;
+    EntityResult node_a;
+    EntityResult node_b;
+    EntityResult node_c;
+    EntityResult beam;
+    EntityResult triangle;
+    EntityIndexResult index_a;
+    EntityIndexResult index_b;
+
+    if(rohr_error_check(rohr_engine_init())) return 1;
+    body = rohr_physics_soft_body_create();
+    if(rohr_error_check(body)) goto fail;
+    node_a = rohr_physics_soft_body_node_create(body.result.value, (Position){-10.0f, 0.0f}, 1.0f, 2.0f);
+    node_b = rohr_physics_soft_body_node_create(body.result.value, (Position){10.0f, 0.0f}, 1.0f, 2.0f);
+    node_c = rohr_physics_soft_body_node_create(body.result.value, (Position){0.0f, 15.0f}, 1.0f, 2.0f);
+    if(rohr_error_check(node_a) || rohr_error_check(node_b) || rohr_error_check(node_c)) goto fail;
+    beam = rohr_physics_soft_body_beam_create(
+        body.result.value, node_a.result.value, node_b.result.value, 10.0f, 1.0f);
+    triangle = rohr_physics_soft_body_triangle_create(
+        body.result.value, node_a.result.value, node_b.result.value, node_c.result.value);
+    if(rohr_error_check(beam) || rohr_error_check(triangle)) goto fail;
+    {
+        SoftBodyResult topology = rohr_physics_soft_body_get(body.result.value);
+        if(rohr_error_check(topology) || topology.result.value.node_count != 3 ||
+                topology.result.value.beam_count != 1 || topology.result.value.triangle_count != 1) goto fail;
+    }
+    if(rohr_error_check(rohr_physics_position_set(node_b.result.value, (Position){20.0f, 0.0f}))) goto fail;
+    rohr_system_update_physics(0.1);
+    index_a = rohr_entity_index_get(node_a.result.value);
+    index_b = rohr_entity_index_get(node_b.result.value);
+    if(rohr_error_check(index_a) || rohr_error_check(index_b) ||
+            velocities[index_a.result.value].x <= 0.0f || velocities[index_b.result.value].x >= 0.0f) goto fail;
+    if(rohr_error_check(rohr_physics_soft_body_node_impulse_apply(
+                node_c.result.value, (Vec2D){0.0f, 2.0f})) ||
+            rohr_error_check(rohr_physics_soft_body_node_force_for_one_tick_apply(
+                node_c.result.value, (Force){0.0f, 1.0f})) ||
+            rohr_error_check(rohr_physics_soft_body_force_for_one_tick_apply(
+                body.result.value, (Force){3.0f, 0.0f})) ||
+            rohr_error_check(rohr_physics_soft_body_torque_for_one_tick_apply(
+                body.result.value, 2.0f))) goto fail;
+    if(rohr_error_check(rohr_entity_delete(body.result.value)) ||
+            rohr_entity_alive_is(node_a.result.value) || rohr_entity_alive_is(node_b.result.value) ||
+            rohr_entity_alive_is(node_c.result.value) || rohr_entity_alive_is(beam.result.value) ||
+            rohr_entity_alive_is(triangle.result.value)) goto fail;
+    {
+        EntityResult collision_body = rohr_physics_soft_body_create();
+        EntityResult collision_node;
+        EntityResult wall = rohr_entity_add();
+        EntityIndexResult collision_node_index;
+        if(rohr_error_check(collision_body) || rohr_error_check(wall)) goto fail;
+        collision_node = rohr_physics_soft_body_node_create(
+            collision_body.result.value, (Position){11.0f, 0.0f}, 1.0f, 3.0f);
+        if(rohr_error_check(collision_node)) goto fail;
+        if(rohr_error_check(rohr_physics_position_set(wall.result.value, (Position){0.0f, 0.0f}))) goto fail;
+        if(rohr_error_check(rohr_physics_hitbox_set(
+                    wall.result.value, rohr_math_create_square(20.0f, 20.0f)))) goto fail;
+        if(rohr_error_check(rohr_physics_static_set(wall.result.value))) goto fail;
+        rohr_system_update_physics(0.0);
+        collision_node_index = rohr_entity_index_get(collision_node.result.value);
+        if(rohr_error_check(collision_node_index) ||
+                positions[collision_node_index.result.value].x <= 11.0f) goto fail;
+    }
+    rohr_engine_shutdown();
+    return 0;
+
+fail:
+    rohr_engine_shutdown();
+    return 1;
+}

@@ -1384,9 +1384,101 @@ void system_update_aabbs(void) {
     }
 }
 
+static void system_apply_soft_body_beams(void) {
+    for(EntityIndex beam_index = 0; beam_index < soft_body_beams_pool.capacity; beam_index += 1) {
+        SoftBodyBeam beam;
+        EntityIndex a;
+        EntityIndex b;
+        Vec2D delta;
+        Vec2D normal;
+        Vec2D relative_velocity;
+        float length;
+        float relative_speed;
+        float force_magnitude;
+        Vec2D force;
+
+        if(!soft_body_beams_pool.used[beam_index] || !entity_index_alive_is(beam_index) ||
+                !entity_index_components_has(beam_index, SOFT_BODY_BEAM)) continue;
+        beam = soft_body_beams[beam_index];
+        if(!entity_index_get(beam.node_a, &a) || !entity_index_alive_is(a) ||
+                !entity_index_get(beam.node_b, &b) || !entity_index_alive_is(b) ||
+                mass[a] <= 0.0f || mass[b] <= 0.0f) continue;
+        delta = math_vector_subtract(positions[b], positions[a]);
+        length = math_vector_magnitude(delta);
+        if(length <= 0.0001f) continue;
+        normal = (Vec2D){delta.x / length, delta.y / length};
+        relative_velocity = math_vector_subtract(velocities[b], velocities[a]);
+        relative_speed = math_dot_product(relative_velocity, normal);
+        force_magnitude = beam.stiffness * (length - beam.rest_length) + beam.damping * relative_speed;
+        force = (Vec2D){normal.x * force_magnitude, normal.y * force_magnitude};
+        force_accelerations[a].x += force.x / mass[a];
+        force_accelerations[a].y += force.y / mass[a];
+        force_accelerations[b].x -= force.x / mass[b];
+        force_accelerations[b].y -= force.y / mass[b];
+    }
+}
+
+static bool system_soft_node_rigid_filter_allows(EntityIndex node, EntityIndex rigid) {
+    CollisionFilterConfig rigid_filter = physics_collision_filter_default_config();
+
+    if(entity_index_components_has(rigid, COLLISION_FILTER) &&
+            rigid < collision_filters_pool.capacity && collision_filters_pool.used[rigid]) {
+        rigid_filter = collision_filters[rigid];
+    }
+    return (soft_body_nodes[node].collides_with & rigid_filter.category) != 0 &&
+        (rigid_filter.collides_with & soft_body_nodes[node].category) != 0;
+}
+
+static void system_apply_soft_body_node_rigid_collisions(void) {
+    for(EntityIndex node = 0; node < soft_body_nodes_pool.capacity; node += 1) {
+        Shape node_shape;
+
+        if(!soft_body_nodes_pool.used[node] || !entity_index_alive_is(node) ||
+                !entity_index_components_has(node, SOFT_BODY_NODE)) continue;
+        node_shape = physics_shape_world_translate(
+            math_create_circle(soft_body_nodes[node].radius, 8),
+            positions[node],
+            0.0f
+        );
+        for(EntityIndex rigid = 0; rigid < world_hit_boxes_pool.capacity; rigid += 1) {
+            Collision collision;
+            float inverse_mass_node;
+            float inverse_mass_rigid;
+            float inverse_mass_sum;
+            Vec2D relative_velocity;
+            float normal_velocity;
+            float impulse_magnitude;
+
+            if(node == rigid || !entity_index_alive_is(rigid) ||
+                    !entity_index_components_has(rigid, HIT_BOX | COLLISION) ||
+                    entity_index_components_has(rigid, SOFT_BODY_NODE) ||
+                    !system_soft_node_rigid_filter_allows(node, rigid)) continue;
+            collision = physics_sat_collision(node_shape, world_hit_boxes[rigid]);
+            if(!collision.overlap) continue;
+            inverse_mass_node = physics_entity_movable_is(node) && mass[node] > 0.0f ? 1.0f / mass[node] : 0.0f;
+            inverse_mass_rigid = physics_entity_movable_is(rigid) && mass[rigid] > 0.0f ? 1.0f / mass[rigid] : 0.0f;
+            inverse_mass_sum = inverse_mass_node + inverse_mass_rigid;
+            if(inverse_mass_sum <= 0.0f) continue;
+            positions[node].x -= collision.normal.x * collision.depth * inverse_mass_node / inverse_mass_sum;
+            positions[node].y -= collision.normal.y * collision.depth * inverse_mass_node / inverse_mass_sum;
+            positions[rigid].x += collision.normal.x * collision.depth * inverse_mass_rigid / inverse_mass_sum;
+            positions[rigid].y += collision.normal.y * collision.depth * inverse_mass_rigid / inverse_mass_sum;
+            relative_velocity = math_vector_subtract(velocities[rigid], velocities[node]);
+            normal_velocity = math_dot_product(relative_velocity, collision.normal);
+            if(normal_velocity >= 0.0f) continue;
+            impulse_magnitude = -(1.0f + 0.25f) * normal_velocity / inverse_mass_sum;
+            velocities[node].x -= collision.normal.x * impulse_magnitude * inverse_mass_node;
+            velocities[node].y -= collision.normal.y * impulse_magnitude * inverse_mass_node;
+            velocities[rigid].x += collision.normal.x * impulse_magnitude * inverse_mass_rigid;
+            velocities[rigid].y += collision.normal.y * impulse_magnitude * inverse_mass_rigid;
+        }
+    }
+}
+
 void system_update_physics(double dt) {
     system_clear_force_torque_accelerations();
     system_apply_joints();
+    system_apply_soft_body_beams();
 
     system_apply_forces();
     system_apply_torques();
@@ -1399,6 +1491,7 @@ void system_update_physics(double dt) {
     system_apply_transform_locks();
 
     system_generate_global_hitboxes();
+    system_apply_soft_body_node_rigid_collisions();
     system_update_aabbs();
     system_add_entities_to_grid();
     system_apply_collisions_tuned();

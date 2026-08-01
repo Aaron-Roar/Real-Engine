@@ -462,4 +462,6 @@ void graphics_draw_local_origins(void);
 bool graphics_draw_joint(Entity joint, Color color);
 /** Draw every live joint using engineering-style debug symbols. */
 void graphics_draw_joints(Color color);
+/** Draw a soft body's deforming surfaces, beams, and collision nodes. */
+bool graphics_draw_soft_body(Entity soft_body, Color surface, Color beam, Color node);
 #endif

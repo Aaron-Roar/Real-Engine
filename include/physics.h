@@ -171,6 +171,51 @@ typedef struct Joint {
     float angular_damping;
 } Joint;
 
+#define SOFT_BODY_MAX_NODES 64
+#define SOFT_BODY_MAX_BEAMS 128
+#define SOFT_BODY_MAX_TRIANGLES 128
+
+/** Entity-owned collection of soft-body topology entities. */
+typedef struct SoftBody {
+    Entity nodes[SOFT_BODY_MAX_NODES];
+    Entity beams[SOFT_BODY_MAX_BEAMS];
+    Entity triangles[SOFT_BODY_MAX_TRIANGLES];
+    uint32_t node_count;
+    uint32_t beam_count;
+    uint32_t triangle_count;
+} SoftBody;
+
+/** Lightweight point mass participating in soft-body collision. */
+typedef struct SoftBodyNode {
+    Entity soft_body;
+    float radius;
+    RohrCollisionCategoryMask category;
+    RohrCollisionCategoryMask collides_with;
+} SoftBodyNode;
+
+/** Elastic connection between two soft-body nodes. */
+typedef struct SoftBodyBeam {
+    Entity soft_body;
+    Entity node_a;
+    Entity node_b;
+    float rest_length;
+    float stiffness;
+    float damping;
+} SoftBodyBeam;
+
+/** Deforming triangular surface referencing three soft-body nodes. */
+typedef struct SoftBodyTriangle {
+    Entity soft_body;
+    Entity node_a;
+    Entity node_b;
+    Entity node_c;
+} SoftBodyTriangle;
+
+ERROR_DECLARE_RESULT_TYPE(SoftBodyResult, SoftBody);
+ERROR_DECLARE_RESULT_TYPE(SoftBodyNodeResult, SoftBodyNode);
+ERROR_DECLARE_RESULT_TYPE(SoftBodyBeamResult, SoftBodyBeam);
+ERROR_DECLARE_RESULT_TYPE(SoftBodyTriangleResult, SoftBodyTriangle);
+
 /** Pool storing positions by EntityIndex. */
 MEMORY_DECLARE_OBJECT_POOL(PositionPool, Position);
 /** Pool storing velocities by EntityIndex. */
@@ -207,6 +252,10 @@ MEMORY_DECLARE_OBJECT_POOL(AxisLockPool, AxisLock);
 MEMORY_DECLARE_OBJECT_POOL(TransformLockPool, TransformLock);
 /** Pool storing joints by EntityIndex. */
 MEMORY_DECLARE_OBJECT_POOL(JointPool, Joint);
+MEMORY_DECLARE_OBJECT_POOL(SoftBodyPool, SoftBody);
+MEMORY_DECLARE_OBJECT_POOL(SoftBodyNodePool, SoftBodyNode);
+MEMORY_DECLARE_OBJECT_POOL(SoftBodyBeamPool, SoftBodyBeam);
+MEMORY_DECLARE_OBJECT_POOL(SoftBodyTrianglePool, SoftBodyTriangle);
 
 extern PositionPool positions_pool;
 extern VelocityPool velocities_pool;
@@ -229,6 +278,10 @@ extern AngleLockPool angle_locks_pool;
 extern AxisLockPool axis_locks_pool;
 extern TransformLockPool transform_locks_pool;
 extern JointPool joints_pool;
+extern SoftBodyPool soft_bodies_pool;
+extern SoftBodyNodePool soft_body_nodes_pool;
+extern SoftBodyBeamPool soft_body_beams_pool;
+extern SoftBodyTrianglePool soft_body_triangles_pool;
 #define positions positions_pool.objects
 #define velocities velocities_pool.objects
 #define accelerations accelerations_pool.objects
@@ -250,6 +303,10 @@ extern JointPool joints_pool;
 #define axis_locks axis_locks_pool.objects
 #define transform_locks transform_locks_pool.objects
 #define joints joints_pool.objects
+#define soft_bodies soft_bodies_pool.objects
+#define soft_body_nodes soft_body_nodes_pool.objects
+#define soft_body_beams soft_body_beams_pool.objects
+#define soft_body_triangles soft_body_triangles_pool.objects
 
 /**
  * Translate a local shape into world coordinates.
@@ -452,6 +509,40 @@ EngineResult physics_joint_spring_set(
     float stiffness,
     float damping
 );
+
+EntityResult physics_soft_body_create(void);
+SoftBodyResult physics_soft_body_get(Entity soft_body);
+EntityResult physics_soft_body_node_create(
+    Entity soft_body,
+    Position position,
+    Mass mass_value,
+    float radius
+);
+SoftBodyNodeResult physics_soft_body_node_get(Entity node);
+EngineResult physics_soft_body_node_collision_filter_set(
+    Entity node,
+    RohrCollisionCategoryMask category,
+    RohrCollisionCategoryMask collides_with
+);
+EngineResult physics_soft_body_node_force_for_one_tick_apply(Entity node, Force force);
+EngineResult physics_soft_body_node_impulse_apply(Entity node, Vec2D impulse);
+EngineResult physics_soft_body_force_for_one_tick_apply(Entity soft_body, Force force);
+EngineResult physics_soft_body_torque_for_one_tick_apply(Entity soft_body, Torque torque);
+EntityResult physics_soft_body_beam_create(
+    Entity soft_body,
+    Entity node_a,
+    Entity node_b,
+    float stiffness,
+    float damping
+);
+SoftBodyBeamResult physics_soft_body_beam_get(Entity beam);
+EntityResult physics_soft_body_triangle_create(
+    Entity soft_body,
+    Entity node_a,
+    Entity node_b,
+    Entity node_c
+);
+SoftBodyTriangleResult physics_soft_body_triangle_get(Entity triangle);
 
 /**
  * Create a joint entity connecting two live entities.

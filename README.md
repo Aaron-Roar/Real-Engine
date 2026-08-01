@@ -238,6 +238,7 @@ Current examples:
 * `flies-in-pit`: physics, particles, animated sprites, collisions, grid drawing, and recording.
 * `flies-around-ball`: joints, attraction-style motion, particles, and animated sprites.
 * `joints`: pin, weld, and spring assemblies periodically thrown around an enclosed room.
+* `soft-body`: node-beam ball dropped into a rigid room under gravity.
 * `view-port`: basic sprite movement and input handling.
 * `pong` (editor): generated app-owned fire component, rotated JSON-authored arena,
   two-player WASD/arrow controls, collision paddles, and scoring.
@@ -248,6 +249,7 @@ Build output is separated the same way:
 build/examples/
 ├── pong
 ├── joints
+├── soft_body
 ├── fly_to_finish
 ├── assets/<example>/
 └── ...

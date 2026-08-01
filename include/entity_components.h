@@ -116,6 +116,14 @@ typedef enum {
     ENTITY_NAME                 = 1 << 20,
     /** Entity overrides the default collision category filtering. */
     COLLISION_FILTER            = 1 << 21,
+    /** Entity owns soft-body topology. */
+    SOFT_BODY                   = 1 << 22,
+    /** Entity is a lightweight soft-body collision node. */
+    SOFT_BODY_NODE              = 1 << 23,
+    /** Entity is a spring beam connecting soft-body nodes. */
+    SOFT_BODY_BEAM              = 1 << 24,
+    /** Entity is a triangular soft-body surface. */
+    SOFT_BODY_TRIANGLE          = 1 << 25,
 } Component;
 
 /** Fixed-size, engine-owned entity name. */

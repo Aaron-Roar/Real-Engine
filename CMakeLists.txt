@@ -129,6 +129,7 @@ if(ROHR_BUILD_EXAMPLES)
         game_state
         user_interface
         joints
+        soft_body
     )
 
     add_custom_target(editor_examples)
@@ -177,6 +178,11 @@ if(ROHR_BUILD_TESTS)
     target_link_libraries(joints_test PRIVATE rohr_engine)
     set_target_properties(joints_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
     add_test(NAME joints COMMAND joints_test)
+
+    add_executable(soft_body_test tests/soft_body.c)
+    target_link_libraries(soft_body_test PRIVATE rohr_engine)
+    set_target_properties(soft_body_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+    add_test(NAME soft_body COMMAND soft_body_test)
 
     add_executable(editor_component_registry_test
         tests/editor_component_registry.c
@@ -255,6 +261,7 @@ if(ROHR_BUILD_TESTS)
         cameras_test
         timing_test
         joints_test
+        soft_body_test
         editor_component_registry_test
         generated_components_test
     )
