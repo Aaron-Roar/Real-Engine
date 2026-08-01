@@ -286,7 +286,7 @@ EngineResult rohr_entity_delete(Entity entity);
  * @param mask Component mask to add.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_entity_add_components(Entity entity, CMask mask);
+EngineResult rohr_entity_add_components(Entity entity, RohrComponentMask mask);
 
 /**
  * @brief Checks whether an entity has all requested components.
@@ -294,7 +294,7 @@ EngineResult rohr_entity_add_components(Entity entity, CMask mask);
  * @param components Component mask to test.
  * @return true when entity has every requested component, false otherwise.
  */
-bool rohr_entity_has_components(Entity entity, CMask components);
+bool rohr_entity_has_components(Entity entity, RohrComponentMask components);
 
 /**
  * @brief Checks whether an entity table index has all requested components.
@@ -302,7 +302,7 @@ bool rohr_entity_has_components(Entity entity, CMask components);
  * @param components Component mask to test.
  * @return true when index has every requested component, false otherwise.
  */
-bool rohr_entity_index_has_components(EntityIndex index, CMask components);
+bool rohr_entity_index_has_components(EntityIndex index, RohrComponentMask components);
 
 /**
  * @brief Creates a reusable entity group.
@@ -370,7 +370,7 @@ EntityGroupMembershipResult rohr_entity_get_groups(Entity entity);
  * @param mask Component mask to remove.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_entity_delete_components(Entity entity, CMask mask);
+EngineResult rohr_entity_delete_components(Entity entity, RohrComponentMask mask);
 
 /**
  * @brief Adds a child relationship from parent to child.

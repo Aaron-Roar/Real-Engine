@@ -205,7 +205,7 @@ Group names are unique among live generic groups and may contain at most 63
 bytes. Parent-owned child groups remain internal and cannot be named through
 this schema.
 
-`components.mask` is an optional numeric `CMask`. `flags` is the more readable
+`components.mask` is an optional numeric `RohrComponentMask`. `flags` is the more readable
 form for `static`, `dynamic`, `collision`, `targetable`, `particle`, and `hold`.
 When saving, both the numeric mask and readable flags are emitted.
 

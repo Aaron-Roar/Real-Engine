@@ -64,9 +64,9 @@ UISliderDefinitionResult rohr_ui_slider_find_by_name(const char *name) { return 
 EngineResult rohr_game_state_save_file(const char *path) { return game_state_save_file(path); }
 EngineResult rohr_game_state_save_template_file(const char *path) { return game_state_save_template_file(path); }
 EngineResult rohr_entity_delete(Entity entity) { return entity_delete(entity); }
-EngineResult rohr_entity_add_components(Entity entity, CMask mask) { return entity_add_components(entity, mask); }
-bool rohr_entity_has_components(Entity entity, CMask components) { return entity_has_components(entity, components); }
-bool rohr_entity_index_has_components(EntityIndex index, CMask components) { return entity_index_has_components(index, components); }
+EngineResult rohr_entity_add_components(Entity entity, RohrComponentMask mask) { return entity_add_components(entity, mask); }
+bool rohr_entity_has_components(Entity entity, RohrComponentMask components) { return entity_has_components(entity, components); }
+bool rohr_entity_index_has_components(EntityIndex index, RohrComponentMask components) { return entity_index_has_components(index, components); }
 GroupIdResult rohr_entity_group_create(void) { return entity_group_create(); }
 EngineResult rohr_entity_group_set_name(GroupId group, const char *name) { return entity_group_set_name(group, name); }
 GroupIdResult rohr_entity_group_find_by_name(const char *name) { return entity_group_find_by_name(name); }
@@ -77,7 +77,7 @@ EngineResult rohr_entity_group_remove(GroupId group, Entity entity) { return ent
 bool rohr_entity_group_contains(GroupId group, Entity entity) { return entity_group_contains(group, entity); }
 EntityGroupResult rohr_entity_group_get(GroupId group) { return entity_group_get(group); }
 EntityGroupMembershipResult rohr_entity_get_groups(Entity entity) { return entity_get_groups(entity); }
-EngineResult rohr_entity_delete_components(Entity entity, CMask mask) { return entity_delete_components(entity, mask); }
+EngineResult rohr_entity_delete_components(Entity entity, RohrComponentMask mask) { return entity_delete_components(entity, mask); }
 EngineResult rohr_entity_set_child(Entity parent, Entity child) { return entity_set_child(parent, child); }
 EngineResult rohr_entity_set_parent(Entity child, Entity parent) { return entity_set_parent(child, parent); }
 EngineResult rohr_entity_remove_parent(Entity child) { return entity_remove_parent(child); }

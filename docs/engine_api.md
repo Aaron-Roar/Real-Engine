@@ -456,7 +456,7 @@ Deletes an entity and releases its slot for reuse.
 ### `rohr_entity_add_components`
 
 ```c
-EngineResult rohr_entity_add_components(Entity entity, CMask mask);
+EngineResult rohr_entity_add_components(Entity entity, RohrComponentMask mask);
 ```
 
 Adds components to an entity.
@@ -471,7 +471,7 @@ Adds components to an entity.
 ### `rohr_entity_has_components`
 
 ```c
-bool rohr_entity_has_components(Entity entity, CMask components);
+bool rohr_entity_has_components(Entity entity, RohrComponentMask components);
 ```
 
 Checks whether an entity has all requested components.
@@ -486,7 +486,7 @@ Checks whether an entity has all requested components.
 ### `rohr_entity_index_has_components`
 
 ```c
-bool rohr_entity_index_has_components(EntityIndex index, CMask components);
+bool rohr_entity_index_has_components(EntityIndex index, RohrComponentMask components);
 ```
 
 Checks whether an entity table index has all requested components.
@@ -622,7 +622,7 @@ Returns the groups assigned to an entity.
 ### `rohr_entity_delete_components`
 
 ```c
-EngineResult rohr_entity_delete_components(Entity entity, CMask mask);
+EngineResult rohr_entity_delete_components(Entity entity, RohrComponentMask mask);
 ```
 
 Removes components from an entity.

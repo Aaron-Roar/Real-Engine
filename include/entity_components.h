@@ -52,10 +52,10 @@ typedef struct GroupName {
 ERROR_DECLARE_RESULT_TYPE(GroupNameResult, GroupName);
 
 /** Component mask value for an entity. */
-typedef uint32_t CMask; //The bit mask for an entities components
+typedef uint32_t RohrComponentMask; //The bit mask for an entity's engine components
 
 /** Object pool storing per-index entity component masks. */
-MEMORY_DECLARE_OBJECT_POOL(EntityMaskPool, CMask);
+MEMORY_DECLARE_OBJECT_POOL(EntityMaskPool, RohrComponentMask);
 
 /** Pool backing the entity_mask table. */
 extern EntityMaskPool entity_mask_pool;
@@ -63,7 +63,7 @@ extern EntityMaskPool entity_mask_pool;
 /** Direct component mask table indexed by EntityIndex. */
 #define entity_mask entity_mask_pool.objects
 
-/** Component bits stored in CMask values. */
+/** Component bits stored in RohrComponentMask values. */
 typedef enum {
     /** No components. */
     NONE                    = 0,
@@ -325,7 +325,7 @@ EngineResult entity_delete(Entity entity);
  * @param mask Component mask bits to add.
  * @return EngineResult describing success or failure.
  */
-EngineResult entity_add_components(Entity entity, CMask mask);
+EngineResult entity_add_components(Entity entity, RohrComponentMask mask);
 
 /**
  * Check whether an entity has all requested components.
@@ -334,7 +334,7 @@ EngineResult entity_add_components(Entity entity, CMask mask);
  * @param components Component mask that must be present.
  * @return true when all requested bits are set.
  */
-bool entity_has_components(Entity entity, CMask components);
+bool entity_has_components(Entity entity, RohrComponentMask components);
 
 /**
  * Check whether an entity index has all requested components.
@@ -343,7 +343,7 @@ bool entity_has_components(Entity entity, CMask components);
  * @param components Component mask that must be present.
  * @return true when all requested bits are set.
  */
-bool entity_index_has_components(EntityIndex index, CMask components);
+bool entity_index_has_components(EntityIndex index, RohrComponentMask components);
 
 /**
  * Create a reusable group of entity ids.
@@ -428,7 +428,7 @@ EntityGroupMembershipResult entity_get_groups(Entity entity);
  * @param mask Component mask bits to remove.
  * @return EngineResult describing success or failure.
  */
-EngineResult entity_delete_components(Entity entity, CMask mask);
+EngineResult entity_delete_components(Entity entity, RohrComponentMask mask);
 
 /**
  * Set a parent-child relationship.

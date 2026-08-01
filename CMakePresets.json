@@ -57,7 +57,7 @@
     {
       "name": "tests",
       "configurePreset": "debug",
-      "targets": ["engine_lifecycle_test"]
+      "targets": ["rohr_tests"]
     }
   ],
   "testPresets": [

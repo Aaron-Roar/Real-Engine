@@ -105,6 +105,7 @@ if(NOT MSVC)
 endif()
 
 add_library(rohr_editor STATIC
+    src/component_codegen.c
     src/level_editor.c
     src/rohr_editor.c
 )
@@ -179,6 +180,83 @@ if(ROHR_BUILD_TESTS)
     set_tests_properties(engine_lifecycle
         PROPERTIES
             ENVIRONMENT "SDL_VIDEODRIVER=dummy"
+    )
+
+    add_executable(editor_component_registry_test
+        tests/editor_component_registry.c
+    )
+    target_link_libraries(editor_component_registry_test PRIVATE rohr_editor)
+    set_target_properties(editor_component_registry_test
+        PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests
+    )
+
+    add_test(
+        NAME editor_component_registry
+        COMMAND editor_component_registry_test
+    )
+
+    set(ROHR_GENERATED_COMPONENT_FIXTURE_DIR
+        ${CMAKE_BINARY_DIR}/tests/generated_components
+    )
+    set(ROHR_GENERATED_COMPONENT_HEADER
+        ${ROHR_GENERATED_COMPONENT_FIXTURE_DIR}/game_components.h
+    )
+    set(ROHR_GENERATED_COMPONENT_SOURCE
+        ${ROHR_GENERATED_COMPONENT_FIXTURE_DIR}/game_components.c
+    )
+
+    add_executable(component_fixture_generator
+        tests/generate_component_fixture.c
+    )
+    target_link_libraries(component_fixture_generator PRIVATE rohr_editor)
+
+    add_custom_command(
+        OUTPUT
+            ${ROHR_GENERATED_COMPONENT_HEADER}
+            ${ROHR_GENERATED_COMPONENT_SOURCE}
+        COMMAND
+            ${CMAKE_COMMAND} -E make_directory
+            ${ROHR_GENERATED_COMPONENT_FIXTURE_DIR}
+        COMMAND
+            $<TARGET_FILE:component_fixture_generator>
+            ${ROHR_GENERATED_COMPONENT_HEADER}
+            ${ROHR_GENERATED_COMPONENT_SOURCE}
+        DEPENDS component_fixture_generator
+        COMMENT "Generating sparse-set component fixture"
+        VERBATIM
+    )
+
+    add_executable(generated_components_test
+        tests/generated_components_runtime.c
+        ${ROHR_GENERATED_COMPONENT_SOURCE}
+        ${ROHR_GENERATED_COMPONENT_HEADER}
+    )
+    target_include_directories(generated_components_test
+        PRIVATE ${ROHR_GENERATED_COMPONENT_FIXTURE_DIR}
+    )
+    target_link_libraries(generated_components_test PRIVATE rohr_engine)
+    set_target_properties(generated_components_test
+        PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests
+    )
+
+    add_test(NAME generated_components COMMAND generated_components_test)
+    add_test(
+        NAME generated_components_deterministic
+        COMMAND
+            ${CMAKE_COMMAND}
+            -DGENERATOR=$<TARGET_FILE:component_fixture_generator>
+            -DOUTPUT_DIRECTORY=${CMAKE_BINARY_DIR}/tests/deterministic_components
+            -P ${CMAKE_SOURCE_DIR}/tests/check_component_generation.cmake
+    )
+
+    add_custom_target(rohr_tests)
+    add_dependencies(
+        rohr_tests
+        engine_lifecycle_test
+        editor_component_registry_test
+        generated_components_test
     )
 endif()
 

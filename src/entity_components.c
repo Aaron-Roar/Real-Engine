@@ -5,7 +5,7 @@
 
 MEMORY_DECLARE_OBJECT_POOL(EntityAlivePool, bool);
 MEMORY_DEFINE_OBJECT_POOL(EntityAlivePool, bool)
-MEMORY_DEFINE_OBJECT_POOL(EntityMaskPool, CMask)
+MEMORY_DEFINE_OBJECT_POOL(EntityMaskPool, RohrComponentMask)
 MEMORY_DEFINE_OBJECT_POOL(TargetPool, Entity)
 MEMORY_DEFINE_OBJECT_POOL(ParentPool, Parent)
 MEMORY_DEFINE_OBJECT_POOL(GroupEntityPool, Entity)
@@ -753,7 +753,7 @@ EngineResult entity_delete(Entity entity) {
     return error_result_value(true);
 }
 
-EngineResult entity_add_components(Entity entity, CMask mask) {
+EngineResult entity_add_components(Entity entity, RohrComponentMask mask) {
     EntityIndex index;
 
     if(!entity_id_valid(entity)) {
@@ -766,7 +766,7 @@ EngineResult entity_add_components(Entity entity, CMask mask) {
     return error_result_value(true);
 }
 
-EngineResult entity_delete_components(Entity entity, CMask mask) {
+EngineResult entity_delete_components(Entity entity, RohrComponentMask mask) {
     EntityIndex index;
 
     if(!entity_id_valid(entity)) {
@@ -779,7 +779,7 @@ EngineResult entity_delete_components(Entity entity, CMask mask) {
     return error_result_value(true);
 }
 
-bool entity_has_components(Entity entity, CMask components) {
+bool entity_has_components(Entity entity, RohrComponentMask components) {
   EntityIndex index;
 
   if(!entity_get_index(entity, &index)) {
@@ -791,7 +791,7 @@ bool entity_has_components(Entity entity, CMask components) {
   return entity_index_has_components(index, components);
 }
 
-bool entity_index_has_components(EntityIndex index, CMask components) {
+bool entity_index_has_components(EntityIndex index, RohrComponentMask components) {
   if(!entity_index_is_alive(index)) {
     return false;
   }

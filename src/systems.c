@@ -71,7 +71,7 @@ static void system_remove_transform_lock_by_index(EntityIndex index) {
 }
 
 void system_generate_global_hitboxes(void) {
-    CMask filter = HIT_BOX;
+    RohrComponentMask filter = HIT_BOX;
 
     for(uint32_t alive_position = 0; alive_position < entity_alive_count(); alive_position += 1) {
         EntityIndex i;
@@ -90,7 +90,7 @@ void system_generate_global_hitboxes(void) {
 }
 
 Shape system_generate_global_hitbox(Entity entity) {
-    CMask filter = HIT_BOX;
+    RohrComponentMask filter = HIT_BOX;
     EntityIndex index;
 
         if(entity_get_index(entity, &index) && entity_index_is_alive(index)) {
@@ -165,8 +165,8 @@ void system_update_velocities(double dt) {
 }
 
 void system_apply_forces(void) {
-  CMask filter = FORCE | TARGETABLE;
-  CMask target_filter = MASS;
+  RohrComponentMask filter = FORCE | TARGETABLE;
+  RohrComponentMask target_filter = MASS;
 
   for(int i = 0; i < MAX_ENTITIES; i++) {
     if(entity_index_is_alive(i)) { //Check if this entity exists
@@ -201,8 +201,8 @@ void system_apply_forces(void) {
 
 void system_apply_torques(void) {
     //Apply force offset from centroid and torque applied directly
-  CMask filter = TORQUE | TARGETABLE;
-  CMask target_filter = MASS;
+  RohrComponentMask filter = TORQUE | TARGETABLE;
+  RohrComponentMask target_filter = MASS;
 
   for(int i = 0; i < MAX_ENTITIES; i++) {
     if(entity_index_is_alive(i)) { //Check if this entity exists

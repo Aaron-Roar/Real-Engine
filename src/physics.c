@@ -787,7 +787,7 @@ EngineResult physics_set_angular_acceleration(
     return error_result_value(true);
 }
 ShapeResult physics_get_global_hit_box(Entity entity) {
-    CMask filter = HIT_BOX;
+    RohrComponentMask filter = HIT_BOX;
     EntityIndex index;
 
     if((entity_get_index(entity, &index) && entity_index_is_alive(index))) {

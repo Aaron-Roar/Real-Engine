@@ -1109,7 +1109,7 @@ static bool state_variation_vec2(
     return false;
 }
 
-static CMask state_flag_mask(const char *flag) {
+static RohrComponentMask state_flag_mask(const char *flag) {
     if(strcmp(flag, "static") == 0) return STATIC;
     if(strcmp(flag, "dynamic") == 0) return DYNAMIC;
     if(strcmp(flag, "collision") == 0) return COLLISION;
@@ -1168,14 +1168,14 @@ static EngineResult state_load_components(
     if(value != NULL) {
         if(!yyjson_is_uint(value) || yyjson_get_uint(value) > UINT32_MAX)
             return error_result_error(ERROR_ENGINE_STATE_INVALID);
-        entity_mask[index] |= (CMask)yyjson_get_uint(value);
+        entity_mask[index] |= (RohrComponentMask)yyjson_get_uint(value);
     }
 
     value = yyjson_obj_get(components, "flags");
     if(value != NULL) {
         if(!yyjson_is_arr(value)) return error_result_error(ERROR_ENGINE_STATE_INVALID);
         yyjson_arr_foreach(value, flag_index, flag_count, flag) {
-            CMask mask;
+            RohrComponentMask mask;
             if(!yyjson_is_str(flag)) return error_result_error(ERROR_ENGINE_STATE_INVALID);
             mask = state_flag_mask(yyjson_get_str(flag));
             if(mask == NONE) return error_result_error(ERROR_ENGINE_STATE_INVALID);
@@ -2232,7 +2232,7 @@ EngineResult game_state_save_file(const char *path) {
         yyjson_mut_val *description;
         yyjson_mut_val *components;
         yyjson_mut_val *flags;
-        CMask mask;
+        RohrComponentMask mask;
         size_t i;
 
         if(entity_result.kind == ERROR_RESULT_ERROR
