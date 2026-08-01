@@ -139,12 +139,14 @@ Build one example from the engine root:
 cmake --build build --target pong
 ```
 
-Build an example independently in release mode:
+From inside any example project, configure and build Debug or Release with local presets:
 
 ```sh
-cmake -S examples/editor/pong -B examples/editor/pong/build/release \
-  -DCMAKE_BUILD_TYPE=Release
-cmake --build examples/editor/pong/build/release --parallel
+cmake --preset debug
+cmake --build --preset debug --parallel
+
+cmake --preset release
+cmake --build --preset release --parallel
 ```
 
 List every available target:
