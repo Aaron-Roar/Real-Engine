@@ -42,8 +42,8 @@ static void pong_draw_field(
     );
 }
 
-static EngineResult pong_draw_screen(
-    ScreenId screen,
+static EngineResult pong_draw_camera(
+    CameraId camera,
     Entity wall_bottom,
     Entity wall_top,
     Entity center_line,
@@ -52,7 +52,7 @@ static EngineResult pong_draw_screen(
     Entity ball,
     bool ball_on_fire
 ) {
-    EngineResult result = rohr_screen_begin(screen);
+    EngineResult result = rohr_camera_begin(camera);
     if(rohr_error_check(result)) return result;
     rohr_graphics_draw_background(background_color);
     pong_draw_field(
@@ -64,7 +64,7 @@ static EngineResult pong_draw_screen(
         ball,
         ball_on_fire
     );
-    return rohr_screen_end();
+    return rohr_camera_end();
 }
 
 static EngineResult pong_reset_ball(Entity ball, int serve_direction) {
@@ -141,9 +141,6 @@ int main(void) {
     CameraId left_camera = CAMERA_INVALID;
     CameraId right_camera = CAMERA_INVALID;
     CameraId ball_camera = CAMERA_INVALID;
-    ScreenId left_screen = SCREEN_INVALID;
-    ScreenId right_screen = SCREEN_INVALID;
-    ScreenId ball_screen = SCREEN_INVALID;
     ViewportId left_viewport = VIEWPORT_INVALID;
     ViewportId right_viewport = VIEWPORT_INVALID;
     bool ball_behind_left = false;
@@ -289,24 +286,6 @@ int main(void) {
         }
     }
     {
-        ScreenConfig config = rohr_screen_default_config();
-        ScreenIdResult result;
-        config.width = WINDOW_WIDTH / 2;
-        config.height = WINDOW_HEIGHT;
-        config.camera = left_camera;
-        result = rohr_screen_create(config);
-        if(rohr_error_check(result)) goto fail;
-        left_screen = result.result.value;
-        config.camera = right_camera;
-        result = rohr_screen_create(config);
-        if(rohr_error_check(result)) goto fail;
-        right_screen = result.result.value;
-        config.camera = ball_camera;
-        result = rohr_screen_create(config);
-        if(rohr_error_check(result)) goto fail;
-        ball_screen = result.result.value;
-    }
-    {
         ViewportConfig config = rohr_viewport_default_config();
         ViewportIdResult result;
         config.rectangle = (ViewportRectangle){0.0f, 0.0f, WINDOW_WIDTH * 0.5f, WINDOW_HEIGHT};
@@ -317,8 +296,8 @@ int main(void) {
         result = rohr_viewport_create(config);
         if(rohr_error_check(result)) goto fail;
         right_viewport = result.result.value;
-        if(rohr_error_check(rohr_viewport_set_screen(left_viewport, left_screen))
-                || rohr_error_check(rohr_viewport_set_screen(right_viewport, right_screen))
+        if(rohr_error_check(rohr_viewport_set_camera(left_viewport, left_camera))
+                || rohr_error_check(rohr_viewport_set_camera(right_viewport, right_camera))
                 || rohr_error_check(rohr_viewport_set_enable(left_viewport))
                 || rohr_error_check(rohr_viewport_set_enable(right_viewport))) goto fail;
     }
@@ -449,8 +428,8 @@ int main(void) {
             BallOnFire ball_on_fire = rohr_error_check(fire_result)
                 ? false
                 : fire_result.result.value;
-            if(rohr_error_check(pong_draw_screen(
-                left_screen,
+            if(rohr_error_check(pong_draw_camera(
+                left_camera,
                 wall_bottom,
                 wall_top,
                 center_line,
@@ -458,8 +437,8 @@ int main(void) {
                 paddle_right,
                 ball,
                 ball_on_fire
-            )) || rohr_error_check(pong_draw_screen(
-                right_screen,
+            )) || rohr_error_check(pong_draw_camera(
+                right_camera,
                 wall_bottom,
                 wall_top,
                 center_line,
@@ -467,8 +446,8 @@ int main(void) {
                 paddle_right,
                 ball,
                 ball_on_fire
-            )) || rohr_error_check(pong_draw_screen(
-                ball_screen,
+            )) || rohr_error_check(pong_draw_camera(
+                ball_camera,
                 wall_bottom,
                 wall_top,
                 center_line,
@@ -477,12 +456,12 @@ int main(void) {
                 ball,
                 ball_on_fire
             ))) goto fail;
-            if(rohr_error_check(rohr_viewport_set_screen(
+            if(rohr_error_check(rohr_viewport_set_camera(
                     left_viewport,
-                    ball_behind_left ? ball_screen : left_screen
-                )) || rohr_error_check(rohr_viewport_set_screen(
+                    ball_behind_left ? ball_camera : left_camera
+                )) || rohr_error_check(rohr_viewport_set_camera(
                     right_viewport,
-                    ball_behind_right ? ball_screen : right_screen
+                    ball_behind_right ? ball_camera : right_camera
                 ))) goto fail;
         }
         rohr_graphics_show();
@@ -490,9 +469,6 @@ int main(void) {
 
     (void)rohr_viewport_destroy(right_viewport);
     (void)rohr_viewport_destroy(left_viewport);
-    (void)rohr_screen_destroy(ball_screen);
-    (void)rohr_screen_destroy(right_screen);
-    (void)rohr_screen_destroy(left_screen);
     (void)rohr_camera_set_active(left_camera);
     (void)rohr_camera_destroy(ball_camera);
     (void)rohr_camera_destroy(right_camera);
@@ -505,9 +481,6 @@ int main(void) {
 fail:
     if(right_viewport != VIEWPORT_INVALID) (void)rohr_viewport_destroy(right_viewport);
     if(left_viewport != VIEWPORT_INVALID) (void)rohr_viewport_destroy(left_viewport);
-    if(ball_screen != SCREEN_INVALID) (void)rohr_screen_destroy(ball_screen);
-    if(right_screen != SCREEN_INVALID) (void)rohr_screen_destroy(right_screen);
-    if(left_screen != SCREEN_INVALID) (void)rohr_screen_destroy(left_screen);
     if(left_camera != CAMERA_INVALID) (void)rohr_camera_set_active(left_camera);
     if(ball_camera != CAMERA_INVALID) (void)rohr_camera_destroy(ball_camera);
     if(right_camera != CAMERA_INVALID) (void)rohr_camera_destroy(right_camera);

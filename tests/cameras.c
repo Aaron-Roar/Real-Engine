@@ -6,7 +6,6 @@ int main(void) {
     CameraIdResult first_result;
     CameraIdResult second_result;
     CameraResult camera_result;
-    ScreenIdResult screen_result;
     ViewportIdResult viewport_result;
     Position screen;
 
@@ -38,26 +37,22 @@ int main(void) {
         return 1;
     }
     {
-        ScreenConfig screen_config = rohr_screen_default_config();
         ViewportConfig viewport_config = rohr_viewport_default_config();
-        screen_config.camera = original;
-        screen_result = rohr_screen_create(screen_config);
         viewport_result = rohr_viewport_create(viewport_config);
     }
-    if(rohr_error_check(screen_result) || rohr_error_check(viewport_result)
+    if(rohr_error_check(viewport_result)
             || rohr_viewport_default_config().fit != SCREEN_FIT_CONTAIN
-            || rohr_error_check(rohr_viewport_set_screen(
+            || rohr_error_check(rohr_viewport_set_camera(
                 viewport_result.result.value,
-                screen_result.result.value
+                original
             ))
             || rohr_error_check(rohr_viewport_set_enable(viewport_result.result.value))
-            || rohr_error_check(rohr_screen_begin(screen_result.result.value))
-            || !rohr_error_check(rohr_screen_begin(screen_result.result.value))
-            || rohr_error_check(rohr_screen_end())
+            || rohr_error_check(rohr_camera_begin(original))
+            || !rohr_error_check(rohr_camera_begin(original))
+            || rohr_error_check(rohr_camera_end())
             || rohr_error_check(rohr_viewport_set_disable(viewport_result.result.value))
-            || rohr_error_check(rohr_viewport_clear_screen(viewport_result.result.value))
-            || rohr_error_check(rohr_viewport_destroy(viewport_result.result.value))
-            || rohr_error_check(rohr_screen_destroy(screen_result.result.value))) {
+            || rohr_error_check(rohr_viewport_clear_camera(viewport_result.result.value))
+            || rohr_error_check(rohr_viewport_destroy(viewport_result.result.value))) {
         rohr_graphics_end();
         rohr_engine_shutdown();
         return 1;

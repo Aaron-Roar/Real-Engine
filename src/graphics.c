@@ -35,10 +35,19 @@ typedef struct GraphicsScreen {
     SDL_Texture *texture;
 } GraphicsScreen;
 
+typedef uint32_t ScreenId;
+#define SCREEN_INVALID 0
+typedef struct ScreenConfig {
+    CameraId camera;
+    int width;
+    int height;
+} ScreenConfig;
+ERROR_DECLARE_RESULT_TYPE(ScreenIdResult, ScreenId);
+
 typedef struct GraphicsViewport {
     ViewportRectangle rectangle;
     ScreenFit fit;
-    ScreenId screen;
+    CameraId camera;
     bool enabled;
 } GraphicsViewport;
 
@@ -50,6 +59,7 @@ static bool screens_used[MAX_SCREENS] = {0};
 static bool viewports_used[MAX_VIEWPORTS] = {0};
 static ScreenId drawing_screen = SCREEN_INVALID;
 static CameraId camera_before_screen = CAMERA_INVALID;
+static EngineResult graphics_screen_destroy(ScreenId id);
 
 static uint32_t graphics_resource_id(uint32_t generation, size_t slot) {
     return (generation << 8) | (uint32_t)(slot + 1);
@@ -63,6 +73,34 @@ static bool graphics_screen_slot(ScreenId id, size_t *slot) {
             || graphics_resource_id(screen_generations[value], value) != id) return false;
     *slot = value;
     return true;
+}
+
+static bool graphics_screen_for_camera(CameraId camera_id, size_t *slot) {
+    size_t value;
+    if(slot == NULL) return false;
+    for(value = 0; value < MAX_SCREENS; value += 1) {
+        if(screens_used[value] && screens[value].camera == camera_id) {
+            *slot = value;
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool graphics_camera_viewport_size(CameraId camera_id, int *width, int *height) {
+    size_t slot;
+    bool found = false;
+    if(width == NULL || height == NULL) return false;
+    for(slot = 0; slot < MAX_VIEWPORTS; slot += 1) {
+        if(!viewports_used[slot]) continue;
+        if(viewports[slot].camera == camera_id || (!found && camera_id == CAMERA_INVALID)) {
+            *width = (int)viewports[slot].rectangle.width;
+            *height = (int)viewports[slot].rectangle.height;
+            found = true;
+            if(viewports[slot].camera == camera_id) return true;
+        }
+    }
+    return found;
 }
 
 static bool graphics_viewport_slot(ViewportId id, size_t *slot) {
@@ -592,15 +630,22 @@ EngineResult graphics_camera_set(CameraId id, Camera value) {
 EngineResult graphics_camera_destroy(CameraId id) {
     size_t slot;
     size_t screen_slot;
+    size_t viewport_slot;
     if(!graphics_camera_slot(id, &slot)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
     }
     if(id == active_camera) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
     }
-    for(screen_slot = 0; screen_slot < MAX_SCREENS; screen_slot += 1) {
-        if(screens_used[screen_slot] && screens[screen_slot].camera == id) {
-            return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    if(graphics_screen_for_camera(id, &screen_slot)) {
+        EngineResult result = graphics_screen_destroy(
+            graphics_resource_id(screen_generations[screen_slot], screen_slot)
+        );
+        if(result.kind == ERROR_RESULT_ERROR) return result;
+    }
+    for(viewport_slot = 0; viewport_slot < MAX_VIEWPORTS; viewport_slot += 1) {
+        if(viewports_used[viewport_slot] && viewports[viewport_slot].camera == id) {
+            viewports[viewport_slot].camera = CAMERA_INVALID;
         }
     }
     cameras_used[slot] = false;
@@ -788,7 +833,7 @@ EngineResult graphics_camera_detach_from(CameraId id) {
     return error_result_value(true);
 }
 
-ScreenConfig graphics_screen_default_config(void) {
+static ScreenConfig graphics_screen_default_config(void) {
     return (ScreenConfig){
         .camera = active_camera,
         .width = WINDOW_WIDTH,
@@ -796,7 +841,7 @@ ScreenConfig graphics_screen_default_config(void) {
     };
 }
 
-ScreenIdResult graphics_screen_create(ScreenConfig config) {
+static ScreenIdResult graphics_screen_create(ScreenConfig config) {
     size_t slot;
     if(sdl_renderer == NULL) {
         return ERROR_RESULT_MAKE_ERROR(ScreenIdResult, ERROR_ENGINE_GRAPHICS_INIT_FAILED);
@@ -837,16 +882,10 @@ ScreenIdResult graphics_screen_create(ScreenConfig config) {
     return ERROR_RESULT_MAKE_ERROR(ScreenIdResult, ERROR_MEMORY_POOL_FULL);
 }
 
-EngineResult graphics_screen_destroy(ScreenId id) {
+static EngineResult graphics_screen_destroy(ScreenId id) {
     size_t slot;
-    size_t viewport_slot;
     if(!graphics_screen_slot(id, &slot) || id == drawing_screen) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
-    }
-    for(viewport_slot = 0; viewport_slot < MAX_VIEWPORTS; viewport_slot += 1) {
-        if(viewports_used[viewport_slot] && viewports[viewport_slot].screen == id) {
-            viewports[viewport_slot].screen = SCREEN_INVALID;
-        }
     }
     SDL_DestroyTexture(screens[slot].texture);
     screens[slot] = (GraphicsScreen){0};
@@ -854,7 +893,7 @@ EngineResult graphics_screen_destroy(ScreenId id) {
     return error_result_value(true);
 }
 
-EngineResult graphics_screen_begin(ScreenId id) {
+static EngineResult graphics_screen_begin(ScreenId id) {
     size_t slot;
     if(drawing_screen != SCREEN_INVALID || !graphics_screen_slot(id, &slot)) {
         return error_result_error(ERROR_ENGINE_STATE_INVALID);
@@ -875,7 +914,7 @@ EngineResult graphics_screen_begin(ScreenId id) {
     return error_result_value(true);
 }
 
-EngineResult graphics_screen_end(void) {
+static EngineResult graphics_screen_end(void) {
     if(drawing_screen == SCREEN_INVALID) {
         return error_result_error(ERROR_ENGINE_STATE_INVALID);
     }
@@ -888,6 +927,45 @@ EngineResult graphics_screen_end(void) {
     (void)SDL_SetRenderViewport(sdl_renderer, NULL);
     (void)SDL_SetRenderClipRect(sdl_renderer, NULL);
     return error_result_value(true);
+}
+
+EngineResult graphics_camera_begin(CameraId camera_id) {
+    size_t screen_slot;
+    int width = WINDOW_WIDTH;
+    int height = WINDOW_HEIGHT;
+    if(!graphics_camera_slot(camera_id, &screen_slot)) {
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    if(!graphics_camera_viewport_size(camera_id, &width, &height)) {
+        (void)graphics_camera_viewport_size(CAMERA_INVALID, &width, &height);
+    }
+    if(graphics_screen_for_camera(camera_id, &screen_slot)
+            && (screens[screen_slot].width != width || screens[screen_slot].height != height)
+            && graphics_camera_viewport_size(camera_id, &width, &height)) {
+        EngineResult result = graphics_screen_destroy(
+            graphics_resource_id(screen_generations[screen_slot], screen_slot)
+        );
+        if(result.kind == ERROR_RESULT_ERROR) return result;
+    }
+    if(!graphics_screen_for_camera(camera_id, &screen_slot)) {
+        ScreenConfig config = graphics_screen_default_config();
+        ScreenIdResult result;
+        config.camera = camera_id;
+        config.width = width;
+        config.height = height;
+        result = graphics_screen_create(config);
+        if(result.kind == ERROR_RESULT_ERROR) {
+            return error_result_error(result.result.error);
+        }
+        return graphics_screen_begin(result.result.value);
+    }
+    return graphics_screen_begin(
+        graphics_resource_id(screen_generations[screen_slot], screen_slot)
+    );
+}
+
+EngineResult graphics_camera_end(void) {
+    return graphics_screen_end();
 }
 
 ViewportConfig graphics_viewport_default_config(void) {
@@ -913,7 +991,7 @@ ViewportIdResult graphics_viewport_create(ViewportConfig config) {
         viewports[slot] = (GraphicsViewport){
             .rectangle = config.rectangle,
             .fit = config.fit,
-            .screen = SCREEN_INVALID,
+            .camera = CAMERA_INVALID,
             .enabled = false,
         };
         return ERROR_RESULT_MAKE_VALUE(
@@ -934,22 +1012,22 @@ EngineResult graphics_viewport_destroy(ViewportId id) {
     return error_result_value(true);
 }
 
-EngineResult graphics_viewport_set_screen(ViewportId id, ScreenId screen) {
+EngineResult graphics_viewport_set_camera(ViewportId id, CameraId camera_id) {
     size_t slot;
-    size_t screen_slot;
-    if(!graphics_viewport_slot(id, &slot) || !graphics_screen_slot(screen, &screen_slot)) {
+    size_t camera_slot;
+    if(!graphics_viewport_slot(id, &slot) || !graphics_camera_slot(camera_id, &camera_slot)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
     }
-    viewports[slot].screen = screen;
+    viewports[slot].camera = camera_id;
     return error_result_value(true);
 }
 
-EngineResult graphics_viewport_clear_screen(ViewportId id) {
+EngineResult graphics_viewport_clear_camera(ViewportId id) {
     size_t slot;
     if(!graphics_viewport_slot(id, &slot)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
     }
-    viewports[slot].screen = SCREEN_INVALID;
+    viewports[slot].camera = CAMERA_INVALID;
     return error_result_value(true);
 }
 
@@ -1292,7 +1370,7 @@ static void graphics_draw_viewports(void) {
             (int)viewport->rectangle.height,
         };
         (void)SDL_SetRenderClipRect(sdl_renderer, &clip);
-        if(!graphics_screen_slot(viewport->screen, &screen_slot)) {
+        if(!graphics_screen_for_camera(viewport->camera, &screen_slot)) {
             graphics_draw_empty_viewport(viewport->rectangle);
             continue;
         }

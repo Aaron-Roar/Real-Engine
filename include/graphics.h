@@ -89,10 +89,8 @@ typedef struct {
 /** Result type for functions that return a CameraAttachment. */
 ERROR_DECLARE_RESULT_TYPE(CameraAttachmentResult, CameraAttachment);
 
-typedef uint32_t ScreenId;
 typedef uint32_t ViewportId;
 
-#define SCREEN_INVALID 0
 #define VIEWPORT_INVALID 0
 
 typedef enum ScreenFit {
@@ -102,14 +100,6 @@ typedef enum ScreenFit {
     SCREEN_FIT_COVER,
 } ScreenFit;
 
-typedef struct ScreenConfig {
-    /** Camera used while rendering this screen. */
-    CameraId camera;
-    /** Render-target size; non-positive values use the engine resolution. */
-    int width;
-    int height;
-} ScreenConfig;
-
 typedef struct ViewportConfig {
     /** Window-space destination and clipping rectangle. */
     ViewportRectangle rectangle;
@@ -117,7 +107,6 @@ typedef struct ViewportConfig {
     ScreenFit fit;
 } ViewportConfig;
 
-ERROR_DECLARE_RESULT_TYPE(ScreenIdResult, ScreenId);
 ERROR_DECLARE_RESULT_TYPE(ViewportIdResult, ViewportId);
 
 /** Descriptor for loading a texture from disk. */
@@ -406,24 +395,18 @@ EngineResult graphics_camera_attach_to(
 );
 EngineResult graphics_camera_detach_from(CameraId camera);
 
-/** Return engine-resolution screen defaults using the current camera. */
-ScreenConfig graphics_screen_default_config(void);
-/** Create an explicitly owned off-screen render target. */
-ScreenIdResult graphics_screen_create(ScreenConfig config);
-/** Destroy a screen and clear all non-owning viewport assignments to it. */
-EngineResult graphics_screen_destroy(ScreenId screen);
-/** Begin directing drawing commands to a screen. */
-EngineResult graphics_screen_begin(ScreenId screen);
-/** Finish drawing the current screen and return to the window target. */
-EngineResult graphics_screen_end(void);
+/** Begin rendering the camera into its engine-owned render surface. */
+EngineResult graphics_camera_begin(CameraId camera);
+/** Finish rendering the current camera and return to the window target. */
+EngineResult graphics_camera_end(void);
 
 /** Return a disabled, full-window viewport using contain fitting. */
 ViewportConfig graphics_viewport_default_config(void);
 ViewportIdResult graphics_viewport_create(ViewportConfig config);
 EngineResult graphics_viewport_destroy(ViewportId viewport);
-/** Assign a screen without transferring ownership. */
-EngineResult graphics_viewport_set_screen(ViewportId viewport, ScreenId screen);
-EngineResult graphics_viewport_clear_screen(ViewportId viewport);
+/** Assign a camera without transferring ownership. */
+EngineResult graphics_viewport_set_camera(ViewportId viewport, CameraId camera);
+EngineResult graphics_viewport_clear_camera(ViewportId viewport);
 EngineResult graphics_viewport_set_enable(ViewportId viewport);
 EngineResult graphics_viewport_set_disable(ViewportId viewport);
 
