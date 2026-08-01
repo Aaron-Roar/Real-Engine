@@ -57,10 +57,10 @@ EntityResult rohr_entity_find_by_name(const char *name) { return entity_find_by_
 EntityNameResult rohr_entity_get_name(Entity entity) { return entity_get_name(entity); }
 EngineResult rohr_game_state_load_file(const char *path) { return game_state_load_file(path); }
 EngineResult rohr_game_state_load_files(const char *const *paths, size_t path_count) { return game_state_load_files(paths, path_count); }
-UIButtonDefinitionResult rohr_game_state_find_ui_button(const char *name) { return game_state_find_ui_button(name); }
-UIFontDefinitionResult rohr_game_state_find_ui_font(const char *name) { return game_state_find_ui_font(name); }
-UILabelDefinitionResult rohr_game_state_find_ui_label(const char *name) { return game_state_find_ui_label(name); }
-UISliderDefinitionResult rohr_game_state_find_ui_slider(const char *name) { return game_state_find_ui_slider(name); }
+UIButtonDefinitionResult rohr_ui_button_find_by_name(const char *name) { return ui_button_find_by_name(name); }
+UIFontDefinitionResult rohr_ui_font_find_by_name(const char *name) { return ui_font_find_by_name(name); }
+UILabelDefinitionResult rohr_ui_label_find_by_name(const char *name) { return ui_label_find_by_name(name); }
+UISliderDefinitionResult rohr_ui_slider_find_by_name(const char *name) { return ui_slider_find_by_name(name); }
 EngineResult rohr_game_state_save_file(const char *path) { return game_state_save_file(path); }
 EngineResult rohr_game_state_save_template_file(const char *path) { return game_state_save_template_file(path); }
 EngineResult rohr_entity_delete(Entity entity) { return entity_delete(entity); }

@@ -6,7 +6,6 @@
 #include "graphics.h"
 
 #define UI_DEFINITION_NAME_MAX 64
-#define UI_ID_MAX 128
 #define UI_LABEL_MAX 128
 #define UI_FONT_PATH_MAX 512
 
@@ -42,7 +41,6 @@ typedef struct UIButtonResult {
 /** Authored button data that can be loaded independently of runtime state. */
 typedef struct UIButtonDefinition {
     char name[UI_DEFINITION_NAME_MAX];
-    char id[UI_ID_MAX];
     char label[UI_LABEL_MAX];
     char font[UI_DEFINITION_NAME_MAX];
     Color text_color;
@@ -119,7 +117,6 @@ typedef struct UISliderResult {
 /** Authored slider definition loaded independently of runtime value state. */
 typedef struct UISliderDefinition {
     char name[UI_DEFINITION_NAME_MAX];
-    char id[UI_ID_MAX];
     char label[UI_LABEL_MAX];
     char font[UI_DEFINITION_NAME_MAX];
     char value_format[UI_LABEL_MAX];

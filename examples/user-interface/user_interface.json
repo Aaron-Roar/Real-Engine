@@ -35,7 +35,6 @@
     "sliders": [
       {
         "name": "angled_value_slider",
-        "id": "main_menu.value_slider",
         "center": {"x": 320.0, "y": 365.0},
         "length": 220.0,
         "angle": 0,
@@ -63,7 +62,6 @@
     "buttons": [
       {
         "name": "settings_button",
-        "id": "main_menu.settings",
         "label": "Settings",
         "font": "menu_font",
         "text_color": {"red": 240, "green": 244, "blue": 250, "alpha": 255},

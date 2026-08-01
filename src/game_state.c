@@ -285,7 +285,7 @@ static StateUISlider *state_find_ui_slider_internal(const char *name) {
     return NULL;
 }
 
-UIButtonDefinitionResult game_state_find_ui_button(const char *name) {
+UIButtonDefinitionResult ui_button_find_by_name(const char *name) {
     StateUIButton *button = state_find_ui_button_internal(name);
 
     if(button == NULL) {
@@ -300,7 +300,7 @@ UIButtonDefinitionResult game_state_find_ui_button(const char *name) {
     );
 }
 
-UIFontDefinitionResult game_state_find_ui_font(const char *name) {
+UIFontDefinitionResult ui_font_find_by_name(const char *name) {
     StateUIFont *font = state_find_ui_font_internal(name);
 
     if(font == NULL) {
@@ -312,7 +312,7 @@ UIFontDefinitionResult game_state_find_ui_font(const char *name) {
     return ERROR_RESULT_MAKE_VALUE(UIFontDefinitionResult, font->definition);
 }
 
-UILabelDefinitionResult game_state_find_ui_label(const char *name) {
+UILabelDefinitionResult ui_label_find_by_name(const char *name) {
     StateUILabel *label = state_find_ui_label_internal(name);
 
     if(label == NULL) {
@@ -324,7 +324,7 @@ UILabelDefinitionResult game_state_find_ui_label(const char *name) {
     return ERROR_RESULT_MAKE_VALUE(UILabelDefinitionResult, label->definition);
 }
 
-UISliderDefinitionResult game_state_find_ui_slider(const char *name) {
+UISliderDefinitionResult ui_slider_find_by_name(const char *name) {
     StateUISlider *slider = state_find_ui_slider_internal(name);
 
     if(slider == NULL) {
@@ -417,7 +417,6 @@ static EngineResult state_load_ui_label_definition(yyjson_val *value) {
 
 static EngineResult state_load_ui_slider_definition(yyjson_val *value) {
     yyjson_val *name;
-    yyjson_val *id;
     yyjson_val *range;
     yyjson_val *style;
     yyjson_val *field;
@@ -427,13 +426,11 @@ static EngineResult state_load_ui_slider_definition(yyjson_val *value) {
     yyjson_val *text_color;
     UISliderDefinition definition = {0};
     double number;
-    size_t i;
 
     if(!yyjson_is_obj(value) || state_ui_slider_count >= STATE_MAX_UI_SLIDERS) {
         return error_result_error(ERROR_ENGINE_STATE_INVALID);
     }
     name = yyjson_obj_get(value, "name");
-    id = yyjson_obj_get(value, "id");
     range = yyjson_obj_get(value, "range");
     style = yyjson_obj_get(value, "style");
     label = yyjson_obj_get(value, "label");
@@ -443,8 +440,6 @@ static EngineResult state_load_ui_slider_definition(yyjson_val *value) {
     definition.config = ui_default_slider_config();
     if(!yyjson_is_str(name) || yyjson_get_len(name) == 0
             || yyjson_get_len(name) >= UI_DEFINITION_NAME_MAX
-            || !yyjson_is_str(id) || yyjson_get_len(id) == 0
-            || yyjson_get_len(id) >= UI_ID_MAX
             || !state_vec2(yyjson_obj_get(value, "center"), &definition.config.center)
             || !state_number(value, "length", &number)
             || !isfinite(number) || number <= 0.0
@@ -560,38 +555,27 @@ static EngineResult state_load_ui_slider_definition(yyjson_val *value) {
             definition.config.style.step_button_gap = (float)yyjson_get_num(field);
         }
     }
-    for(i = 0; i < state_ui_slider_count; i += 1) {
-        if(strcmp(state_ui_sliders[i].definition.id, yyjson_get_str(id)) == 0) {
-            return error_result_error(ERROR_ENGINE_STATE_DUPLICATE_ASSET_DEFINITION);
-        }
-    }
-    for(i = 0; i < state_ui_button_count; i += 1) {
-        if(strcmp(state_ui_buttons[i].definition.id, yyjson_get_str(id)) == 0) {
-            return error_result_error(ERROR_ENGINE_STATE_DUPLICATE_ASSET_DEFINITION);
-        }
+    if(state_find_ui_button_internal(yyjson_get_str(name)) != NULL) {
+        return error_result_error(ERROR_ENGINE_STATE_DUPLICATE_ASSET_DEFINITION);
     }
     memcpy(definition.name, yyjson_get_str(name), yyjson_get_len(name) + 1);
-    memcpy(definition.id, yyjson_get_str(id), yyjson_get_len(id) + 1);
     state_ui_sliders[state_ui_slider_count++].definition = definition;
     return error_result_value(true);
 }
 
 static EngineResult state_load_ui_button_definition(yyjson_val *value) {
     yyjson_val *name;
-    yyjson_val *id;
     yyjson_val *label;
     yyjson_val *font;
     yyjson_val *text_color;
     yyjson_val *bounds;
     yyjson_val *style;
     UIButtonDefinition definition = {0};
-    size_t i;
 
     if(!yyjson_is_obj(value) || state_ui_button_count >= STATE_MAX_UI_BUTTONS) {
         return error_result_error(ERROR_ENGINE_STATE_INVALID);
     }
     name = yyjson_obj_get(value, "name");
-    id = yyjson_obj_get(value, "id");
     label = yyjson_obj_get(value, "label");
     font = yyjson_obj_get(value, "font");
     text_color = yyjson_obj_get(value, "text_color");
@@ -599,8 +583,6 @@ static EngineResult state_load_ui_button_definition(yyjson_val *value) {
     style = yyjson_obj_get(value, "style");
     if(!yyjson_is_str(name) || yyjson_get_len(name) == 0
             || yyjson_get_len(name) >= UI_DEFINITION_NAME_MAX
-            || !yyjson_is_str(id) || yyjson_get_len(id) == 0
-            || yyjson_get_len(id) >= UI_ID_MAX
             || (label != NULL && (!yyjson_is_str(label)
                 || yyjson_get_len(label) >= UI_LABEL_MAX))
             || (font != NULL && (!yyjson_is_str(font)
@@ -617,19 +599,11 @@ static EngineResult state_load_ui_button_definition(yyjson_val *value) {
     if(state_find_ui_button_internal(yyjson_get_str(name)) != NULL) {
         return error_result_error(ERROR_ENGINE_STATE_DUPLICATE_ASSET_DEFINITION);
     }
-    for(i = 0; i < state_ui_button_count; i += 1) {
-        if(strcmp(state_ui_buttons[i].definition.id, yyjson_get_str(id)) == 0) {
-            return error_result_error(ERROR_ENGINE_STATE_DUPLICATE_ASSET_DEFINITION);
-        }
-    }
-    for(i = 0; i < state_ui_slider_count; i += 1) {
-        if(strcmp(state_ui_sliders[i].definition.id, yyjson_get_str(id)) == 0) {
-            return error_result_error(ERROR_ENGINE_STATE_DUPLICATE_ASSET_DEFINITION);
-        }
+    if(state_find_ui_slider_internal(yyjson_get_str(name)) != NULL) {
+        return error_result_error(ERROR_ENGINE_STATE_DUPLICATE_ASSET_DEFINITION);
     }
 
     memcpy(definition.name, yyjson_get_str(name), yyjson_get_len(name) + 1);
-    memcpy(definition.id, yyjson_get_str(id), yyjson_get_len(id) + 1);
     if(label != NULL) {
         memcpy(definition.label, yyjson_get_str(label), yyjson_get_len(label) + 1);
     }
@@ -1953,7 +1927,6 @@ static yyjson_mut_val *state_write_ui_button(
     style = yyjson_mut_obj(document);
     if(definition == NULL || bounds == NULL || style == NULL) return NULL;
     yyjson_mut_obj_add_strcpy(document, definition, "name", button->name);
-    yyjson_mut_obj_add_strcpy(document, definition, "id", button->id);
     yyjson_mut_obj_add_strcpy(document, definition, "label", button->label);
     if(button->font[0] != '\0') {
         yyjson_mut_obj_add_strcpy(document, definition, "font", button->font);
@@ -2021,7 +1994,6 @@ static yyjson_mut_val *state_write_ui_slider(
     style = yyjson_mut_obj(document);
     if(definition == NULL || center == NULL || range == NULL || style == NULL) return NULL;
     yyjson_mut_obj_add_strcpy(document, definition, "name", slider->name);
-    yyjson_mut_obj_add_strcpy(document, definition, "id", slider->id);
     yyjson_mut_obj_add_strcpy(document, definition, "label", slider->label);
     yyjson_mut_obj_add_strcpy(document, definition, "font", slider->font);
     yyjson_mut_obj_add_strcpy(document, definition, "value_format", slider->value_format);

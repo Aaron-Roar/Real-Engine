@@ -49,7 +49,7 @@ int main(void) {
             goto fail;
         }
         UIButtonDefinitionResult settings_result =
-            rohr_game_state_find_ui_button("settings_button");
+            rohr_ui_button_find_by_name("settings_button");
         if(rohr_error_check(settings_result)) {
             PRINT_ENGINE_ERROR(settings_result);
             goto fail;
@@ -57,7 +57,7 @@ int main(void) {
         settings_button = settings_result.result.value;
 
         UIFontDefinitionResult font_result =
-            rohr_game_state_find_ui_font("menu_font");
+            rohr_ui_font_find_by_name("menu_font");
         if(rohr_error_check(font_result)) {
             PRINT_ENGINE_ERROR(font_result);
             goto fail;
@@ -65,7 +65,7 @@ int main(void) {
         font_definition = font_result.result.value;
 
         UILabelDefinitionResult title_result =
-            rohr_game_state_find_ui_label("example_title");
+            rohr_ui_label_find_by_name("example_title");
         if(rohr_error_check(title_result)) {
             PRINT_ENGINE_ERROR(title_result);
             goto fail;
@@ -73,7 +73,7 @@ int main(void) {
         title_definition = title_result.result.value;
 
         UILabelDefinitionResult play_result =
-            rohr_game_state_find_ui_label("play_label");
+            rohr_ui_label_find_by_name("play_label");
         if(rohr_error_check(play_result)) {
             PRINT_ENGINE_ERROR(play_result);
             goto fail;
@@ -81,7 +81,7 @@ int main(void) {
         play_definition = play_result.result.value;
 
         UILabelDefinitionResult description_result =
-            rohr_game_state_find_ui_label("example_description");
+            rohr_ui_label_find_by_name("example_description");
         if(rohr_error_check(description_result)) {
             PRINT_ENGINE_ERROR(description_result);
             goto fail;
@@ -89,7 +89,7 @@ int main(void) {
         description_definition = description_result.result.value;
 
         UISliderDefinitionResult slider_result =
-            rohr_game_state_find_ui_slider("angled_value_slider");
+            rohr_ui_slider_find_by_name("angled_value_slider");
         if(rohr_error_check(slider_result)) {
             PRINT_ENGINE_ERROR(slider_result);
             goto fail;
@@ -222,7 +222,7 @@ int main(void) {
         UIRect play_bounds = play_definition.bounds;
         UIButtonResult play = rohr_ui_button("main_menu.play", NULL, play_bounds, NULL);
         UIButtonResult settings = rohr_ui_button(
-            settings_button.id,
+            settings_button.name,
             &settings_label,
             settings_button.bounds,
             &settings_button.style
@@ -236,7 +236,7 @@ int main(void) {
             description_definition.bounds
         );
         UISliderResult slider = rohr_ui_slider_with_text(
-            value_slider.id,
+            value_slider.name,
             slider_value,
             &value_slider.config,
             &(UISliderText){
