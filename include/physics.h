@@ -211,10 +211,17 @@ typedef struct SoftBodyTriangle {
     Entity node_c;
 } SoftBodyTriangle;
 
+/** Explicit handles created when pinning a soft-body node to an anchor. */
+typedef struct SoftBodyNodeAnchorPin {
+    Entity joint;
+    JointAnchorId node_anchor;
+} SoftBodyNodeAnchorPin;
+
 ERROR_DECLARE_RESULT_TYPE(SoftBodyResult, SoftBody);
 ERROR_DECLARE_RESULT_TYPE(SoftBodyNodeResult, SoftBodyNode);
 ERROR_DECLARE_RESULT_TYPE(SoftBodyBeamResult, SoftBodyBeam);
 ERROR_DECLARE_RESULT_TYPE(SoftBodyTriangleResult, SoftBodyTriangle);
+ERROR_DECLARE_RESULT_TYPE(SoftBodyNodeAnchorPinResult, SoftBodyNodeAnchorPin);
 
 /** Pool storing positions by EntityIndex. */
 MEMORY_DECLARE_OBJECT_POOL(PositionPool, Position);
@@ -528,6 +535,10 @@ EngineResult physics_soft_body_node_force_for_one_tick_apply(Entity node, Force 
 EngineResult physics_soft_body_node_impulse_apply(Entity node, Vec2D impulse);
 EngineResult physics_soft_body_force_for_one_tick_apply(Entity soft_body, Force force);
 EngineResult physics_soft_body_torque_for_one_tick_apply(Entity soft_body, Torque torque);
+SoftBodyNodeAnchorPinResult physics_soft_body_node_to_anchor_pin_create(
+    Entity node,
+    JointAnchorId anchor
+);
 EntityResult physics_soft_body_beam_create(
     Entity soft_body,
     Entity node_a,

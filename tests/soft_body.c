@@ -7,6 +7,9 @@ int main(void) {
     EntityResult node_c;
     EntityResult beam;
     EntityResult triangle;
+    SoftBodyNodeAnchorPinResult attachment;
+    EntityResult rigid_body;
+    JointAnchorIdResult rigid_anchor;
     EntityIndexResult index_a;
     EntityIndexResult index_b;
 
@@ -41,10 +44,24 @@ int main(void) {
                 body.result.value, (Force){3.0f, 0.0f})) ||
             rohr_error_check(rohr_physics_soft_body_torque_for_one_tick_apply(
                 body.result.value, 2.0f))) goto fail;
+    rigid_body = rohr_entity_add();
+    if(rohr_error_check(rigid_body) ||
+            rohr_error_check(rohr_physics_position_set(rigid_body.result.value, (Position){0.0f, 0.0f})) ||
+            rohr_error_check(rohr_physics_mass_set(rigid_body.result.value, 4.0f)) ||
+            rohr_error_check(rohr_physics_velocity_set(rigid_body.result.value, (Velocity){0})) ||
+            rohr_error_check(rohr_physics_dynamic_set(rigid_body.result.value))) goto fail;
+    rigid_anchor = rohr_physics_joint_anchor_create(
+        rigid_body.result.value, (Vec2D){0.0f, 15.0f});
+    if(rohr_error_check(rigid_anchor)) goto fail;
+    attachment = rohr_physics_soft_body_node_to_anchor_pin_create(
+        node_c.result.value, rigid_anchor.result.value);
+    if(rohr_error_check(attachment) ||
+            !rohr_entity_alive_is(attachment.result.value.joint)) goto fail;
     if(rohr_error_check(rohr_entity_delete(body.result.value)) ||
             rohr_entity_alive_is(node_a.result.value) || rohr_entity_alive_is(node_b.result.value) ||
             rohr_entity_alive_is(node_c.result.value) || rohr_entity_alive_is(beam.result.value) ||
-            rohr_entity_alive_is(triangle.result.value)) goto fail;
+            rohr_entity_alive_is(triangle.result.value) ||
+            rohr_entity_alive_is(attachment.result.value.joint)) goto fail;
     {
         EntityResult collision_body = rohr_physics_soft_body_create();
         EntityResult collision_node;

@@ -1872,6 +1872,21 @@ Applies body-level torque as balanced node forces for the next physics tick.
 
 **Returns:** EngineResult describing success or failure.
 
+### `rohr_physics_soft_body_node_to_anchor_pin_create`
+
+```c
+SoftBodyNodeAnchorPinResult rohr_physics_soft_body_node_to_anchor_pin_create( Entity node, JointAnchorId anchor );
+```
+
+Pins a soft-body node to an existing anchor.
+
+| Parameter | Description |
+| --- | --- |
+| `node` | Soft-body node entity. |
+| `anchor` | Existing anchor to connect to the node. |
+
+**Returns:** SoftBodyNodeAnchorPinResult containing the joint and node-owned anchor. Remove node_anchor to remove both the attachment joint and the created anchor.
+
 ### `rohr_physics_soft_body_beam_create`
 
 ```c

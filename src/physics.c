@@ -1716,6 +1716,42 @@ EngineResult physics_soft_body_torque_for_one_tick_apply(Entity soft_body, Torqu
     return error_result_value(true);
 }
 
+SoftBodyNodeAnchorPinResult physics_soft_body_node_to_anchor_pin_create(
+        Entity node, JointAnchorId anchor) {
+    EntityIndex node_index;
+    JointAnchorIdResult node_anchor;
+    EntityResult joint;
+    EngineResult pin_result;
+
+    if(physics_live_index_get(node, &node_index).kind == ERROR_RESULT_ERROR ||
+            !entity_index_components_has(node_index, SOFT_BODY_NODE) ||
+            !soft_body_nodes_pool.used[node_index]) {
+        return ERROR_RESULT_MAKE_ERROR(SoftBodyNodeAnchorPinResult, ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    if(physics_joint_anchor_world_position_get(anchor).kind == ERROR_RESULT_ERROR) {
+        return ERROR_RESULT_MAKE_ERROR(SoftBodyNodeAnchorPinResult, ERROR_ENGINE_ENTITY_NOT_FOUND);
+    }
+    node_anchor = physics_joint_anchor_create(node, (Vec2D){0.0f, 0.0f});
+    if(node_anchor.kind == ERROR_RESULT_ERROR) {
+        return ERROR_RESULT_MAKE_ERROR(SoftBodyNodeAnchorPinResult, node_anchor.result.error);
+    }
+    joint = entity_add();
+    if(joint.kind == ERROR_RESULT_ERROR) {
+        (void)physics_joint_anchor_remove(node_anchor.result.value);
+        return ERROR_RESULT_MAKE_ERROR(SoftBodyNodeAnchorPinResult, joint.result.error);
+    }
+    pin_result = physics_joint_pin_set(joint.result.value, node_anchor.result.value, anchor);
+    if(pin_result.kind == ERROR_RESULT_ERROR) {
+        (void)entity_delete(joint.result.value);
+        (void)physics_joint_anchor_remove(node_anchor.result.value);
+        return ERROR_RESULT_MAKE_ERROR(SoftBodyNodeAnchorPinResult, pin_result.result.error);
+    }
+    return ERROR_RESULT_MAKE_VALUE(SoftBodyNodeAnchorPinResult, ((SoftBodyNodeAnchorPin){
+        .joint = joint.result.value,
+        .node_anchor = node_anchor.result.value
+    }));
+}
+
 EntityResult physics_soft_body_beam_create(Entity soft_body, Entity node_a, Entity node_b,
         float stiffness, float damping) {
     EntityIndex body_index;

@@ -212,6 +212,7 @@ EngineResult rohr_physics_soft_body_node_force_for_one_tick_apply(Entity node, F
 EngineResult rohr_physics_soft_body_node_impulse_apply(Entity node, Vec2D impulse) { return physics_soft_body_node_impulse_apply(node, impulse); }
 EngineResult rohr_physics_soft_body_force_for_one_tick_apply(Entity soft_body, Force force) { return physics_soft_body_force_for_one_tick_apply(soft_body, force); }
 EngineResult rohr_physics_soft_body_torque_for_one_tick_apply(Entity soft_body, Torque torque) { return physics_soft_body_torque_for_one_tick_apply(soft_body, torque); }
+SoftBodyNodeAnchorPinResult rohr_physics_soft_body_node_to_anchor_pin_create(Entity node, JointAnchorId anchor) { return physics_soft_body_node_to_anchor_pin_create(node, anchor); }
 EntityResult rohr_physics_soft_body_beam_create(Entity soft_body, Entity node_a, Entity node_b, float stiffness, float damping) { return physics_soft_body_beam_create(soft_body, node_a, node_b, stiffness, damping); }
 SoftBodyBeamResult rohr_physics_soft_body_beam_get(Entity beam) { return physics_soft_body_beam_get(beam); }
 EntityResult rohr_physics_soft_body_triangle_create(Entity soft_body, Entity node_a, Entity node_b, Entity node_c) { return physics_soft_body_triangle_create(soft_body, node_a, node_b, node_c); }

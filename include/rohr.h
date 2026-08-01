@@ -1013,6 +1013,17 @@ EngineResult rohr_physics_soft_body_force_for_one_tick_apply(Entity soft_body, F
  */
 EngineResult rohr_physics_soft_body_torque_for_one_tick_apply(Entity soft_body, Torque torque);
 /**
+ * @brief Pins a soft-body node to an existing anchor.
+ * @param node Soft-body node entity.
+ * @param anchor Existing anchor to connect to the node.
+ * @return SoftBodyNodeAnchorPinResult containing the joint and node-owned anchor.
+ * Remove node_anchor to remove both the attachment joint and the created anchor.
+ */
+SoftBodyNodeAnchorPinResult rohr_physics_soft_body_node_to_anchor_pin_create(
+    Entity node,
+    JointAnchorId anchor
+);
+/**
  * @brief Creates an elastic beam between two nodes.
  * @param soft_body Owning soft body.
  * @param node_a First node.
