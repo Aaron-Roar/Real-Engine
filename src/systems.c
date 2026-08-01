@@ -703,6 +703,11 @@ void system_apply_collisions_tuned(void) {
                                 continue;
                             }
                             add_pair(entity_1,entity_2);
+                            if(!physics_collision_between_is(entity_1, entity_2)) {
+                                system_collision_report_by_index_set(entity_1, entity_2, false);
+                                system_collision_report_by_index_set(entity_2, entity_1, false);
+                                continue;
+                            }
                             Collision collision = system_entity_collision_get(entity_1, entity_2);
                             if(collision.overlap == true) {
                                 system_collision_report_by_index_set(entity_1, entity_2, true);
@@ -740,6 +745,9 @@ void system_apply_collisions(void) {
         }
 
         for(int j = i + 1; j < MAX_ENTITIES; j += 1) {
+            Entity entity_1;
+            Entity entity_2;
+
             if(!entity_index_alive_is(j)) {
                 continue;
             }
@@ -748,6 +756,14 @@ void system_apply_collisions(void) {
             }
 
             if(!entity_index_components_has(i, HIT_BOX) || !entity_index_components_has(j, HIT_BOX)) {
+                continue;
+            }
+            if(!system_entity_from_index(i, &entity_1) || !system_entity_from_index(j, &entity_2)) {
+                continue;
+            }
+            if(!physics_collision_between_is(entity_1, entity_2)) {
+                system_collision_report_by_index_set(i, j, false);
+                system_collision_report_by_index_set(j, i, false);
                 continue;
             }
             Collision collision = system_entity_collision_get(i, j);

@@ -707,6 +707,23 @@ EngineResult rohr_physics_apply_torque_for_one_tick(Entity entity, Torque t);
  */
 EngineResult rohr_physics_hitbox_set(Entity entity, Shape hitbox);
 
+/** Return the default collision filtering configuration. */
+CollisionFilterConfig rohr_physics_collision_filter_default_config(void);
+/** Replace an entity's collision category and whitelist. */
+EngineResult rohr_physics_collision_filter_set(Entity entity, CollisionFilterConfig config);
+/** Return an entity's collision filtering configuration. */
+CollisionFilterConfigResult rohr_physics_collision_filter_get(Entity entity);
+/** Set the collision categories represented by an entity. */
+EngineResult rohr_physics_collision_category_set(Entity entity, RohrCollisionCategoryMask category);
+/** Set the collision category whitelist for an entity. */
+EngineResult rohr_physics_collision_with_set(Entity entity, RohrCollisionCategoryMask categories);
+/** Allow an entity to collide with every category. */
+EngineResult rohr_physics_collision_with_all_set(Entity entity);
+/** Prevent an entity from colliding with every category. */
+EngineResult rohr_physics_collision_with_none_set(Entity entity);
+/** Return whether two entities mutually permit collision checks. */
+bool rohr_physics_collision_between_is(Entity entity_1, Entity entity_2);
+
 /**
  * @brief Sets an entity orientation component value.
  * @param entity Entity to modify.

@@ -15,6 +15,7 @@ MEMORY_DEFINE_OBJECT_POOL(MassPool, float)
 MEMORY_DEFINE_OBJECT_POOL(ForcePool, Force)
 MEMORY_DEFINE_OBJECT_POOL(ShapePool, Shape)
 MEMORY_DEFINE_OBJECT_POOL(CollisionReportPool, CollisionReport)
+MEMORY_DEFINE_OBJECT_POOL(CollisionFilterConfigPool, CollisionFilterConfig)
 MEMORY_DEFINE_OBJECT_POOL(OrientationPool, Orientation)
 MEMORY_DEFINE_OBJECT_POOL(AngularVelocityPool, AngularVelocity)
 MEMORY_DEFINE_OBJECT_POOL(AngularAccelerationPool, AngularAcceleration)
@@ -36,6 +37,7 @@ ForcePool forces_pool = {0};
 ShapePool hit_boxes_pool = {0};
 ShapePool world_hit_boxes_pool = {0};
 CollisionReportPool collision_reports_pool = {0};
+CollisionFilterConfigPool collision_filters_pool = {0};
 AngularVelocityPool angular_velocities_pool = {0};
 AngularAccelerationPool angular_accelerations_pool = {0};
 AngularVelocityPool torque_angular_accelerations_pool = {0};
@@ -60,6 +62,7 @@ EngineResult physics_tables_init(void) {
     if(ShapePool_init(&hit_boxes_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(ShapePool_init(&world_hit_boxes_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(CollisionReportPool_init(&collision_reports_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
+    if(CollisionFilterConfigPool_init(&collision_filters_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(AngularVelocityPool_init(&angular_velocities_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(AngularAccelerationPool_init(&angular_accelerations_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(AngularVelocityPool_init(&torque_angular_accelerations_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
@@ -103,6 +106,7 @@ EngineResult physics_tables_ensure_capacity(size_t capacity) {
     if(new_capacity > hit_boxes_pool.capacity && ShapePool_expand(&hit_boxes_pool, new_capacity - hit_boxes_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
     if(new_capacity > world_hit_boxes_pool.capacity && ShapePool_expand(&world_hit_boxes_pool, new_capacity - world_hit_boxes_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
     if(new_capacity > collision_reports_pool.capacity && CollisionReportPool_expand(&collision_reports_pool, new_capacity - collision_reports_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
+    if(new_capacity > collision_filters_pool.capacity && CollisionFilterConfigPool_expand(&collision_filters_pool, new_capacity - collision_filters_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
     if(new_capacity > angular_velocities_pool.capacity && AngularVelocityPool_expand(&angular_velocities_pool, new_capacity - angular_velocities_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
     if(new_capacity > angular_accelerations_pool.capacity && AngularAccelerationPool_expand(&angular_accelerations_pool, new_capacity - angular_accelerations_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
     if(new_capacity > torque_angular_accelerations_pool.capacity && AngularVelocityPool_expand(&torque_angular_accelerations_pool, new_capacity - torque_angular_accelerations_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
@@ -127,6 +131,7 @@ void physics_tables_destroy(void) {
     (void)ShapePool_destroy(&hit_boxes_pool);
     (void)ShapePool_destroy(&world_hit_boxes_pool);
     (void)CollisionReportPool_destroy(&collision_reports_pool);
+    (void)CollisionFilterConfigPool_destroy(&collision_filters_pool);
     (void)AngularVelocityPool_destroy(&angular_velocities_pool);
     (void)AngularAccelerationPool_destroy(&angular_accelerations_pool);
     (void)AngularVelocityPool_destroy(&torque_angular_accelerations_pool);
@@ -741,6 +746,78 @@ EngineResult physics_hitbox_set(Entity entity, Shape hitbox) {
     (void)ShapePool_store_at(&hit_boxes_pool, index, hitbox);
     console_debug_write(LOG_ENGINE, "Set Entity: %d to have a hit box\n", entity);
     return error_result_value(true);
+}
+
+CollisionFilterConfig physics_collision_filter_default_config(void) {
+    return (CollisionFilterConfig) {
+        .category = ROHR_COLLISION_CATEGORY_DEFAULT,
+        .collides_with = ROHR_COLLISION_CATEGORY_ALL
+    };
+}
+
+EngineResult physics_collision_filter_set(Entity entity, CollisionFilterConfig config) {
+    EntityIndex index;
+    EngineResult result = physics_live_index_get(entity, &index);
+
+    if(result.kind == ERROR_RESULT_ERROR) return result;
+    if(!entity_index_components_has(index, HIT_BOX)) {
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    if(CollisionFilterConfigPool_store_at(&collision_filters_pool, index, config).kind
+            == ERROR_RESULT_ERROR) {
+        return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED);
+    }
+    entity_mask[index] |= COLLISION_FILTER;
+    return error_result_value(true);
+}
+
+CollisionFilterConfigResult physics_collision_filter_get(Entity entity) {
+    EntityIndex index;
+    EngineResult result = physics_live_index_get(entity, &index);
+
+    if(result.kind == ERROR_RESULT_ERROR) {
+        return ERROR_RESULT_MAKE_ERROR(CollisionFilterConfigResult, result.result.error);
+    }
+    if(!entity_index_components_has(index, HIT_BOX)) {
+        return ERROR_RESULT_MAKE_ERROR(CollisionFilterConfigResult, ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    if(!entity_index_components_has(index, COLLISION_FILTER)) {
+        return ERROR_RESULT_MAKE_VALUE(CollisionFilterConfigResult, physics_collision_filter_default_config());
+    }
+    return ERROR_RESULT_MAKE_VALUE(CollisionFilterConfigResult, collision_filters[index]);
+}
+
+EngineResult physics_collision_category_set(Entity entity, RohrCollisionCategoryMask category) {
+    CollisionFilterConfigResult result = physics_collision_filter_get(entity);
+
+    if(result.kind == ERROR_RESULT_ERROR) return error_result_error(result.result.error);
+    result.result.value.category = category;
+    return physics_collision_filter_set(entity, result.result.value);
+}
+
+EngineResult physics_collision_with_set(Entity entity, RohrCollisionCategoryMask categories) {
+    CollisionFilterConfigResult result = physics_collision_filter_get(entity);
+
+    if(result.kind == ERROR_RESULT_ERROR) return error_result_error(result.result.error);
+    result.result.value.collides_with = categories;
+    return physics_collision_filter_set(entity, result.result.value);
+}
+
+EngineResult physics_collision_with_all_set(Entity entity) {
+    return physics_collision_with_set(entity, ROHR_COLLISION_CATEGORY_ALL);
+}
+
+EngineResult physics_collision_with_none_set(Entity entity) {
+    return physics_collision_with_set(entity, ROHR_COLLISION_CATEGORY_NONE);
+}
+
+bool physics_collision_between_is(Entity entity_1, Entity entity_2) {
+    CollisionFilterConfigResult first = physics_collision_filter_get(entity_1);
+    CollisionFilterConfigResult second = physics_collision_filter_get(entity_2);
+
+    if(first.kind == ERROR_RESULT_ERROR || second.kind == ERROR_RESULT_ERROR) return false;
+    return (first.result.value.collides_with & second.result.value.category) != 0
+        && (second.result.value.collides_with & first.result.value.category) != 0;
 }
 EngineResult physics_orientation_set(Entity entity, Orientation angle) {
     EntityIndex index;

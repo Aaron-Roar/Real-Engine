@@ -1282,6 +1282,70 @@ Sets an entity hitbox component value.
 
 **Returns:** EngineResult describing success or failure.
 
+### `rohr_physics_collision_filter_default_config`
+
+```c
+CollisionFilterConfig rohr_physics_collision_filter_default_config(void);
+```
+
+ Return the default collision filtering configuration.
+
+### `rohr_physics_collision_filter_set`
+
+```c
+EngineResult rohr_physics_collision_filter_set(Entity entity, CollisionFilterConfig config);
+```
+
+ Replace an entity's collision category and whitelist.
+
+### `rohr_physics_collision_filter_get`
+
+```c
+CollisionFilterConfigResult rohr_physics_collision_filter_get(Entity entity);
+```
+
+ Return an entity's collision filtering configuration.
+
+### `rohr_physics_collision_category_set`
+
+```c
+EngineResult rohr_physics_collision_category_set(Entity entity, RohrCollisionCategoryMask category);
+```
+
+ Set the collision categories represented by an entity.
+
+### `rohr_physics_collision_with_set`
+
+```c
+EngineResult rohr_physics_collision_with_set(Entity entity, RohrCollisionCategoryMask categories);
+```
+
+ Set the collision category whitelist for an entity.
+
+### `rohr_physics_collision_with_all_set`
+
+```c
+EngineResult rohr_physics_collision_with_all_set(Entity entity);
+```
+
+ Allow an entity to collide with every category.
+
+### `rohr_physics_collision_with_none_set`
+
+```c
+EngineResult rohr_physics_collision_with_none_set(Entity entity);
+```
+
+ Prevent an entity from colliding with every category.
+
+### `rohr_physics_collision_between_is`
+
+```c
+bool rohr_physics_collision_between_is(Entity entity_1, Entity entity_2);
+```
+
+ Return whether two entities mutually permit collision checks.
+
 ### `rohr_physics_orientation_set`
 
 ```c

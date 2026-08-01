@@ -160,6 +160,14 @@ EngineResult rohr_physics_torque_component_set(Entity entity, Torque torque) {
 }
 EngineResult rohr_physics_apply_torque_for_one_tick(Entity entity, Torque t) { return physics_apply_torque_for_one_tick(entity, t); }
 EngineResult rohr_physics_hitbox_set(Entity entity, Shape hitbox) { return physics_hitbox_set(entity, hitbox); }
+CollisionFilterConfig rohr_physics_collision_filter_default_config(void) { return physics_collision_filter_default_config(); }
+EngineResult rohr_physics_collision_filter_set(Entity entity, CollisionFilterConfig config) { return physics_collision_filter_set(entity, config); }
+CollisionFilterConfigResult rohr_physics_collision_filter_get(Entity entity) { return physics_collision_filter_get(entity); }
+EngineResult rohr_physics_collision_category_set(Entity entity, RohrCollisionCategoryMask category) { return physics_collision_category_set(entity, category); }
+EngineResult rohr_physics_collision_with_set(Entity entity, RohrCollisionCategoryMask categories) { return physics_collision_with_set(entity, categories); }
+EngineResult rohr_physics_collision_with_all_set(Entity entity) { return physics_collision_with_all_set(entity); }
+EngineResult rohr_physics_collision_with_none_set(Entity entity) { return physics_collision_with_none_set(entity); }
+bool rohr_physics_collision_between_is(Entity entity_1, Entity entity_2) { return physics_collision_between_is(entity_1, entity_2); }
 EngineResult rohr_physics_orientation_set(Entity entity, Orientation angle) { return physics_orientation_set(entity, angle); }
 EngineResult rohr_physics_angular_velocity_set(Entity entity, AngularVelocity v) { return physics_angular_velocity_set(entity, v); }
 ShapeResult rohr_physics_global_hit_box_get(Entity entity) { return physics_global_hit_box_get(entity); }

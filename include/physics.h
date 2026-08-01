@@ -15,6 +15,27 @@ typedef struct Collision {
     Vec1D depth;
 } Collision;
 
+/** Bit mask describing one or more collision categories. */
+typedef uint64_t RohrCollisionCategoryMask;
+
+/** Default collision category assigned to colliders. */
+#define ROHR_COLLISION_CATEGORY_DEFAULT UINT64_C(1)
+/** Mask matching every collision category. */
+#define ROHR_COLLISION_CATEGORY_ALL UINT64_MAX
+/** Mask matching no collision categories. */
+#define ROHR_COLLISION_CATEGORY_NONE UINT64_C(0)
+
+/** Collision filtering configuration owned by one collider entity. */
+typedef struct CollisionFilterConfig {
+    /** Categories represented by this collider. */
+    RohrCollisionCategoryMask category;
+    /** Categories this collider permits collision checks against. */
+    RohrCollisionCategoryMask collides_with;
+} CollisionFilterConfig;
+
+/** Result type for functions returning collision filter configuration. */
+ERROR_DECLARE_RESULT_TYPE(CollisionFilterConfigResult, CollisionFilterConfig);
+
 /** Per-target collision state table for one entity. */
 typedef struct {
     /** Collision flags indexed by target EntityIndex. */
@@ -137,6 +158,8 @@ MEMORY_DECLARE_OBJECT_POOL(ForcePool, Force);
 MEMORY_DECLARE_OBJECT_POOL(ShapePool, Shape);
 /** Pool storing collision reports by EntityIndex. */
 MEMORY_DECLARE_OBJECT_POOL(CollisionReportPool, CollisionReport);
+/** Pool storing collision filters by EntityIndex. */
+MEMORY_DECLARE_OBJECT_POOL(CollisionFilterConfigPool, CollisionFilterConfig);
 /** Pool storing orientations by EntityIndex. */
 MEMORY_DECLARE_OBJECT_POOL(OrientationPool, Orientation);
 /** Pool storing angular velocities by EntityIndex. */
@@ -167,6 +190,7 @@ extern AccelerationPool force_accelerations_pool;
 extern ShapePool hit_boxes_pool;
 extern ShapePool world_hit_boxes_pool;
 extern CollisionReportPool collision_reports_pool;
+extern CollisionFilterConfigPool collision_filters_pool;
 extern OrientationPool orientations_pool;
 extern AngularVelocityPool angular_velocities_pool;
 extern AngularAccelerationPool angular_accelerations_pool;
@@ -187,6 +211,7 @@ extern JointPool joints_pool;
 #define hit_boxes hit_boxes_pool.objects
 #define world_hit_boxes world_hit_boxes_pool.objects
 #define collision_reports collision_reports_pool.objects
+#define collision_filters collision_filters_pool.objects
 #define orientations orientations_pool.objects
 #define angular_velocities angular_velocities_pool.objects
 #define angular_accelerations angular_accelerations_pool.objects
@@ -298,6 +323,22 @@ EngineResult physics_torque_component_set(Entity entity, Torque torque);
 EngineResult physics_apply_torque_for_one_tick(Entity entity, Torque t);
 /** Set an entity's hitbox and add collision/hitbox components. */
 EngineResult physics_hitbox_set(Entity entity, Shape hitbox);
+/** Return the default collision filter: default category against all categories. */
+CollisionFilterConfig physics_collision_filter_default_config(void);
+/** Replace an entity's complete collision filter. */
+EngineResult physics_collision_filter_set(Entity entity, CollisionFilterConfig config);
+/** Return an entity's collision filter. Colliders without an override use defaults. */
+CollisionFilterConfigResult physics_collision_filter_get(Entity entity);
+/** Set the categories represented by an entity. */
+EngineResult physics_collision_category_set(Entity entity, RohrCollisionCategoryMask category);
+/** Set the category whitelist an entity can collide with. */
+EngineResult physics_collision_with_set(Entity entity, RohrCollisionCategoryMask categories);
+/** Allow an entity to collide with every category. */
+EngineResult physics_collision_with_all_set(Entity entity);
+/** Prevent an entity from colliding with every category. */
+EngineResult physics_collision_with_none_set(Entity entity);
+/** Return whether two entities mutually permit collision checks. */
+bool physics_collision_between_is(Entity entity_1, Entity entity_2);
 /** Set an entity's orientation in radians. */
 EngineResult physics_orientation_set(Entity entity, Orientation angle);
 /** Set an entity's angular velocity. */

@@ -114,6 +114,8 @@ typedef enum {
     GROUP                       = 1 << 19,
     /** Entity has a human-readable name used for state-file references. */
     ENTITY_NAME                 = 1 << 20,
+    /** Entity overrides the default collision category filtering. */
+    COLLISION_FILTER            = 1 << 21,
 } Component;
 
 /** Fixed-size, engine-owned entity name. */
