@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include "rohr.h"
+#include "example_runtime.h"
 
 #define PRINT_ENGINE_ERROR(engine_result) \
     fprintf(stderr, "%s\n", rohr_error_default_message((engine_result).result.error))
 
 int main(void) {
+    if(!example_use_executable_directory()) return 1;
     MouseState mouse = {0};
     bool running = true;
     FontAsset font = {0};

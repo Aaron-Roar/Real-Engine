@@ -15,6 +15,7 @@ add_custom_command(
 )
 
 add_executable(pong src/main.c ${generated_header} ${generated_source})
+rohr_add_example_runtime(pong)
 target_include_directories(pong PRIVATE ${generated_dir})
 target_link_libraries(pong PRIVATE rohr_editor)
 rohr_stage_example_assets(pong editor/pong)

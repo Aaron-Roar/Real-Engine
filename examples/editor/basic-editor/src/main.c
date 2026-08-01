@@ -1,8 +1,10 @@
 #include "rohr_editor.h"
+#include "example_runtime.h"
 
 #include <stdio.h>
 
 int main(void) {
+    if(!example_use_executable_directory()) return 1;
     EngineResult engine_result = rohr_engine_init();
     if(rohr_error_check(engine_result)) {
         fprintf(stderr, "%s\n", rohr_error_default_message(engine_result.result.error));

@@ -1,4 +1,5 @@
 add_executable(flies_around_ball src/main.c ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/elder-fly/elderfly_descriptors.c)
+rohr_add_example_runtime(flies_around_ball)
 target_include_directories(flies_around_ball PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../shared)
 target_link_libraries(flies_around_ball PRIVATE rohr_engine)
 rohr_stage_example_assets(flies_around_ball engine-core/flies-around-ball)

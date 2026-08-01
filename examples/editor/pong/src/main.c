@@ -1,5 +1,6 @@
 #include "rohr_editor.h"
 #include "game_components.h"
+#include "example_runtime.h"
 #include <stdio.h>
 
 static const Color background_color = {18, 22, 30, 255};
@@ -78,6 +79,7 @@ static EngineResult pong_constrain_paddle(
 }
 
 int main(void) {
+    if(!example_use_executable_directory()) return 1;
     KeyboardState keyboard = {0};
     Controller left_controller = rohr_controller_default_wasd();
     Controller right_controller = rohr_controller_default_arrows();

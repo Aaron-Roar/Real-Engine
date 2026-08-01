@@ -1,4 +1,5 @@
 #include "rohr.h"
+#include "example_runtime.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -166,6 +167,7 @@ static EngineResult reset_level(
 }
 
 int main(void) {
+    if(!example_use_executable_directory()) return 1;
     KeyboardState keyboard = {0};
     ObstacleRecord obstacle_records[MAX_OBSTACLE_RECORDS] = {0};
     size_t next_obstacle_record = 0;

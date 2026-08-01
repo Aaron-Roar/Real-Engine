@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include "rohr.h"
+#include "example_runtime.h"
 
 int main(void) {
+    if(!example_use_executable_directory()) return 1;
     const char *paths[] = {
         "assets/world.json",
         "assets/relationships.json"

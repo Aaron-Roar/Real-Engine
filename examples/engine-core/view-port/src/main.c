@@ -1,4 +1,5 @@
 #include "rohr.h"
+#include "example_runtime.h"
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
@@ -15,6 +16,7 @@ const float camera_turn_speed = PI_F * 0.5f;
     fprintf(stderr, "%s\n", rohr_error_default_message((engine_result).result.error))
 
 int main(void) {
+    if(!example_use_executable_directory()) return 1;
     {
         EngineResult init_result = rohr_engine_init();
         if(rohr_error_check(init_result)) {

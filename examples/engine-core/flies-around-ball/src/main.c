@@ -1,4 +1,5 @@
 #include "rohr.h"
+#include "example_runtime.h"
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
@@ -17,6 +18,7 @@ const Torque ball_control_torque = 2000000.0f;
     fprintf(stderr, "%s\n", rohr_error_default_message((engine_result).result.error))
 
 int main(void) {
+    if(!example_use_executable_directory()) return 1;
     GroupId children_group = GROUP_INVALID;
     KeyboardState keyboard = {0};
 

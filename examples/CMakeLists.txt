@@ -1,5 +1,10 @@
 set(ROHR_EXAMPLES_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR})
 
+function(rohr_add_example_runtime target)
+    target_sources(${target} PRIVATE ${ROHR_EXAMPLES_SOURCE_DIR}/shared/example_runtime.c)
+    target_include_directories(${target} PRIVATE ${ROHR_EXAMPLES_SOURCE_DIR}/shared)
+endfunction()
+
 function(rohr_stage_example_assets target project_dir)
     set(runtime_dir ${CMAKE_BINARY_DIR}/example-projects/${project_dir})
     set_target_properties(${target} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${runtime_dir})
