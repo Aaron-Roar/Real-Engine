@@ -3,12 +3,13 @@
 
 #include <stdio.h>
 
-#define BODY_COUNT 5
+#define BODY_COUNT 6
 
 static const Color background_color = {18, 22, 30, 255};
 static const Color wall_color = {90, 100, 115, 255};
 static const Color pin_color = {70, 170, 255, 255};
 static const Color weld_color = {255, 105, 120, 255};
+static const Color weld_secondary_color = {185, 55, 75, 255};
 static const Color spring_color = {245, 190, 65, 255};
 static const Color joint_color = {235, 240, 245, 255};
 static const RohrCollisionCategoryMask room_category = UINT64_C(1) << 1;
@@ -53,16 +54,6 @@ static Entity body_create(Position position, Vec2D dimensions,
     return entity;
 }
 
-static Entity anchor_entity_create(Position position) {
-    EntityResult result = rohr_entity_add();
-
-    if(rohr_error_check(result) ||
-            !result_ok(rohr_physics_position_set(result.result.value, position)) ||
-            !result_ok(rohr_physics_orientation_set(result.result.value, 0.0f)) ||
-            !result_ok(rohr_physics_static_set(result.result.value))) return ENTITY_INVALID;
-    return result.result.value;
-}
-
 static Entity joint_entity_create(void) {
     EntityResult result = rohr_entity_add();
     return rohr_error_check(result) ? ENTITY_INVALID : result.result.value;
@@ -80,7 +71,6 @@ static bool room_create(Entity walls[4]) {
 int main(void) {
     Entity walls[4];
     Entity bodies[BODY_COUNT];
-    Entity pin_anchor_entity;
     Entity pin_joint;
     Entity weld_joint;
     Entity spring_joint;
@@ -102,30 +92,32 @@ int main(void) {
             !result_ok(rohr_graphics_start())) goto fail;
     if(!room_create(walls)) goto fail;
 
-    pin_anchor_entity = anchor_entity_create((Position){-180.0f, 120.0f});
-    bodies[0] = body_create((Position){-180.0f, 70.0f}, (Vec2D){70.0f, 24.0f}, 3.0f, pin_category, true);
+    bodies[0] = body_create((Position){-220.0f, 110.0f}, (Vec2D){70.0f, 22.0f}, 3.0f, pin_category, true);
+    bodies[1] = body_create((Position){-150.0f, 110.0f}, (Vec2D){70.0f, 22.0f}, 3.0f, pin_category, true);
     pin_joint = joint_entity_create();
-    anchor_a = rohr_physics_joint_anchor_create(pin_anchor_entity, (Vec2D){0.0f, 0.0f});
-    anchor_b = rohr_physics_joint_anchor_create(bodies[0], (Vec2D){0.0f, 50.0f});
-    if(pin_anchor_entity == ENTITY_INVALID || bodies[0] == ENTITY_INVALID || pin_joint == ENTITY_INVALID ||
+    anchor_a = rohr_physics_joint_anchor_create(bodies[0], (Vec2D){35.0f, 0.0f});
+    anchor_b = rohr_physics_joint_anchor_create(bodies[1], (Vec2D){-35.0f, 0.0f});
+    if(bodies[0] == ENTITY_INVALID || bodies[1] == ENTITY_INVALID || pin_joint == ENTITY_INVALID ||
             rohr_error_check(anchor_a) || rohr_error_check(anchor_b) ||
             !result_ok(rohr_physics_joint_pin_set(pin_joint, anchor_a.result.value, anchor_b.result.value))) goto fail;
 
-    bodies[1] = body_create((Position){-45.0f, 60.0f}, (Vec2D){55.0f, 30.0f}, 2.0f, weld_category, true);
-    bodies[2] = body_create((Position){10.0f, 60.0f}, (Vec2D){55.0f, 30.0f}, 4.0f, weld_category, true);
+    bodies[2] = body_create((Position){-55.0f, 30.0f}, (Vec2D){60.0f, 22.0f}, 2.0f, weld_category, true);
+    bodies[3] = body_create((Position){-25.0f, 60.0f}, (Vec2D){60.0f, 22.0f}, 4.0f, weld_category, true);
+    if(bodies[3] != ENTITY_INVALID &&
+            !result_ok(rohr_physics_orientation_set(bodies[3], PI_F * 0.5f))) goto fail;
     weld_joint = joint_entity_create();
-    anchor_a = rohr_physics_joint_anchor_create(bodies[1], (Vec2D){27.5f, 0.0f});
-    anchor_b = rohr_physics_joint_anchor_create(bodies[2], (Vec2D){-27.5f, 0.0f});
-    if(bodies[1] == ENTITY_INVALID || bodies[2] == ENTITY_INVALID || weld_joint == ENTITY_INVALID ||
+    anchor_a = rohr_physics_joint_anchor_create(bodies[2], (Vec2D){30.0f, 0.0f});
+    anchor_b = rohr_physics_joint_anchor_create(bodies[3], (Vec2D){-30.0f, 0.0f});
+    if(bodies[2] == ENTITY_INVALID || bodies[3] == ENTITY_INVALID || weld_joint == ENTITY_INVALID ||
             rohr_error_check(anchor_a) || rohr_error_check(anchor_b) ||
             !result_ok(rohr_physics_joint_weld_set(weld_joint, anchor_a.result.value, anchor_b.result.value))) goto fail;
 
-    bodies[3] = body_create((Position){105.0f, -70.0f}, (Vec2D){38.0f, 38.0f}, 2.0f, spring_category, true);
-    bodies[4] = body_create((Position){215.0f, -70.0f}, (Vec2D){38.0f, 38.0f}, 2.0f, spring_category, true);
+    bodies[4] = body_create((Position){105.0f, -70.0f}, (Vec2D){38.0f, 38.0f}, 2.0f, spring_category, true);
+    bodies[5] = body_create((Position){215.0f, -70.0f}, (Vec2D){38.0f, 38.0f}, 2.0f, spring_category, true);
     spring_joint = joint_entity_create();
-    anchor_a = rohr_physics_joint_anchor_create(bodies[3], (Vec2D){0.0f, 0.0f});
-    anchor_b = rohr_physics_joint_anchor_create(bodies[4], (Vec2D){0.0f, 0.0f});
-    if(bodies[3] == ENTITY_INVALID || bodies[4] == ENTITY_INVALID || spring_joint == ENTITY_INVALID ||
+    anchor_a = rohr_physics_joint_anchor_create(bodies[4], (Vec2D){0.0f, 0.0f});
+    anchor_b = rohr_physics_joint_anchor_create(bodies[5], (Vec2D){0.0f, 0.0f});
+    if(bodies[4] == ENTITY_INVALID || bodies[5] == ENTITY_INVALID || spring_joint == ENTITY_INVALID ||
             rohr_error_check(anchor_a) || rohr_error_check(anchor_b) ||
             !result_ok(rohr_physics_joint_spring_set(
                 spring_joint,
@@ -160,10 +152,11 @@ int main(void) {
         rohr_graphics_draw_background(background_color);
         for(uint32_t i = 0; i < 4; i += 1) rohr_graphics_draw_hit_box_colored(walls[i], GRAPHICS_FILLED, wall_color);
         rohr_graphics_draw_hit_box_colored(bodies[0], GRAPHICS_FILLED, pin_color);
-        rohr_graphics_draw_hit_box_colored(bodies[1], GRAPHICS_FILLED, weld_color);
+        rohr_graphics_draw_hit_box_colored(bodies[1], GRAPHICS_FILLED, pin_color);
         rohr_graphics_draw_hit_box_colored(bodies[2], GRAPHICS_FILLED, weld_color);
-        rohr_graphics_draw_hit_box_colored(bodies[3], GRAPHICS_FILLED, spring_color);
+        rohr_graphics_draw_hit_box_colored(bodies[3], GRAPHICS_FILLED, weld_secondary_color);
         rohr_graphics_draw_hit_box_colored(bodies[4], GRAPHICS_FILLED, spring_color);
+        rohr_graphics_draw_hit_box_colored(bodies[5], GRAPHICS_FILLED, spring_color);
         rohr_graphics_draw_joints(joint_color);
         rohr_graphics_show();
     }
