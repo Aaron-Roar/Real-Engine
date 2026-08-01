@@ -261,6 +261,10 @@ EngineResult rohr_camera_set_enable(CameraId camera) { return graphics_camera_se
 EngineResult rohr_camera_set_disable(CameraId camera) { return graphics_camera_set_disable(camera); }
 EngineResult rohr_camera_set_pause_with_engine(CameraId camera) { return graphics_camera_set_pause_with_engine(camera); }
 EngineResult rohr_camera_set_render_when_paused(CameraId camera) { return graphics_camera_set_render_when_paused(camera); }
+EngineResult rohr_camera_move(CameraId camera, Vec2D translation, Time duration) { return graphics_camera_move(camera, translation, duration); }
+EngineResult rohr_camera_move_to(CameraId camera, Position position, Time duration) { return graphics_camera_move_to(camera, position, duration); }
+EngineResult rohr_camera_move_to_entity(CameraId camera, Entity entity, Time duration) { return graphics_camera_move_to_entity(camera, entity, duration); }
+EngineResult rohr_camera_attach_to_entity(CameraId camera, Entity entity) { return graphics_camera_attach_to_entity(camera, entity); }
 ViewportConfig rohr_viewport_default_config(void) { return graphics_viewport_default_config(); }
 ViewportIdResult rohr_viewport_create(ViewportConfig config) { return graphics_viewport_create(config); }
 EngineResult rohr_viewport_destroy(ViewportId viewport) { return graphics_viewport_destroy(viewport); }

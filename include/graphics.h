@@ -408,6 +408,14 @@ EngineResult graphics_camera_set_disable(CameraId camera);
 EngineResult graphics_camera_set_pause_with_engine(CameraId camera);
 /** Continue camera rendering while paused; this is the default. */
 EngineResult graphics_camera_set_render_when_paused(CameraId camera);
+/** Move relatively over engine-tick time; non-positive duration is immediate. */
+EngineResult graphics_camera_move(CameraId camera, Vec2D translation, Time duration);
+/** Move to a world position over engine-tick time. */
+EngineResult graphics_camera_move_to(CameraId camera, Position position, Time duration);
+/** Move toward an entity's current position without attaching. */
+EngineResult graphics_camera_move_to_entity(CameraId camera, Entity entity, Time duration);
+/** Immediately attach to and follow an entity's position. */
+EngineResult graphics_camera_attach_to_entity(CameraId camera, Entity entity);
 
 /** Return a disabled, full-window viewport using contain fitting. */
 ViewportConfig graphics_viewport_default_config(void);

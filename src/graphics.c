@@ -30,6 +30,14 @@ typedef struct CameraRuntime {
     bool pause_with_engine;
 } CameraRuntime;
 static CameraRuntime camera_runtime[MAX_CAMERAS] = {0};
+typedef struct CameraMotion {
+    Position start;
+    Position target;
+    Tick start_tick;
+    Tick duration_ticks;
+    bool active;
+} CameraMotion;
+static CameraMotion camera_motion[MAX_CAMERAS] = {0};
 static uint32_t camera_generations[MAX_CAMERAS] = {0};
 static bool cameras_used[MAX_CAMERAS] = {0};
 static CameraId active_camera = CAMERA_INVALID;
@@ -191,6 +199,7 @@ EngineResult graphics_tables_init(void) {
     memset(cameras, 0, sizeof(cameras));
     memset(camera_attachments, 0, sizeof(camera_attachments));
     memset(camera_runtime, 0, sizeof(camera_runtime));
+    memset(camera_motion, 0, sizeof(camera_motion));
     memset(camera_generations, 0, sizeof(camera_generations));
     memset(cameras_used, 0, sizeof(cameras_used));
     cameras_used[0] = true;
@@ -578,6 +587,7 @@ CameraIdResult graphics_camera_create(CameraConfig config) {
             cameras[slot] = graphics_camera_from_config(config);
             camera_attachments[slot] = (ActiveCameraAttachment){0};
             camera_runtime[slot] = (CameraRuntime){.enabled = true};
+            camera_motion[slot] = (CameraMotion){0};
             return ERROR_RESULT_MAKE_VALUE(CameraIdResult, graphics_camera_id(slot));
         }
     }
@@ -629,6 +639,7 @@ EngineResult graphics_camera_set(CameraId id, Camera value) {
     });
     cameras[slot] = value;
     camera_attachments[slot] = (ActiveCameraAttachment){0};
+    camera_motion[slot] = (CameraMotion){0};
     if(id == active_camera) {
         camera = value;
         camera_attachment = (ActiveCameraAttachment){0};
@@ -662,6 +673,7 @@ EngineResult graphics_camera_destroy(CameraId id) {
     cameras[slot] = (Camera){0};
     camera_attachments[slot] = (ActiveCameraAttachment){0};
     camera_runtime[slot] = (CameraRuntime){0};
+    camera_motion[slot] = (CameraMotion){0};
     return error_result_value(true);
 }
 
@@ -704,6 +716,7 @@ static bool graphics_resolve_camera_attachment(void) {
 }
 
 void graphics_set_camera(Camera value) {
+    size_t slot;
     camera_attachment = (ActiveCameraAttachment){0};
     camera = graphics_camera_from_config((CameraConfig){
         .position = value.position,
@@ -711,6 +724,9 @@ void graphics_set_camera(Camera value) {
         .dimensions = value.dimensions,
         .scale = value.scale,
     });
+    if(graphics_camera_slot(active_camera, &slot)) {
+        camera_motion[slot] = (CameraMotion){0};
+    }
     graphics_camera_store_active();
 }
 
@@ -720,19 +736,7 @@ Camera graphics_get_camera(void) {
 }
 
 void graphics_move_camera(Vec2D translation) {
-    EntityIndex index;
-
-    if(graphics_resolve_camera_attachment()
-            && entity_get_index(camera_attachment.value.entity, &index)) {
-        Vec2D local_translation = camera_attachment.value.follow_orientation
-            ? math_rotate_vector(translation, -orientations[index])
-            : translation;
-        camera_attachment.value.position_offset.x += local_translation.x;
-        camera_attachment.value.position_offset.y += local_translation.y;
-    }
-    camera.position.x += translation.x;
-    camera.position.y += translation.y;
-    graphics_camera_store_active();
+    (void)graphics_camera_move(active_camera, translation, 0.0);
 }
 
 void graphics_rotate_camera(Orientation radians) {
@@ -820,6 +824,11 @@ EngineResult graphics_camera_attach_to(
         bool follow_orientation
         ) {
     CameraId previous = active_camera;
+    size_t slot;
+    if(!graphics_camera_slot(id, &slot)) {
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    camera_motion[slot] = (CameraMotion){0};
     EngineResult result = graphics_camera_set_active(id);
     if(error_check(result)) return result;
     result = graphics_attach_camera_with_options(
@@ -836,6 +845,11 @@ EngineResult graphics_camera_attach_to(
 
 EngineResult graphics_camera_detach_from(CameraId id) {
     CameraId previous = active_camera;
+    size_t slot;
+    if(!graphics_camera_slot(id, &slot)) {
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    camera_motion[slot] = (CameraMotion){0};
     EngineResult result = graphics_camera_set_active(id);
     if(error_check(result)) return result;
     graphics_detach_camera();
@@ -1027,6 +1041,104 @@ EngineResult graphics_camera_set_render_when_paused(CameraId camera_id) {
     }
     camera_runtime[slot].pause_with_engine = false;
     return error_result_value(true);
+}
+
+static EngineResult graphics_camera_resolve_and_detach(CameraId camera_id, Camera *value) {
+    CameraResult camera_result;
+    EngineResult result;
+    if(value == NULL) return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    result = graphics_camera_detach_from(camera_id);
+    if(result.kind == ERROR_RESULT_ERROR) return result;
+    camera_result = graphics_camera_get(camera_id);
+    if(camera_result.kind == ERROR_RESULT_ERROR) {
+        return error_result_error(camera_result.result.error);
+    }
+    *value = camera_result.result.value;
+    return error_result_value(true);
+}
+
+static EngineResult graphics_camera_start_motion(
+    CameraId camera_id,
+    Position target,
+    Time duration
+) {
+    Camera value;
+    size_t slot;
+    EngineResult result;
+    Tick duration_ticks;
+    if(!graphics_camera_slot(camera_id, &slot)) {
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    result = graphics_camera_resolve_and_detach(camera_id, &value);
+    if(result.kind == ERROR_RESULT_ERROR) return result;
+    if(duration <= 0.0) {
+        value.position = target;
+        return graphics_camera_set(camera_id, value);
+    }
+    duration_ticks = (Tick)ceil(duration / engine_get_time_per_tick());
+    if(duration_ticks == 0) duration_ticks = 1;
+    camera_motion[slot] = (CameraMotion){
+        .start = value.position,
+        .target = target,
+        .start_tick = engine_get_tick(),
+        .duration_ticks = duration_ticks,
+        .active = true,
+    };
+    return error_result_value(true);
+}
+
+EngineResult graphics_camera_move(
+    CameraId camera_id,
+    Vec2D translation,
+    Time duration
+) {
+    Camera value;
+    EngineResult result = graphics_camera_resolve_and_detach(camera_id, &value);
+    if(result.kind == ERROR_RESULT_ERROR) return result;
+    return graphics_camera_start_motion(
+        camera_id,
+        (Position){
+            value.position.x + translation.x,
+            value.position.y + translation.y,
+        },
+        duration
+    );
+}
+
+EngineResult graphics_camera_move_to(CameraId camera_id, Position position, Time duration) {
+    return graphics_camera_start_motion(
+        camera_id,
+        position,
+        duration
+    );
+}
+
+EngineResult graphics_camera_move_to_entity(CameraId camera_id, Entity entity, Time duration) {
+    EntityIndex index;
+    if(!entity_get_index(entity, &index) || index >= positions_pool.capacity
+            || !positions_pool.used[index]) {
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    return graphics_camera_start_motion(
+        camera_id,
+        positions[index],
+        duration
+    );
+}
+
+EngineResult graphics_camera_attach_to_entity(CameraId camera_id, Entity entity) {
+    CameraResult result = graphics_camera_get(camera_id);
+    if(result.kind == ERROR_RESULT_ERROR) {
+        return error_result_error(result.result.error);
+    }
+    return graphics_camera_attach_to(
+        camera_id,
+        entity,
+        (Vec2D){0.0f, 0.0f},
+        result.result.value.orientation,
+        true,
+        false
+    );
 }
 
 ViewportConfig graphics_viewport_default_config(void) {
@@ -1398,6 +1510,34 @@ static void graphics_draw_empty_viewport(ViewportRectangle rectangle) {
     }
 }
 
+static void graphics_update_camera_motions(void) {
+    Tick current_tick = engine_get_tick();
+    size_t slot;
+    for(slot = 0; slot < MAX_CAMERAS; slot += 1) {
+        CameraMotion *motion;
+        Position target;
+        Tick elapsed;
+        float progress;
+        if(!cameras_used[slot] || !camera_motion[slot].active) continue;
+        motion = &camera_motion[slot];
+        target = motion->target;
+        elapsed = current_tick - motion->start_tick;
+        progress = elapsed >= motion->duration_ticks
+            ? 1.0f
+            : (float)elapsed / (float)motion->duration_ticks;
+        cameras[slot].position = (Position){
+            .x = motion->start.x + (target.x - motion->start.x) * progress,
+            .y = motion->start.y + (target.y - motion->start.y) * progress,
+        };
+        if(graphics_camera_id(slot) == active_camera) {
+            camera.position = cameras[slot].position;
+        }
+        if(progress >= 1.0f) {
+            *motion = (CameraMotion){0};
+        }
+    }
+}
+
 static void graphics_render_viewport_cameras(void) {
     bool rendered[MAX_CAMERAS] = {0};
     size_t viewport_slot;
@@ -1492,6 +1632,7 @@ static void graphics_draw_viewports(void) {
 }
 
 void graphics_show(void) {
+    graphics_update_camera_motions();
     graphics_render_viewport_cameras();
     graphics_draw_viewports();
       if(screen_recorder.recording) {

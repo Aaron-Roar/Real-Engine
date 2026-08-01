@@ -16,6 +16,7 @@ int main(void) {
     ViewportIdResult viewport_result;
     Position screen;
     int render_count = 0;
+    EntityResult target_entity_result;
 
     if(rohr_error_check(rohr_engine_init())) return 1;
     if(rohr_error_check(rohr_graphics_start())) {
@@ -40,6 +41,47 @@ int main(void) {
             rohr_error_check(rohr_camera_set_active(second_result.result.value)) ||
             rohr_error_check(rohr_camera_destroy(first_result.result.value)) ||
             rohr_error_check(rohr_camera_set_active(original))) {
+        rohr_graphics_end();
+        rohr_engine_shutdown();
+        return 1;
+    }
+    target_entity_result = rohr_entity_add();
+    if(rohr_error_check(target_entity_result)
+            || rohr_error_check(rohr_physics_set_position(
+                target_entity_result.result.value,
+                (Position){20.0f, 30.0f}
+            ))
+            || rohr_error_check(rohr_camera_move_to_entity(
+                original,
+                target_entity_result.result.value,
+                0.0
+            ))
+            || rohr_graphics_get_camera_attachment().kind != ERROR_RESULT_ERROR
+            || rohr_error_check(rohr_camera_attach_to_entity(
+                original,
+                target_entity_result.result.value
+            ))
+            || rohr_graphics_get_camera_attachment().kind == ERROR_RESULT_ERROR
+            || rohr_error_check(rohr_camera_move(
+                original,
+                (Vec2D){5.0f, -5.0f},
+                -1.0
+            ))
+            || rohr_graphics_get_camera_attachment().kind != ERROR_RESULT_ERROR) {
+        rohr_graphics_end();
+        rohr_engine_shutdown();
+        return 1;
+    }
+    camera_result = rohr_camera_get(original);
+    if(rohr_error_check(camera_result)
+            || camera_result.result.value.position.x != 25.0f
+            || camera_result.result.value.position.y != 25.0f
+            || rohr_error_check(rohr_camera_move_to(
+                original,
+                (Position){0.0f, 0.0f},
+                0.0
+            ))
+            || rohr_error_check(rohr_entity_delete(target_entity_result.result.value))) {
         rohr_graphics_end();
         rohr_engine_shutdown();
         return 1;

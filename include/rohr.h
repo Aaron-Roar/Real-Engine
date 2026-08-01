@@ -1158,6 +1158,10 @@ EngineResult rohr_camera_set_enable(CameraId camera);
 EngineResult rohr_camera_set_disable(CameraId camera);
 EngineResult rohr_camera_set_pause_with_engine(CameraId camera);
 EngineResult rohr_camera_set_render_when_paused(CameraId camera);
+EngineResult rohr_camera_move(CameraId camera, Vec2D translation, Time duration);
+EngineResult rohr_camera_move_to(CameraId camera, Position position, Time duration);
+EngineResult rohr_camera_move_to_entity(CameraId camera, Entity entity, Time duration);
+EngineResult rohr_camera_attach_to_entity(CameraId camera, Entity entity);
 
 ViewportConfig rohr_viewport_default_config(void);
 ViewportIdResult rohr_viewport_create(ViewportConfig config);
