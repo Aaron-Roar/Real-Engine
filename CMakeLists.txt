@@ -193,18 +193,36 @@ if(ROHR_ENABLE_DOCUMENTATION)
         set(ROHR_README_HTML ${ROHR_DOCS_OUTPUT}/readme.html)
         set(ROHR_STATIC_README_HTML ${ROHR_STATIC_OUTPUT}/readme.html)
 
-        add_custom_target(generate_public_api
+        add_custom_target(generate_engine_api
             COMMAND
                 ${PERL_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/scripts/generate_public_api_markdown.pl
                 ${CMAKE_SOURCE_DIR}/include/rohr.h
-                ${CMAKE_SOURCE_DIR}/docs/public_api.md
+                ${CMAKE_SOURCE_DIR}/docs/engine_api.md
+                rohr_
             DEPENDS
                 ${CMAKE_SOURCE_DIR}/include/rohr.h
                 ${CMAKE_SOURCE_DIR}/scripts/generate_public_api_markdown.pl
-            COMMENT "Generating public API Markdown"
+            COMMENT "Generating engine API Markdown"
             VERBATIM
         )
+
+        add_custom_target(generate_editor_api
+            COMMAND
+                ${PERL_EXECUTABLE}
+                ${CMAKE_SOURCE_DIR}/scripts/generate_public_api_markdown.pl
+                ${CMAKE_SOURCE_DIR}/include/rohr_editor.h
+                ${CMAKE_SOURCE_DIR}/docs/editor_api.md
+                RE_
+            DEPENDS
+                ${CMAKE_SOURCE_DIR}/include/rohr_editor.h
+                ${CMAKE_SOURCE_DIR}/scripts/generate_public_api_markdown.pl
+            COMMENT "Generating editor API Markdown"
+            VERBATIM
+        )
+
+        add_custom_target(generate_public_api)
+        add_dependencies(generate_public_api generate_engine_api generate_editor_api)
 
         add_custom_command(
             OUTPUT ${ROHR_README_HTML}

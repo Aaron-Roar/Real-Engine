@@ -1,6 +1,6 @@
-# Public API Reference
+# Engine API Reference
 
-This page is the GitHub-readable reference for the public Rohr Engine C API.
+This page is the GitHub-readable reference for the public Rohr Engine core C API.
 The source of truth is [`include/rohr.h`](../include/rohr.h), which uses Doxygen comments for the generated HTML documentation.
 
 Application code should include the public facade:

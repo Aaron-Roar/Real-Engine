@@ -47,7 +47,8 @@ I look forward to releasing a game with Rohr Engine in the soon future.
 
 ## Public API
 
-* [Public API reference](docs/public_api.md)
+* [Engine API reference](docs/engine_api.md)
+* [Editor API reference](docs/editor_api.md)
 Application code should include the public Rohr API facade:
 
 ```c
@@ -196,7 +197,8 @@ cmake --build --preset debug --parallel
 
 Readable Markdown docs are committed in the repo:
 
-* [Public API reference](docs/public_api.md)
+* [Engine API reference](docs/engine_api.md)
+* [Editor API reference](docs/editor_api.md)
 * [Documentation overview](docs/README.md)
 * [Architecture notes](docs/architecture.md)
 * [Entity ids](docs/entity_ids.md)

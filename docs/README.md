@@ -15,7 +15,8 @@ smaller internal module headers and implementations.
 
 ## Public API
 
-- [Public API reference](public_api.md)
+- [Engine API reference](engine_api.md)
+- [Editor API reference](editor_api.md)
 
 ## Local Generation
 
@@ -23,7 +24,8 @@ From the project root:
 
 ```sh
 nix develop
-make docs
+cmake --preset debug
+cmake --build --preset debug --target docs
 ```
 
 The generated HTML is written to:
@@ -38,7 +40,8 @@ configuration.
 
 ## Useful Pages
 
-- [Public API reference](public_api.md)
+- [Engine API reference](engine_api.md)
+- [Editor API reference](editor_api.md)
 - [Architecture](architecture.md)
 - [Entity ids](entity_ids.md)
 - [Error handling](errors.md)

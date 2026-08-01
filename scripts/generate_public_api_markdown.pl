@@ -2,9 +2,12 @@
 use strict;
 use warnings;
 
-my ($header, $out) = @ARGV;
+my ($header, $out, $prefix) = @ARGV;
 
-die "usage: $0 include/rohr.h docs/public_api.md\n" unless defined $header && defined $out;
+die "usage: $0 <header> <output> <function-prefix>\n"
+    unless defined $header && defined $out && defined $prefix;
+
+my $function_pattern = quotemeta($prefix) . '[A-Za-z0-9_]+';
 
 open my $fh, '<', $header or die "open $header: $!";
 local $/;
@@ -31,7 +34,7 @@ while ($text =~ m{/\*\*(.*?)\*/}sg) {
     next unless @sig_lines;
 
     my $sig = join ' ', @sig_lines;
-    next unless $sig =~ /\brohr_[A-Za-z0-9_]+\b/;
+    next unless $sig =~ /\b$function_pattern\b/;
 
     my @comment_lines;
     for my $line (split /\n/, $comment) {
@@ -71,7 +74,7 @@ while ($text =~ m{/\*\*(.*?)\*/}sg) {
         }
     }
 
-    my ($name) = $sig =~ /\b(rohr_[A-Za-z0-9_]+)\b/;
+    my ($name) = $sig =~ /\b($function_pattern)\b/;
     push @entries, {
         name => $name,
         signature => $sig,
@@ -84,6 +87,7 @@ while ($text =~ m{/\*\*(.*?)\*/}sg) {
 
 sub group_name {
     my ($name) = @_;
+    return 'Editor' if $prefix eq 'RE_';
     return 'Engine' if $name =~ /^rohr_engine_/;
     return 'Errors and Results' if $name =~ /^rohr_error_/;
     return 'Console' if $name =~ /^rohr_console_/;
@@ -107,7 +111,7 @@ sub anchor {
     return $s;
 }
 
-my @order = (
+my @engine_order = (
     'Engine',
     'Errors and Results',
     'Console',
@@ -122,6 +126,7 @@ my @order = (
     'Tools',
     'Other',
 );
+my @order = $prefix eq 'RE_' ? ('Editor') : @engine_order;
 my %groups = map { $_ => [] } @order;
 
 for my $entry (@entries) {
@@ -129,12 +134,19 @@ for my $entry (@entries) {
 }
 
 my @lines;
-push @lines, '# Public API Reference', '';
-push @lines, 'This page is the GitHub-readable reference for the public Rohr Engine C API.';
-push @lines, 'The source of truth is [`include/rohr.h`](../include/rohr.h), which uses Doxygen comments for the generated HTML documentation.', '';
+my $is_editor = $prefix eq 'RE_';
+my $api_name = $is_editor ? 'Editor API Reference' : 'Engine API Reference';
+my $facade = $is_editor ? 'rohr_editor.h' : 'rohr.h';
+my $description = $is_editor
+    ? 'This page is the GitHub-readable reference for the public Real Engine editor C API.'
+    : 'This page is the GitHub-readable reference for the public Rohr Engine core C API.';
+
+push @lines, '# ' . $api_name, '';
+push @lines, $description;
+push @lines, 'The source of truth is [`include/' . $facade . '`](../include/' . $facade . '), which uses Doxygen comments for the generated HTML documentation.', '';
 push @lines, 'Application code should include the public facade:', '';
-push @lines, '```c', '#include "rohr.h"', '```', '';
-push @lines, 'Entity values are stable ids, not component table indexes. Use the public entity functions to validate ids and resolve indexes.', '';
+push @lines, '```c', '#include "' . $facade . '"', '```', '';
+push @lines, 'Entity values are stable ids, not component table indexes. Use the public entity functions to validate ids and resolve indexes.', '' unless $is_editor;
 push @lines, '## Contents', '';
 
 for my $group (@order) {
