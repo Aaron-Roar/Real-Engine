@@ -374,7 +374,7 @@ EngineResult graphics_attach_camera_with_options(
 void graphics_detach_camera(void);
 
 /** Report whether the camera is attached to a live entity transform. */
-bool graphics_camera_is_attached(void);
+bool graphics_camera_attached_is(void);
 
 /** Copy the active attachment description to the caller. */
 bool graphics_camera_attachment_get(CameraAttachment *attachment);
@@ -417,7 +417,7 @@ EngineResult graphics_camera_position_from_entity_set(CameraId camera, Entity en
 /** Immediately attach to and follow an entity's position. */
 EngineResult graphics_camera_entity_attachment_set(CameraId camera, Entity entity);
 /** Return success with true while a timed movement is active. */
-EngineResult graphics_camera_is_moving(CameraId camera);
+EngineResult graphics_camera_moving_is(CameraId camera);
 /** Scale over engine-tick time; non-positive duration is immediate. */
 EngineResult graphics_camera_zoom_set(CameraId camera, float zoom, Time duration);
 CameraZoomResult graphics_camera_zoom_get(CameraId camera);

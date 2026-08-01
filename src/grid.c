@@ -52,7 +52,7 @@ void grid_tables_destroy(void) {
     (void)AABBPool_destroy(&aabbs_pool);
 }
 
-bool checked_pair(Entity entity_1, Entity entity_2) {
+bool grid_pair_checked_is(Entity entity_1, Entity entity_2) {
     if(entity_1 >= MAX_ENTITIES || entity_2 >= MAX_ENTITIES) {
         return true;
     }

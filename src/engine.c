@@ -92,7 +92,7 @@ EngineResult engine_init(void) {
 void engine_pause(void) {
     engine_paused = true;
 }
-bool engine_is_paused(void) {
+bool engine_paused_is(void) {
     if(engine_paused) {
         return true;
     }

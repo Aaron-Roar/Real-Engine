@@ -95,7 +95,7 @@ int main(void) {
 
         rohr_controller_update_key_states(&keyboard);
         rohr_controller_add_key_event(&keyboard, key_event);
-        Vec2D move_axis = rohr_controller_wasd_axis(&keyboard);
+        Vec2D move_axis = rohr_controller_wasd_axis_get(&keyboard);
         Vec2D camera_move_axis = rohr_controller_axis_from_keycodes(
             &keyboard,
             SDLK_I,
@@ -127,7 +127,7 @@ int main(void) {
         if(mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_DOWN) {
             rohr_physics_position_set(
                 water_smash,
-                rohr_controller_mouse_world_position(&mouse)
+                rohr_controller_mouse_world_position_get(&mouse)
             );
         }
         if(mouse.button_states[MOUSE_BUTTON_RIGHT] == MOUSE_BUTTON_STATE_DOWN) {

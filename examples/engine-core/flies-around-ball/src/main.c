@@ -133,7 +133,7 @@ int main(void) {
         Time time = rohr_engine_time_get();
         Time phase_time = time - ((int)(time / 4.0) * 4.0);
         float acceleration_magnitude = 50.0f + (float)time * 22.0f;
-        Vec2D move_axis = rohr_controller_wasd_axis(&keyboard);
+        Vec2D move_axis = rohr_controller_wasd_axis_get(&keyboard);
         Vec2D turn_axis = rohr_controller_axis_from_keycodes(&keyboard, SDLK_UNKNOWN, SDLK_LEFT, SDLK_UNKNOWN, SDLK_RIGHT);
 
         if(move_axis.x != 0.0f || move_axis.y != 0.0f) {

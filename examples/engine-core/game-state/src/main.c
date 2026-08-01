@@ -22,8 +22,8 @@ int main(void) {
         }
     }
 
-    EntityResult seeker_result = rohr_entity_find_by_name("seeker");
-    EntityResult player_result = rohr_entity_find_by_name("player");
+    EntityResult seeker_result = rohr_entity_by_name_get("seeker");
+    EntityResult player_result = rohr_entity_by_name_get("player");
     if(rohr_error_check(seeker_result) || rohr_error_check(player_result)) {
         rohr_engine_shutdown();
         return 1;

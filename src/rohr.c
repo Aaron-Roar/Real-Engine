@@ -15,7 +15,7 @@ Tick rohr_engine_update_tick(void) { return engine_update_tick(); }
 EngineResult rohr_engine_time_per_tick_set(Time value) { return engine_time_per_tick_set(value); }
 Time rohr_engine_time_per_tick_get(void) { return engine_time_per_tick_get(); }
 SDL_Event rohr_engine_poll_event(void) { return engine_poll_event(); }
-bool rohr_engine_is_paused(void) { return engine_is_paused(); }
+bool rohr_engine_paused_is(void) { return engine_paused_is(); }
 void rohr_engine_reset_clock(void) { engine_reset_clock(); }
 
 EngineResult rohr_error_result_value(bool value) { return error_result_value(value); }
@@ -35,7 +35,7 @@ void rohr_console_write(LogSourceType source, const char *fmt, ...) {
     console_vwrite(source, fmt, args);
     va_end(args);
 }
-bool rohr_console_is_active(void) { return console_is_active(); }
+bool rohr_console_active_is(void) { return console_active_is(); }
 void rohr_console_debug_write(LogSourceType source, const char *fmt, ...) {
     va_list args;
 
@@ -45,10 +45,10 @@ void rohr_console_debug_write(LogSourceType source, const char *fmt, ...) {
 }
 void rohr_console_debug_set(bool state) { console_debug_set(state); }
 
-bool rohr_entity_is_alive(Entity entity) { return entity_is_alive(entity); }
-bool rohr_entity_index_is_alive(EntityIndex index) { return entity_index_is_alive(index); }
-uint32_t rohr_entity_alive_count(void) { return entity_alive_count(); }
-EntityResult rohr_entity_alive_at(uint32_t position) { return entity_alive_at(position); }
+bool rohr_entity_alive_is(Entity entity) { return entity_alive_is(entity); }
+bool rohr_entity_index_alive_is(EntityIndex index) { return entity_index_alive_is(index); }
+uint32_t rohr_entity_alive_count_get(void) { return entity_alive_count_get(); }
+EntityResult rohr_entity_alive_at_get(uint32_t position) { return entity_alive_at_get(position); }
 EntityIndexResult rohr_entity_index_get(Entity entity) {
     EntityIndex index;
     if(!entity_index_get(entity, &index)) {
@@ -59,28 +59,28 @@ EntityIndexResult rohr_entity_index_get(Entity entity) {
 EntityResult rohr_entity_from_index(EntityIndex index) { return entity_from_index(index); }
 EntityResult rohr_entity_add(void) { return entity_add(); }
 EngineResult rohr_entity_name_set(Entity entity, const char *name) { return entity_name_set(entity, name); }
-EntityResult rohr_entity_find_by_name(const char *name) { return entity_find_by_name(name); }
+EntityResult rohr_entity_by_name_get(const char *name) { return entity_by_name_get(name); }
 EntityNameResult rohr_entity_name_get(Entity entity) { return entity_name_get(entity); }
 EngineResult rohr_game_state_load_file(const char *path) { return game_state_load_file(path); }
 EngineResult rohr_game_state_load_files(const char *const *paths, size_t path_count) { return game_state_load_files(paths, path_count); }
-UIButtonDefinitionResult rohr_ui_button_find_by_name(const char *name) { return ui_button_find_by_name(name); }
-UIFontDefinitionResult rohr_ui_font_find_by_name(const char *name) { return ui_font_find_by_name(name); }
-UILabelDefinitionResult rohr_ui_label_find_by_name(const char *name) { return ui_label_find_by_name(name); }
-UISliderDefinitionResult rohr_ui_slider_find_by_name(const char *name) { return ui_slider_find_by_name(name); }
+UIButtonDefinitionResult rohr_ui_button_by_name_get(const char *name) { return ui_button_by_name_get(name); }
+UIFontDefinitionResult rohr_ui_font_by_name_get(const char *name) { return ui_font_by_name_get(name); }
+UILabelDefinitionResult rohr_ui_label_by_name_get(const char *name) { return ui_label_by_name_get(name); }
+UISliderDefinitionResult rohr_ui_slider_by_name_get(const char *name) { return ui_slider_by_name_get(name); }
 EngineResult rohr_game_state_save_file(const char *path) { return game_state_save_file(path); }
 EngineResult rohr_game_state_save_template_file(const char *path) { return game_state_save_template_file(path); }
 EngineResult rohr_entity_delete(Entity entity) { return entity_delete(entity); }
 EngineResult rohr_entity_add_components(Entity entity, RohrComponentMask mask) { return entity_add_components(entity, mask); }
-bool rohr_entity_has_components(Entity entity, RohrComponentMask components) { return entity_has_components(entity, components); }
-bool rohr_entity_index_has_components(EntityIndex index, RohrComponentMask components) { return entity_index_has_components(index, components); }
+bool rohr_entity_components_has(Entity entity, RohrComponentMask components) { return entity_components_has(entity, components); }
+bool rohr_entity_index_components_has(EntityIndex index, RohrComponentMask components) { return entity_index_components_has(index, components); }
 GroupIdResult rohr_entity_group_create(void) { return entity_group_create(); }
 EngineResult rohr_entity_group_name_set(GroupId group, const char *name) { return entity_group_name_set(group, name); }
-GroupIdResult rohr_entity_group_find_by_name(const char *name) { return entity_group_find_by_name(name); }
+GroupIdResult rohr_entity_group_by_name_get(const char *name) { return entity_group_by_name_get(name); }
 GroupNameResult rohr_entity_group_name_get(GroupId group) { return entity_group_name_get(group); }
 EngineResult rohr_entity_group_destroy(GroupId group) { return entity_group_destroy(group); }
 EngineResult rohr_entity_group_add(GroupId group, Entity entity) { return entity_group_add(group, entity); }
 EngineResult rohr_entity_group_remove(GroupId group, Entity entity) { return entity_group_remove(group, entity); }
-bool rohr_entity_group_contains(GroupId group, Entity entity) { return entity_group_contains(group, entity); }
+bool rohr_entity_group_entity_has(GroupId group, Entity entity) { return entity_group_entity_has(group, entity); }
 EntityGroupResult rohr_entity_group_get(GroupId group) { return entity_group_get(group); }
 EntityGroupMembershipResult rohr_entity_groups_get(Entity entity) { return entity_groups_get(entity); }
 EngineResult rohr_entity_delete_components(Entity entity, RohrComponentMask mask) { return entity_delete_components(entity, mask); }
@@ -102,7 +102,7 @@ Shape rohr_physics_shape_world_translate(Shape shape, Position position, Orienta
 float rohr_physics_polygon_moment_of_inertia(Shape shape, Mass mass_value) { return physics_polygon_moment_of_inertia(shape, mass_value); }
 Collision rohr_physics_sat_collision(Shape shape_1, Shape shape_2) { return physics_sat_collision(shape_1, shape_2); }
 Vec1D rohr_physics_circle_moment_of_inertia(Shape circle, Mass mass_value) { return physics_circle_moment_of_inertia(circle, mass_value); }
-bool rohr_physics_entity_is_held(EntityIndex index) { return physics_entity_is_held(index); }
+bool rohr_physics_entity_held_is(EntityIndex index) { return physics_entity_held_is(index); }
 EngineResult rohr_physics_acceleration_set(Entity entity, Acceleration a) { return physics_acceleration_set(entity, a); }
 EngineResult rohr_physics_angular_acceleration_set(Entity entity, AngularAcceleration acceleration) {
     return physics_angular_acceleration_set(entity, acceleration);
@@ -149,12 +149,12 @@ EngineResult rohr_physics_group_stop_entities(GroupId group) { return physics_gr
 EngineResult rohr_physics_apply_impulse(Entity entity, Vec2D impulse) { return physics_apply_impulse(entity, impulse); }
 EngineResult rohr_physics_position_set(Entity entity, Position p) { return physics_position_set(entity, p); }
 EngineResult rohr_physics_mass_set(Entity entity, Mass m) { return physics_mass_set(entity, m); }
-EntityResult rohr_physics_force_set(Entity entity, Force f) { return physics_force_set(entity, f); }
+EntityResult rohr_physics_force_create(Entity entity, Force f) { return physics_force_create(entity, f); }
 EngineResult rohr_physics_force_component_set(Entity entity, Force force) {
     return physics_force_component_set(entity, force);
 }
 EngineResult rohr_physics_apply_force_for_one_tick(Entity entity, Force f) { return physics_apply_force_for_one_tick(entity, f); }
-EntityResult rohr_physics_torque_set(Entity entity, Torque t) { return physics_torque_set(entity, t); }
+EntityResult rohr_physics_torque_create(Entity entity, Torque t) { return physics_torque_create(entity, t); }
 EngineResult rohr_physics_torque_component_set(Entity entity, Torque torque) {
     return physics_torque_component_set(entity, torque);
 }
@@ -186,8 +186,8 @@ EngineResult rohr_physics_target_set(Entity entity, Entity target) {
 EngineResult rohr_physics_joint_component_set(Entity entity, Joint joint) {
     return physics_joint_component_set(entity, joint);
 }
-EntityResult rohr_physics_joint_set(Entity a, Entity b, JointType type, Vec2D local_anchor_a, Vec2D local_anchor_b, float stiffness, float damping) {
-    return physics_joint_set(a, b, type, local_anchor_a, local_anchor_b, stiffness, damping);
+EntityResult rohr_physics_joint_create(Entity a, Entity b, JointType type, Vec2D local_anchor_a, Vec2D local_anchor_b, float stiffness, float damping) {
+    return physics_joint_create(a, b, type, local_anchor_a, local_anchor_b, stiffness, damping);
 }
 Collision rohr_physics_particle_collision(Shape shape_1, Shape shape_2) { return physics_particle_collision(shape_1, shape_2); }
 EngineResult rohr_physics_collision_report_set(Entity entity, Entity target, bool state) { return physics_collision_report_set(entity, target, state); }
@@ -223,7 +223,7 @@ void rohr_graphics_rotate_camera(Orientation radians) { graphics_rotate_camera(r
 EngineResult rohr_graphics_attach_camera(Entity entity, Vec2D position_offset, Orientation orientation_offset) { return graphics_attach_camera(entity, position_offset, orientation_offset); }
 EngineResult rohr_graphics_attach_camera_with_options(Entity entity, Vec2D position_offset, Orientation orientation_offset, bool follow_position, bool follow_orientation) { return graphics_attach_camera_with_options(entity, position_offset, orientation_offset, follow_position, follow_orientation); }
 void rohr_graphics_detach_camera(void) { graphics_detach_camera(); }
-bool rohr_graphics_camera_is_attached(void) { return graphics_camera_is_attached(); }
+bool rohr_graphics_camera_attached_is(void) { return graphics_camera_attached_is(); }
 CameraAttachmentResult rohr_graphics_camera_attachment_get(void) {
     CameraAttachment attachment;
     if(!graphics_camera_attachment_get(&attachment)) {
@@ -265,7 +265,7 @@ EngineResult rohr_camera_position_move(CameraId camera, Vec2D translation, Time 
 EngineResult rohr_camera_position_set(CameraId camera, Position position, Time duration) { return graphics_camera_position_set(camera, position, duration); }
 EngineResult rohr_camera_position_from_entity_set(CameraId camera, Entity entity, Time duration) { return graphics_camera_position_from_entity_set(camera, entity, duration); }
 EngineResult rohr_camera_entity_attachment_set(CameraId camera, Entity entity) { return graphics_camera_entity_attachment_set(camera, entity); }
-EngineResult rohr_camera_is_moving(CameraId camera) { return graphics_camera_is_moving(camera); }
+EngineResult rohr_camera_moving_is(CameraId camera) { return graphics_camera_moving_is(camera); }
 EngineResult rohr_camera_zoom_set(CameraId camera, float zoom, Time duration) { return graphics_camera_zoom_set(camera, zoom, duration); }
 CameraZoomResult rohr_camera_zoom_get(CameraId camera) { return graphics_camera_zoom_get(camera); }
 ViewportConfig rohr_viewport_default_config(void) { return graphics_viewport_default_config(); }
@@ -314,9 +314,9 @@ void rohr_system_clean_entities_past_lifetime(void) { system_clean_entities_past
 void rohr_controller_update_key_states(KeyboardState *keyboard) { update_key_states(keyboard); }
 void rohr_controller_add_key_event(KeyboardState *keyboard, KeyboardEvent key_event) { add_key_event(keyboard, key_event); }
 KeyboardEvent rohr_controller_capture_keyboard_event(const SDL_Event *sdl_event) { return capture_keyboard_event(sdl_event); }
-bool rohr_controller_key_down(const KeyboardState *keyboard, SDL_Keycode keycode) { return controller_key_down(keyboard, keycode); }
-bool rohr_controller_key_pressed(const KeyboardState *keyboard, SDL_Keycode keycode) { return controller_key_pressed(keyboard, keycode); }
-bool rohr_controller_key_released(const KeyboardState *keyboard, SDL_Keycode keycode) { return controller_key_released(keyboard, keycode); }
+bool rohr_controller_key_down_is(const KeyboardState *keyboard, SDL_Keycode keycode) { return controller_key_down_is(keyboard, keycode); }
+bool rohr_controller_key_pressed_is(const KeyboardState *keyboard, SDL_Keycode keycode) { return controller_key_pressed_is(keyboard, keycode); }
+bool rohr_controller_key_released_is(const KeyboardState *keyboard, SDL_Keycode keycode) { return controller_key_released_is(keyboard, keycode); }
 Vec2D rohr_controller_axis_from_keycodes(
         const KeyboardState *keyboard,
         SDL_Keycode up,
@@ -326,16 +326,16 @@ Vec2D rohr_controller_axis_from_keycodes(
         ) {
     return controller_axis_from_keycodes(keyboard, up, left, down, right);
 }
-Vec2D rohr_controller_wasd_axis(const KeyboardState *keyboard) { return controller_wasd_axis(keyboard); }
-Vec2D rohr_controller_arrow_axis(const KeyboardState *keyboard) { return controller_arrow_axis(keyboard); }
+Vec2D rohr_controller_wasd_axis_get(const KeyboardState *keyboard) { return controller_wasd_axis_get(keyboard); }
+Vec2D rohr_controller_arrow_axis_get(const KeyboardState *keyboard) { return controller_arrow_axis_get(keyboard); }
 Controller rohr_controller_default(void) { return controller_default(); }
 Controller rohr_controller_default_wasd(void) { return controller_default_wasd(); }
 Controller rohr_controller_default_arrows(void) { return controller_default_arrows(); }
 void rohr_controller_axis_binding_set(Controller *controller, ControllerAxisBinding binding) {
     controller_axis_binding_set(controller, binding);
 }
-Vec2D rohr_controller_axis(const KeyboardState *keyboard, const Controller *controller) {
-    return controller_axis(keyboard, controller);
+Vec2D rohr_controller_default_axis_get(const KeyboardState *keyboard, const Controller *controller) {
+    return controller_default_axis_get(keyboard, controller);
 }
 bool rohr_controller_add_axis(Controller *controller, const char *name, ControllerAxisBinding binding) {
     return controller_add_axis(controller, name, binding);
@@ -350,32 +350,32 @@ Vec2D rohr_controller_axis_get(
         ) {
     return controller_axis_get(keyboard, controller, name);
 }
-bool rohr_controller_button_down(
+bool rohr_controller_button_down_is(
         const KeyboardState *keyboard,
         const Controller *controller,
         const char *name
         ) {
-    return controller_button_down(keyboard, controller, name);
+    return controller_button_down_is(keyboard, controller, name);
 }
-bool rohr_controller_button_pressed(
+bool rohr_controller_button_pressed_is(
         const KeyboardState *keyboard,
         const Controller *controller,
         const char *name
         ) {
-    return controller_button_pressed(keyboard, controller, name);
+    return controller_button_pressed_is(keyboard, controller, name);
 }
-bool rohr_controller_button_released(
+bool rohr_controller_button_released_is(
         const KeyboardState *keyboard,
         const Controller *controller,
         const char *name
         ) {
-    return controller_button_released(keyboard, controller, name);
+    return controller_button_released_is(keyboard, controller, name);
 }
 void rohr_controller_print_mouse_event(MouseEvent event) { print_mouse_event(event); }
 void rohr_controller_update_mouse_states(MouseState *mouse) { update_mouse_states(mouse); }
 void rohr_controller_add_mouse_event(MouseState *mouse, MouseEvent mouse_event) { add_mouse_event(mouse, mouse_event); }
 MouseEvent rohr_controller_capture_mouse_event(const SDL_Event *sdl_event) { return capture_mouse_event(sdl_event); }
-Position rohr_controller_mouse_world_position(const MouseState *mouse) {
+Position rohr_controller_mouse_world_position_get(const MouseState *mouse) {
     if(mouse == NULL) {
         return (Position){0};
     }
@@ -383,7 +383,7 @@ Position rohr_controller_mouse_world_position(const MouseState *mouse) {
 }
 
 void rohr_grid_add_entity_to_grids(Entity entity) { add_entity_to_grids(entity); }
-bool rohr_grid_checked_pair(Entity entity_1, Entity entity_2) { return checked_pair(entity_1, entity_2); }
+bool rohr_grid_pair_checked_is(Entity entity_1, Entity entity_2) { return grid_pair_checked_is(entity_1, entity_2); }
 void rohr_grid_add_pair(Entity entity_1, Entity entity_2) { add_pair(entity_1, entity_2); }
 void rohr_grid_clear(void) { clear_grid(); }
 void rohr_grid_update_aabb(Entity entity) { grid_update_aabb(entity); }
@@ -399,7 +399,7 @@ void rohr_ui_begin_frame(UIInput input) { ui_begin_frame(input); }
 UIButtonResult rohr_ui_button(const char *id, const TextAsset *label, UIRect bounds, const UIButtonStyle *style) { return ui_button(id, label, bounds, style); }
 void rohr_ui_label(const TextAsset *text, UIRect bounds) { ui_label(text, bounds); }
 void rohr_ui_button_disabled(UIRect bounds, const UIButtonStyle *style) { ui_button_disabled(bounds, style); }
-bool rohr_ui_pointer_consumed(void) { return ui_pointer_consumed(); }
+bool rohr_ui_pointer_consumed_is(void) { return ui_pointer_consumed_is(); }
 void rohr_ui_end_frame(void) { ui_end_frame(); }
 UIButtonStyle rohr_ui_default_button_style(void) { return ui_default_button_style(); }
 UISliderConfig rohr_ui_default_slider_config(void) { return ui_default_slider_config(); }

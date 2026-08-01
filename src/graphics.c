@@ -551,7 +551,7 @@ void graphics_draw_grid(void) {
 void graphics_scale_textures(Entity entity, Scale scale) {
     EntityIndex index;
 
-    if(!entity_index_get(entity, &index) || !entity_has_components(entity, ANIMATED_SPRITE)) {
+    if(!entity_index_get(entity, &index) || !entity_components_has(entity, ANIMATED_SPRITE)) {
         return;
     }
     for(int i = 0; i < MAX_TEXTURES; i += 1) {
@@ -816,7 +816,7 @@ void graphics_detach_camera(void) {
     graphics_camera_store_active();
 }
 
-bool graphics_camera_is_attached(void) {
+bool graphics_camera_attached_is(void) {
     return graphics_resolve_camera_attachment();
 }
 
@@ -1154,7 +1154,7 @@ EngineResult graphics_camera_entity_attachment_set(CameraId camera_id, Entity en
     );
 }
 
-EngineResult graphics_camera_is_moving(CameraId camera_id) {
+EngineResult graphics_camera_moving_is(CameraId camera_id) {
     size_t slot;
     if(!graphics_camera_slot(camera_id, &slot)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
@@ -1618,7 +1618,7 @@ static void graphics_render_viewport_cameras(void) {
         rendered[camera_slot] = true;
         runtime = &camera_runtime[camera_slot];
         if(!runtime->enabled || runtime->callback == NULL
-                || (runtime->pause_with_engine && engine_is_paused())) continue;
+                || (runtime->pause_with_engine && engine_paused_is())) continue;
         if(graphics_camera_begin(camera_id).kind == ERROR_RESULT_ERROR) continue;
         runtime->callback(camera_id, runtime->context);
         (void)graphics_camera_end();
@@ -1800,8 +1800,8 @@ void graphics_draw_hit_box_colored(Entity entity, Fill fill_type, Color color) {
 
 void graphics_draw_hit_boxes(void) {
   for(int i = 0; i < MAX_ENTITIES; i += 1) {
-    if(entity_index_is_alive(i)) {
-        if( entity_index_has_components(i, HIT_BOX)) {
+    if(entity_index_alive_is(i)) {
+        if( entity_index_components_has(i, HIT_BOX)) {
             EntityResult entity_result = entity_from_index(i);
             if(entity_result.kind == ERROR_RESULT_VALUE) {
                 graphics_draw_hit_box(entity_result.result.value, GRAPHICS_OUTLINE);
@@ -1834,9 +1834,9 @@ void graphics_draw_particle(Entity entity, Fill fill_type) {
 }
 void graphics_draw_particles(void) {
   for(int i = 0; i < MAX_ENTITIES; i += 1) {
-    if(entity_index_is_alive(i)) {
-        if( entity_index_has_components(i, HIT_BOX)) {
-          if( entity_index_has_components(i, PARTICLE)) {
+    if(entity_index_alive_is(i)) {
+        if( entity_index_components_has(i, HIT_BOX)) {
+          if( entity_index_components_has(i, PARTICLE)) {
               EntityResult entity_result = entity_from_index(i);
               if(entity_result.kind == ERROR_RESULT_VALUE) {
                   graphics_draw_particle(entity_result.result.value, GRAPHICS_OUTLINE);
@@ -2026,7 +2026,7 @@ EngineResult graphics_add_animated_sprite(Entity entity, AnimatedSprite sprite) 
     EntityIndex index;
     EngineResult result;
 
-    if(!entity_index_get(entity, &index) || !entity_index_is_alive(index)) {
+    if(!entity_index_get(entity, &index) || !entity_index_alive_is(index)) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
     (void)AnimatedSpritePool_store_at(&animated_sprites_pool, index, sprite);
@@ -2040,7 +2040,7 @@ EngineResult graphics_add_animated_sprite(Entity entity, AnimatedSprite sprite) 
 void graphics_draw_animated_sprites(void) {
     RohrComponentMask filter = ANIMATED_SPRITE;
     for(int i = 0; i < MAX_ENTITIES; i += 1) {
-        if(entity_index_is_alive(i) && entity_index_has_components(i, filter)) {
+        if(entity_index_alive_is(i) && entity_index_components_has(i, filter)) {
             graphics_draw_sprite(animated_sprites[i], positions[i], orientations[i]);
         }
     }
@@ -2049,7 +2049,7 @@ void graphics_draw_animated_sprites(void) {
 void graphics_update_sprite_frames(Tick current_tick, Time current_time) {
     RohrComponentMask filter = ANIMATED_SPRITE;
     for(int i = 0; i < MAX_ENTITIES; i += 1) {
-        if(entity_index_is_alive(i) && entity_index_has_components(i, filter)) {
+        if(entity_index_alive_is(i) && entity_index_components_has(i, filter)) {
             graphics_update_sprite_frame(&animated_sprites[i], current_tick, current_time);
         }
     }
@@ -2061,7 +2061,7 @@ void graphics_draw_local_origin(Entity entity) {
     if(!entity_index_get(entity, &index)) {
         return;
     }
-    if (!entity_has_components(entity, HIT_BOX)) {
+    if (!entity_components_has(entity, HIT_BOX)) {
         return;
     }
 
@@ -2167,10 +2167,10 @@ void graphics_draw_local_origin(Entity entity) {
 
 void graphics_draw_local_origins(void) {
     for(int i = 0; i < MAX_ENTITIES; i += 1) {
-        if(!entity_index_is_alive(i)) {
+        if(!entity_index_alive_is(i)) {
             continue;
         }
-        if (!entity_index_has_components(i, HIT_BOX)) {
+        if (!entity_index_components_has(i, HIT_BOX)) {
             continue;
         }
         EntityResult entity_result = entity_from_index(i);

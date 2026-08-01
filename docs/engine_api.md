@@ -126,10 +126,10 @@ Polls one SDL event.
 
 **Returns:** SDL event value returned by the engine event poller.
 
-### `rohr_engine_is_paused`
+### `rohr_engine_paused_is`
 
 ```c
-bool rohr_engine_is_paused(void);
+bool rohr_engine_paused_is(void);
 ```
 
 Checks whether the engine is paused.
@@ -281,10 +281,10 @@ Writes a formatted message to the engine console.
 | `source` | Source category for the log entry. |
 | `fmt` | printf-style format string. |
 
-### `rohr_console_is_active`
+### `rohr_console_active_is`
 
 ```c
-bool rohr_console_is_active(void);
+bool rohr_console_active_is(void);
 ```
 
 Checks whether the console is active.
@@ -318,10 +318,10 @@ Enables or disables debug console output.
 
 ## Entities
 
-### `rohr_entity_is_alive`
+### `rohr_entity_alive_is`
 
 ```c
-bool rohr_entity_is_alive(Entity entity);
+bool rohr_entity_alive_is(Entity entity);
 ```
 
 Checks whether an entity id currently refers to a live entity.
@@ -332,10 +332,10 @@ Checks whether an entity id currently refers to a live entity.
 
 **Returns:** true when the entity is alive, false otherwise.
 
-### `rohr_entity_index_is_alive`
+### `rohr_entity_index_alive_is`
 
 ```c
-bool rohr_entity_index_is_alive(EntityIndex index);
+bool rohr_entity_index_alive_is(EntityIndex index);
 ```
 
 Checks whether an entity table index currently contains a live entity.
@@ -346,20 +346,20 @@ Checks whether an entity table index currently contains a live entity.
 
 **Returns:** true when the index contains a live entity, false otherwise.
 
-### `rohr_entity_alive_count`
+### `rohr_entity_alive_count_get`
 
 ```c
-uint32_t rohr_entity_alive_count(void);
+uint32_t rohr_entity_alive_count_get(void);
 ```
 
 Returns the number of currently alive entities.
 
 **Returns:** Number of alive entities.
 
-### `rohr_entity_alive_at`
+### `rohr_entity_alive_at_get`
 
 ```c
-EntityResult rohr_entity_alive_at(uint32_t position);
+EntityResult rohr_entity_alive_at_get(uint32_t position);
 ```
 
 Returns the entity id stored at a dense alive-list position.
@@ -422,10 +422,10 @@ EngineResult rohr_entity_name_set(Entity entity, const char *name);
 
  Assigns a unique fixed-size name to an entity.
 
-### `rohr_entity_find_by_name`
+### `rohr_entity_by_name_get`
 
 ```c
-EntityResult rohr_entity_find_by_name(const char *name);
+EntityResult rohr_entity_by_name_get(const char *name);
 ```
 
  Finds a live entity by its state-file name.
@@ -467,10 +467,10 @@ Adds components to an entity.
 
 **Returns:** EngineResult describing success or failure.
 
-### `rohr_entity_has_components`
+### `rohr_entity_components_has`
 
 ```c
-bool rohr_entity_has_components(Entity entity, RohrComponentMask components);
+bool rohr_entity_components_has(Entity entity, RohrComponentMask components);
 ```
 
 Checks whether an entity has all requested components.
@@ -482,10 +482,10 @@ Checks whether an entity has all requested components.
 
 **Returns:** true when entity has every requested component, false otherwise.
 
-### `rohr_entity_index_has_components`
+### `rohr_entity_index_components_has`
 
 ```c
-bool rohr_entity_index_has_components(EntityIndex index, RohrComponentMask components);
+bool rohr_entity_index_components_has(EntityIndex index, RohrComponentMask components);
 ```
 
 Checks whether an entity table index has all requested components.
@@ -515,10 +515,10 @@ EngineResult rohr_entity_group_name_set(GroupId group, const char *name);
 
  Assigns a unique fixed-size name to a generic group.
 
-### `rohr_entity_group_find_by_name`
+### `rohr_entity_group_by_name_get`
 
 ```c
-GroupIdResult rohr_entity_group_find_by_name(const char *name);
+GroupIdResult rohr_entity_group_by_name_get(const char *name);
 ```
 
  Finds a live generic group by name.
@@ -575,10 +575,10 @@ Removes an entity from a generic group.
 
 **Returns:** EngineResult describing success or failure.
 
-### `rohr_entity_group_contains`
+### `rohr_entity_group_entity_has`
 
 ```c
-bool rohr_entity_group_contains(GroupId group, Entity entity);
+bool rohr_entity_group_entity_has(GroupId group, Entity entity);
 ```
 
 Checks whether an entity belongs to a group.
@@ -853,10 +853,10 @@ Calculates circle moment of inertia.
 
 **Returns:** Moment of inertia value.
 
-### `rohr_physics_entity_is_held`
+### `rohr_physics_entity_held_is`
 
 ```c
-bool rohr_physics_entity_is_held(EntityIndex index);
+bool rohr_physics_entity_held_is(EntityIndex index);
 ```
 
 Checks whether an entity index has HOLD.
@@ -1177,10 +1177,10 @@ Sets an entity mass component value.
 
 **Returns:** EngineResult describing success or failure.
 
-### `rohr_physics_force_set`
+### `rohr_physics_force_create`
 
 ```c
-EntityResult rohr_physics_force_set(Entity entity, Force f);
+EntityResult rohr_physics_force_create(Entity entity, Force f);
 ```
 
 Sets an entity force component value.
@@ -1222,10 +1222,10 @@ Applies force to an entity for one physics tick.
 
 **Returns:** EngineResult describing success or failure.
 
-### `rohr_physics_torque_set`
+### `rohr_physics_torque_create`
 
 ```c
-EntityResult rohr_physics_torque_set(Entity entity, Torque t);
+EntityResult rohr_physics_torque_create(Entity entity, Torque t);
 ```
 
 Sets an entity torque component value.
@@ -1554,10 +1554,10 @@ Adds or replaces complete joint data on an existing entity.
 
 **Returns:** EngineResult describing success or failure.
 
-### `rohr_physics_joint_set`
+### `rohr_physics_joint_create`
 
 ```c
-EntityResult rohr_physics_joint_set( Entity a, Entity b, JointType type, Vec2D local_anchor_a, Vec2D local_anchor_b, float stiffness, float damping );
+EntityResult rohr_physics_joint_create( Entity a, Entity b, JointType type, Vec2D local_anchor_a, Vec2D local_anchor_b, float stiffness, float damping );
 ```
 
 Creates a joint between two entities.
@@ -1973,10 +1973,10 @@ void rohr_graphics_detach_camera(void);
 
 Detaches the camera and preserves its current world transform.
 
-### `rohr_graphics_camera_is_attached`
+### `rohr_graphics_camera_attached_is`
 
 ```c
-bool rohr_graphics_camera_is_attached(void);
+bool rohr_graphics_camera_attached_is(void);
 ```
 
 Reports whether the camera is attached to a live entity transform.
@@ -2488,10 +2488,10 @@ Converts an SDL event into a Rohr keyboard event.
 
 **Returns:** KeyboardEvent derived from sdl_event.
 
-### `rohr_controller_key_down`
+### `rohr_controller_key_down_is`
 
 ```c
-bool rohr_controller_key_down(const KeyboardState *keyboard, SDL_Keycode keycode);
+bool rohr_controller_key_down_is(const KeyboardState *keyboard, SDL_Keycode keycode);
 ```
 
 Checks whether an SDL keycode is currently held or was pressed this frame.
@@ -2503,10 +2503,10 @@ Checks whether an SDL keycode is currently held or was pressed this frame.
 
 **Returns:** true when the key is down or pressed.
 
-### `rohr_controller_key_pressed`
+### `rohr_controller_key_pressed_is`
 
 ```c
-bool rohr_controller_key_pressed(const KeyboardState *keyboard, SDL_Keycode keycode);
+bool rohr_controller_key_pressed_is(const KeyboardState *keyboard, SDL_Keycode keycode);
 ```
 
 Checks whether an SDL keycode was pressed this frame.
@@ -2518,10 +2518,10 @@ Checks whether an SDL keycode was pressed this frame.
 
 **Returns:** true when the key was pressed this frame.
 
-### `rohr_controller_key_released`
+### `rohr_controller_key_released_is`
 
 ```c
-bool rohr_controller_key_released(const KeyboardState *keyboard, SDL_Keycode keycode);
+bool rohr_controller_key_released_is(const KeyboardState *keyboard, SDL_Keycode keycode);
 ```
 
 Checks whether an SDL keycode was released this frame.
@@ -2555,10 +2555,10 @@ produces zero X, and up+down produces zero Y.
 
 **Returns:** Direction vector from the supplied directional keys.
 
-### `rohr_controller_wasd_axis`
+### `rohr_controller_wasd_axis_get`
 
 ```c
-Vec2D rohr_controller_wasd_axis(const KeyboardState *keyboard);
+Vec2D rohr_controller_wasd_axis_get(const KeyboardState *keyboard);
 ```
 
 Returns normalized movement input from W/A/S/D.
@@ -2569,10 +2569,10 @@ Returns normalized movement input from W/A/S/D.
 
 **Returns:** Direction vector where W is positive Y and D is positive X.
 
-### `rohr_controller_arrow_axis`
+### `rohr_controller_arrow_axis_get`
 
 ```c
-Vec2D rohr_controller_arrow_axis(const KeyboardState *keyboard);
+Vec2D rohr_controller_arrow_axis_get(const KeyboardState *keyboard);
 ```
 
 Returns normalized movement input from arrow keys.
@@ -2626,10 +2626,10 @@ Replaces the axis mapping on a caller-owned controller.
 | `controller` | Controller to modify. NULL is ignored. |
 | `binding` | New positive/negative X/Y key mapping. |
 
-### `rohr_controller_axis`
+### `rohr_controller_default_axis_get`
 
 ```c
-Vec2D rohr_controller_axis( const KeyboardState *keyboard, const Controller *controller );
+Vec2D rohr_controller_default_axis_get( const KeyboardState *keyboard, const Controller *controller );
 ```
 
 Reads a game-owned controller from shared keyboard state.
@@ -2665,26 +2665,26 @@ Vec2D rohr_controller_axis_get( const KeyboardState *keyboard, const Controller 
 
  @brief Reads a named axis, returning zero when unavailable or disabled.
 
-### `rohr_controller_button_down`
+### `rohr_controller_button_down_is`
 
 ```c
-bool rohr_controller_button_down( const KeyboardState *keyboard, const Controller *controller, const char *name );
+bool rohr_controller_button_down_is( const KeyboardState *keyboard, const Controller *controller, const char *name );
 ```
 
  @brief Checks whether a named button is held or newly pressed.
 
-### `rohr_controller_button_pressed`
+### `rohr_controller_button_pressed_is`
 
 ```c
-bool rohr_controller_button_pressed( const KeyboardState *keyboard, const Controller *controller, const char *name );
+bool rohr_controller_button_pressed_is( const KeyboardState *keyboard, const Controller *controller, const char *name );
 ```
 
  @brief Checks whether a named button was pressed this frame.
 
-### `rohr_controller_button_released`
+### `rohr_controller_button_released_is`
 
 ```c
-bool rohr_controller_button_released( const KeyboardState *keyboard, const Controller *controller, const char *name );
+bool rohr_controller_button_released_is( const KeyboardState *keyboard, const Controller *controller, const char *name );
 ```
 
  @brief Checks whether a named button was released this frame.
@@ -2740,10 +2740,10 @@ Converts an SDL event into a Rohr mouse event.
 
 **Returns:** MouseEvent derived from sdl_event.
 
-### `rohr_controller_mouse_world_position`
+### `rohr_controller_mouse_world_position_get`
 
 ```c
-Position rohr_controller_mouse_world_position(const MouseState *mouse);
+Position rohr_controller_mouse_world_position_get(const MouseState *mouse);
 ```
 
 Converts the current logical screen-space mouse position to world space.
@@ -2768,10 +2768,10 @@ Adds an entity to the spatial grid tables.
 | --- | --- |
 | `entity` | Entity to add. |
 
-### `rohr_grid_checked_pair`
+### `rohr_grid_pair_checked_is`
 
 ```c
-bool rohr_grid_checked_pair(Entity entity_1, Entity entity_2);
+bool rohr_grid_pair_checked_is(Entity entity_1, Entity entity_2);
 ```
 
 Checks whether a pair of entities has already been processed.
@@ -2922,34 +2922,34 @@ EngineResult rohr_game_state_load_files(const char *const *paths, size_t path_co
 
  Loads multiple JSON files with cross-file name resolution.
 
-### `rohr_ui_button_find_by_name`
+### `rohr_ui_button_by_name_get`
 
 ```c
-UIButtonDefinitionResult rohr_ui_button_find_by_name(const char *name);
+UIButtonDefinitionResult rohr_ui_button_by_name_get(const char *name);
 ```
 
  @brief Finds a UI button definition loaded from JSON.
 
-### `rohr_ui_font_find_by_name`
+### `rohr_ui_font_by_name_get`
 
 ```c
-UIFontDefinitionResult rohr_ui_font_find_by_name(const char *name);
+UIFontDefinitionResult rohr_ui_font_by_name_get(const char *name);
 ```
 
  @brief Finds a UI font definition loaded from JSON.
 
-### `rohr_ui_label_find_by_name`
+### `rohr_ui_label_by_name_get`
 
 ```c
-UILabelDefinitionResult rohr_ui_label_find_by_name(const char *name);
+UILabelDefinitionResult rohr_ui_label_by_name_get(const char *name);
 ```
 
  @brief Finds a standalone UI label definition loaded from JSON.
 
-### `rohr_ui_slider_find_by_name`
+### `rohr_ui_slider_by_name_get`
 
 ```c
-UISliderDefinitionResult rohr_ui_slider_find_by_name(const char *name);
+UISliderDefinitionResult rohr_ui_slider_by_name_get(const char *name);
 ```
 
  @brief Finds a UI slider definition loaded from JSON.
@@ -3078,10 +3078,10 @@ void rohr_ui_button_disabled(UIRect bounds, const UIButtonStyle *style);
 
  @brief Draws a disabled button that cannot capture input.
 
-### `rohr_ui_pointer_consumed`
+### `rohr_ui_pointer_consumed_is`
 
 ```c
-bool rohr_ui_pointer_consumed(void);
+bool rohr_ui_pointer_consumed_is(void);
 ```
 
  @brief Returns whether UI consumed pointer input during this frame.

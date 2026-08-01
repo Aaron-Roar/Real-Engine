@@ -241,7 +241,7 @@ EngineResult entity_name_set(Entity entity, const char *name);
  * @param name Null-terminated entity name.
  * @return EntityResult containing the entity id, or an error.
  */
-EntityResult entity_find_by_name(const char *name);
+EntityResult entity_by_name_get(const char *name);
 
 /**
  * Return a copy of an entity's fixed-size name component.
@@ -257,7 +257,7 @@ EntityNameResult entity_name_get(Entity entity);
  * @param entity Entity id to check.
  * @return true when the entity id is valid and live.
  */
-bool entity_is_alive(Entity entity);
+bool entity_alive_is(Entity entity);
 
 /**
  * Check whether an entity table index is currently live.
@@ -265,17 +265,17 @@ bool entity_is_alive(Entity entity);
  * @param index Entity table index to check.
  * @return true when the index is live.
  */
-bool entity_index_is_alive(EntityIndex index);
+bool entity_index_alive_is(EntityIndex index);
 
 /**
  * Return the number of currently alive entities.
  *
- * Systems can use this with entity_alive_at() to iterate only live entities
+ * Systems can use this with entity_alive_at_get() to iterate only live entities
  * instead of scanning every possible entity slot.
  *
  * @return Number of alive entities.
  */
-uint32_t entity_alive_count(void);
+uint32_t entity_alive_count_get(void);
 
 /**
  * Return the entity id stored at a dense alive-list position.
@@ -287,7 +287,7 @@ uint32_t entity_alive_count(void);
  * @param position Dense alive-list position.
  * @return EntityResult containing the entity id, or an error.
  */
-EntityResult entity_alive_at(uint32_t position);
+EntityResult entity_alive_at_get(uint32_t position);
 
 /**
  * Resolve an entity id to its current table index.
@@ -337,7 +337,7 @@ EngineResult entity_add_components(Entity entity, RohrComponentMask mask);
  * @param components Component mask that must be present.
  * @return true when all requested bits are set.
  */
-bool entity_has_components(Entity entity, RohrComponentMask components);
+bool entity_components_has(Entity entity, RohrComponentMask components);
 
 /**
  * Check whether an entity index has all requested components.
@@ -346,7 +346,7 @@ bool entity_has_components(Entity entity, RohrComponentMask components);
  * @param components Component mask that must be present.
  * @return true when all requested bits are set.
  */
-bool entity_index_has_components(EntityIndex index, RohrComponentMask components);
+bool entity_index_components_has(EntityIndex index, RohrComponentMask components);
 
 /**
  * Create a reusable group of entity ids.
@@ -359,7 +359,7 @@ GroupIdResult entity_group_create(void);
 EngineResult entity_group_name_set(GroupId group, const char *name);
 
 /** Find a live generic group by name. */
-GroupIdResult entity_group_find_by_name(const char *name);
+GroupIdResult entity_group_by_name_get(const char *name);
 
 /** Return a copy of a generic group's fixed-size name. */
 GroupNameResult entity_group_name_get(GroupId group);
@@ -406,7 +406,7 @@ EngineResult entity_group_remove(GroupId group, Entity entity);
  * @param entity Entity id to search for.
  * @return true when entity is a member of group.
  */
-bool entity_group_contains(GroupId group, Entity entity);
+bool entity_group_entity_has(GroupId group, Entity entity);
 
 /**
  * Get the group component for a group id.

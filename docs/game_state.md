@@ -64,16 +64,16 @@ Fonts, standalone labels, and immediate-mode buttons can be authored under
 ```
 
 Font definitions provide a unique name, font-file path, and positive point
-size. They are retrieved with `ui_font_find_by_name()`; the game explicitly
+size. They are retrieved with `ui_font_by_name_get()`; the game explicitly
 loads and owns the resulting `FontAsset`.
 
 Standalone labels have a unique name, text, named font, color, and bounds. They
-are retrieved with `ui_label_find_by_name()`. This data is independent from
+are retrieved with `ui_label_by_name_get()`. This data is independent from
 buttons and can be drawn with `ui_label()` after the game creates its text
 asset.
 
 Button `name` identifies the authored definition for
-`ui_button_find_by_name()` and is its default stable runtime interaction ID.
+`ui_button_by_name_get()` and is its default stable runtime interaction ID.
 Pass that name to `ui_button()` for ordinary use, or supply a different runtime
 ID when instantiating one definition more than once. `label` is optional and defaults to an empty string. A
 non-empty button label requires a valid named `font`; `text_color` is optional
@@ -115,7 +115,7 @@ Sliders are authored independently from their runtime values:
 }]
 ```
 
-Slider `name` is both the key used by `ui_slider_find_by_name()` and the
+Slider `name` is both the key used by `ui_slider_by_name_get()` and the
 ordinary runtime ID passed to `ui_slider()` or `ui_slider_with_text()`. A game
 may still pass a different runtime ID when reusing one definition for multiple
 live sliders.
@@ -146,7 +146,7 @@ Supported positive sizes are `track_thickness`, `handle_width`,
 `handle_height`, and `step_button_size`; `step_button_size` defaults to zero,
 and `step_button_gap` may always be zero. The game
 retrieves definitions with
-`ui_slider_find_by_name()`, retains the current value, and passes that value
+`ui_slider_by_name_get()`, retains the current value, and passes that value
 back to `ui_slider()` each frame.
 
 An entity description may use `count` to create multiple copies from one

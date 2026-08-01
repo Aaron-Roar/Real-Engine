@@ -970,7 +970,7 @@ EngineResult editor_move_right(EditorInput input) {
 }
 
 EngineResult editor_pause_engine(EditorInput input) {
-    if(engine_is_paused()) {
+    if(engine_paused_is()) {
         engine_resume();
     }
     else {

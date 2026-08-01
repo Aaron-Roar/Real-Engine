@@ -437,7 +437,7 @@ void ui_button_disabled(UIRect bounds, const UIButtonStyle *style) {
     );
 }
 
-bool ui_pointer_consumed(void) {
+bool ui_pointer_consumed_is(void) {
     return ui_context.pointer_consumed;
 }
 

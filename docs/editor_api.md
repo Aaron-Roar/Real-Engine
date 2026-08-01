@@ -117,10 +117,10 @@ output directory and all strings referenced by the registry.
 
 **Returns:** true when both files were written successfully.
 
-### `RE_entity_find_by_name`
+### `RE_entity_by_name_get`
 
 ```c
-EntityResult RE_entity_find_by_name(const char *name);
+EntityResult RE_entity_by_name_get(const char *name);
 ```
 
 Find a named game-state entity for editor-authored code.

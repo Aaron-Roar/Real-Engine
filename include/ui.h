@@ -149,7 +149,7 @@ void ui_label(const TextAsset *text, UIRect bounds);
 void ui_button_disabled(UIRect bounds, const UIButtonStyle *style);
 
 /** Return whether a UI control consumed pointer input this frame. */
-bool ui_pointer_consumed(void);
+bool ui_pointer_consumed_is(void);
 
 /** Finish a UI frame and release stale pointer capture when appropriate. */
 void ui_end_frame(void);

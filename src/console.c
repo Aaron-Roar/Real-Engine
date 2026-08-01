@@ -123,7 +123,7 @@ void console_debug_write(LogSourceType source, const char *fmt, ...)
     va_end(args);
 }
 
-bool console_is_active(void) {
+bool console_active_is(void) {
     return console_active;
 }
 

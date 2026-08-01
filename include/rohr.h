@@ -83,7 +83,7 @@ SDL_Event rohr_engine_poll_event(void);
  * @brief Checks whether the engine is paused.
  * @return true when paused, false when running.
  */
-bool rohr_engine_is_paused(void);
+bool rohr_engine_paused_is(void);
 
 /**
  * @brief Resets the engine clock baseline.
@@ -164,7 +164,7 @@ void rohr_console_write(LogSourceType source, const char *fmt, ...);
  * @brief Checks whether the console is active.
  * @return true when active, false otherwise.
  */
-bool rohr_console_is_active(void);
+bool rohr_console_active_is(void);
 
 /**
  * @brief Writes a formatted debug message when debug logging is enabled.
@@ -184,20 +184,20 @@ void rohr_console_debug_set(bool state);
  * @param entity Stable entity id to inspect.
  * @return true when the entity is alive, false otherwise.
  */
-bool rohr_entity_is_alive(Entity entity);
+bool rohr_entity_alive_is(Entity entity);
 
 /**
  * @brief Checks whether an entity table index currently contains a live entity.
  * @param index Component table index to inspect.
  * @return true when the index contains a live entity, false otherwise.
  */
-bool rohr_entity_index_is_alive(EntityIndex index);
+bool rohr_entity_index_alive_is(EntityIndex index);
 
 /**
  * @brief Returns the number of currently alive entities.
  * @return Number of alive entities.
  */
-uint32_t rohr_entity_alive_count(void);
+uint32_t rohr_entity_alive_count_get(void);
 
 /**
  * @brief Returns the entity id stored at a dense alive-list position.
@@ -208,7 +208,7 @@ uint32_t rohr_entity_alive_count(void);
  * @param position Dense alive-list position.
  * @return EntityResult containing the entity id, or an error.
  */
-EntityResult rohr_entity_alive_at(uint32_t position);
+EntityResult rohr_entity_alive_at_get(uint32_t position);
 
 /**
  * @brief Resolves a stable entity id to its current component table index.
@@ -238,7 +238,7 @@ EntityResult rohr_entity_add(void);
 EngineResult rohr_entity_name_set(Entity entity, const char *name);
 
 /** Finds a live entity by its state-file name. */
-EntityResult rohr_entity_find_by_name(const char *name);
+EntityResult rohr_entity_by_name_get(const char *name);
 
 /** Returns a copy of an entity's fixed-size name component. */
 EntityNameResult rohr_entity_name_get(Entity entity);
@@ -250,16 +250,16 @@ EngineResult rohr_game_state_load_file(const char *path);
 EngineResult rohr_game_state_load_files(const char *const *paths, size_t path_count);
 
 /** @brief Finds a UI button definition loaded from JSON. */
-UIButtonDefinitionResult rohr_ui_button_find_by_name(const char *name);
+UIButtonDefinitionResult rohr_ui_button_by_name_get(const char *name);
 
 /** @brief Finds a UI font definition loaded from JSON. */
-UIFontDefinitionResult rohr_ui_font_find_by_name(const char *name);
+UIFontDefinitionResult rohr_ui_font_by_name_get(const char *name);
 
 /** @brief Finds a standalone UI label definition loaded from JSON. */
-UILabelDefinitionResult rohr_ui_label_find_by_name(const char *name);
+UILabelDefinitionResult rohr_ui_label_by_name_get(const char *name);
 
 /** @brief Finds a UI slider definition loaded from JSON. */
-UISliderDefinitionResult rohr_ui_slider_find_by_name(const char *name);
+UISliderDefinitionResult rohr_ui_slider_by_name_get(const char *name);
 
 /** Saves all named live entities to a JSON game-state file. */
 EngineResult rohr_game_state_save_file(const char *path);
@@ -288,7 +288,7 @@ EngineResult rohr_entity_add_components(Entity entity, RohrComponentMask mask);
  * @param components Component mask to test.
  * @return true when entity has every requested component, false otherwise.
  */
-bool rohr_entity_has_components(Entity entity, RohrComponentMask components);
+bool rohr_entity_components_has(Entity entity, RohrComponentMask components);
 
 /**
  * @brief Checks whether an entity table index has all requested components.
@@ -296,7 +296,7 @@ bool rohr_entity_has_components(Entity entity, RohrComponentMask components);
  * @param components Component mask to test.
  * @return true when index has every requested component, false otherwise.
  */
-bool rohr_entity_index_has_components(EntityIndex index, RohrComponentMask components);
+bool rohr_entity_index_components_has(EntityIndex index, RohrComponentMask components);
 
 /**
  * @brief Creates a reusable entity group.
@@ -308,7 +308,7 @@ GroupIdResult rohr_entity_group_create(void);
 EngineResult rohr_entity_group_name_set(GroupId group, const char *name);
 
 /** Finds a live generic group by name. */
-GroupIdResult rohr_entity_group_find_by_name(const char *name);
+GroupIdResult rohr_entity_group_by_name_get(const char *name);
 
 /** Returns a copy of a generic group's fixed-size name. */
 GroupNameResult rohr_entity_group_name_get(GroupId group);
@@ -342,7 +342,7 @@ EngineResult rohr_entity_group_remove(GroupId group, Entity entity);
  * @param entity Entity id to search for.
  * @return true when entity belongs to the group.
  */
-bool rohr_entity_group_contains(GroupId group, Entity entity);
+bool rohr_entity_group_entity_has(GroupId group, Entity entity);
 
 /**
  * @brief Returns an entity group.
@@ -476,7 +476,7 @@ Vec1D rohr_physics_circle_moment_of_inertia(Shape circle, Mass mass_value);
  * @param index Entity table index to inspect.
  * @return true when index is live and held, false otherwise.
  */
-bool rohr_physics_entity_is_held(EntityIndex index);
+bool rohr_physics_entity_held_is(EntityIndex index);
 
 /**
  * @brief Sets an entity acceleration component value.
@@ -657,7 +657,7 @@ EngineResult rohr_physics_mass_set(Entity entity, Mass m);
  * @param f Force value.
  * @return EntityResult containing entity on success, or an error.
  */
-EntityResult rohr_physics_force_set(Entity entity, Force f);
+EntityResult rohr_physics_force_create(Entity entity, Force f);
 
 /**
  * @brief Sets force component data directly on an existing entity.
@@ -681,7 +681,7 @@ EngineResult rohr_physics_apply_force_for_one_tick(Entity entity, Force f);
  * @param t Torque value.
  * @return EntityResult containing entity on success, or an error.
  */
-EntityResult rohr_physics_torque_set(Entity entity, Torque t);
+EntityResult rohr_physics_torque_create(Entity entity, Torque t);
 
 /**
  * @brief Sets torque component data directly on an existing entity.
@@ -878,7 +878,7 @@ EngineResult rohr_physics_joint_component_set(Entity entity, Joint joint);
  * @param damping Spring damping.
  * @return EntityResult containing the joint entity, or an error.
  */
-EntityResult rohr_physics_joint_set(
+EntityResult rohr_physics_joint_create(
     Entity a,
     Entity b,
     JointType type,
@@ -1115,7 +1115,7 @@ void rohr_graphics_detach_camera(void);
  * @brief Reports whether the camera is attached to a live entity transform.
  * @return true when attached to a valid entity transform.
  */
-bool rohr_graphics_camera_is_attached(void);
+bool rohr_graphics_camera_attached_is(void);
 
 /**
  * @brief Returns the active camera attachment description.
@@ -1162,7 +1162,7 @@ EngineResult rohr_camera_position_move(CameraId camera, Vec2D translation, Time 
 EngineResult rohr_camera_position_set(CameraId camera, Position position, Time duration);
 EngineResult rohr_camera_position_from_entity_set(CameraId camera, Entity entity, Time duration);
 EngineResult rohr_camera_entity_attachment_set(CameraId camera, Entity entity);
-EngineResult rohr_camera_is_moving(CameraId camera);
+EngineResult rohr_camera_moving_is(CameraId camera);
 EngineResult rohr_camera_zoom_set(CameraId camera, float zoom, Time duration);
 CameraZoomResult rohr_camera_zoom_get(CameraId camera);
 
@@ -1439,7 +1439,7 @@ KeyboardEvent rohr_controller_capture_keyboard_event(const SDL_Event *sdl_event)
  * @param keycode SDL keycode to check.
  * @return true when the key is down or pressed.
  */
-bool rohr_controller_key_down(const KeyboardState *keyboard, SDL_Keycode keycode);
+bool rohr_controller_key_down_is(const KeyboardState *keyboard, SDL_Keycode keycode);
 
 /**
  * @brief Checks whether an SDL keycode was pressed this frame.
@@ -1447,7 +1447,7 @@ bool rohr_controller_key_down(const KeyboardState *keyboard, SDL_Keycode keycode
  * @param keycode SDL keycode to check.
  * @return true when the key was pressed this frame.
  */
-bool rohr_controller_key_pressed(const KeyboardState *keyboard, SDL_Keycode keycode);
+bool rohr_controller_key_pressed_is(const KeyboardState *keyboard, SDL_Keycode keycode);
 
 /**
  * @brief Checks whether an SDL keycode was released this frame.
@@ -1455,7 +1455,7 @@ bool rohr_controller_key_pressed(const KeyboardState *keyboard, SDL_Keycode keyc
  * @param keycode SDL keycode to check.
  * @return true when the key was released this frame.
  */
-bool rohr_controller_key_released(const KeyboardState *keyboard, SDL_Keycode keycode);
+bool rohr_controller_key_released_is(const KeyboardState *keyboard, SDL_Keycode keycode);
 
 /**
  * @brief Returns normalized movement input from supplied up/left/down/right SDL keycodes.
@@ -1483,14 +1483,14 @@ Vec2D rohr_controller_axis_from_keycodes(
  * @param keyboard Keyboard state table to inspect.
  * @return Direction vector where W is positive Y and D is positive X.
  */
-Vec2D rohr_controller_wasd_axis(const KeyboardState *keyboard);
+Vec2D rohr_controller_wasd_axis_get(const KeyboardState *keyboard);
 
 /**
  * @brief Returns normalized movement input from arrow keys.
  * @param keyboard Keyboard state table to inspect.
  * @return Direction vector where up is positive Y and right is positive X.
  */
-Vec2D rohr_controller_arrow_axis(const KeyboardState *keyboard);
+Vec2D rohr_controller_arrow_axis_get(const KeyboardState *keyboard);
 
 /**
  * @brief Returns an enabled, empty, game-owned controller.
@@ -1526,7 +1526,7 @@ void rohr_controller_axis_binding_set(
  * @param controller Game-owned mapping to read.
  * @return Normalized axis, or zero for NULL or disabled controllers.
  */
-Vec2D rohr_controller_axis(
+Vec2D rohr_controller_default_axis_get(
     const KeyboardState *keyboard,
     const Controller *controller
 );
@@ -1553,21 +1553,21 @@ Vec2D rohr_controller_axis_get(
 );
 
 /** @brief Checks whether a named button is held or newly pressed. */
-bool rohr_controller_button_down(
+bool rohr_controller_button_down_is(
     const KeyboardState *keyboard,
     const Controller *controller,
     const char *name
 );
 
 /** @brief Checks whether a named button was pressed this frame. */
-bool rohr_controller_button_pressed(
+bool rohr_controller_button_pressed_is(
     const KeyboardState *keyboard,
     const Controller *controller,
     const char *name
 );
 
 /** @brief Checks whether a named button was released this frame. */
-bool rohr_controller_button_released(
+bool rohr_controller_button_released_is(
     const KeyboardState *keyboard,
     const Controller *controller,
     const char *name
@@ -1604,7 +1604,7 @@ MouseEvent rohr_controller_capture_mouse_event(const SDL_Event *sdl_event);
  * @param mouse Mouse state to convert.
  * @return World position under the mouse, or zero when mouse is NULL.
  */
-Position rohr_controller_mouse_world_position(const MouseState *mouse);
+Position rohr_controller_mouse_world_position_get(const MouseState *mouse);
 
 /**
  * @brief Adds an entity to the spatial grid tables.
@@ -1618,7 +1618,7 @@ void rohr_grid_add_entity_to_grids(Entity entity);
  * @param entity_2 Second entity.
  * @return true when the pair was already checked, false otherwise.
  */
-bool rohr_grid_checked_pair(Entity entity_1, Entity entity_2);
+bool rohr_grid_pair_checked_is(Entity entity_1, Entity entity_2);
 
 /**
  * @brief Stores a processed entity pair.
@@ -1706,7 +1706,7 @@ void rohr_ui_label(const TextAsset *text, UIRect bounds);
 void rohr_ui_button_disabled(UIRect bounds, const UIButtonStyle *style);
 
 /** @brief Returns whether UI consumed pointer input during this frame. */
-bool rohr_ui_pointer_consumed(void);
+bool rohr_ui_pointer_consumed_is(void);
 
 /** @brief Finishes the current UI frame. */
 void rohr_ui_end_frame(void);

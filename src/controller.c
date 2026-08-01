@@ -7,7 +7,7 @@ static bool controller_scancode_valid(SDL_Scancode scancode) {
     return scancode > SDL_SCANCODE_UNKNOWN && scancode < SDL_SCANCODE_COUNT;
 }
 
-static bool controller_scancode_has_state(const KeyboardState *keyboard, SDL_Scancode scancode, KeyState state) {
+static bool controller_scancode_state_has(const KeyboardState *keyboard, SDL_Scancode scancode, KeyState state) {
     if(keyboard == NULL || !controller_scancode_valid(scancode)) {
         return false;
     }
@@ -39,16 +39,16 @@ Vec2D controller_axis_from_keycodes(
         ) {
     Vec2D axis = {0};
 
-    if(controller_key_down(keyboard, right)) {
+    if(controller_key_down_is(keyboard, right)) {
         axis.x += 1.0f;
     }
-    if(controller_key_down(keyboard, left)) {
+    if(controller_key_down_is(keyboard, left)) {
         axis.x -= 1.0f;
     }
-    if(controller_key_down(keyboard, up)) {
+    if(controller_key_down_is(keyboard, up)) {
         axis.y += 1.0f;
     }
-    if(controller_key_down(keyboard, down)) {
+    if(controller_key_down_is(keyboard, down)) {
         axis.y -= 1.0f;
     }
     /* Opposing direction keys cancel each other before diagonal normalization. */
@@ -93,23 +93,23 @@ KeyboardEvent capture_keyboard_event(const SDL_Event *sdl_event) {
     return key_event;
 }
 
-bool controller_key_down(const KeyboardState *keyboard, SDL_Keycode keycode) {
+bool controller_key_down_is(const KeyboardState *keyboard, SDL_Keycode keycode) {
     return controller_scancode_down(keyboard, controller_keycode_to_scancode(keycode));
 }
 
-bool controller_key_pressed(const KeyboardState *keyboard, SDL_Keycode keycode) {
-    return controller_scancode_has_state(keyboard, controller_keycode_to_scancode(keycode), KEY_STATE_PRESSED);
+bool controller_key_pressed_is(const KeyboardState *keyboard, SDL_Keycode keycode) {
+    return controller_scancode_state_has(keyboard, controller_keycode_to_scancode(keycode), KEY_STATE_PRESSED);
 }
 
-bool controller_key_released(const KeyboardState *keyboard, SDL_Keycode keycode) {
-    return controller_scancode_has_state(keyboard, controller_keycode_to_scancode(keycode), KEY_STATE_RELEASED);
+bool controller_key_released_is(const KeyboardState *keyboard, SDL_Keycode keycode) {
+    return controller_scancode_state_has(keyboard, controller_keycode_to_scancode(keycode), KEY_STATE_RELEASED);
 }
 
-Vec2D controller_wasd_axis(const KeyboardState *keyboard) {
+Vec2D controller_wasd_axis_get(const KeyboardState *keyboard) {
     return controller_axis_from_keycodes(keyboard, SDLK_W, SDLK_A, SDLK_S, SDLK_D);
 }
 
-Vec2D controller_arrow_axis(const KeyboardState *keyboard) {
+Vec2D controller_arrow_axis_get(const KeyboardState *keyboard) {
     return controller_axis_from_keycodes(keyboard, SDLK_UP, SDLK_LEFT, SDLK_DOWN, SDLK_RIGHT);
 }
 
@@ -153,7 +153,7 @@ void controller_axis_binding_set(Controller *controller, ControllerAxisBinding b
     (void)controller_add_axis(controller, "movement", binding);
 }
 
-Vec2D controller_axis(const KeyboardState *keyboard, const Controller *controller) {
+Vec2D controller_default_axis_get(const KeyboardState *keyboard, const Controller *controller) {
     return controller_axis_get(keyboard, controller, "movement");
 }
 
@@ -259,34 +259,34 @@ Vec2D controller_axis_get(
     );
 }
 
-bool controller_button_down(
+bool controller_button_down_is(
         const KeyboardState *keyboard,
         const Controller *controller,
         const char *name
         ) {
     const ControllerButton *button = controller_find_button(controller, name);
     return controller != NULL && controller->enabled && button != NULL &&
-        controller_key_down(keyboard, button->keycode);
+        controller_key_down_is(keyboard, button->keycode);
 }
 
-bool controller_button_pressed(
+bool controller_button_pressed_is(
         const KeyboardState *keyboard,
         const Controller *controller,
         const char *name
         ) {
     const ControllerButton *button = controller_find_button(controller, name);
     return controller != NULL && controller->enabled && button != NULL &&
-        controller_key_pressed(keyboard, button->keycode);
+        controller_key_pressed_is(keyboard, button->keycode);
 }
 
-bool controller_button_released(
+bool controller_button_released_is(
         const KeyboardState *keyboard,
         const Controller *controller,
         const char *name
         ) {
     const ControllerButton *button = controller_find_button(controller, name);
     return controller != NULL && controller->enabled && button != NULL &&
-        controller_key_released(keyboard, button->keycode);
+        controller_key_released_is(keyboard, button->keycode);
 }
 
 void add_key_event(KeyboardState *keyboard, KeyboardEvent key_event) {

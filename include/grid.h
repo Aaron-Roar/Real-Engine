@@ -33,7 +33,7 @@ typedef struct {
 /** Add an entity to every grid cell touched by its AABB. */
 void add_entity_to_grids(Entity entity);
 /** Check whether an entity pair has already been processed. */
-bool checked_pair(Entity entity_1, Entity entity_2);
+bool grid_pair_checked_is(Entity entity_1, Entity entity_2);
 /** Mark an entity pair as processed. */
 void add_pair(Entity entity_1, Entity entity_2);
 /** Clear all grid cells and checked-pair state. */

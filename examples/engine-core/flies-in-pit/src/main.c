@@ -40,25 +40,25 @@ int main(void) {
         goto fail;
     }
 
-    EntityResult wall_1_result = rohr_entity_find_by_name("wall_1");
+    EntityResult wall_1_result = rohr_entity_by_name_get("wall_1");
     if(rohr_error_check(wall_1_result)) {
         PRINT_ENGINE_ERROR(wall_1_result);
         goto fail;
     }
     Entity wall_1 = wall_1_result.result.value;
-    EntityResult wall_2_result = rohr_entity_find_by_name("wall_2");
+    EntityResult wall_2_result = rohr_entity_by_name_get("wall_2");
     if(rohr_error_check(wall_2_result)) {
         PRINT_ENGINE_ERROR(wall_2_result);
         goto fail;
     }
     Entity wall_2 = wall_2_result.result.value;
-    EntityResult wall_3_result = rohr_entity_find_by_name("wall_3");
+    EntityResult wall_3_result = rohr_entity_by_name_get("wall_3");
     if(rohr_error_check(wall_3_result)) {
         PRINT_ENGINE_ERROR(wall_3_result);
         goto fail;
     }
     Entity wall_3 = wall_3_result.result.value;
-    EntityResult large_fly_result = rohr_entity_find_by_name("large_fly");
+    EntityResult large_fly_result = rohr_entity_by_name_get("large_fly");
     if(rohr_error_check(large_fly_result)) {
         PRINT_ENGINE_ERROR(large_fly_result);
         goto fail;
@@ -99,7 +99,7 @@ int main(void) {
         }
 
         //Game Code
-        Vec2D move_axis = rohr_controller_wasd_axis(&keyboard);
+        Vec2D move_axis = rohr_controller_wasd_axis_get(&keyboard);
         Vec2D turn_axis = rohr_controller_axis_from_keycodes(&keyboard, SDLK_UNKNOWN, SDLK_LEFT, SDLK_UNKNOWN, SDLK_RIGHT);
         if(move_axis.x != 0.0f || move_axis.y != 0.0f) {
             EngineResult force_result = rohr_physics_apply_force_for_one_tick(large_fly, (Force){

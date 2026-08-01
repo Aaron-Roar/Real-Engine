@@ -285,7 +285,7 @@ static StateUISlider *state_find_ui_slider_internal(const char *name) {
     return NULL;
 }
 
-UIButtonDefinitionResult ui_button_find_by_name(const char *name) {
+UIButtonDefinitionResult ui_button_by_name_get(const char *name) {
     StateUIButton *button = state_find_ui_button_internal(name);
 
     if(button == NULL) {
@@ -300,7 +300,7 @@ UIButtonDefinitionResult ui_button_find_by_name(const char *name) {
     );
 }
 
-UIFontDefinitionResult ui_font_find_by_name(const char *name) {
+UIFontDefinitionResult ui_font_by_name_get(const char *name) {
     StateUIFont *font = state_find_ui_font_internal(name);
 
     if(font == NULL) {
@@ -312,7 +312,7 @@ UIFontDefinitionResult ui_font_find_by_name(const char *name) {
     return ERROR_RESULT_MAKE_VALUE(UIFontDefinitionResult, font->definition);
 }
 
-UILabelDefinitionResult ui_label_find_by_name(const char *name) {
+UILabelDefinitionResult ui_label_by_name_get(const char *name) {
     StateUILabel *label = state_find_ui_label_internal(name);
 
     if(label == NULL) {
@@ -324,7 +324,7 @@ UILabelDefinitionResult ui_label_find_by_name(const char *name) {
     return ERROR_RESULT_MAKE_VALUE(UILabelDefinitionResult, label->definition);
 }
 
-UISliderDefinitionResult ui_slider_find_by_name(const char *name) {
+UISliderDefinitionResult ui_slider_by_name_get(const char *name) {
     StateUISlider *slider = state_find_ui_slider_internal(name);
 
     if(slider == NULL) {
@@ -795,7 +795,7 @@ static EngineResult state_resolve_name(yyjson_val *value, Entity *entity) {
     if(!yyjson_is_str(value) || entity == NULL) {
         return error_result_error(ERROR_ENGINE_STATE_INVALID);
     }
-    result = entity_find_by_name(yyjson_get_str(value));
+    result = entity_by_name_get(yyjson_get_str(value));
     if(result.kind == ERROR_RESULT_ERROR) {
         return error_result_error(ERROR_ENGINE_STATE_REFERENCE_NOT_FOUND);
     }
@@ -917,7 +917,7 @@ static EngineResult state_make_entity_name(
         if(written < 0 || written >= ENTITY_NAME_MAX) {
             return error_result_error(ERROR_ENGINE_ENTITY_NAME_TOO_LONG);
         }
-        if(entity_find_by_name(name).kind == ERROR_RESULT_ERROR) {
+        if(entity_by_name_get(name).kind == ERROR_RESULT_ERROR) {
             return error_result_value(true);
         }
         suffix += 1;
@@ -1519,7 +1519,7 @@ static EngineResult state_load_components(
             if(!yyjson_is_str(group_name)) {
                 return error_result_error(ERROR_ENGINE_STATE_INVALID);
             }
-            group_result = entity_group_find_by_name(yyjson_get_str(group_name));
+            group_result = entity_group_by_name_get(yyjson_get_str(group_name));
             if(group_result.kind == ERROR_RESULT_ERROR) {
                 return error_result_error(ERROR_ENGINE_STATE_REFERENCE_NOT_FOUND);
             }
@@ -2225,8 +2225,8 @@ EngineResult game_state_save_file(const char *path) {
         );
     }
 
-    for(position = 0; position < entity_alive_count(); position += 1) {
-        EntityResult entity_result = entity_alive_at(position);
+    for(position = 0; position < entity_alive_count_get(); position += 1) {
+        EntityResult entity_result = entity_alive_at_get(position);
         EntityIndex index;
         EntityNameResult name;
         yyjson_mut_val *description;

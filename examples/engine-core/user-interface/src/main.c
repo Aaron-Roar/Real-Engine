@@ -51,7 +51,7 @@ int main(void) {
             goto fail;
         }
         UIButtonDefinitionResult settings_result =
-            rohr_ui_button_find_by_name("settings_button");
+            rohr_ui_button_by_name_get("settings_button");
         if(rohr_error_check(settings_result)) {
             PRINT_ENGINE_ERROR(settings_result);
             goto fail;
@@ -59,7 +59,7 @@ int main(void) {
         settings_button = settings_result.result.value;
 
         UIFontDefinitionResult font_result =
-            rohr_ui_font_find_by_name("menu_font");
+            rohr_ui_font_by_name_get("menu_font");
         if(rohr_error_check(font_result)) {
             PRINT_ENGINE_ERROR(font_result);
             goto fail;
@@ -67,7 +67,7 @@ int main(void) {
         font_definition = font_result.result.value;
 
         UILabelDefinitionResult title_result =
-            rohr_ui_label_find_by_name("example_title");
+            rohr_ui_label_by_name_get("example_title");
         if(rohr_error_check(title_result)) {
             PRINT_ENGINE_ERROR(title_result);
             goto fail;
@@ -75,7 +75,7 @@ int main(void) {
         title_definition = title_result.result.value;
 
         UILabelDefinitionResult play_result =
-            rohr_ui_label_find_by_name("play_label");
+            rohr_ui_label_by_name_get("play_label");
         if(rohr_error_check(play_result)) {
             PRINT_ENGINE_ERROR(play_result);
             goto fail;
@@ -83,7 +83,7 @@ int main(void) {
         play_definition = play_result.result.value;
 
         UILabelDefinitionResult description_result =
-            rohr_ui_label_find_by_name("example_description");
+            rohr_ui_label_by_name_get("example_description");
         if(rohr_error_check(description_result)) {
             PRINT_ENGINE_ERROR(description_result);
             goto fail;
@@ -91,7 +91,7 @@ int main(void) {
         description_definition = description_result.result.value;
 
         UISliderDefinitionResult slider_result =
-            rohr_ui_slider_find_by_name("angled_value_slider");
+            rohr_ui_slider_by_name_get("angled_value_slider");
         if(rohr_error_check(slider_result)) {
             PRINT_ENGINE_ERROR(slider_result);
             goto fail;

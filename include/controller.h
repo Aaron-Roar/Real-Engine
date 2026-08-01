@@ -140,11 +140,11 @@ void add_key_event(KeyboardState *keyboard, KeyboardEvent key_event);
 /** Convert an SDL event to an engine keyboard event. */
 KeyboardEvent capture_keyboard_event(const SDL_Event *sdl_event);
 /** Check whether an SDL keycode is currently held or was pressed this frame. */
-bool controller_key_down(const KeyboardState *keyboard, SDL_Keycode keycode);
+bool controller_key_down_is(const KeyboardState *keyboard, SDL_Keycode keycode);
 /** Check whether an SDL keycode was pressed this frame. */
-bool controller_key_pressed(const KeyboardState *keyboard, SDL_Keycode keycode);
+bool controller_key_pressed_is(const KeyboardState *keyboard, SDL_Keycode keycode);
 /** Check whether an SDL keycode was released this frame. */
-bool controller_key_released(const KeyboardState *keyboard, SDL_Keycode keycode);
+bool controller_key_released_is(const KeyboardState *keyboard, SDL_Keycode keycode);
 /** Return normalized movement input from supplied up/left/down/right SDL keycodes. Opposing directions cancel. */
 Vec2D controller_axis_from_keycodes(
         const KeyboardState *keyboard,
@@ -154,9 +154,9 @@ Vec2D controller_axis_from_keycodes(
         SDL_Keycode right
 );
 /** Return normalized movement input from W/A/S/D. */
-Vec2D controller_wasd_axis(const KeyboardState *keyboard);
+Vec2D controller_wasd_axis_get(const KeyboardState *keyboard);
 /** Return normalized movement input from arrow keys. */
-Vec2D controller_arrow_axis(const KeyboardState *keyboard);
+Vec2D controller_arrow_axis_get(const KeyboardState *keyboard);
 /** Return an enabled controller with no axes or buttons. */
 Controller controller_default(void);
 /** Return a controller using conventional W/A/S/D axis bindings. */
@@ -166,7 +166,7 @@ Controller controller_default_arrows(void);
 /** Replace the axis binding on a caller-owned controller. */
 void controller_axis_binding_set(Controller *controller, ControllerAxisBinding binding);
 /** Read a caller-owned controller from shared keyboard state. */
-Vec2D controller_axis(const KeyboardState *keyboard, const Controller *controller);
+Vec2D controller_default_axis_get(const KeyboardState *keyboard, const Controller *controller);
 /** Add or replace a named axis on a caller-owned controller. */
 bool controller_add_axis(Controller *controller, const char *name, ControllerAxisBinding binding);
 /** Add or replace a named button on a caller-owned controller. */
@@ -174,11 +174,11 @@ bool controller_add_button(Controller *controller, const char *name, SDL_Keycode
 /** Read a named axis from shared keyboard state. */
 Vec2D controller_axis_get(const KeyboardState *keyboard, const Controller *controller, const char *name);
 /** Check whether a named button is held or was pressed this frame. */
-bool controller_button_down(const KeyboardState *keyboard, const Controller *controller, const char *name);
+bool controller_button_down_is(const KeyboardState *keyboard, const Controller *controller, const char *name);
 /** Check whether a named button was pressed this frame. */
-bool controller_button_pressed(const KeyboardState *keyboard, const Controller *controller, const char *name);
+bool controller_button_pressed_is(const KeyboardState *keyboard, const Controller *controller, const char *name);
 /** Check whether a named button was released this frame. */
-bool controller_button_released(const KeyboardState *keyboard, const Controller *controller, const char *name);
+bool controller_button_released_is(const KeyboardState *keyboard, const Controller *controller, const char *name);
 
 /** Print a mouse event to the console. */
 void print_mouse_event(MouseEvent event);

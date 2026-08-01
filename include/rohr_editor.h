@@ -90,7 +90,7 @@ bool RE_component_registry_generate(
  * @param name Entity name stored in the loaded game state.
  * @return EntityResult containing the live entity handle or lookup failure.
  */
-EntityResult RE_entity_find_by_name(const char *name);
+EntityResult RE_entity_by_name_get(const char *name);
 
 /**
  * Initialize editor-owned state.

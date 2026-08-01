@@ -49,7 +49,7 @@ bool console_read(ConsoleLogString *input);
 /** Write a formatted message to the console. */
 void console_write(LogSourceType source, const char *fmt, ...);
 /** Check whether the console is active. */
-bool console_is_active(void);
+bool console_active_is(void);
 /** Write a formatted debug message when debug output is enabled. */
 void console_debug_write(LogSourceType source, const char *fmt, ...);
 /** Set console debug output state. */

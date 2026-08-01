@@ -77,7 +77,7 @@ SDL_Event engine_poll_event(void);
  *
  * @return true when paused, false otherwise.
  */
-bool engine_is_paused(void);
+bool engine_paused_is(void);
 
 /**
  * Reset the internal timing baseline without advancing time.

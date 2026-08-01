@@ -237,9 +237,9 @@ Collision physics_sat_collision(Shape shape_1, Shape shape_2);
 Vec1D physics_circle_moment_of_inertia(Shape circle, Mass mass_value);
 
 /** Check whether an entity index has HOLD. */
-bool physics_entity_is_held(EntityIndex index);
+bool physics_entity_held_is(EntityIndex index);
 /** Check whether an entity index can be moved by physics update stages. */
-bool physics_entity_can_move(EntityIndex index);
+bool physics_entity_movable_is(EntityIndex index);
 
 /** Set an entity's base linear acceleration. */
 EngineResult physics_acceleration_set(Entity entity, Acceleration a);
@@ -285,13 +285,13 @@ EngineResult physics_position_set(Entity entity, Position p);
 /** Set an entity's mass and add the MASS component. */
 EngineResult physics_mass_set(Entity entity, Mass m);
 /** Create a force entity targeting the given entity. */
-EntityResult physics_force_set(Entity entity, Force f);
+EntityResult physics_force_create(Entity entity, Force f);
 /** Set force component data directly on an existing entity. */
 EngineResult physics_force_component_set(Entity entity, Force force);
 /** Create a force entity that applies for one physics tick. */
 EngineResult physics_apply_force_for_one_tick(Entity entity, Force f);
 /** Create a torque entity targeting the given entity. */
-EntityResult physics_torque_set(Entity entity, Torque t);
+EntityResult physics_torque_create(Entity entity, Torque t);
 /** Set torque component data directly on an existing entity. */
 EngineResult physics_torque_component_set(Entity entity, Torque torque);
 /** Create a torque entity that applies for one physics tick. */
@@ -372,7 +372,7 @@ EngineResult physics_joint_component_set(Entity entity, Joint joint);
  *
  * @return EntityResult containing the new joint entity, or an error.
  */
-EntityResult physics_joint_set(
+EntityResult physics_joint_create(
     Entity a,
     Entity b,
     JointType type,

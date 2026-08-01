@@ -50,8 +50,8 @@ int main(void) {
         }
     );
 
-    first_axis = rohr_controller_axis(&keyboard, &first);
-    second_axis = rohr_controller_axis(&keyboard, &second);
+    first_axis = rohr_controller_default_axis_get(&keyboard, &first);
+    second_axis = rohr_controller_default_axis_get(&keyboard, &second);
     if(first_axis.x != 1.0f || first_axis.y != 0.0f ||
             second_axis.x != 0.0f || second_axis.y != 1.0f) {
         rohr_engine_shutdown();
@@ -59,10 +59,10 @@ int main(void) {
     }
     first_axis = rohr_controller_axis_get(&keyboard, &first, "aim");
     if(first_axis.x != 1.0f || first_axis.y != 0.0f ||
-            !rohr_controller_button_down(&keyboard, &first, "fire") ||
-            !rohr_controller_button_pressed(&keyboard, &first, "fire") ||
-            rohr_controller_button_down(&keyboard, &second, "fire") ||
-            rohr_controller_button_down(&keyboard, &first, "missing")) {
+            !rohr_controller_button_down_is(&keyboard, &first, "fire") ||
+            !rohr_controller_button_pressed_is(&keyboard, &first, "fire") ||
+            rohr_controller_button_down_is(&keyboard, &second, "fire") ||
+            rohr_controller_button_down_is(&keyboard, &first, "missing")) {
         rohr_engine_shutdown();
         return 1;
     }
@@ -76,14 +76,14 @@ int main(void) {
             .negative_y = SDLK_D,
         }
     );
-    first_axis = rohr_controller_axis(&keyboard, &first);
+    first_axis = rohr_controller_default_axis_get(&keyboard, &first);
     if(first_axis.x != 0.0f || first_axis.y != -1.0f) {
         rohr_engine_shutdown();
         return 1;
     }
 
     first.enabled = false;
-    first_axis = rohr_controller_axis(&keyboard, &first);
+    first_axis = rohr_controller_default_axis_get(&keyboard, &first);
     if(first_axis.x != 0.0f || first_axis.y != 0.0f) {
         rohr_engine_shutdown();
         return 1;

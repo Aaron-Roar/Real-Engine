@@ -98,7 +98,7 @@ static EngineResult pong_update_camera(
             if(rohr_error_check(result)) return result;
             *state = PONG_CAMERA_MOVING_TO_BALL;
         } else if(*state == PONG_CAMERA_MOVING_TO_BALL) {
-            result = rohr_camera_is_moving(camera);
+            result = rohr_camera_moving_is(camera);
             if(rohr_error_check(result)) return result;
             if(!result.result.value) {
                 result = rohr_camera_entity_attachment_set(camera, ball);
@@ -114,7 +114,7 @@ static EngineResult pong_update_camera(
         if(rohr_error_check(result)) return result;
         *state = PONG_CAMERA_RETURNING_HOME;
     } else if(*state == PONG_CAMERA_RETURNING_HOME) {
-        result = rohr_camera_is_moving(camera);
+        result = rohr_camera_moving_is(camera);
         if(rohr_error_check(result)) return result;
         if(!result.result.value) *state = PONG_CAMERA_HOME;
     }
@@ -251,37 +251,37 @@ int main(void) {
         rohr_error_print_stderr(load_result.result.error);
         goto fail;
     }
-    EntityResult wall_bottom_result = RE_entity_find_by_name("wall_bottom");
+    EntityResult wall_bottom_result = RE_entity_by_name_get("wall_bottom");
     if(rohr_error_check(wall_bottom_result)) {
         rohr_error_print_stderr(wall_bottom_result.result.error);
         goto fail;
     }
     wall_bottom = wall_bottom_result.result.value;
-    EntityResult wall_top_result = RE_entity_find_by_name("wall_top");
+    EntityResult wall_top_result = RE_entity_by_name_get("wall_top");
     if(rohr_error_check(wall_top_result)) {
         rohr_error_print_stderr(wall_top_result.result.error);
         goto fail;
     }
     wall_top = wall_top_result.result.value;
-    EntityResult center_line_result = RE_entity_find_by_name("center_line");
+    EntityResult center_line_result = RE_entity_by_name_get("center_line");
     if(rohr_error_check(center_line_result)) {
         rohr_error_print_stderr(center_line_result.result.error);
         goto fail;
     }
     center_line = center_line_result.result.value;
-    EntityResult paddle_left_result = RE_entity_find_by_name("paddle_left");
+    EntityResult paddle_left_result = RE_entity_by_name_get("paddle_left");
     if(rohr_error_check(paddle_left_result)) {
         rohr_error_print_stderr(paddle_left_result.result.error);
         goto fail;
     }
     paddle_left = paddle_left_result.result.value;
-    EntityResult paddle_right_result = RE_entity_find_by_name("paddle_right");
+    EntityResult paddle_right_result = RE_entity_by_name_get("paddle_right");
     if(rohr_error_check(paddle_right_result)) {
         rohr_error_print_stderr(paddle_right_result.result.error);
         goto fail;
     }
     paddle_right = paddle_right_result.result.value;
-    EntityResult ball_result = RE_entity_find_by_name("ball");
+    EntityResult ball_result = RE_entity_by_name_get("ball");
     if(rohr_error_check(ball_result)) {
         rohr_error_print_stderr(ball_result.result.error);
         goto fail;

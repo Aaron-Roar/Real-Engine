@@ -97,7 +97,7 @@ int main(void) {
             rohr_engine_shutdown();
             return 1;
         }
-        moving_result = rohr_camera_is_moving(original);
+        moving_result = rohr_camera_moving_is(original);
         if(rohr_error_check(moving_result) || !moving_result.result.value
                 || rohr_error_check(rohr_camera_position_move(
                     original,
@@ -108,7 +108,7 @@ int main(void) {
             rohr_engine_shutdown();
             return 1;
         }
-        moving_result = rohr_camera_is_moving(original);
+        moving_result = rohr_camera_moving_is(original);
         if(rohr_error_check(moving_result) || moving_result.result.value
             || rohr_error_check(rohr_camera_zoom_set(original, 1.5f, -1.0))) {
             rohr_graphics_end();

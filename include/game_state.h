@@ -28,16 +28,16 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count);
 EngineResult game_state_load_file(const char *path);
 
 /** Find a UI button definition loaded from JSON by its authored name. */
-UIButtonDefinitionResult ui_button_find_by_name(const char *name);
+UIButtonDefinitionResult ui_button_by_name_get(const char *name);
 
 /** Find a UI font definition loaded from JSON by name. */
-UIFontDefinitionResult ui_font_find_by_name(const char *name);
+UIFontDefinitionResult ui_font_by_name_get(const char *name);
 
 /** Find a standalone UI label definition loaded from JSON by name. */
-UILabelDefinitionResult ui_label_find_by_name(const char *name);
+UILabelDefinitionResult ui_label_by_name_get(const char *name);
 
 /** Find a UI slider definition loaded from JSON by name. */
-UISliderDefinitionResult ui_slider_find_by_name(const char *name);
+UISliderDefinitionResult ui_slider_by_name_get(const char *name);
 
 /**
  * Save all named live entities to one JSON state file.
