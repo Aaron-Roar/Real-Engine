@@ -55,7 +55,7 @@ int main(void) {
     if(rohr_error_check(health_result) || health_result.result.value.current != 20.0f) {
         return 1;
     }
-    health_addr = game_health_get_addr(first);
+    health_addr = game_health_addr_get(first);
     if(health_addr == NULL) {
         return 1;
     }
@@ -71,7 +71,7 @@ int main(void) {
     }
 
     inventory.count = 1;
-    game_inventory_set_destroy_hook(inventory_destroy);
+    game_inventory_destroy_hook_set(inventory_destroy);
     if(!game_inventory_set(first, inventory) || !game_inventory_has(first)) {
         return 1;
     }

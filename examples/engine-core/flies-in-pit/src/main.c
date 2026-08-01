@@ -22,7 +22,7 @@ int main(void) {
             return 1;
         }
     }
-    if(rohr_error_check(rohr_engine_set_time_per_tick(1.0 / 120.0))) return 1;
+    if(rohr_error_check(rohr_engine_time_per_tick_set(1.0 / 120.0))) return 1;
     {
         EngineResult graphics_result = rohr_graphics_start();
         if(rohr_error_check(graphics_result)) {
@@ -64,7 +64,7 @@ int main(void) {
         goto fail;
     }
     Entity large_fly = large_fly_result.result.value;
-    CameraAttachmentResult attachment_result = rohr_graphics_get_camera_attachment();
+    CameraAttachmentResult attachment_result = rohr_graphics_camera_attachment_get();
     if(rohr_error_check(attachment_result)
             || attachment_result.result.value.entity != large_fly
             || !attachment_result.result.value.follow_position
@@ -79,7 +79,7 @@ int main(void) {
     bool phase_1 = false;
     bool phase_2 = false;
     bool phase_3 = false;
-    while (rohr_engine_get_time() < demo_duration_seconds) {
+    while (rohr_engine_time_get() < demo_duration_seconds) {
         rohr_system_clean_entities_past_lifetime();
         SDL_Event event = rohr_engine_poll_event();
         if(event.type == SDL_EVENT_QUIT) {
@@ -88,13 +88,13 @@ int main(void) {
         KeyboardEvent key_event = rohr_controller_capture_keyboard_event(&event);
         rohr_controller_update_key_states(&keyboard);
         rohr_controller_add_key_event(&keyboard, key_event);
-        if(!phase_1 && rohr_engine_get_time() > 3) {
+        if(!phase_1 && rohr_engine_time_get() > 3) {
             phase_1 = true;
         }
-        if(!phase_2 && rohr_engine_get_time() > 5) {
+        if(!phase_2 && rohr_engine_time_get() > 5) {
             phase_2 = true;
         }
-        if(!phase_3 && rohr_engine_get_time() > 7) {
+        if(!phase_3 && rohr_engine_time_get() > 7) {
             phase_3 = true;
         }
 
@@ -128,7 +128,7 @@ int main(void) {
         rohr_graphics_draw_hit_box(wall_1, GRAPHICS_FILLED);
         rohr_graphics_draw_hit_box(wall_2, GRAPHICS_FILLED);
         rohr_graphics_draw_hit_box(wall_3, GRAPHICS_FILLED);
-        rohr_graphics_update_sprite_frames(rohr_engine_get_tick(), rohr_engine_get_time());
+        rohr_graphics_update_sprite_frames(rohr_engine_tick_get(), rohr_engine_time_get());
         rohr_graphics_draw_animated_sprites();
         if(phase_1) {
             rohr_graphics_draw_hit_boxes();

@@ -3,7 +3,7 @@
 `Entity` values are stable ids, not component table indexes.
 
 Systems that need direct table access resolve an entity id through
-`entity_get_index()`. This keeps ids decoupled from storage location and avoids
+`entity_index_get()`. This keeps ids decoupled from storage location and avoids
 using raw array indexes as public handles.
 
 `EntityIndex` values still correspond to component table indexes. That property

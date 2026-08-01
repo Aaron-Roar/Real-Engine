@@ -127,6 +127,6 @@ bool console_is_active(void) {
     return console_active;
 }
 
-void console_set_debug(bool state) {
+void console_debug_set(bool state) {
     console_debug = state;
 }

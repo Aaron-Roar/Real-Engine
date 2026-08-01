@@ -194,10 +194,10 @@ static bool RE_generate_header(
                 "%s\n\n"
                 "ERROR_DECLARE_RESULT_TYPE(Game%sResult, %s);\n"
                 "typedef void (*Game%sDestroyHook)(Entity entity, %s *value);\n"
-                "void game_%s_set_destroy_hook(Game%sDestroyHook hook);\n"
+                "void game_%s_destroy_hook_set(Game%sDestroyHook hook);\n"
                 "bool game_%s_set(Entity entity, %s value);\n"
                 "Game%sResult game_%s_get(Entity entity);\n"
-                "%s *game_%s_get_addr(Entity entity);\n"
+                "%s *game_%s_addr_get(Entity entity);\n"
                 "bool game_%s_has(Entity entity);\n"
                 "void game_%s_remove(Entity entity);\n\n",
                 component->type_declaration,
@@ -265,7 +265,7 @@ static bool RE_generate_source_prelude(FILE *source, const char *header_name) {
         "    return true;\n"
         "}\n\n"
         "static bool game_entity_index(Entity entity, EntityIndex *entity_index) {\n"
-        "    EntityIndexResult result = rohr_entity_get_index(entity);\n"
+        "    EntityIndexResult result = rohr_entity_index_get(entity);\n"
         "    if(rohr_error_check(result)) {\n"
         "        return false;\n"
         "    }\n"
@@ -284,7 +284,7 @@ static bool RE_generate_source_prelude(FILE *source, const char *header_name) {
         "    *dense_index = encoded - 1;\n"
         "    return game_entity_states.entities[*dense_index] == entity;\n"
         "}\n\n"
-        "static bool game_entity_state_set_bit(Entity entity, GameComponentMask bit) {\n"
+        "static bool game_entity_state_bit_set(Entity entity, GameComponentMask bit) {\n"
         "    EntityIndex entity_index;\n"
         "    size_t dense_index;\n"
         "    size_t entity_capacity;\n"
@@ -350,7 +350,7 @@ static bool RE_generate_tag_source(FILE *source, const char *name) {
     }
     return fprintf(source,
         "bool game_%s_set(Entity entity) {\n"
-        "    return game_entity_state_set_bit(entity, GAME_TAG_%s);\n"
+        "    return game_entity_state_bit_set(entity, GAME_TAG_%s);\n"
         "}\n\n"
         "bool game_%s_has(Entity entity) {\n"
         "    return game_entity_state_has_bit(entity, GAME_TAG_%s);\n"
@@ -385,7 +385,7 @@ static bool RE_generate_component_source(
             "} Game_%sPool;\n\n"
             "static Game_%sPool game_%s_pool = {0};\n"
             "static Game%sDestroyHook game_%s_destroy_hook = NULL;\n\n"
-            "void game_%s_set_destroy_hook(Game%sDestroyHook hook) {\n"
+            "void game_%s_destroy_hook_set(Game%sDestroyHook hook) {\n"
             "    game_%s_destroy_hook = hook;\n"
             "}\n\n",
             type, type, type, type, name,
@@ -419,7 +419,7 @@ static bool RE_generate_component_source(
             "            game_%s_destroy_hook(entity, &game_%s_pool.values[dense_index]);\n"
             "        }\n"
             "        game_%s_pool.values[dense_index] = value;\n"
-            "        return game_entity_state_set_bit(entity, GAME_COMPONENT_%s);\n"
+            "        return game_entity_state_bit_set(entity, GAME_COMPONENT_%s);\n"
             "    }\n"
             "    if(!game_entity_index(entity, &entity_index)) {\n"
             "        return false;\n"
@@ -449,7 +449,7 @@ static bool RE_generate_component_source(
         return false;
     }
     if(fprintf(source,
-            "    if(!game_entity_state_set_bit(entity, GAME_COMPONENT_%s)) {\n"
+            "    if(!game_entity_state_bit_set(entity, GAME_COMPONENT_%s)) {\n"
             "        game_%s_pool.count -= 1;\n"
             "        game_%s_pool.sparse[entity_index] = 0;\n"
             "        return false;\n"
@@ -472,7 +472,7 @@ static bool RE_generate_component_source(
         return false;
     }
     if(fprintf(source,
-            "%s *game_%s_get_addr(Entity entity) {\n"
+            "%s *game_%s_addr_get(Entity entity) {\n"
             "    EntityIndex entity_index;\n"
             "    size_t dense_index;\n"
             "    if(!game_%s_find(entity, &entity_index, &dense_index)) {\n"

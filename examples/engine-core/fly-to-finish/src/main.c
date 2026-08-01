@@ -88,21 +88,21 @@ static EngineResult spawn_obstacle(ObstacleRecord records[], size_t *next_record
         return rohr_error_result_error(entity_result.result.error);
     }
     Entity obstacle = entity_result.result.value;
-    rohr_physics_set_position(obstacle, (Position){
+    rohr_physics_position_set(obstacle, (Position){
         .x = rohr_tools_random_range_float(screen_left + size, screen_right - size),
         .y = spawn_y
     });
-    rohr_physics_set_orientation(obstacle, rohr_tools_random_range_float(0.0f, 2.0f * PI_F));
-    rohr_physics_set_mass(obstacle, mass_value);
-    rohr_physics_set_velocity(obstacle, (Velocity){.x = 0.0f, .y = -speed});
-    rohr_physics_set_acceleration(obstacle, (Acceleration){0});
-    rohr_physics_set_restitution(obstacle, 0.15f);
-    rohr_physics_set_friction(obstacle, 0.45f);
-    rohr_physics_set_hitbox(obstacle, rohr_math_create_circle(size, 8));
-    rohr_physics_set_dynamic(obstacle);
-    EngineResult lifetime_result = rohr_entity_set_life_time(
+    rohr_physics_orientation_set(obstacle, rohr_tools_random_range_float(0.0f, 2.0f * PI_F));
+    rohr_physics_mass_set(obstacle, mass_value);
+    rohr_physics_velocity_set(obstacle, (Velocity){.x = 0.0f, .y = -speed});
+    rohr_physics_acceleration_set(obstacle, (Acceleration){0});
+    rohr_physics_restitution_set(obstacle, 0.15f);
+    rohr_physics_friction_set(obstacle, 0.45f);
+    rohr_physics_hitbox_set(obstacle, rohr_math_create_circle(size, 8));
+    rohr_physics_dynamic_set(obstacle);
+    EngineResult lifetime_result = rohr_entity_life_time_set(
         obstacle,
-        rohr_engine_get_time() + 12.0,
+        rohr_engine_time_get() + 12.0,
         0
     );
     if(rohr_error_check(lifetime_result)) {
@@ -148,19 +148,19 @@ static EngineResult reset_level(
         records[i] = (ObstacleRecord){0};
     }
 
-    EngineResult position_result = rohr_physics_set_position(player, player_start_position);
+    EngineResult position_result = rohr_physics_position_set(player, player_start_position);
     if(rohr_error_check(position_result)) { return position_result; }
-    EngineResult orientation_result = rohr_physics_set_orientation(player, player_start_orientation);
+    EngineResult orientation_result = rohr_physics_orientation_set(player, player_start_orientation);
     if(rohr_error_check(orientation_result)) { return orientation_result; }
-    EngineResult velocity_result = rohr_physics_set_velocity(player, (Velocity){0});
+    EngineResult velocity_result = rohr_physics_velocity_set(player, (Velocity){0});
     if(rohr_error_check(velocity_result)) { return velocity_result; }
-    EngineResult acceleration_result = rohr_physics_set_acceleration(player, (Acceleration){0});
+    EngineResult acceleration_result = rohr_physics_acceleration_set(player, (Acceleration){0});
     if(rohr_error_check(acceleration_result)) { return acceleration_result; }
-    EngineResult angular_velocity_result = rohr_physics_set_angular_velocity(player, 0.0f);
+    EngineResult angular_velocity_result = rohr_physics_angular_velocity_set(player, 0.0f);
     if(rohr_error_check(angular_velocity_result)) { return angular_velocity_result; }
 
     *next_record = 0;
-    *level_start_time = rohr_engine_get_time();
+    *level_start_time = rohr_engine_time_get();
     *next_spawn_time = *level_start_time;
     *reached_finish = false;
     return rohr_error_result_value(true);
@@ -196,7 +196,7 @@ int main(void) {
             return 1;
         }
     }
-    if(rohr_error_check(rohr_engine_set_time_per_tick(1.0 / 120.0))) return 1;
+    if(rohr_error_check(rohr_engine_time_per_tick_set(1.0 / 120.0))) return 1;
     {
         EngineResult graphics_result = rohr_graphics_start();
         if(rohr_error_check(graphics_result)) {
@@ -242,7 +242,7 @@ int main(void) {
         goto fail;
     }
     wall_mid = wall_mid_result.result.value;
-    EntityIndexResult player_index_result = rohr_entity_get_index(player);
+    EntityIndexResult player_index_result = rohr_entity_index_get(player);
     if(rohr_error_check(player_index_result)) {
         fprintf(stderr, "Invalid player state\n");
         goto fail;
@@ -260,7 +260,7 @@ int main(void) {
 
     srand((unsigned int)time(NULL));
     rohr_engine_reset_clock();
-    level_start_time = rohr_engine_get_time();
+    level_start_time = rohr_engine_time_get();
     while(true) {
         SDL_Event event;
         Vec2D thrust_axis;
@@ -297,20 +297,20 @@ int main(void) {
             }
         }
 
-        level_active = !reached_finish && rohr_engine_get_time() - level_start_time < demo_duration_seconds;
+        level_active = !reached_finish && rohr_engine_time_get() - level_start_time < demo_duration_seconds;
         player_control_enabled = level_active &&
-            rohr_engine_get_time() - level_start_time >= player_control_delay_seconds;
+            rohr_engine_time_get() - level_start_time >= player_control_delay_seconds;
 
-        if(level_active && rohr_engine_get_time() >= next_spawn_time) {
+        if(level_active && rohr_engine_time_get() >= next_spawn_time) {
             EngineResult spawn_result = spawn_obstacle(obstacle_records, &next_obstacle_record);
             if(rohr_error_check(spawn_result)) {
                 PRINT_ENGINE_ERROR(spawn_result);
                 goto fail;
             }
-            next_spawn_time = rohr_engine_get_time() + spawn_interval_seconds;
+            next_spawn_time = rohr_engine_time_get() + spawn_interval_seconds;
         }
 
-        EntityIndexResult player_index_result = rohr_entity_get_index(player);
+        EntityIndexResult player_index_result = rohr_entity_index_get(player);
         if(rohr_error_check(player_index_result)) {
             goto fail;
         }
@@ -361,8 +361,8 @@ int main(void) {
         }
 
         if(level_active) {
-            ShapeResult player_shape_result = rohr_physics_get_global_hit_box(player);
-            ShapeResult finish_shape_result = rohr_physics_get_global_hit_box(finish_line);
+            ShapeResult player_shape_result = rohr_physics_global_hit_box_get(player);
+            ShapeResult finish_shape_result = rohr_physics_global_hit_box_get(finish_line);
             if(player_shape_result.kind == ERROR_RESULT_VALUE && finish_shape_result.kind == ERROR_RESULT_VALUE) {
                 Collision finish_collision = rohr_physics_sat_collision(
                     player_shape_result.result.value,
@@ -388,7 +388,7 @@ int main(void) {
                 rohr_graphics_draw_hit_box_colored(obstacle_records[i].entity, GRAPHICS_FILLED, obstacle_records[i].color);
             }
         }
-        rohr_graphics_update_sprite_frames(rohr_engine_get_tick(), rohr_engine_get_time());
+        rohr_graphics_update_sprite_frames(rohr_engine_tick_get(), rohr_engine_time_get());
         rohr_graphics_draw_animated_sprites();
         rohr_graphics_show();
     }

@@ -215,7 +215,7 @@ int main(void) {
 
         rohr_graphics_draw_background((Color){18, 22, 30, 255});
         rohr_ui_begin_frame((UIInput){
-            .pointer = rohr_graphics_get_mouse_screen_position(),
+            .pointer = rohr_graphics_mouse_screen_position_get(),
             .primary_button = mouse.button_states[MOUSE_BUTTON_LEFT],
         });
 

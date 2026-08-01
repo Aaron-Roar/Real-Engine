@@ -20,7 +20,7 @@ static const float left_paddle_min_y = 20.0f;
 static const float left_paddle_max_y = 312.0f;
 static const float right_paddle_min_y = -312.0f;
 static const float right_paddle_max_y = -20.0f;
-static const Time camera_move_to_ball_duration = 0.5;
+static const Time camera_approach_duration = 0.5;
 static const Time camera_return_duration = 0.25;
 static const float camera_ball_scale = 1.5f;
 
@@ -88,29 +88,29 @@ static EngineResult pong_update_camera(
     if(state == NULL) return rohr_error_result_error(ERROR_ENGINE_STATE_INVALID);
     if(ball_behind_paddle) {
         if(*state == PONG_CAMERA_HOME || *state == PONG_CAMERA_RETURNING_HOME) {
-            result = rohr_camera_set_zoom(
+            result = rohr_camera_zoom_set(
                 camera,
                 camera_ball_scale,
-                camera_move_to_ball_duration
+                camera_approach_duration
             );
             if(rohr_error_check(result)) return result;
-            result = rohr_camera_move_to_entity(camera, ball, camera_move_to_ball_duration);
+            result = rohr_camera_position_from_entity_set(camera, ball, camera_approach_duration);
             if(rohr_error_check(result)) return result;
             *state = PONG_CAMERA_MOVING_TO_BALL;
         } else if(*state == PONG_CAMERA_MOVING_TO_BALL) {
             result = rohr_camera_is_moving(camera);
             if(rohr_error_check(result)) return result;
             if(!result.result.value) {
-                result = rohr_camera_attach_to_entity(camera, ball);
+                result = rohr_camera_entity_attachment_set(camera, ball);
                 if(rohr_error_check(result)) return result;
                 *state = PONG_CAMERA_FOLLOWING_BALL;
             }
         }
     } else if(*state == PONG_CAMERA_MOVING_TO_BALL
             || *state == PONG_CAMERA_FOLLOWING_BALL) {
-        result = rohr_camera_set_zoom(camera, 1.0f, camera_return_duration);
+        result = rohr_camera_zoom_set(camera, 1.0f, camera_return_duration);
         if(rohr_error_check(result)) return result;
-        result = rohr_camera_move_to(camera, home, camera_return_duration);
+        result = rohr_camera_position_set(camera, home, camera_return_duration);
         if(rohr_error_check(result)) return result;
         *state = PONG_CAMERA_RETURNING_HOME;
     } else if(*state == PONG_CAMERA_RETURNING_HOME) {
@@ -122,13 +122,13 @@ static EngineResult pong_update_camera(
 }
 
 static EngineResult pong_reset_ball(Entity ball, int serve_direction) {
-    EngineResult position_result = rohr_physics_set_position(ball, (Position){0.0f, 0.0f});
+    EngineResult position_result = rohr_physics_position_set(ball, (Position){0.0f, 0.0f});
     if(rohr_error_check(position_result)) return position_result;
-    EngineResult orientation_result = rohr_physics_set_orientation(ball, 0.0f);
+    EngineResult orientation_result = rohr_physics_orientation_set(ball, 0.0f);
     if(rohr_error_check(orientation_result)) return orientation_result;
-    EngineResult angular_velocity_result = rohr_physics_set_angular_velocity(ball, 0.0f);
+    EngineResult angular_velocity_result = rohr_physics_angular_velocity_set(ball, 0.0f);
     if(rohr_error_check(angular_velocity_result)) return angular_velocity_result;
-    return rohr_physics_set_velocity(ball, (Velocity){
+    return rohr_physics_velocity_set(ball, (Velocity){
         .x = serve_direction * 25.0f,
         .y = serve_direction * 45.0f
     });
@@ -143,7 +143,7 @@ static EngineResult pong_constrain_paddle(
     Position position;
     Velocity velocity;
     bool position_changed = false;
-    EntityIndexResult index_result = rohr_entity_get_index(paddle);
+    EntityIndexResult index_result = rohr_entity_index_get(paddle);
 
     if(rohr_error_check(index_result)) {
         return rohr_error_result_error(index_result.result.error);
@@ -175,10 +175,10 @@ static EngineResult pong_constrain_paddle(
     }
     if(!position_changed) return rohr_error_result_value(true);
     {
-        EngineResult position_result = rohr_physics_set_position(paddle, position);
+        EngineResult position_result = rohr_physics_position_set(paddle, position);
         if(rohr_error_check(position_result)) return position_result;
     }
-    return rohr_physics_set_velocity(paddle, velocity);
+    return rohr_physics_velocity_set(paddle, velocity);
 }
 
 int main(void) {
@@ -234,7 +234,7 @@ int main(void) {
             return 1;
         }
     }
-    if(rohr_error_check(rohr_engine_set_time_per_tick(1.0 / 120.0))) return 1;
+    if(rohr_error_check(rohr_engine_time_per_tick_set(1.0 / 120.0))) return 1;
     {
         EngineResult graphics_result = rohr_graphics_start();
         if(rohr_error_check(graphics_result)) {
@@ -296,7 +296,7 @@ int main(void) {
         .ball = ball,
     };
 
-    left_camera = rohr_camera_get_active();
+    left_camera = rohr_camera_active_get();
     {
         Camera left_camera_value = {
             .position = {0.0f, field_camera_center_y},
@@ -334,16 +334,16 @@ int main(void) {
         result = rohr_viewport_create(config);
         if(rohr_error_check(result)) goto fail;
         right_viewport = result.result.value;
-        if(rohr_error_check(rohr_viewport_set_camera(left_viewport, left_camera))
-                || rohr_error_check(rohr_viewport_set_camera(right_viewport, right_camera))
-                || rohr_error_check(rohr_viewport_set_enable(left_viewport))
-                || rohr_error_check(rohr_viewport_set_enable(right_viewport))) goto fail;
+        if(rohr_error_check(rohr_viewport_camera_set(left_viewport, left_camera))
+                || rohr_error_check(rohr_viewport_camera_set(right_viewport, right_camera))
+                || rohr_error_check(rohr_viewport_enable_set(left_viewport))
+                || rohr_error_check(rohr_viewport_enable_set(right_viewport))) goto fail;
     }
-    if(rohr_error_check(rohr_camera_set_render_callback(
+    if(rohr_error_check(rohr_camera_render_callback_set(
             left_camera,
             pong_render_camera,
             &render_context
-        )) || rohr_error_check(rohr_camera_set_render_callback(
+        )) || rohr_error_check(rohr_camera_render_callback_set(
             right_camera,
             pong_render_camera,
             &render_context
@@ -363,9 +363,9 @@ int main(void) {
             &keyboard,
             rohr_controller_capture_keyboard_event(&event)
         );
-        left_axis = rohr_controller_get_axis(&keyboard, &left_controller, "movement");
-        right_axis = rohr_controller_get_axis(&keyboard, &right_controller, "movement");
-        EngineResult left_velocity_result = rohr_physics_set_velocity(
+        left_axis = rohr_controller_axis_get(&keyboard, &left_controller, "movement");
+        right_axis = rohr_controller_axis_get(&keyboard, &right_controller, "movement");
+        EngineResult left_velocity_result = rohr_physics_velocity_set(
             paddle_left,
             (Velocity){
                 left_axis.x * paddle_speed,
@@ -376,7 +376,7 @@ int main(void) {
             rohr_error_print_stderr(left_velocity_result.result.error);
             goto fail;
         }
-        EngineResult right_velocity_result = rohr_physics_set_velocity(
+        EngineResult right_velocity_result = rohr_physics_velocity_set(
             paddle_right,
             (Velocity){
                 right_axis.x * paddle_speed,
@@ -390,17 +390,17 @@ int main(void) {
 
         ticks_advanced = rohr_engine_update_tick();
         rohr_physics_update(ticks_advanced);
-        if(rohr_physics_get_collision_report(ball, paddle_left) ||
-                rohr_physics_get_collision_report(ball, paddle_right)) {
+        if(rohr_physics_collision_report_get(ball, paddle_left) ||
+                rohr_physics_collision_report_get(ball, paddle_right)) {
             if(!game_ball_on_fire_set(ball, true)) {
                 goto fail;
             }
-            fire_expires_at = rohr_engine_get_time() + fire_duration;
+            fire_expires_at = rohr_engine_time_get() + fire_duration;
         }
         {
             GameBallOnFireResult fire_result = game_ball_on_fire_get(ball);
             if(!rohr_error_check(fire_result) && fire_result.result.value &&
-                    rohr_engine_get_time() >= fire_expires_at &&
+                    rohr_engine_time_get() >= fire_expires_at &&
                     !game_ball_on_fire_set(ball, false)) {
                 goto fail;
             }
@@ -425,7 +425,7 @@ int main(void) {
         }
 
         {
-            EntityIndexResult ball_index_result = rohr_entity_get_index(ball);
+            EntityIndexResult ball_index_result = rohr_entity_index_get(ball);
             if(rohr_error_check(ball_index_result)) goto fail;
             ball_index = ball_index_result.result.value;
         }
@@ -450,8 +450,8 @@ int main(void) {
         }
 
         {
-            EntityIndexResult left_index_result = rohr_entity_get_index(paddle_left);
-            EntityIndexResult right_index_result = rohr_entity_get_index(paddle_right);
+            EntityIndexResult left_index_result = rohr_entity_index_get(paddle_left);
+            EntityIndexResult right_index_result = rohr_entity_index_get(paddle_right);
             bool was_behind_left = ball_behind_left;
             bool was_behind_right = ball_behind_right;
             if(rohr_error_check(left_index_result) || rohr_error_check(right_index_result)) {
@@ -461,8 +461,8 @@ int main(void) {
             ball_behind_right = positions[ball_index].y < positions[right_index_result.result.value].y;
             if(ball_behind_left != was_behind_left || ball_behind_right != was_behind_right) {
                 EngineResult dt_result = (ball_behind_left || ball_behind_right)
-                    ? rohr_physics_set_dt_per_tick(slow_motion_physics_dt)
-                    : rohr_physics_set_dt_per_tick(normal_physics_dt);
+                    ? rohr_physics_dt_per_tick_set(slow_motion_physics_dt)
+                    : rohr_physics_dt_per_tick_set(normal_physics_dt);
                 if(rohr_error_check(dt_result)) {
                     rohr_error_print_stderr(dt_result.result.error);
                     goto fail;
@@ -494,7 +494,7 @@ int main(void) {
 
     (void)rohr_viewport_destroy(right_viewport);
     (void)rohr_viewport_destroy(left_viewport);
-    (void)rohr_camera_set_active(left_camera);
+    (void)rohr_camera_active_set(left_camera);
     (void)rohr_camera_destroy(right_camera);
     game_components_clear(ball);
     game_components_shutdown();
@@ -505,7 +505,7 @@ int main(void) {
 fail:
     if(right_viewport != VIEWPORT_INVALID) (void)rohr_viewport_destroy(right_viewport);
     if(left_viewport != VIEWPORT_INVALID) (void)rohr_viewport_destroy(left_viewport);
-    if(left_camera != CAMERA_INVALID) (void)rohr_camera_set_active(left_camera);
+    if(left_camera != CAMERA_INVALID) (void)rohr_camera_active_set(left_camera);
     if(right_camera != CAMERA_INVALID) (void)rohr_camera_destroy(right_camera);
     game_components_shutdown();
     rohr_graphics_end();

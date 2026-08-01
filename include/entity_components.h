@@ -233,7 +233,7 @@ extern EntityNamePool entity_names_pool;
  * @param name Null-terminated name shorter than ENTITY_NAME_MAX.
  * @return EngineResult describing success or failure.
  */
-EngineResult entity_set_name(Entity entity, const char *name);
+EngineResult entity_name_set(Entity entity, const char *name);
 
 /**
  * Find a live entity by its unique name.
@@ -249,7 +249,7 @@ EntityResult entity_find_by_name(const char *name);
  * @param entity Entity id to inspect.
  * @return EntityNameResult containing the name, or an error.
  */
-EntityNameResult entity_get_name(Entity entity);
+EntityNameResult entity_name_get(Entity entity);
 
 /**
  * Check whether an entity id currently refers to a live entity.
@@ -281,7 +281,7 @@ uint32_t entity_alive_count(void);
  * Return the entity id stored at a dense alive-list position.
  *
  * The position is not a component table index and can change when entities are
- * deleted. Resolve the returned id with entity_get_index() before accessing
+ * deleted. Resolve the returned id with entity_index_get() before accessing
  * component tables.
  *
  * @param position Dense alive-list position.
@@ -296,7 +296,7 @@ EntityResult entity_alive_at(uint32_t position);
  * @param index Out parameter receiving the current table index.
  * @return true when the entity resolves to a live index.
  */
-bool entity_get_index(Entity entity, EntityIndex *index);
+bool entity_index_get(Entity entity, EntityIndex *index);
 
 /**
  * Resolve a table index to its current entity id.
@@ -356,13 +356,13 @@ bool entity_index_has_components(EntityIndex index, RohrComponentMask components
 GroupIdResult entity_group_create(void);
 
 /** Assign a unique name to a generic entity group. */
-EngineResult entity_group_set_name(GroupId group, const char *name);
+EngineResult entity_group_name_set(GroupId group, const char *name);
 
 /** Find a live generic group by name. */
 GroupIdResult entity_group_find_by_name(const char *name);
 
 /** Return a copy of a generic group's fixed-size name. */
-GroupNameResult entity_group_get_name(GroupId group);
+GroupNameResult entity_group_name_get(GroupId group);
 
 /**
  * Destroy a generic group and remove it from member entity group lists.
@@ -422,7 +422,7 @@ EntityGroupResult entity_group_get(GroupId group);
  * @param entity Entity id to inspect.
  * @return EntityGroupMembershipResult containing group ids, or an error.
  */
-EntityGroupMembershipResult entity_get_groups(Entity entity);
+EntityGroupMembershipResult entity_groups_get(Entity entity);
 
 /**
  * Remove component bits from an entity.
@@ -440,7 +440,7 @@ EngineResult entity_delete_components(Entity entity, RohrComponentMask mask);
  * @param child Child entity id.
  * @return EngineResult describing success or failure.
  */
-EngineResult entity_set_child(Entity parent, Entity child);
+EngineResult entity_child_set(Entity parent, Entity child);
 
 /**
  * Set a parent-child relationship from the child side.
@@ -449,7 +449,7 @@ EngineResult entity_set_child(Entity parent, Entity child);
  * @param parent Parent entity id.
  * @return EngineResult describing success or failure.
  */
-EngineResult entity_set_parent(Entity child, Entity parent);
+EngineResult entity_parent_set(Entity child, Entity parent);
 
 /**
  * Remove the parent from a child entity.
@@ -474,7 +474,7 @@ EngineResult entity_remove_child(Entity parent, Entity child);
  * @param entity Entity id to inspect.
  * @return ChildrenResult containing a group id, or an error.
  */
-ChildrenResult entity_get_children(Entity entity);
+ChildrenResult entity_children_get(Entity entity);
 
 /**
  * Get the parent entity for an entity.
@@ -482,7 +482,7 @@ ChildrenResult entity_get_children(Entity entity);
  * @param entity Entity id to inspect.
  * @return ParentResult containing parent id, or an error.
  */
-ParentResult entity_get_parent(Entity entity);
+ParentResult entity_parent_get(Entity entity);
 
 /**
  * Set an entity lifetime expiry by time and/or tick.
@@ -492,7 +492,7 @@ ParentResult entity_get_parent(Entity entity);
  * @param expirey_tick Engine tick expiry, or zero when unused.
  * @return EngineResult describing success or failure.
  */
-EngineResult entity_set_life_time(Entity entity, Time expirey_time, Tick expirey_tick);
+EngineResult entity_life_time_set(Entity entity, Time expirey_time, Tick expirey_tick);
 
 /**
  * Remove lifetime data from an entity.

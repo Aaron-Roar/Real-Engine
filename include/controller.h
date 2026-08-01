@@ -164,7 +164,7 @@ Controller controller_default_wasd(void);
 /** Return a controller using conventional arrow-key axis bindings. */
 Controller controller_default_arrows(void);
 /** Replace the axis binding on a caller-owned controller. */
-void controller_set_axis_binding(Controller *controller, ControllerAxisBinding binding);
+void controller_axis_binding_set(Controller *controller, ControllerAxisBinding binding);
 /** Read a caller-owned controller from shared keyboard state. */
 Vec2D controller_axis(const KeyboardState *keyboard, const Controller *controller);
 /** Add or replace a named axis on a caller-owned controller. */
@@ -172,7 +172,7 @@ bool controller_add_axis(Controller *controller, const char *name, ControllerAxi
 /** Add or replace a named button on a caller-owned controller. */
 bool controller_add_button(Controller *controller, const char *name, SDL_Keycode keycode);
 /** Read a named axis from shared keyboard state. */
-Vec2D controller_get_axis(const KeyboardState *keyboard, const Controller *controller, const char *name);
+Vec2D controller_axis_get(const KeyboardState *keyboard, const Controller *controller, const char *name);
 /** Check whether a named button is held or was pressed this frame. */
 bool controller_button_down(const KeyboardState *keyboard, const Controller *controller, const char *name);
 /** Check whether a named button was pressed this frame. */

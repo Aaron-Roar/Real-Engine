@@ -242,38 +242,38 @@ bool physics_entity_is_held(EntityIndex index);
 bool physics_entity_can_move(EntityIndex index);
 
 /** Set an entity's base linear acceleration. */
-EngineResult physics_set_acceleration(Entity entity, Acceleration a);
+EngineResult physics_acceleration_set(Entity entity, Acceleration a);
 /** Set an entity's angular acceleration and mark it dynamic. */
-EngineResult physics_set_angular_acceleration(
+EngineResult physics_angular_acceleration_set(
         Entity entity,
         AngularAcceleration acceleration
 );
 /** Set acceleration toward a world position using a scalar magnitude. */
-EngineResult physics_set_acceleration_toward_position(Entity entity, float acceleration_magnitude, Position position);
+EngineResult physics_acceleration_toward_position_set(Entity entity, float acceleration_magnitude, Position position);
 /** Set acceleration toward another entity's current world position. */
-EngineResult physics_set_acceleration_toward_entity(Entity entity, float acceleration_magnitude, Entity target);
+EngineResult physics_acceleration_toward_entity_set(Entity entity, float acceleration_magnitude, Entity target);
 /** Set acceleration away from a world position using a scalar magnitude. */
-EngineResult physics_set_acceleration_away_from_position(Entity entity, float acceleration_magnitude, Position position);
+EngineResult physics_acceleration_away_from_position_set(Entity entity, float acceleration_magnitude, Position position);
 /** Set acceleration away from another entity's current world position. */
-EngineResult physics_set_acceleration_away_from_entity(Entity entity, float acceleration_magnitude, Entity target);
+EngineResult physics_acceleration_away_from_entity_set(Entity entity, float acceleration_magnitude, Entity target);
 /** Set acceleration toward an entity for every live entity in a group. */
-EngineResult physics_group_set_acceleration_toward_entity(GroupId group, float acceleration_magnitude, Entity target);
+EngineResult physics_group_acceleration_toward_entity_set(GroupId group, float acceleration_magnitude, Entity target);
 /** Set acceleration away from an entity for every live entity in a group. */
-EngineResult physics_group_set_acceleration_away_from_entity(GroupId group, float acceleration_magnitude, Entity target);
+EngineResult physics_group_acceleration_away_from_entity_set(GroupId group, float acceleration_magnitude, Entity target);
 /** Set an entity's linear velocity. */
-EngineResult physics_set_velocity(Entity entity, Velocity v);
+EngineResult physics_velocity_set(Entity entity, Velocity v);
 /** Set velocity toward a world position using a scalar speed. */
-EngineResult physics_set_velocity_toward_position(Entity entity, float speed, Position position);
+EngineResult physics_velocity_toward_position_set(Entity entity, float speed, Position position);
 /** Set velocity toward another entity's current world position. */
-EngineResult physics_set_velocity_toward_entity(Entity entity, float speed, Entity target);
+EngineResult physics_velocity_toward_entity_set(Entity entity, float speed, Entity target);
 /** Set velocity away from a world position using a scalar speed. */
-EngineResult physics_set_velocity_away_from_position(Entity entity, float speed, Position position);
+EngineResult physics_velocity_away_from_position_set(Entity entity, float speed, Position position);
 /** Set velocity away from another entity's current world position. */
-EngineResult physics_set_velocity_away_from_entity(Entity entity, float speed, Entity target);
+EngineResult physics_velocity_away_from_entity_set(Entity entity, float speed, Entity target);
 /** Set velocity toward an entity for every live entity in a group. */
-EngineResult physics_group_set_velocity_toward_entity(GroupId group, float speed, Entity target);
+EngineResult physics_group_velocity_toward_entity_set(GroupId group, float speed, Entity target);
 /** Set velocity away from an entity for every live entity in a group. */
-EngineResult physics_group_set_velocity_away_from_entity(GroupId group, float speed, Entity target);
+EngineResult physics_group_velocity_away_from_entity_set(GroupId group, float speed, Entity target);
 /** Set an entity's velocity to zero. */
 EngineResult physics_stop_entity(Entity entity);
 /** Set velocity to zero for every live entity in a group. */
@@ -281,35 +281,35 @@ EngineResult physics_group_stop_entities(GroupId group);
 /** Apply an immediate linear impulse to an entity's velocity. */
 EngineResult physics_apply_impulse(Entity entity, Vec2D impulse);
 /** Set an entity's world position. */
-EngineResult physics_set_position(Entity entity, Position p);
+EngineResult physics_position_set(Entity entity, Position p);
 /** Set an entity's mass and add the MASS component. */
-EngineResult physics_set_mass(Entity entity, Mass m);
+EngineResult physics_mass_set(Entity entity, Mass m);
 /** Create a force entity targeting the given entity. */
-EntityResult physics_set_force(Entity entity, Force f);
+EntityResult physics_force_set(Entity entity, Force f);
 /** Set force component data directly on an existing entity. */
-EngineResult physics_set_force_component(Entity entity, Force force);
+EngineResult physics_force_component_set(Entity entity, Force force);
 /** Create a force entity that applies for one physics tick. */
 EngineResult physics_apply_force_for_one_tick(Entity entity, Force f);
 /** Create a torque entity targeting the given entity. */
-EntityResult physics_set_torque(Entity entity, Torque t);
+EntityResult physics_torque_set(Entity entity, Torque t);
 /** Set torque component data directly on an existing entity. */
-EngineResult physics_set_torque_component(Entity entity, Torque torque);
+EngineResult physics_torque_component_set(Entity entity, Torque torque);
 /** Create a torque entity that applies for one physics tick. */
 EngineResult physics_apply_torque_for_one_tick(Entity entity, Torque t);
 /** Set an entity's hitbox and add collision/hitbox components. */
-EngineResult physics_set_hitbox(Entity entity, Shape hitbox);
+EngineResult physics_hitbox_set(Entity entity, Shape hitbox);
 /** Set an entity's orientation in radians. */
-EngineResult physics_set_orientation(Entity entity, Orientation angle);
+EngineResult physics_orientation_set(Entity entity, Orientation angle);
 /** Set an entity's angular velocity. */
-EngineResult physics_set_angular_velocity(Entity entity, AngularVelocity v);
+EngineResult physics_angular_velocity_set(Entity entity, AngularVelocity v);
 /** Get an entity's current world-space hitbox. */
-ShapeResult physics_get_global_hit_box(Entity entity);
+ShapeResult physics_global_hit_box_get(Entity entity);
 /** Set an entity's collision restitution. */
-EngineResult physics_set_restitution(Entity entity, Restitution restitution);
+EngineResult physics_restitution_set(Entity entity, Restitution restitution);
 /** Mark an entity dynamic and remove STATIC. */
-EngineResult physics_set_dynamic(Entity entity);
+EngineResult physics_dynamic_set(Entity entity);
 /** Mark an entity static and remove DYNAMIC. */
-EngineResult physics_set_static(Entity entity);
+EngineResult physics_static_set(Entity entity);
 /** Add HOLD so physics update stages preserve current values. */
 EngineResult physics_hold_entity(Entity entity);
 /** Remove HOLD without changing STATIC or DYNAMIC state. */
@@ -319,11 +319,11 @@ EngineResult physics_group_hold_entities(GroupId group);
 /** Remove HOLD from every live entity in a group. */
 EngineResult physics_group_unhold_entities(GroupId group);
 /** Add or update an angle lock constraint. */
-EngineResult physics_set_angle_lock(Entity entity, Orientation min, Orientation max);
+EngineResult physics_angle_lock_set(Entity entity, Orientation min, Orientation max);
 /** Add or update an axis lock constraint. */
-EngineResult physics_set_axis_lock(Entity entity, Axis axis, Position axis_point);
+EngineResult physics_axis_lock_set(Entity entity, Axis axis, Position axis_point);
 /** Set an entity's friction value. */
-EngineResult physics_set_friction(Entity entity, float friction);
+EngineResult physics_friction_set(Entity entity, float friction);
 
 /**
  * Add or update a transform lock.
@@ -337,7 +337,7 @@ EngineResult physics_set_friction(Entity entity, float friction);
  * @param inherit_velocity Whether to inherit velocity.
  * @return EngineResult describing success or failure.
  */
-EngineResult physics_set_transform_lock(
+EngineResult physics_transform_lock_set(
         Entity driven,
         Entity driver,
         Vec2D local_offset,
@@ -353,7 +353,7 @@ EngineResult physics_remove_transform_lock(Entity entity);
 /**
  * Add a transform lock using the current relative transform as the offset.
  */
-EngineResult physics_set_transform_lock_current_transform(
+EngineResult physics_transform_lock_current_transform_set(
         Entity driven,
         Entity driver,
         bool lock_position,
@@ -362,17 +362,17 @@ EngineResult physics_set_transform_lock_current_transform(
 );
 
 /** Set the target component used by force and torque source entities. */
-EngineResult physics_set_target(Entity entity, Entity target);
+EngineResult physics_target_set(Entity entity, Entity target);
 
 /** Add or replace complete joint component data on an existing entity. */
-EngineResult physics_set_joint_component(Entity entity, Joint joint);
+EngineResult physics_joint_component_set(Entity entity, Joint joint);
 
 /**
  * Create a joint entity connecting two live entities.
  *
  * @return EntityResult containing the new joint entity, or an error.
  */
-EntityResult physics_set_joint(
+EntityResult physics_joint_set(
     Entity a,
     Entity b,
     JointType type,
@@ -390,17 +390,17 @@ Collision physics_particle_collision(Shape shape_1, Shape shape_2);
 /**
  * Set collision state between an entity and target entity.
  */
-EngineResult physics_set_collision_report(Entity entity, Entity target, bool state);
+EngineResult physics_collision_report_set(Entity entity, Entity target, bool state);
 
 /**
  * Get collision state between an entity and target entity.
  */
-bool physics_get_collision_report(Entity entity, Entity target);
+bool physics_collision_report_get(Entity entity, Entity target);
 
 /** Set an explicit simulation delta for each engine tick. */
-EngineResult physics_set_dt_per_tick(Time dt);
+EngineResult physics_dt_per_tick_set(Time dt);
 /** Return the explicit delta or the engine time per tick when using defaults. */
-Time physics_get_dt_per_tick(void);
+Time physics_dt_per_tick_get(void);
 /** Return physics timing to the engine time-per-tick default. */
 void physics_use_engine_time_per_tick(void);
 /** Advance physics for a number of elapsed engine ticks. */

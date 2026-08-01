@@ -44,13 +44,13 @@ void rohr_engine_update_time(void);
  * @brief Returns the current engine time in seconds.
  * @return Current engine time.
  */
-Time rohr_engine_get_time(void);
+Time rohr_engine_time_get(void);
 
 /**
  * @brief Returns the current engine tick counter.
  * @return Current tick.
  */
-Tick rohr_engine_get_tick(void);
+Tick rohr_engine_tick_get(void);
 
 /**
  * @brief Pauses engine time-dependent updates.
@@ -69,9 +69,9 @@ void rohr_engine_resume(void);
 Tick rohr_engine_update_tick(void);
 
 /** Sets the real-time duration required for one engine tick. */
-EngineResult rohr_engine_set_time_per_tick(Time time_per_tick);
+EngineResult rohr_engine_time_per_tick_set(Time time_per_tick);
 /** Returns the real-time duration required for one engine tick. */
-Time rohr_engine_get_time_per_tick(void);
+Time rohr_engine_time_per_tick_get(void);
 
 /**
  * @brief Polls one SDL event.
@@ -177,7 +177,7 @@ void rohr_console_debug_write(LogSourceType source, const char *fmt, ...);
  * @brief Enables or disables debug console output.
  * @param state true to enable debug logging, false to disable it.
  */
-void rohr_console_set_debug(bool state);
+void rohr_console_debug_set(bool state);
 
 /**
  * @brief Checks whether an entity id currently refers to a live entity.
@@ -215,7 +215,7 @@ EntityResult rohr_entity_alive_at(uint32_t position);
  * @param entity Stable entity id to resolve.
  * @return EntityIndexResult containing the index or an invalid-entity error.
  */
-EntityIndexResult rohr_entity_get_index(Entity entity);
+EntityIndexResult rohr_entity_index_get(Entity entity);
 
 /**
  * @brief Returns the stable entity id stored at a component table index.
@@ -235,13 +235,13 @@ EntityResult rohr_entity_from_index(EntityIndex index);
 EntityResult rohr_entity_add(void);
 
 /** Assigns a unique fixed-size name to an entity. */
-EngineResult rohr_entity_set_name(Entity entity, const char *name);
+EngineResult rohr_entity_name_set(Entity entity, const char *name);
 
 /** Finds a live entity by its state-file name. */
 EntityResult rohr_entity_find_by_name(const char *name);
 
 /** Returns a copy of an entity's fixed-size name component. */
-EntityNameResult rohr_entity_get_name(Entity entity);
+EntityNameResult rohr_entity_name_get(Entity entity);
 
 /** Loads and merges one JSON game-state file. */
 EngineResult rohr_game_state_load_file(const char *path);
@@ -305,13 +305,13 @@ bool rohr_entity_index_has_components(EntityIndex index, RohrComponentMask compo
 GroupIdResult rohr_entity_group_create(void);
 
 /** Assigns a unique fixed-size name to a generic group. */
-EngineResult rohr_entity_group_set_name(GroupId group, const char *name);
+EngineResult rohr_entity_group_name_set(GroupId group, const char *name);
 
 /** Finds a live generic group by name. */
 GroupIdResult rohr_entity_group_find_by_name(const char *name);
 
 /** Returns a copy of a generic group's fixed-size name. */
-GroupNameResult rohr_entity_group_get_name(GroupId group);
+GroupNameResult rohr_entity_group_name_get(GroupId group);
 
 /**
  * @brief Destroys a generic entity group and clears member group references.
@@ -356,7 +356,7 @@ EntityGroupResult rohr_entity_group_get(GroupId group);
  * @param entity Entity id to inspect.
  * @return EntityGroupMembershipResult containing group ids, or an error.
  */
-EntityGroupMembershipResult rohr_entity_get_groups(Entity entity);
+EntityGroupMembershipResult rohr_entity_groups_get(Entity entity);
 
 /**
  * @brief Removes components from an entity.
@@ -372,7 +372,7 @@ EngineResult rohr_entity_delete_components(Entity entity, RohrComponentMask mask
  * @param child Child entity id.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_entity_set_child(Entity parent, Entity child);
+EngineResult rohr_entity_child_set(Entity parent, Entity child);
 
 /**
  * @brief Sets an entity parent relationship.
@@ -380,7 +380,7 @@ EngineResult rohr_entity_set_child(Entity parent, Entity child);
  * @param parent Parent entity id.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_entity_set_parent(Entity child, Entity parent);
+EngineResult rohr_entity_parent_set(Entity child, Entity parent);
 
 /**
  * @brief Removes the parent relationship from an entity.
@@ -402,14 +402,14 @@ EngineResult rohr_entity_remove_child(Entity parent, Entity child);
  * @param entity Stable entity id to inspect.
  * @return ChildrenResult containing a group id, or an error.
  */
-ChildrenResult rohr_entity_get_children(Entity entity);
+ChildrenResult rohr_entity_children_get(Entity entity);
 
 /**
  * @brief Returns the parent assigned to an entity.
  * @param entity Stable entity id to inspect.
  * @return ParentResult containing parent id, or an error.
  */
-ParentResult rohr_entity_get_parent(Entity entity);
+ParentResult rohr_entity_parent_get(Entity entity);
 
 /**
  * @brief Adds or updates an entity lifetime.
@@ -418,7 +418,7 @@ ParentResult rohr_entity_get_parent(Entity entity);
  * @param expirey_tick Engine tick when the entity expires.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_entity_set_life_time(Entity entity, Time expirey_time, Tick expirey_tick);
+EngineResult rohr_entity_life_time_set(Entity entity, Time expirey_time, Tick expirey_tick);
 
 /**
  * @brief Removes lifetime data from an entity.
@@ -428,9 +428,9 @@ EngineResult rohr_entity_set_life_time(Entity entity, Time expirey_time, Tick ex
 EngineResult rohr_entity_remove_life_time(Entity entity);
 
 /** Sets an explicit simulation delta per engine tick. */
-EngineResult rohr_physics_set_dt_per_tick(Time dt);
+EngineResult rohr_physics_dt_per_tick_set(Time dt);
 /** Returns the current physics delta per tick. */
-Time rohr_physics_get_dt_per_tick(void);
+Time rohr_physics_dt_per_tick_get(void);
 /** Restores the engine time-per-tick default. */
 void rohr_physics_use_engine_time_per_tick(void);
 /** Advances physics using the supplied number of elapsed engine ticks. */
@@ -484,7 +484,7 @@ bool rohr_physics_entity_is_held(EntityIndex index);
  * @param a Acceleration value.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_acceleration(Entity entity, Acceleration a);
+EngineResult rohr_physics_acceleration_set(Entity entity, Acceleration a);
 
 /**
  * @brief Sets an entity angular acceleration component value.
@@ -492,7 +492,7 @@ EngineResult rohr_physics_set_acceleration(Entity entity, Acceleration a);
  * @param acceleration Angular acceleration value.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_angular_acceleration(
+EngineResult rohr_physics_angular_acceleration_set(
     Entity entity,
     AngularAcceleration acceleration
 );
@@ -504,7 +504,7 @@ EngineResult rohr_physics_set_angular_acceleration(
  * @param position Target world position.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_acceleration_toward_position(Entity entity, float acceleration_magnitude, Position position);
+EngineResult rohr_physics_acceleration_toward_position_set(Entity entity, float acceleration_magnitude, Position position);
 
 /**
  * @brief Sets entity acceleration toward another entity's current world position.
@@ -513,7 +513,7 @@ EngineResult rohr_physics_set_acceleration_toward_position(Entity entity, float 
  * @param target Target entity.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_acceleration_toward_entity(Entity entity, float acceleration_magnitude, Entity target);
+EngineResult rohr_physics_acceleration_toward_entity_set(Entity entity, float acceleration_magnitude, Entity target);
 
 /**
  * @brief Sets entity acceleration away from a world position.
@@ -522,7 +522,7 @@ EngineResult rohr_physics_set_acceleration_toward_entity(Entity entity, float ac
  * @param position Source world position.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_acceleration_away_from_position(Entity entity, float acceleration_magnitude, Position position);
+EngineResult rohr_physics_acceleration_away_from_position_set(Entity entity, float acceleration_magnitude, Position position);
 
 /**
  * @brief Sets entity acceleration away from another entity's current world position.
@@ -531,7 +531,7 @@ EngineResult rohr_physics_set_acceleration_away_from_position(Entity entity, flo
  * @param target Source entity.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_acceleration_away_from_entity(Entity entity, float acceleration_magnitude, Entity target);
+EngineResult rohr_physics_acceleration_away_from_entity_set(Entity entity, float acceleration_magnitude, Entity target);
 
 /**
  * @brief Sets acceleration toward an entity for every live entity in a group.
@@ -540,7 +540,7 @@ EngineResult rohr_physics_set_acceleration_away_from_entity(Entity entity, float
  * @param target Target entity.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_group_set_acceleration_toward_entity(GroupId group, float acceleration_magnitude, Entity target);
+EngineResult rohr_physics_group_acceleration_toward_entity_set(GroupId group, float acceleration_magnitude, Entity target);
 
 /**
  * @brief Sets acceleration away from an entity for every live entity in a group.
@@ -549,7 +549,7 @@ EngineResult rohr_physics_group_set_acceleration_toward_entity(GroupId group, fl
  * @param target Source entity.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_group_set_acceleration_away_from_entity(GroupId group, float acceleration_magnitude, Entity target);
+EngineResult rohr_physics_group_acceleration_away_from_entity_set(GroupId group, float acceleration_magnitude, Entity target);
 
 /**
  * @brief Sets an entity velocity component value.
@@ -557,7 +557,7 @@ EngineResult rohr_physics_group_set_acceleration_away_from_entity(GroupId group,
  * @param v Velocity value.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_velocity(Entity entity, Velocity v);
+EngineResult rohr_physics_velocity_set(Entity entity, Velocity v);
 
 /**
  * @brief Sets entity velocity toward a world position.
@@ -566,7 +566,7 @@ EngineResult rohr_physics_set_velocity(Entity entity, Velocity v);
  * @param position Target world position.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_velocity_toward_position(Entity entity, float speed, Position position);
+EngineResult rohr_physics_velocity_toward_position_set(Entity entity, float speed, Position position);
 
 /**
  * @brief Sets entity velocity toward another entity's current world position.
@@ -575,7 +575,7 @@ EngineResult rohr_physics_set_velocity_toward_position(Entity entity, float spee
  * @param target Target entity.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_velocity_toward_entity(Entity entity, float speed, Entity target);
+EngineResult rohr_physics_velocity_toward_entity_set(Entity entity, float speed, Entity target);
 
 /**
  * @brief Sets entity velocity away from a world position.
@@ -584,7 +584,7 @@ EngineResult rohr_physics_set_velocity_toward_entity(Entity entity, float speed,
  * @param position Source world position.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_velocity_away_from_position(Entity entity, float speed, Position position);
+EngineResult rohr_physics_velocity_away_from_position_set(Entity entity, float speed, Position position);
 
 /**
  * @brief Sets entity velocity away from another entity's current world position.
@@ -593,7 +593,7 @@ EngineResult rohr_physics_set_velocity_away_from_position(Entity entity, float s
  * @param target Source entity.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_velocity_away_from_entity(Entity entity, float speed, Entity target);
+EngineResult rohr_physics_velocity_away_from_entity_set(Entity entity, float speed, Entity target);
 
 /**
  * @brief Sets velocity toward an entity for every live entity in a group.
@@ -602,7 +602,7 @@ EngineResult rohr_physics_set_velocity_away_from_entity(Entity entity, float spe
  * @param target Target entity.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_group_set_velocity_toward_entity(GroupId group, float speed, Entity target);
+EngineResult rohr_physics_group_velocity_toward_entity_set(GroupId group, float speed, Entity target);
 
 /**
  * @brief Sets velocity away from an entity for every live entity in a group.
@@ -611,7 +611,7 @@ EngineResult rohr_physics_group_set_velocity_toward_entity(GroupId group, float 
  * @param target Source entity.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_group_set_velocity_away_from_entity(GroupId group, float speed, Entity target);
+EngineResult rohr_physics_group_velocity_away_from_entity_set(GroupId group, float speed, Entity target);
 
 /**
  * @brief Sets an entity velocity to zero.
@@ -641,7 +641,7 @@ EngineResult rohr_physics_apply_impulse(Entity entity, Vec2D impulse);
  * @param p Position value.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_position(Entity entity, Position p);
+EngineResult rohr_physics_position_set(Entity entity, Position p);
 
 /**
  * @brief Sets an entity mass component value.
@@ -649,7 +649,7 @@ EngineResult rohr_physics_set_position(Entity entity, Position p);
  * @param m Mass value.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_mass(Entity entity, Mass m);
+EngineResult rohr_physics_mass_set(Entity entity, Mass m);
 
 /**
  * @brief Sets an entity force component value.
@@ -657,7 +657,7 @@ EngineResult rohr_physics_set_mass(Entity entity, Mass m);
  * @param f Force value.
  * @return EntityResult containing entity on success, or an error.
  */
-EntityResult rohr_physics_set_force(Entity entity, Force f);
+EntityResult rohr_physics_force_set(Entity entity, Force f);
 
 /**
  * @brief Sets force component data directly on an existing entity.
@@ -665,7 +665,7 @@ EntityResult rohr_physics_set_force(Entity entity, Force f);
  * @param force Force component value.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_force_component(Entity entity, Force force);
+EngineResult rohr_physics_force_component_set(Entity entity, Force force);
 
 /**
  * @brief Applies force to an entity for one physics tick.
@@ -681,7 +681,7 @@ EngineResult rohr_physics_apply_force_for_one_tick(Entity entity, Force f);
  * @param t Torque value.
  * @return EntityResult containing entity on success, or an error.
  */
-EntityResult rohr_physics_set_torque(Entity entity, Torque t);
+EntityResult rohr_physics_torque_set(Entity entity, Torque t);
 
 /**
  * @brief Sets torque component data directly on an existing entity.
@@ -689,7 +689,7 @@ EntityResult rohr_physics_set_torque(Entity entity, Torque t);
  * @param torque Torque component value.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_torque_component(Entity entity, Torque torque);
+EngineResult rohr_physics_torque_component_set(Entity entity, Torque torque);
 
 /**
  * @brief Applies torque to an entity for one physics tick.
@@ -705,7 +705,7 @@ EngineResult rohr_physics_apply_torque_for_one_tick(Entity entity, Torque t);
  * @param hitbox Local-space hitbox shape.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_hitbox(Entity entity, Shape hitbox);
+EngineResult rohr_physics_hitbox_set(Entity entity, Shape hitbox);
 
 /**
  * @brief Sets an entity orientation component value.
@@ -713,7 +713,7 @@ EngineResult rohr_physics_set_hitbox(Entity entity, Shape hitbox);
  * @param angle Orientation in radians.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_orientation(Entity entity, Orientation angle);
+EngineResult rohr_physics_orientation_set(Entity entity, Orientation angle);
 
 /**
  * @brief Sets an entity angular velocity component value.
@@ -721,14 +721,14 @@ EngineResult rohr_physics_set_orientation(Entity entity, Orientation angle);
  * @param v Angular velocity value.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_angular_velocity(Entity entity, AngularVelocity v);
+EngineResult rohr_physics_angular_velocity_set(Entity entity, AngularVelocity v);
 
 /**
  * @brief Returns an entity hitbox transformed into world space.
  * @param entity Entity to inspect.
  * @return ShapeResult containing the world-space hitbox, or an error.
  */
-ShapeResult rohr_physics_get_global_hit_box(Entity entity);
+ShapeResult rohr_physics_global_hit_box_get(Entity entity);
 
 /**
  * @brief Sets an entity restitution value.
@@ -736,21 +736,21 @@ ShapeResult rohr_physics_get_global_hit_box(Entity entity);
  * @param restitution Restitution value.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_restitution(Entity entity, Restitution restitution);
+EngineResult rohr_physics_restitution_set(Entity entity, Restitution restitution);
 
 /**
  * @brief Marks an entity as dynamic for physics simulation.
  * @param entity Entity to modify.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_dynamic(Entity entity);
+EngineResult rohr_physics_dynamic_set(Entity entity);
 
 /**
  * @brief Marks an entity as static for physics simulation.
  * @param entity Entity to modify.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_static(Entity entity);
+EngineResult rohr_physics_static_set(Entity entity);
 
 /**
  * @brief Adds HOLD so physics update stages preserve current values.
@@ -787,7 +787,7 @@ EngineResult rohr_physics_group_unhold_entities(GroupId group);
  * @param max Maximum orientation in radians.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_angle_lock(Entity entity, Orientation min, Orientation max);
+EngineResult rohr_physics_angle_lock_set(Entity entity, Orientation min, Orientation max);
 
 /**
  * @brief Locks an entity position along an axis.
@@ -796,7 +796,7 @@ EngineResult rohr_physics_set_angle_lock(Entity entity, Orientation min, Orienta
  * @param axis_point Point on the locked axis.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_axis_lock(Entity entity, Axis axis, Position axis_point);
+EngineResult rohr_physics_axis_lock_set(Entity entity, Axis axis, Position axis_point);
 
 /**
  * @brief Sets an entity friction value.
@@ -804,7 +804,7 @@ EngineResult rohr_physics_set_axis_lock(Entity entity, Axis axis, Position axis_
  * @param friction Friction value.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_friction(Entity entity, float friction);
+EngineResult rohr_physics_friction_set(Entity entity, float friction);
 
 /**
  * @brief Locks one entity transform to another entity.
@@ -817,7 +817,7 @@ EngineResult rohr_physics_set_friction(Entity entity, float friction);
  * @param inherit_velocity true to inherit driver velocity.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_transform_lock(
+EngineResult rohr_physics_transform_lock_set(
     Entity driven,
     Entity driver,
     Vec2D local_offset,
@@ -843,7 +843,7 @@ EngineResult rohr_physics_remove_transform_lock(Entity entity);
  * @param inherit_velocity true to inherit driver velocity.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_transform_lock_current_transform(
+EngineResult rohr_physics_transform_lock_current_transform_set(
     Entity driven,
     Entity driver,
     bool lock_position,
@@ -857,7 +857,7 @@ EngineResult rohr_physics_set_transform_lock_current_transform(
  * @param target Live entity that receives the force or torque.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_target(Entity entity, Entity target);
+EngineResult rohr_physics_target_set(Entity entity, Entity target);
 
 /**
  * @brief Adds or replaces complete joint data on an existing entity.
@@ -865,7 +865,7 @@ EngineResult rohr_physics_set_target(Entity entity, Entity target);
  * @param joint Complete joint component value.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_joint_component(Entity entity, Joint joint);
+EngineResult rohr_physics_joint_component_set(Entity entity, Joint joint);
 
 /**
  * @brief Creates a joint between two entities.
@@ -878,7 +878,7 @@ EngineResult rohr_physics_set_joint_component(Entity entity, Joint joint);
  * @param damping Spring damping.
  * @return EntityResult containing the joint entity, or an error.
  */
-EntityResult rohr_physics_set_joint(
+EntityResult rohr_physics_joint_set(
     Entity a,
     Entity b,
     JointType type,
@@ -903,7 +903,7 @@ Collision rohr_physics_particle_collision(Shape shape_1, Shape shape_2);
  * @param state true to enable reporting, false to disable it.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_set_collision_report(Entity entity, Entity target, bool state);
+EngineResult rohr_physics_collision_report_set(Entity entity, Entity target, bool state);
 
 /**
  * @brief Checks whether a collision report exists between two entities.
@@ -911,7 +911,7 @@ EngineResult rohr_physics_set_collision_report(Entity entity, Entity target, boo
  * @param target Target entity.
  * @return true when reporting is enabled, false otherwise.
  */
-bool rohr_physics_get_collision_report(Entity entity, Entity target);
+bool rohr_physics_collision_report_get(Entity entity, Entity target);
 
 /**
  * @brief Creates an engine color from a hexadecimal RGB or RGBA value.
@@ -1046,13 +1046,13 @@ void rohr_graphics_scale_textures(Entity entity, Scale scale);
  * @brief Replaces the active camera transform.
  * @param camera World-space camera position and orientation.
  */
-void rohr_graphics_set_camera(Camera camera);
+void rohr_graphics_active_camera_set(Camera camera);
 
 /**
  * @brief Returns the active camera transform.
  * @return Current world-space camera transform.
  */
-Camera rohr_graphics_get_camera(void);
+Camera rohr_graphics_active_camera_get(void);
 
 /**
  * @brief Translates the active camera in world space.
@@ -1121,7 +1121,7 @@ bool rohr_graphics_camera_is_attached(void);
  * @brief Returns the active camera attachment description.
  * @return CameraAttachmentResult containing the attachment or a missing-component error.
  */
-CameraAttachmentResult rohr_graphics_get_camera_attachment(void);
+CameraAttachmentResult rohr_graphics_camera_attachment_get(void);
 
 /** Returns defaults for a full-screen camera with unit zoom. */
 CameraConfig rohr_camera_default_config(void);
@@ -1130,9 +1130,9 @@ CameraIdResult rohr_camera_create(CameraConfig config);
 /** Destroys a non-active camera. */
 EngineResult rohr_camera_destroy(CameraId camera);
 /** Selects the camera used by transforms and subsequent drawing. */
-EngineResult rohr_camera_set_active(CameraId camera);
+EngineResult rohr_camera_active_set(CameraId camera);
 /** Returns the active camera handle. */
-CameraId rohr_camera_get_active(void);
+CameraId rohr_camera_active_get(void);
 /** Returns an engine-owned camera value. */
 CameraResult rohr_camera_get(CameraId camera);
 /** Replaces a camera value and detaches it. */
@@ -1149,30 +1149,30 @@ EngineResult rohr_camera_attach(
 /** Detaches a camera while preserving its resolved transform. */
 EngineResult rohr_camera_detach(CameraId camera);
 
-EngineResult rohr_camera_set_render_callback(
+EngineResult rohr_camera_render_callback_set(
     CameraId camera,
     CameraRenderCallback callback,
     void *context
 );
-EngineResult rohr_camera_set_enable(CameraId camera);
-EngineResult rohr_camera_set_disable(CameraId camera);
-EngineResult rohr_camera_set_pause_with_engine(CameraId camera);
-EngineResult rohr_camera_set_render_when_paused(CameraId camera);
-EngineResult rohr_camera_move(CameraId camera, Vec2D translation, Time duration);
-EngineResult rohr_camera_move_to(CameraId camera, Position position, Time duration);
-EngineResult rohr_camera_move_to_entity(CameraId camera, Entity entity, Time duration);
-EngineResult rohr_camera_attach_to_entity(CameraId camera, Entity entity);
+EngineResult rohr_camera_enable_set(CameraId camera);
+EngineResult rohr_camera_disable_set(CameraId camera);
+EngineResult rohr_camera_pause_with_engine_set(CameraId camera);
+EngineResult rohr_camera_render_when_paused_set(CameraId camera);
+EngineResult rohr_camera_position_move(CameraId camera, Vec2D translation, Time duration);
+EngineResult rohr_camera_position_set(CameraId camera, Position position, Time duration);
+EngineResult rohr_camera_position_from_entity_set(CameraId camera, Entity entity, Time duration);
+EngineResult rohr_camera_entity_attachment_set(CameraId camera, Entity entity);
 EngineResult rohr_camera_is_moving(CameraId camera);
-EngineResult rohr_camera_set_zoom(CameraId camera, float zoom, Time duration);
-CameraZoomResult rohr_camera_get_zoom(CameraId camera);
+EngineResult rohr_camera_zoom_set(CameraId camera, float zoom, Time duration);
+CameraZoomResult rohr_camera_zoom_get(CameraId camera);
 
 ViewportConfig rohr_viewport_default_config(void);
 ViewportIdResult rohr_viewport_create(ViewportConfig config);
 EngineResult rohr_viewport_destroy(ViewportId viewport);
-EngineResult rohr_viewport_set_camera(ViewportId viewport, CameraId camera);
+EngineResult rohr_viewport_camera_set(ViewportId viewport, CameraId camera);
 EngineResult rohr_viewport_clear_camera(ViewportId viewport);
-EngineResult rohr_viewport_set_enable(ViewportId viewport);
-EngineResult rohr_viewport_set_disable(ViewportId viewport);
+EngineResult rohr_viewport_enable_set(ViewportId viewport);
+EngineResult rohr_viewport_disable_set(ViewportId viewport);
 
 /**
  * @brief Converts a world position to screen coordinates.
@@ -1192,7 +1192,7 @@ Position rohr_graphics_screen_to_world(Position screen);
  * @brief Returns the current mouse position in screen coordinates.
  * @return Mouse screen position.
  */
-Position rohr_graphics_get_mouse_screen_position(void);
+Position rohr_graphics_mouse_screen_position_get(void);
 
 /**
  * @brief Draws the spatial grid overlay.
@@ -1515,7 +1515,7 @@ Controller rohr_controller_default_arrows(void);
  * @param controller Controller to modify. NULL is ignored.
  * @param binding New positive/negative X/Y key mapping.
  */
-void rohr_controller_set_axis_binding(
+void rohr_controller_axis_binding_set(
     Controller *controller,
     ControllerAxisBinding binding
 );
@@ -1546,7 +1546,7 @@ bool rohr_controller_add_button(
 );
 
 /** @brief Reads a named axis, returning zero when unavailable or disabled. */
-Vec2D rohr_controller_get_axis(
+Vec2D rohr_controller_axis_get(
     const KeyboardState *keyboard,
     const Controller *controller,
     const char *name

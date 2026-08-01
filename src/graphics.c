@@ -551,7 +551,7 @@ void graphics_draw_grid(void) {
 void graphics_scale_textures(Entity entity, Scale scale) {
     EntityIndex index;
 
-    if(!entity_get_index(entity, &index) || !entity_has_components(entity, ANIMATED_SPRITE)) {
+    if(!entity_index_get(entity, &index) || !entity_has_components(entity, ANIMATED_SPRITE)) {
         return;
     }
     for(int i = 0; i < MAX_TEXTURES; i += 1) {
@@ -604,7 +604,7 @@ CameraIdResult graphics_camera_create(CameraConfig config) {
     return ERROR_RESULT_MAKE_ERROR(CameraIdResult, ERROR_MEMORY_POOL_FULL);
 }
 
-EngineResult graphics_camera_set_active(CameraId id) {
+EngineResult graphics_camera_active_set(CameraId id) {
     size_t slot;
     if(!graphics_camera_slot(id, &slot)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
@@ -620,7 +620,7 @@ EngineResult graphics_camera_set_active(CameraId id) {
     return error_result_value(true);
 }
 
-CameraId graphics_camera_get_active(void) {
+CameraId graphics_camera_active_get(void) {
     return active_camera;
 }
 
@@ -654,7 +654,7 @@ EngineResult graphics_camera_set(CameraId id, Camera value) {
     if(id == active_camera) {
         camera = value;
         camera_attachment = (ActiveCameraAttachment){0};
-        return graphics_camera_set_active(id);
+        return graphics_camera_active_set(id);
     }
     return error_result_value(true);
 }
@@ -696,7 +696,7 @@ static bool graphics_resolve_camera_attachment(void) {
     if(!camera_attachment.attached) {
         return false;
     }
-    if(!entity_get_index(camera_attachment.value.entity, &index)
+    if(!entity_index_get(camera_attachment.value.entity, &index)
             || (camera_attachment.value.follow_position
                 && (index >= positions_pool.capacity
                     || !positions_pool.used[index]))
@@ -727,7 +727,7 @@ static bool graphics_resolve_camera_attachment(void) {
     return true;
 }
 
-void graphics_set_camera(Camera value) {
+void graphics_active_camera_set(Camera value) {
     size_t slot;
     camera_attachment = (ActiveCameraAttachment){0};
     camera = graphics_camera_from_config((CameraConfig){
@@ -743,13 +743,13 @@ void graphics_set_camera(Camera value) {
     graphics_camera_store_active();
 }
 
-Camera graphics_get_camera(void) {
+Camera graphics_active_camera_get(void) {
     (void)graphics_resolve_camera_attachment();
     return camera;
 }
 
 void graphics_move_camera(Vec2D translation) {
-    (void)graphics_camera_move(active_camera, translation, 0.0);
+    (void)graphics_camera_position_move(active_camera, translation, 0.0);
 }
 
 void graphics_rotate_camera(Orientation radians) {
@@ -783,7 +783,7 @@ EngineResult graphics_attach_camera_with_options(
 ) {
     EntityIndex index;
 
-    if(!entity_get_index(entity, &index)) {
+    if(!entity_index_get(entity, &index)) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
     if((follow_position
@@ -820,7 +820,7 @@ bool graphics_camera_is_attached(void) {
     return graphics_resolve_camera_attachment();
 }
 
-bool graphics_get_camera_attachment(CameraAttachment *attachment) {
+bool graphics_camera_attachment_get(CameraAttachment *attachment) {
     if(attachment == NULL || !graphics_resolve_camera_attachment()) {
         return false;
     }
@@ -842,7 +842,7 @@ EngineResult graphics_camera_attach_to(
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
     }
     camera_motion[slot] = (CameraMotion){0};
-    EngineResult result = graphics_camera_set_active(id);
+    EngineResult result = graphics_camera_active_set(id);
     if(error_check(result)) return result;
     result = graphics_attach_camera_with_options(
         entity,
@@ -852,7 +852,7 @@ EngineResult graphics_camera_attach_to(
         follow_orientation
     );
     graphics_camera_store_active();
-    if(previous != id) (void)graphics_camera_set_active(previous);
+    if(previous != id) (void)graphics_camera_active_set(previous);
     return result;
 }
 
@@ -863,11 +863,11 @@ EngineResult graphics_camera_detach_from(CameraId id) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
     }
     camera_motion[slot] = (CameraMotion){0};
-    EngineResult result = graphics_camera_set_active(id);
+    EngineResult result = graphics_camera_active_set(id);
     if(error_check(result)) return result;
     graphics_detach_camera();
     graphics_camera_store_active();
-    if(previous != id) (void)graphics_camera_set_active(previous);
+    if(previous != id) (void)graphics_camera_active_set(previous);
     return error_result_value(true);
 }
 
@@ -938,11 +938,11 @@ static EngineResult graphics_screen_begin(ScreenId id) {
     }
     camera_before_screen = active_camera;
     {
-        EngineResult result = graphics_camera_set_active(screens[slot].camera);
+        EngineResult result = graphics_camera_active_set(screens[slot].camera);
         if(result.kind == ERROR_RESULT_ERROR) return result;
     }
     if(!SDL_SetRenderTarget(sdl_renderer, screens[slot].texture)) {
-        (void)graphics_camera_set_active(camera_before_screen);
+        (void)graphics_camera_active_set(camera_before_screen);
         camera_before_screen = CAMERA_INVALID;
         return error_result_error(ERROR_ENGINE_GRAPHICS_INIT_FAILED);
     }
@@ -959,7 +959,7 @@ static EngineResult graphics_screen_end(void) {
     (void)SDL_SetRenderTarget(sdl_renderer, NULL);
     drawing_screen = SCREEN_INVALID;
     if(camera_before_screen != CAMERA_INVALID) {
-        (void)graphics_camera_set_active(camera_before_screen);
+        (void)graphics_camera_active_set(camera_before_screen);
     }
     camera_before_screen = CAMERA_INVALID;
     (void)SDL_SetRenderViewport(sdl_renderer, NULL);
@@ -1006,7 +1006,7 @@ static EngineResult graphics_camera_end(void) {
     return graphics_screen_end();
 }
 
-EngineResult graphics_camera_set_render_callback(
+EngineResult graphics_camera_render_callback_set(
     CameraId camera_id,
     CameraRenderCallback callback,
     void *context
@@ -1020,7 +1020,7 @@ EngineResult graphics_camera_set_render_callback(
     return error_result_value(true);
 }
 
-EngineResult graphics_camera_set_enable(CameraId camera_id) {
+EngineResult graphics_camera_enable_set(CameraId camera_id) {
     size_t slot;
     if(!graphics_camera_slot(camera_id, &slot)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
@@ -1029,7 +1029,7 @@ EngineResult graphics_camera_set_enable(CameraId camera_id) {
     return error_result_value(true);
 }
 
-EngineResult graphics_camera_set_disable(CameraId camera_id) {
+EngineResult graphics_camera_disable_set(CameraId camera_id) {
     size_t slot;
     if(!graphics_camera_slot(camera_id, &slot)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
@@ -1038,7 +1038,7 @@ EngineResult graphics_camera_set_disable(CameraId camera_id) {
     return error_result_value(true);
 }
 
-EngineResult graphics_camera_set_pause_with_engine(CameraId camera_id) {
+EngineResult graphics_camera_pause_with_engine_set(CameraId camera_id) {
     size_t slot;
     if(!graphics_camera_slot(camera_id, &slot)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
@@ -1047,7 +1047,7 @@ EngineResult graphics_camera_set_pause_with_engine(CameraId camera_id) {
     return error_result_value(true);
 }
 
-EngineResult graphics_camera_set_render_when_paused(CameraId camera_id) {
+EngineResult graphics_camera_render_when_paused_set(CameraId camera_id) {
     size_t slot;
     if(!graphics_camera_slot(camera_id, &slot)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
@@ -1088,19 +1088,19 @@ static EngineResult graphics_camera_start_motion(
         value.position = target;
         return graphics_camera_set(camera_id, value);
     }
-    duration_ticks = (Tick)ceil(duration / engine_get_time_per_tick());
+    duration_ticks = (Tick)ceil(duration / engine_time_per_tick_get());
     if(duration_ticks == 0) duration_ticks = 1;
     camera_motion[slot] = (CameraMotion){
         .start = value.position,
         .target = target,
-        .start_tick = engine_get_tick(),
+        .start_tick = engine_tick_get(),
         .duration_ticks = duration_ticks,
         .active = true,
     };
     return error_result_value(true);
 }
 
-EngineResult graphics_camera_move(
+EngineResult graphics_camera_position_move(
     CameraId camera_id,
     Vec2D translation,
     Time duration
@@ -1118,7 +1118,7 @@ EngineResult graphics_camera_move(
     );
 }
 
-EngineResult graphics_camera_move_to(CameraId camera_id, Position position, Time duration) {
+EngineResult graphics_camera_position_set(CameraId camera_id, Position position, Time duration) {
     return graphics_camera_start_motion(
         camera_id,
         position,
@@ -1126,9 +1126,9 @@ EngineResult graphics_camera_move_to(CameraId camera_id, Position position, Time
     );
 }
 
-EngineResult graphics_camera_move_to_entity(CameraId camera_id, Entity entity, Time duration) {
+EngineResult graphics_camera_position_from_entity_set(CameraId camera_id, Entity entity, Time duration) {
     EntityIndex index;
-    if(!entity_get_index(entity, &index) || index >= positions_pool.capacity
+    if(!entity_index_get(entity, &index) || index >= positions_pool.capacity
             || !positions_pool.used[index]) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
     }
@@ -1139,7 +1139,7 @@ EngineResult graphics_camera_move_to_entity(CameraId camera_id, Entity entity, T
     );
 }
 
-EngineResult graphics_camera_attach_to_entity(CameraId camera_id, Entity entity) {
+EngineResult graphics_camera_entity_attachment_set(CameraId camera_id, Entity entity) {
     CameraResult result = graphics_camera_get(camera_id);
     if(result.kind == ERROR_RESULT_ERROR) {
         return error_result_error(result.result.error);
@@ -1162,7 +1162,7 @@ EngineResult graphics_camera_is_moving(CameraId camera_id) {
     return error_result_value(camera_motion[slot].active);
 }
 
-EngineResult graphics_camera_set_zoom(
+EngineResult graphics_camera_zoom_set(
     CameraId camera_id,
     float zoom,
     Time duration
@@ -1179,19 +1179,19 @@ EngineResult graphics_camera_set_zoom(
         if(camera_id == active_camera) camera.zoom = zoom;
         return error_result_value(true);
     }
-    duration_ticks = (Tick)ceil(duration / engine_get_time_per_tick());
+    duration_ticks = (Tick)ceil(duration / engine_time_per_tick_get());
     if(duration_ticks == 0) duration_ticks = 1;
     camera_zoom_motion[slot] = (CameraZoomMotion){
         .start = cameras[slot].zoom,
         .target = zoom,
-        .start_tick = engine_get_tick(),
+        .start_tick = engine_tick_get(),
         .duration_ticks = duration_ticks,
         .active = true,
     };
     return error_result_value(true);
 }
 
-CameraZoomResult graphics_camera_get_zoom(CameraId camera_id) {
+CameraZoomResult graphics_camera_zoom_get(CameraId camera_id) {
     size_t slot;
     if(!graphics_camera_slot(camera_id, &slot)) {
         return ERROR_RESULT_MAKE_ERROR(CameraZoomResult, ERROR_ENGINE_COMPONENT_MISSING);
@@ -1243,7 +1243,7 @@ EngineResult graphics_viewport_destroy(ViewportId id) {
     return error_result_value(true);
 }
 
-EngineResult graphics_viewport_set_camera(ViewportId id, CameraId camera_id) {
+EngineResult graphics_viewport_camera_set(ViewportId id, CameraId camera_id) {
     size_t slot;
     size_t camera_slot;
     if(!graphics_viewport_slot(id, &slot) || !graphics_camera_slot(camera_id, &camera_slot)) {
@@ -1262,7 +1262,7 @@ EngineResult graphics_viewport_clear_camera(ViewportId id) {
     return error_result_value(true);
 }
 
-EngineResult graphics_viewport_set_enable(ViewportId id) {
+EngineResult graphics_viewport_enable_set(ViewportId id) {
     size_t slot;
     if(!graphics_viewport_slot(id, &slot)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
@@ -1271,7 +1271,7 @@ EngineResult graphics_viewport_set_enable(ViewportId id) {
     return error_result_value(true);
 }
 
-EngineResult graphics_viewport_set_disable(ViewportId id) {
+EngineResult graphics_viewport_disable_set(ViewportId id) {
     size_t slot;
     if(!graphics_viewport_slot(id, &slot)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
@@ -1352,7 +1352,7 @@ Position graphics_window_to_screen(Position window) {
     };
 }
 
-Position graphics_get_mouse_screen_position(void) {
+Position graphics_mouse_screen_position_get(void) {
     float window_x;
     float window_y;
 
@@ -1408,7 +1408,7 @@ EngineResult graphics_start(void) {
         ttf_initialized = false;
         return error_result_error(ERROR_ENGINE_GRAPHICS_INIT_FAILED);
     }
-    (void)graphics_camera_set_active(active_camera);
+    (void)graphics_camera_active_set(active_camera);
 
     console_write(LOG_ENGINE, "Graphics initialization complete\n");
     console_write(LOG_ENGINE, "---Initializing Graphics---\n");
@@ -1569,7 +1569,7 @@ static void graphics_draw_empty_viewport(ViewportRectangle rectangle) {
 }
 
 static void graphics_update_camera_motions(void) {
-    Tick current_tick = engine_get_tick();
+    Tick current_tick = engine_tick_get();
     size_t slot;
     for(slot = 0; slot < MAX_CAMERAS; slot += 1) {
         if(!cameras_used[slot]) continue;
@@ -1771,7 +1771,7 @@ bool graphics_draw_shape_filled(Shape shape, Color color)
 }
 
 void graphics_draw_hit_box(Entity entity, Fill fill_type) {
-    ShapeResult shape_result = physics_get_global_hit_box(entity);
+    ShapeResult shape_result = physics_global_hit_box_get(entity);
     if(shape_result.kind == ERROR_RESULT_ERROR) {
         return;
     }
@@ -1785,7 +1785,7 @@ void graphics_draw_hit_box(Entity entity, Fill fill_type) {
 }
 
 void graphics_draw_hit_box_colored(Entity entity, Fill fill_type, Color color) {
-    ShapeResult shape_result = physics_get_global_hit_box(entity);
+    ShapeResult shape_result = physics_global_hit_box_get(entity);
     if(shape_result.kind == ERROR_RESULT_ERROR) {
         return;
     }
@@ -1814,10 +1814,10 @@ void graphics_draw_hit_boxes(void) {
 void graphics_draw_particle(Entity entity, Fill fill_type) {
     EntityIndex index;
 
-    if(!entity_get_index(entity, &index)) {
+    if(!entity_index_get(entity, &index)) {
         return;
     }
-    ShapeResult shape_result = physics_get_global_hit_box(entity);
+    ShapeResult shape_result = physics_global_hit_box_get(entity);
     if(shape_result.kind == ERROR_RESULT_ERROR) {
         return;
     }
@@ -2026,7 +2026,7 @@ EngineResult graphics_add_animated_sprite(Entity entity, AnimatedSprite sprite) 
     EntityIndex index;
     EngineResult result;
 
-    if(!entity_get_index(entity, &index) || !entity_index_is_alive(index)) {
+    if(!entity_index_get(entity, &index) || !entity_index_is_alive(index)) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
     (void)AnimatedSpritePool_store_at(&animated_sprites_pool, index, sprite);
@@ -2058,14 +2058,14 @@ void graphics_update_sprite_frames(Tick current_tick, Time current_time) {
 void graphics_draw_local_origin(Entity entity) {
     EntityIndex index;
 
-    if(!entity_get_index(entity, &index)) {
+    if(!entity_index_get(entity, &index)) {
         return;
     }
     if (!entity_has_components(entity, HIT_BOX)) {
         return;
     }
 
-    ShapeResult shape_result = physics_get_global_hit_box(entity);
+    ShapeResult shape_result = physics_global_hit_box_get(entity);
     if(shape_result.kind == ERROR_RESULT_ERROR) {
         return;
     }

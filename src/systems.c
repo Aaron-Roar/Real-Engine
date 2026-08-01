@@ -30,17 +30,17 @@ static bool system_alive_index_at(uint32_t alive_position, EntityIndex *index) {
     if(result.kind == ERROR_RESULT_ERROR) {
         return false;
     }
-    return entity_get_index(result.result.value, index) && entity_index_is_alive(*index);
+    return entity_index_get(result.result.value, index) && entity_index_is_alive(*index);
 }
 
-static void system_set_collision_report_by_index(EntityIndex entity_1, EntityIndex entity_2, bool state) {
+static void system_collision_report_by_index_set(EntityIndex entity_1, EntityIndex entity_2, bool state) {
     Entity entity_1_id;
     Entity entity_2_id;
 
     if(!system_entity_from_index(entity_1, &entity_1_id) || !system_entity_from_index(entity_2, &entity_2_id)) {
         return;
     }
-    physics_set_collision_report(entity_1_id, entity_2_id, state);
+    physics_collision_report_set(entity_1_id, entity_2_id, state);
 }
 
 static void system_generate_global_hitbox_by_index(EntityIndex index) {
@@ -93,7 +93,7 @@ Shape system_generate_global_hitbox(Entity entity) {
     RohrComponentMask filter = HIT_BOX;
     EntityIndex index;
 
-        if(entity_get_index(entity, &index) && entity_index_is_alive(index)) {
+        if(entity_index_get(entity, &index) && entity_index_is_alive(index)) {
             if( entity_index_has_components(index, filter) ) {
                 Position pos = positions[index];
                 Orientation ort = orientations[index];
@@ -175,7 +175,7 @@ void system_apply_forces(void) {
         }
         if( entity_index_has_components(i, filter) ) { //Check if this entity is a targetable force
             EntityIndex target_index;
-            if(entity_get_index(targets[i], &target_index) && entity_index_is_alive(target_index)) { //Check if the target to the force exists
+            if(entity_index_get(targets[i], &target_index) && entity_index_is_alive(target_index)) { //Check if the target to the force exists
                 if(physics_entity_can_move(target_index) && entity_index_has_components(target_index, target_filter)) { //Check if the target is moveable
                     if(mass[target_index] != 0) {
                         force_accelerations[target_index].x += forces[i].x/mass[target_index];
@@ -211,7 +211,7 @@ void system_apply_torques(void) {
         }
         if( entity_index_has_components(i, filter) ) { //Check if this entity is a targetable force
             EntityIndex target_index;
-            if(entity_get_index(targets[i], &target_index) && entity_index_is_alive(target_index)) { //Check if the target to the force exists
+            if(entity_index_get(targets[i], &target_index) && entity_index_is_alive(target_index)) { //Check if the target to the force exists
                 if(physics_entity_can_move(target_index) && entity_index_has_components(target_index, target_filter)) { //Check if the target is moveable
                     if(mass[target_index] != 0) {
                         torque_angular_accelerations[target_index] += torques[i]/physics_polygon_moment_of_inertia(hit_boxes[target_index], mass[target_index]);
@@ -247,7 +247,7 @@ void system_clear_force_torque_accelerations(void) {
     }
 }
 
-Collision system_get_entity_collision(Entity entity_1, Entity entity_2) {
+Collision system_entity_collision_get(Entity entity_1, Entity entity_2) {
     Shape shape1 = world_hit_boxes[entity_1];
     Shape shape2 = world_hit_boxes[entity_2];
     if(entity_index_has_components(entity_1, PARTICLE) && entity_index_has_components(entity_2, PARTICLE)) {
@@ -358,7 +358,7 @@ Position system_support_point_average(Shape shape, Vec2D direction)
     return sum;
 }
 
-Position system_get_particle_edge(Entity entity, Vec2D normal, Vec1D radius) {
+Position system_particle_edge_get(Entity entity, Vec2D normal, Vec1D radius) {
     return (Position) {
         .x = positions[entity].x + normal.x*radius,
         .y = positions[entity].y + normal.y*radius,
@@ -389,13 +389,13 @@ Position system_collision_contact_point(Entity entity_1, Entity entity_2, Collis
 
     if(entity_1_particle) {
         Vec1D r1 = math_circle_radius(shape_1, math_polygon_centroid(shape_1));
-        point_1 = system_get_particle_edge(entity_1, normal, r1);
+        point_1 = system_particle_edge_get(entity_1, normal, r1);
     } else {
         point_1 = system_support_point_average(shape_1, normal);
     }
     if(entity_2_particle) {
         Vec1D r2 = math_circle_radius(shape_2, math_polygon_centroid(shape_2));
-        point_2 = system_get_particle_edge(entity_2, opposite_normal, r2);
+        point_2 = system_particle_edge_get(entity_2, opposite_normal, r2);
     } else {
         point_2 = system_support_point_average(shape_2, opposite_normal);
     }
@@ -703,10 +703,10 @@ void system_apply_collisions_tuned(void) {
                                 continue;
                             }
                             add_pair(entity_1,entity_2);
-                            Collision collision = system_get_entity_collision(entity_1, entity_2);
+                            Collision collision = system_entity_collision_get(entity_1, entity_2);
                             if(collision.overlap == true) {
-                                system_set_collision_report_by_index(entity_1, entity_2, true);
-                                system_set_collision_report_by_index(entity_2, entity_1, true);
+                                system_collision_report_by_index_set(entity_1, entity_2, true);
+                                system_collision_report_by_index_set(entity_2, entity_1, true);
                                 if(entity_index_has_components(entity_1, COLLISION) && entity_index_has_components(entity_2, COLLISION)) {
                                     system_resolve_collision(entity_1, entity_2, collision);
                                     system_separate_entities(entity_1,entity_2, collision);
@@ -718,8 +718,8 @@ void system_apply_collisions_tuned(void) {
                                 }
 
                             } else {
-                                system_set_collision_report_by_index(entity_1, entity_2, false);
-                                system_set_collision_report_by_index(entity_2, entity_1, false);
+                                system_collision_report_by_index_set(entity_1, entity_2, false);
+                                system_collision_report_by_index_set(entity_2, entity_1, false);
 
                             }
 
@@ -750,20 +750,20 @@ void system_apply_collisions(void) {
             if(!entity_index_has_components(i, HIT_BOX) || !entity_index_has_components(j, HIT_BOX)) {
                 continue;
             }
-            Collision collision = system_get_entity_collision(i, j);
+            Collision collision = system_entity_collision_get(i, j);
 
 
             if(collision.overlap == true) {
-                system_set_collision_report_by_index(i, j, true);
-                system_set_collision_report_by_index(j, i, true);
+                system_collision_report_by_index_set(i, j, true);
+                system_collision_report_by_index_set(j, i, true);
                 if(entity_index_has_components(i, COLLISION) && entity_index_has_components(j, COLLISION)) {
                     system_resolve_collision(i, j, collision);
                 }
 
             }
             else {
-                system_set_collision_report_by_index(i, j, false);
-                system_set_collision_report_by_index(j, i, false);
+                system_collision_report_by_index_set(i, j, false);
+                system_collision_report_by_index_set(j, i, false);
 
             }
         }
@@ -907,7 +907,7 @@ void system_apply_transform_locks(void) {
         Entity driver = transform_locks[driven].driver;
         EntityIndex driver_index;
 
-        if(!entity_get_index(driver, &driver_index) || !entity_index_is_alive(driver_index)) {
+        if(!entity_index_get(driver, &driver_index) || !entity_index_is_alive(driver_index)) {
             system_remove_transform_lock_by_index(driven);
             continue;
         }
@@ -952,10 +952,10 @@ void system_clean_entities_past_lifetime(void) {
         }
         if( entity_index_has_components(i, LIFETIME) ) {
 
-            if( (life_times[i].expirey_time != 0 && life_times[i].expirey_time <= engine_get_time()) ) {
+            if( (life_times[i].expirey_time != 0 && life_times[i].expirey_time <= engine_time_get()) ) {
                 system_delete_by_index(i);
             }
-            else if( (life_times[i].expirey_tick != 0 && life_times[i].expirey_tick <= engine_get_tick()) ) {
+            else if( (life_times[i].expirey_tick != 0 && life_times[i].expirey_tick <= engine_tick_get()) ) {
                 system_delete_by_index(i);
             }
         }
@@ -965,7 +965,7 @@ void system_clean_entities_past_lifetime(void) {
 static Velocity system_point_velocity(Entity entity, Vec2D world_offset) {
     EntityIndex index;
 
-    if(!entity_get_index(entity, &index) || !entity_index_is_alive(index)) {
+    if(!entity_index_get(entity, &index) || !entity_index_is_alive(index)) {
         return (Velocity){0};
     }
     if(!physics_entity_can_move(index)) {
@@ -984,7 +984,7 @@ static Velocity system_point_velocity(Entity entity, Vec2D world_offset) {
 static void system_add_joint_force_for_one_tick(Entity target, Force force) {
     EntityIndex target_index;
 
-    if(!entity_get_index(target, &target_index) || !entity_index_is_alive(target_index)) {
+    if(!entity_index_get(target, &target_index) || !entity_index_is_alive(target_index)) {
         return;
     }
     if(!physics_entity_can_move(target_index)) {
@@ -1004,13 +1004,13 @@ static void system_add_joint_force_for_one_tick(Entity target, Force force) {
     //set_life_time(
     //    force_entity,
     //    0.0,
-    //    engine_get_tick() + 1
+    //    engine_tick_get() + 1
     //);
 }
 static void system_add_joint_torque_for_one_tick(Entity target, Torque torque) {
     EntityIndex target_index;
 
-    if(!entity_get_index(target, &target_index) || !entity_index_is_alive(target_index)) {
+    if(!entity_index_get(target, &target_index) || !entity_index_is_alive(target_index)) {
         return;
     }
     if(!physics_entity_can_move(target_index)) {
@@ -1029,14 +1029,14 @@ static void system_add_joint_torque_for_one_tick(Entity target, Torque torque) {
     //set_life_time(
     //    torque_entity,
     //    0.0,
-    //    engine_get_tick() + 1
+    //    engine_tick_get() + 1
     //);
 }
 
 static void system_add_joint_force_at_point_for_one_tick(Entity target, Position world_point, Force force) {
     EntityIndex target_index;
 
-    if(!entity_get_index(target, &target_index) || !entity_index_is_alive(target_index)) {
+    if(!entity_index_get(target, &target_index) || !entity_index_is_alive(target_index)) {
         return;
     }
 
@@ -1044,10 +1044,10 @@ static void system_add_joint_force_at_point_for_one_tick(Entity target, Position
         return;
     }
 
-    EntityResult force_result = physics_set_force(target, force);
+    EntityResult force_result = physics_force_set(target, force);
 
     if(force_result.kind == ERROR_RESULT_VALUE) {
-        entity_set_life_time(force_result.result.value, 0.0, engine_get_tick() + 1);
+        entity_life_time_set(force_result.result.value, 0.0, engine_tick_get() + 1);
     }
 
     Vec2D r = {
@@ -1057,10 +1057,10 @@ static void system_add_joint_force_at_point_for_one_tick(Entity target, Position
 
     Torque torque = math_cross_2d(r, force);
 
-    EntityResult torque_result = physics_set_torque(target, torque);
+    EntityResult torque_result = physics_torque_set(target, torque);
 
     if(torque_result.kind == ERROR_RESULT_VALUE) {
-        entity_set_life_time(torque_result.result.value, 0.0, engine_get_tick() + 1);
+        entity_life_time_set(torque_result.result.value, 0.0, engine_tick_get() + 1);
     }
 }
 
@@ -1072,7 +1072,7 @@ static void system_apply_pin_joint(Entity joint_entity) {
     EntityIndex a_index;
     EntityIndex b_index;
 
-    if(!entity_get_index(a, &a_index) || !entity_index_is_alive(a_index) || !entity_get_index(b, &b_index) || !entity_index_is_alive(b_index)) {
+    if(!entity_index_get(a, &a_index) || !entity_index_is_alive(a_index) || !entity_index_get(b, &b_index) || !entity_index_is_alive(b_index)) {
         system_delete_by_index(joint_entity);
         return;
     }
@@ -1144,7 +1144,7 @@ void system_apply_distance_joint(Entity joint_entity) {
         EntityIndex a_index;
         EntityIndex b_index;
 
-        if(!entity_get_index(a, &a_index) || !entity_index_is_alive(a_index) || !entity_get_index(b, &b_index) || !entity_index_is_alive(b_index)) {
+        if(!entity_index_get(a, &a_index) || !entity_index_is_alive(a_index) || !entity_index_get(b, &b_index) || !entity_index_is_alive(b_index)) {
             system_delete_by_index(joint_entity);
             return;
         }

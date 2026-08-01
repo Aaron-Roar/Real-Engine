@@ -38,14 +38,14 @@ void engine_update_time(void);
  *
  * @return Current simulated engine time.
  */
-Time engine_get_time(void);
+Time engine_time_get(void);
 
 /**
  * Get the current engine tick count.
  *
  * @return Number of ticks advanced since initialization or reset.
  */
-Tick engine_get_tick(void);
+Tick engine_tick_get(void);
 
 /**
  * Pause engine time and tick advancement.
@@ -61,9 +61,9 @@ void engine_resume(void);
 Tick engine_update_tick(void);
 
 /** Set the real-time duration required for one engine tick. */
-EngineResult engine_set_time_per_tick(Time time_per_tick);
+EngineResult engine_time_per_tick_set(Time time_per_tick);
 /** Return the real-time duration required for one engine tick. */
-Time engine_get_time_per_tick(void);
+Time engine_time_per_tick_get(void);
 
 /**
  * Poll one SDL event.

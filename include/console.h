@@ -53,5 +53,5 @@ bool console_is_active(void);
 /** Write a formatted debug message when debug output is enabled. */
 void console_debug_write(LogSourceType source, const char *fmt, ...);
 /** Set console debug output state. */
-void console_set_debug(bool state);
+void console_debug_set(bool state);
 #endif

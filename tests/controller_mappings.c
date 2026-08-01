@@ -57,7 +57,7 @@ int main(void) {
         rohr_engine_shutdown();
         return 1;
     }
-    first_axis = rohr_controller_get_axis(&keyboard, &first, "aim");
+    first_axis = rohr_controller_axis_get(&keyboard, &first, "aim");
     if(first_axis.x != 1.0f || first_axis.y != 0.0f ||
             !rohr_controller_button_down(&keyboard, &first, "fire") ||
             !rohr_controller_button_pressed(&keyboard, &first, "fire") ||
@@ -67,7 +67,7 @@ int main(void) {
         return 1;
     }
 
-    rohr_controller_set_axis_binding(
+    rohr_controller_axis_binding_set(
         &first,
         (ControllerAxisBinding){
             .positive_x = SDLK_W,

@@ -30,8 +30,8 @@ int main(void) {
     }
     Entity seeker = seeker_result.result.value;
     Entity player = player_result.result.value;
-    EntityIndexResult index_result = rohr_entity_get_index(seeker);
-    CameraAttachmentResult attachment_result = rohr_graphics_get_camera_attachment();
+    EntityIndexResult index_result = rohr_entity_index_get(seeker);
+    CameraAttachmentResult attachment_result = rohr_graphics_camera_attachment_get();
     if(rohr_error_check(index_result) || rohr_error_check(attachment_result)) {
         if(rohr_error_check(index_result)) {
             rohr_error_print_stderr(index_result.result.error);

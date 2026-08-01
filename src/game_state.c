@@ -695,7 +695,7 @@ static EngineResult state_apply_placement(
     if(strcmp(yyjson_get_str(type), "point") == 0) {
         return error_result_value(true);
     }
-    if(!entity_get_index(loaded->entity, &index)
+    if(!entity_index_get(loaded->entity, &index)
             || index >= positions_pool.capacity
             || positions_pool.used[index] == 0) {
         return error_result_error(ERROR_ENGINE_STATE_INVALID);
@@ -786,7 +786,7 @@ static EngineResult state_apply_placement(
     else {
         return error_result_error(ERROR_ENGINE_STATE_INVALID);
     }
-    return physics_set_position(loaded->entity, generated);
+    return physics_position_set(loaded->entity, generated);
 }
 
 static EngineResult state_resolve_name(yyjson_val *value, Entity *entity) {
@@ -831,7 +831,7 @@ static EngineResult state_load_camera(yyjson_val *camera) {
                 || !state_number(transform, "orientation", &orientation)) {
             return error_result_error(ERROR_ENGINE_STATE_INVALID);
         }
-        graphics_set_camera((Camera){
+        graphics_active_camera_set((Camera){
             .position = position,
             .orientation = (Orientation)orientation
         });
@@ -1160,7 +1160,7 @@ static EngineResult state_load_components(
     Vec2D vector;
     EngineResult result;
 
-    if(!entity_get_index(entity, &index) || !yyjson_is_obj(components)) {
+    if(!entity_index_get(entity, &index) || !yyjson_is_obj(components)) {
         return error_result_error(ERROR_ENGINE_STATE_INVALID);
     }
 
@@ -1202,7 +1202,7 @@ static EngineResult state_load_components(
         if(!state_vec2(value, &vector)) {
             return error_result_error(ERROR_ENGINE_STATE_INVALID);
         }
-        result = physics_set_force_component(entity, vector);
+        result = physics_force_component_set(entity, vector);
         if(result.kind == ERROR_RESULT_ERROR) return result;
     }
 
@@ -1228,7 +1228,7 @@ static EngineResult state_load_components(
         if(!yyjson_is_num(value)) {
             return error_result_error(ERROR_ENGINE_STATE_INVALID);
         }
-        result = physics_set_angular_acceleration(
+        result = physics_angular_acceleration_set(
             entity,
             (AngularAcceleration)yyjson_get_num(value)
         );
@@ -1240,7 +1240,7 @@ static EngineResult state_load_components(
         if(!yyjson_is_num(value)) {
             return error_result_error(ERROR_ENGINE_STATE_INVALID);
         }
-        result = physics_set_torque_component(
+        result = physics_torque_component_set(
             entity,
             (Torque)yyjson_get_num(value)
         );
@@ -1258,7 +1258,7 @@ static EngineResult state_load_components(
         Entity target;
         result = state_resolve_name(value, &target);
         if(result.kind == ERROR_RESULT_ERROR) return result;
-        result = physics_set_target(entity, target);
+        result = physics_target_set(entity, target);
         if(result.kind == ERROR_RESULT_ERROR) return result;
     }
 
@@ -1267,7 +1267,7 @@ static EngineResult state_load_components(
         Entity parent;
         result = state_resolve_name(value, &parent);
         if(result.kind == ERROR_RESULT_ERROR) return result;
-        result = entity_set_parent(entity, parent);
+        result = entity_parent_set(entity, parent);
         if(result.kind == ERROR_RESULT_ERROR) return result;
     }
 
@@ -1284,7 +1284,7 @@ static EngineResult state_load_components(
             if(!yyjson_is_uint(tick)) return error_result_error(ERROR_ENGINE_STATE_INVALID);
             expiry_tick = yyjson_get_uint(tick);
         }
-        result = entity_set_life_time(entity, expiry_time, expiry_tick);
+        result = entity_life_time_set(entity, expiry_time, expiry_tick);
         if(result.kind == ERROR_RESULT_ERROR) return result;
     }
 
@@ -1357,7 +1357,7 @@ static EngineResult state_load_components(
 #undef JOINT_NUMBER
         if(!state_boolean(value, "lock_angle", &joint.lock_angle))
             return error_result_error(ERROR_ENGINE_STATE_INVALID);
-        result = physics_set_joint_component(entity, joint);
+        result = physics_joint_component_set(entity, joint);
         if(result.kind == ERROR_RESULT_ERROR) return result;
     }
 
@@ -1739,7 +1739,7 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
                 goto cleanup;
             }
             created_groups[created_group_count++] = group_result.result.value;
-            result = entity_group_set_name(
+            result = entity_group_name_set(
                 group_result.result.value,
                 yyjson_get_str(name)
             );
@@ -1802,7 +1802,7 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
                 };
                 created_count += 1;
                 total_created = created_count;
-                result = entity_set_name(
+                result = entity_name_set(
                     entity_result.result.value,
                     generated_name
                 );
@@ -2029,7 +2029,7 @@ static void state_write_named_reference(
         const char *key,
         Entity entity
 ) {
-    EntityNameResult name = entity_get_name(entity);
+    EntityNameResult name = entity_name_get(entity);
     if(name.kind == ERROR_RESULT_VALUE)
         yyjson_mut_obj_add_strcpy(document, components, key, name.result.value.value);
 }
@@ -2078,8 +2078,8 @@ EngineResult game_state_save_file(const char *path) {
     {
         yyjson_mut_val *camera = yyjson_mut_obj(document);
         CameraAttachment attachment;
-        if(graphics_get_camera_attachment(&attachment)) {
-            EntityNameResult entity_name = entity_get_name(attachment.entity);
+        if(graphics_camera_attachment_get(&attachment)) {
+            EntityNameResult entity_name = entity_name_get(attachment.entity);
             if(entity_name.kind == ERROR_RESULT_VALUE) {
                 yyjson_mut_val *attachment_value = yyjson_mut_obj(document);
                 yyjson_mut_obj_add_strcpy(
@@ -2121,7 +2121,7 @@ EngineResult game_state_save_file(const char *path) {
             }
         }
         if(yyjson_mut_obj_size(camera) == 0) {
-            Camera camera_value = graphics_get_camera();
+            Camera camera_value = graphics_active_camera_get();
             yyjson_mut_val *transform = yyjson_mut_obj(document);
             yyjson_mut_obj_add_val(
                 document,
@@ -2141,7 +2141,7 @@ EngineResult game_state_save_file(const char *path) {
     }
 
     for(position = 1; position <= MAX_GROUPS; position += 1) {
-        GroupNameResult name = entity_group_get_name((GroupId)position);
+        GroupNameResult name = entity_group_name_get((GroupId)position);
         if(name.kind == ERROR_RESULT_VALUE) {
             yyjson_mut_val *definition = yyjson_mut_obj(document);
             yyjson_mut_obj_add_strcpy(
@@ -2236,8 +2236,8 @@ EngineResult game_state_save_file(const char *path) {
         size_t i;
 
         if(entity_result.kind == ERROR_RESULT_ERROR
-                || !entity_get_index(entity_result.result.value, &index)) continue;
-        name = entity_get_name(entity_result.result.value);
+                || !entity_index_get(entity_result.result.value, &index)) continue;
+        name = entity_name_get(entity_result.result.value);
         if(name.kind == ERROR_RESULT_ERROR) continue;
         mask = entity_mask[index];
         description = yyjson_mut_obj(document);
@@ -2294,7 +2294,7 @@ EngineResult game_state_save_file(const char *path) {
         }
         if(transform_locks_pool.used[index]) {
             yyjson_mut_val *lock = yyjson_mut_obj(document);
-            EntityNameResult driver = entity_get_name(transform_locks[index].driver);
+            EntityNameResult driver = entity_name_get(transform_locks[index].driver);
             if(driver.kind == ERROR_RESULT_VALUE) {
                 yyjson_mut_obj_add_strcpy(document, lock, "driver", driver.result.value.value);
                 yyjson_mut_obj_add_val(document, lock, "local_offset", state_write_vec2(document, transform_locks[index].local_offset));
@@ -2306,8 +2306,8 @@ EngineResult game_state_save_file(const char *path) {
             }
         }
         if(joints_pool.used[index]) {
-            EntityNameResult a = entity_get_name(joints[index].a);
-            EntityNameResult b = entity_get_name(joints[index].b);
+            EntityNameResult a = entity_name_get(joints[index].a);
+            EntityNameResult b = entity_name_get(joints[index].b);
             if(a.kind == ERROR_RESULT_VALUE && b.kind == ERROR_RESULT_VALUE) {
                 const char *type = joints[index].type == JOINT_DISTANCE ? "distance"
                     : joints[index].type == JOINT_WELD ? "weld" : "pin";
@@ -2373,7 +2373,7 @@ EngineResult game_state_save_file(const char *path) {
         }
         if((entity_mask[index] & GROUP) != 0) {
             EntityGroupMembershipResult membership =
-                entity_get_groups(entity_result.result.value);
+                entity_groups_get(entity_result.result.value);
             if(membership.kind == ERROR_RESULT_VALUE) {
                 yyjson_mut_val *groups = yyjson_mut_arr(document);
                 GroupIdPool *group_ids = &membership.result.value.groups;
@@ -2383,7 +2383,7 @@ EngineResult game_state_save_file(const char *path) {
                         group_index += 1) {
                     GroupNameResult group_name;
                     if(group_ids->used[group_index] == 0) continue;
-                    group_name = entity_group_get_name(
+                    group_name = entity_group_name_get(
                         group_ids->objects[group_index]
                     );
                     if(group_name.kind == ERROR_RESULT_VALUE) {

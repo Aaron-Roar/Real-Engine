@@ -338,10 +338,10 @@ void graphics_update_sprite_frames(Tick current_tick, Time current_time);
 void graphics_scale_textures(Entity entity, Scale scale);
 
 /** Replace the active camera transform. */
-void graphics_set_camera(Camera camera);
+void graphics_active_camera_set(Camera camera);
 
 /** Return the active camera transform. */
-Camera graphics_get_camera(void);
+Camera graphics_active_camera_get(void);
 
 /** Translate the active camera in world space. */
 void graphics_move_camera(Vec2D translation);
@@ -377,13 +377,13 @@ void graphics_detach_camera(void);
 bool graphics_camera_is_attached(void);
 
 /** Copy the active attachment description to the caller. */
-bool graphics_get_camera_attachment(CameraAttachment *attachment);
+bool graphics_camera_attachment_get(CameraAttachment *attachment);
 
 CameraConfig graphics_camera_default_config(void);
 CameraIdResult graphics_camera_create(CameraConfig config);
 EngineResult graphics_camera_destroy(CameraId camera);
-EngineResult graphics_camera_set_active(CameraId camera);
-CameraId graphics_camera_get_active(void);
+EngineResult graphics_camera_active_set(CameraId camera);
+CameraId graphics_camera_active_get(void);
 CameraResult graphics_camera_get(CameraId camera);
 EngineResult graphics_camera_set(CameraId camera, Camera value);
 EngineResult graphics_camera_attach_to(
@@ -397,40 +397,40 @@ EngineResult graphics_camera_attach_to(
 EngineResult graphics_camera_detach_from(CameraId camera);
 
 /** Register the drawing callback invoked automatically when this camera is needed. */
-EngineResult graphics_camera_set_render_callback(
+EngineResult graphics_camera_render_callback_set(
     CameraId camera,
     CameraRenderCallback callback,
     void *context
 );
-EngineResult graphics_camera_set_enable(CameraId camera);
-EngineResult graphics_camera_set_disable(CameraId camera);
+EngineResult graphics_camera_enable_set(CameraId camera);
+EngineResult graphics_camera_disable_set(CameraId camera);
 /** Skip camera rendering while the engine is paused. */
-EngineResult graphics_camera_set_pause_with_engine(CameraId camera);
+EngineResult graphics_camera_pause_with_engine_set(CameraId camera);
 /** Continue camera rendering while paused; this is the default. */
-EngineResult graphics_camera_set_render_when_paused(CameraId camera);
+EngineResult graphics_camera_render_when_paused_set(CameraId camera);
 /** Move relatively over engine-tick time; non-positive duration is immediate. */
-EngineResult graphics_camera_move(CameraId camera, Vec2D translation, Time duration);
+EngineResult graphics_camera_position_move(CameraId camera, Vec2D translation, Time duration);
 /** Move to a world position over engine-tick time. */
-EngineResult graphics_camera_move_to(CameraId camera, Position position, Time duration);
+EngineResult graphics_camera_position_set(CameraId camera, Position position, Time duration);
 /** Move toward an entity's current position without attaching. */
-EngineResult graphics_camera_move_to_entity(CameraId camera, Entity entity, Time duration);
+EngineResult graphics_camera_position_from_entity_set(CameraId camera, Entity entity, Time duration);
 /** Immediately attach to and follow an entity's position. */
-EngineResult graphics_camera_attach_to_entity(CameraId camera, Entity entity);
+EngineResult graphics_camera_entity_attachment_set(CameraId camera, Entity entity);
 /** Return success with true while a timed movement is active. */
 EngineResult graphics_camera_is_moving(CameraId camera);
 /** Scale over engine-tick time; non-positive duration is immediate. */
-EngineResult graphics_camera_set_zoom(CameraId camera, float zoom, Time duration);
-CameraZoomResult graphics_camera_get_zoom(CameraId camera);
+EngineResult graphics_camera_zoom_set(CameraId camera, float zoom, Time duration);
+CameraZoomResult graphics_camera_zoom_get(CameraId camera);
 
 /** Return a disabled, full-window viewport using contain fitting. */
 ViewportConfig graphics_viewport_default_config(void);
 ViewportIdResult graphics_viewport_create(ViewportConfig config);
 EngineResult graphics_viewport_destroy(ViewportId viewport);
 /** Assign a camera without transferring ownership. */
-EngineResult graphics_viewport_set_camera(ViewportId viewport, CameraId camera);
+EngineResult graphics_viewport_camera_set(ViewportId viewport, CameraId camera);
 EngineResult graphics_viewport_clear_camera(ViewportId viewport);
-EngineResult graphics_viewport_set_enable(ViewportId viewport);
-EngineResult graphics_viewport_set_disable(ViewportId viewport);
+EngineResult graphics_viewport_enable_set(ViewportId viewport);
+EngineResult graphics_viewport_disable_set(ViewportId viewport);
 
 /** Convert world coordinates to logical screen coordinates. */
 Position graphics_world_to_screen(Position pos);
@@ -442,7 +442,7 @@ Position graphics_screen_to_world(Position screen);
 Position graphics_window_to_screen(Position window);
 
 /** Get the mouse position in logical screen coordinates. */
-Position graphics_get_mouse_screen_position(void);
+Position graphics_mouse_screen_position_get(void);
 
 /** Draw the editor/debug grid. */
 void graphics_draw_grid(void);

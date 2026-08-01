@@ -149,12 +149,12 @@ Controller controller_default_arrows(void) {
     return controller;
 }
 
-void controller_set_axis_binding(Controller *controller, ControllerAxisBinding binding) {
+void controller_axis_binding_set(Controller *controller, ControllerAxisBinding binding) {
     (void)controller_add_axis(controller, "movement", binding);
 }
 
 Vec2D controller_axis(const KeyboardState *keyboard, const Controller *controller) {
-    return controller_get_axis(keyboard, controller, "movement");
+    return controller_axis_get(keyboard, controller, "movement");
 }
 
 bool controller_add_axis(
@@ -241,7 +241,7 @@ static const ControllerButton *controller_find_button(
     return NULL;
 }
 
-Vec2D controller_get_axis(
+Vec2D controller_axis_get(
         const KeyboardState *keyboard,
         const Controller *controller,
         const char *name
@@ -430,7 +430,7 @@ void update_mouse_states(MouseState *mouse) {
             mouse->button_states[i] = MOUSE_BUTTON_STATE_DOWN;
         }
     }
-    mouse->position = graphics_get_mouse_screen_position();
+    mouse->position = graphics_mouse_screen_position_get();
 }
 const char *mouse_button_name(MouseButton button)
 {

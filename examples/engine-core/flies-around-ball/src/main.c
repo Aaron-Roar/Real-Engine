@@ -29,7 +29,7 @@ int main(void) {
             return 1;
         }
     }
-    if(rohr_error_check(rohr_engine_set_time_per_tick(1.0 / 120.0))) return 1;
+    if(rohr_error_check(rohr_engine_time_per_tick_set(1.0 / 120.0))) return 1;
     {
         EngineResult graphics_result = rohr_graphics_start();
         if(rohr_error_check(graphics_result)) {
@@ -53,17 +53,17 @@ int main(void) {
         goto fail;
     }
     Entity ball = ball_result.result.value;
-    rohr_physics_set_position(ball, (Position){.x = 0, .y = 100});
-    rohr_physics_set_orientation(ball, 0);
-    rohr_physics_set_mass(ball, ball_mass);
-    rohr_physics_set_velocity(ball, (Velocity){0, 0});
+    rohr_physics_position_set(ball, (Position){.x = 0, .y = 100});
+    rohr_physics_orientation_set(ball, 0);
+    rohr_physics_mass_set(ball, ball_mass);
+    rohr_physics_velocity_set(ball, (Velocity){0, 0});
     //set_angular_velocity(ball, 3);
-    rohr_physics_set_acceleration(ball, (Acceleration){0, 0});
-    rohr_physics_set_restitution(ball, 0.7);
+    rohr_physics_acceleration_set(ball, (Acceleration){0, 0});
+    rohr_physics_restitution_set(ball, 0.7);
     Shape ball_shape = rohr_math_create_circle(50, 4);
-    rohr_physics_set_hitbox(ball, ball_shape);
-    rohr_physics_set_friction(ball, 0.4);
-    rohr_physics_set_dynamic(ball);
+    rohr_physics_hitbox_set(ball, ball_shape);
+    rohr_physics_friction_set(ball, 0.4);
+    rohr_physics_dynamic_set(ball);
     //set_angle_lock(ball, 0, 0);
 
     time_t seed = 1003463;
@@ -75,18 +75,18 @@ int main(void) {
             goto fail;
         }
         Entity small_fly = small_fly_result.result.value;
-        rohr_physics_set_position(small_fly, (Position){.x = rohr_tools_random_range(100, 400), .y = rohr_tools_random_range(0, 300)});
-        rohr_physics_set_orientation(small_fly, rohr_tools_random_range(0, 2*PI_F));
-        rohr_physics_set_mass(small_fly, 10);
-        rohr_physics_set_velocity(small_fly, (Velocity){.x = rohr_tools_random_range(-10, 10), .y = rohr_tools_random_range(0, 100)});
-        rohr_physics_set_acceleration(small_fly, (Acceleration){0, 0});
-        rohr_physics_set_restitution(small_fly, 0.1);
+        rohr_physics_position_set(small_fly, (Position){.x = rohr_tools_random_range(100, 400), .y = rohr_tools_random_range(0, 300)});
+        rohr_physics_orientation_set(small_fly, rohr_tools_random_range(0, 2*PI_F));
+        rohr_physics_mass_set(small_fly, 10);
+        rohr_physics_velocity_set(small_fly, (Velocity){.x = rohr_tools_random_range(-10, 10), .y = rohr_tools_random_range(0, 100)});
+        rohr_physics_acceleration_set(small_fly, (Acceleration){0, 0});
+        rohr_physics_restitution_set(small_fly, 0.1);
         float size = rohr_tools_random_range_float(10, 20);
         Shape small_fly_shape = rohr_math_create_circle(size, 5);
-        rohr_physics_set_hitbox(small_fly, small_fly_shape);
-        rohr_physics_set_friction(small_fly, 0.4);
-        rohr_physics_set_dynamic(small_fly);
-        EngineResult parent_result = rohr_entity_set_parent(small_fly, ball);
+        rohr_physics_hitbox_set(small_fly, small_fly_shape);
+        rohr_physics_friction_set(small_fly, 0.4);
+        rohr_physics_dynamic_set(small_fly);
+        EngineResult parent_result = rohr_entity_parent_set(small_fly, ball);
         if(rohr_error_check(parent_result)) {
             PRINT_ENGINE_ERROR(parent_result);
             goto fail;
@@ -97,7 +97,7 @@ int main(void) {
         rohr_entity_add_components(small_fly, PARTICLE);
     }
 
-    ChildrenResult children_result = rohr_entity_get_children(ball);
+    ChildrenResult children_result = rohr_entity_children_get(ball);
     if(rohr_error_check(children_result)) {
         PRINT_ENGINE_ERROR(children_result);
         goto fail;
@@ -110,7 +110,7 @@ int main(void) {
     bool phase_1 = false;
     bool phase_2 = false;
     bool phase_3 = false;
-    while (rohr_engine_get_time() < demo_duration_seconds) {
+    while (rohr_engine_time_get() < demo_duration_seconds) {
         rohr_system_clean_entities_past_lifetime();
         SDL_Event event = rohr_engine_poll_event();
         if(event.type == SDL_EVENT_QUIT) {
@@ -119,18 +119,18 @@ int main(void) {
         KeyboardEvent key_event = rohr_controller_capture_keyboard_event(&event);
         rohr_controller_update_key_states(&keyboard);
         rohr_controller_add_key_event(&keyboard, key_event);
-        if(!phase_1 && rohr_engine_get_time() > 3) {
+        if(!phase_1 && rohr_engine_time_get() > 3) {
             phase_1 = true;
         }
-        if(!phase_2 && rohr_engine_get_time() > 5) {
+        if(!phase_2 && rohr_engine_time_get() > 5) {
             phase_2 = true;
         }
-        if(!phase_3 && rohr_engine_get_time() > 7) {
+        if(!phase_3 && rohr_engine_time_get() > 7) {
             phase_3 = true;
         }
 
         //Game Code
-        Time time = rohr_engine_get_time();
+        Time time = rohr_engine_time_get();
         Time phase_time = time - ((int)(time / 4.0) * 4.0);
         float acceleration_magnitude = 50.0f + (float)time * 22.0f;
         Vec2D move_axis = rohr_controller_wasd_axis(&keyboard);
@@ -156,9 +156,9 @@ int main(void) {
 
         EngineResult acceleration_result;
         if(phase_time < 3.0) {
-            acceleration_result = rohr_physics_group_set_acceleration_toward_entity(children_group, acceleration_magnitude, ball);
+            acceleration_result = rohr_physics_group_acceleration_toward_entity_set(children_group, acceleration_magnitude, ball);
         } else {
-            acceleration_result = rohr_physics_group_set_acceleration_away_from_entity(children_group, acceleration_magnitude, ball);
+            acceleration_result = rohr_physics_group_acceleration_away_from_entity_set(children_group, acceleration_magnitude, ball);
         }
         if(rohr_error_check(acceleration_result)) {
             PRINT_ENGINE_ERROR(acceleration_result);
@@ -171,7 +171,7 @@ int main(void) {
 
         //render
         rohr_graphics_draw_background(background_color);
-        rohr_graphics_update_sprite_frames(rohr_engine_get_tick(), rohr_engine_get_time());
+        rohr_graphics_update_sprite_frames(rohr_engine_tick_get(), rohr_engine_time_get());
         rohr_graphics_draw_animated_sprites();
         if(phase_1) {
             rohr_graphics_draw_hit_boxes();

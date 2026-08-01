@@ -42,15 +42,15 @@ int main(void) {
         goto fail;
     }
     Entity water_smash = water_smash_result.result.value;
-    rohr_physics_set_position(water_smash, (Position){.x = 0, .y = 0});
-    rohr_physics_set_orientation(water_smash, 0);
-    rohr_physics_set_mass(water_smash, 50);
-    rohr_physics_set_velocity(water_smash, (Velocity){0, 0});
-    rohr_physics_set_restitution(water_smash, 0.1);
+    rohr_physics_position_set(water_smash, (Position){.x = 0, .y = 0});
+    rohr_physics_orientation_set(water_smash, 0);
+    rohr_physics_mass_set(water_smash, 50);
+    rohr_physics_velocity_set(water_smash, (Velocity){0, 0});
+    rohr_physics_restitution_set(water_smash, 0.1);
     Shape shape4 = rohr_math_create_square(150, 220);
-    rohr_physics_set_hitbox(water_smash, shape4);
-    rohr_physics_set_friction(water_smash, 0.4);
-    rohr_physics_set_dynamic(water_smash);
+    rohr_physics_hitbox_set(water_smash, shape4);
+    rohr_physics_friction_set(water_smash, 0.4);
+    rohr_physics_dynamic_set(water_smash);
     EngineResult camera_result = rohr_graphics_attach_camera(
             water_smash,
             (Vec2D){.x = 0.0f, .y = 100.0f},
@@ -71,18 +71,18 @@ int main(void) {
     rohr_engine_reset_clock();
     //Game Loop
     //rohr_graphics_recording_start("examples/engine-core/view-port/recording.mp4",60);
-    while (rohr_engine_get_time() < demo_duration_seconds) {
+    while (rohr_engine_time_get() < demo_duration_seconds) {
         rohr_system_clean_entities_past_lifetime();
         //rohr_level_editor_update(renderer);
 
         //physics
         Tick ticks_advanced = rohr_engine_update_tick();
-        Time tick_time = rohr_engine_get_time_per_tick() * (Time)ticks_advanced;
+        Time tick_time = rohr_engine_time_per_tick_get() * (Time)ticks_advanced;
         rohr_physics_update(ticks_advanced);
 
         //render
         rohr_graphics_draw_background(background_color);
-        rohr_graphics_update_sprite_frames(rohr_engine_get_tick(), rohr_engine_get_time());
+        rohr_graphics_update_sprite_frames(rohr_engine_tick_get(), rohr_engine_time_get());
         rohr_graphics_draw_animated_sprites();
         rohr_graphics_show();
 
@@ -110,7 +110,7 @@ int main(void) {
             SDLK_UNKNOWN,
             SDLK_E
         );
-        rohr_physics_set_velocity(water_smash, (Velocity){
+        rohr_physics_velocity_set(water_smash, (Velocity){
             .x = move_axis.x * 100.0f,
             .y = move_axis.y * 100.0f
         });
@@ -125,15 +125,15 @@ int main(void) {
         rohr_controller_update_mouse_states(&mouse);
         rohr_controller_add_mouse_event(&mouse, mouse_event);
         if(mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_DOWN) {
-            rohr_physics_set_position(
+            rohr_physics_position_set(
                 water_smash,
                 rohr_controller_mouse_world_position(&mouse)
             );
         }
         if(mouse.button_states[MOUSE_BUTTON_RIGHT] == MOUSE_BUTTON_STATE_DOWN) {
-            EntityIndexResult index_result = rohr_entity_get_index(water_smash);
+            EntityIndexResult index_result = rohr_entity_index_get(water_smash);
             if(!rohr_error_check(index_result)) {
-                rohr_physics_set_orientation(water_smash, orientations[index_result.result.value] + 10*(2*PI_F/360));
+                rohr_physics_orientation_set(water_smash, orientations[index_result.result.value] + 10*(2*PI_F/360));
             }
         }
 

@@ -135,11 +135,11 @@ Tick engine_update_tick(void) {
     return ticks_advanced;
 }
 
-Tick engine_get_tick(void) {
+Tick engine_tick_get(void) {
     return engine_tick_count;
 }
 
-Time engine_get_time(void) {
+Time engine_time_get(void) {
     return engine_time;
 }
 void engine_reset_clock(void) {
@@ -147,13 +147,13 @@ void engine_reset_clock(void) {
     engine_tick_accumulator = 0.0;
 }
 
-EngineResult engine_set_time_per_tick(Time value) {
+EngineResult engine_time_per_tick_set(Time value) {
     if(value <= 0.0) return error_result_error(ERROR_ENGINE_STATE_INVALID);
     engine_time_per_tick = value;
     return error_result_value(true);
 }
 
-Time engine_get_time_per_tick(void) { return engine_time_per_tick; }
+Time engine_time_per_tick_get(void) { return engine_time_per_tick; }
 
 void engine_shutdown(void) {
     game_state_runtime_reset();
