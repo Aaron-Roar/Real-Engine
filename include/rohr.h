@@ -9,7 +9,6 @@
 #include "graphics.h"
 #include "game_state.h"
 #include "grid.h"
-#include "level_editor.h"
 #include "math2d.h"
 #include "physics.h"
 #include "systems.h"
@@ -1358,18 +1357,6 @@ void rohr_system_update_physics(double dt);
  * @brief Deletes entities whose lifetime has expired.
  */
 void rohr_system_clean_entities_past_lifetime(void);
-
-/**
- * @brief Initializes the level editor.
- * @return EngineResult describing success or failure.
- */
-EngineResult rohr_level_editor_init(void);
-
-/**
- * @brief Updates the level editor.
- * @return EngineResult describing success or failure.
- */
-EngineResult rohr_level_editor_update(void);
 
 /**
  * @brief Updates keyboard key states for the frame.

@@ -78,12 +78,12 @@ Internal modules still exist under `include/` and `src/`, but examples are inten
 
 ```text
 engine/
-├── include/               # Public headers
-├── src/                   # Engine implementation and private headers
+├── include/               # Engine and editor public facades
+├── src/                   # Engine and editor implementations
 ├── docs/                  # Doxygen config and documentation source
 ├── docs/assets/           # README and documentation media
-├── examples/              # Example programs and example assets
-├── lib/                   # Generated static library output
+├── examples/              # Core examples, editor examples, and assets
+├── lib/                   # Generated engine and editor static libraries
 └── build/                 # Generated objects, binaries, and docs
 ```
 
@@ -106,6 +106,24 @@ Build the engine and examples:
 ```sh
 make build
 ```
+
+Build only the engine core or editor:
+
+```sh
+make build-engine
+make build-editor
+```
+
+Build the two example groups independently:
+
+```sh
+make build-core-examples
+make build-editor-examples
+```
+
+Games include `rohr.h` and link `librohr_engine.a`. Editor applications include
+`rohr_editor.h`, use the `RE_` API, and link `librohr_editor.a` followed by
+`librohr_engine.a`.
 
 Or build the runtime targets with CMake:
 

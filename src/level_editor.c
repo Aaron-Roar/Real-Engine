@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
-#include "examples/test-assets/elder-fly/elderfly_descriptors.h"
 
 Entity selection = 0;
 Entity selected_entity = 0;

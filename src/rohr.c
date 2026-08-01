@@ -250,9 +250,6 @@ AABB rohr_math_create_aabb(Shape world_shape) { return math_create_aabb(world_sh
 void rohr_system_update_physics(double dt) { system_update_physics(dt); }
 void rohr_system_clean_entities_past_lifetime(void) { system_clean_entities_past_lifetime(); }
 
-EngineResult rohr_level_editor_init(void) { return level_editor_init(); }
-EngineResult rohr_level_editor_update(void) { return level_editor_update(); }
-
 void rohr_controller_update_key_states(KeyboardState *keyboard) { update_key_states(keyboard); }
 void rohr_controller_add_key_event(KeyboardState *keyboard, KeyboardEvent key_event) { add_key_event(keyboard, key_event); }
 KeyboardEvent rohr_controller_capture_keyboard_event(const SDL_Event *sdl_event) { return capture_keyboard_event(sdl_event); }

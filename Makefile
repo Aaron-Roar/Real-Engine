@@ -17,7 +17,6 @@ ENGINE_SRC := \
 	src/rohr.c \
 	src/systems.c \
 	src/tools.c \
-	src/level_editor.c\
 	src/grid.c\
 	src/controller.c \
 	src/ui.c \
@@ -26,6 +25,11 @@ ENGINE_SRC := \
 ENGINE_OBJ := $(patsubst src/%.c,build/obj/%.o,$(ENGINE_SRC))
 ENGINE_OBJ += build/obj/yyjson.o
 ENGINE_LIB := lib/librohr_engine.a
+EDITOR_SRC := \
+	src/level_editor.c \
+	src/rohr_editor.c
+EDITOR_OBJ := $(patsubst src/%.c,build/obj/editor/%.o,$(EDITOR_SRC))
+EDITOR_LIB := lib/librohr_editor.a
 DOXYGEN := doxygen
 PANDOC := pandoc
 DOCS_DOXYFILE := docs/Doxyfile
@@ -46,8 +50,9 @@ FINISH_BINARY := build/examples/fly_to_finish
 STATE_BINARY := build/examples/game_state
 PONG_BINARY := build/examples/pong
 UI_BINARY := build/examples/user_interface
+EDITOR_BINARY := build/examples/editor/basic_editor
 
-.PHONY: help all build build-engine build-example-pit build-example-ball build-example-view build-example-finish build-example-state build-example-pong build-example-ui run-pit run-ball run-view run-finish run-state run-pong run-ui docs clean-docs clean
+.PHONY: help all build build-engine build-editor build-core-examples build-editor-examples build-example-pit build-example-ball build-example-view build-example-finish build-example-state build-example-pong build-example-ui build-example-editor run-pit run-ball run-view run-finish run-state run-pong run-ui run-editor docs clean-docs clean
 
 help:
 	@printf '%s\n' \
@@ -63,6 +68,15 @@ help:
 		"" \
 		"  build-engine" \
 		"		  Builds lib/librohr_engine.a" \
+		"" \
+		"  build-editor" \
+		"		  Builds lib/librohr_editor.a" \
+		"" \
+		"  build-core-examples" \
+		"		  Builds examples that use the engine core directly" \
+		"" \
+		"  build-editor-examples" \
+		"		  Builds examples that use the editor facade" \
 		"" \
 		"  build-example-pit" \
 		"		  Builds examples/flies-in-pit/flies_in_pit.c" \
@@ -121,9 +135,15 @@ help:
 
 all: build
 
-build: build-example-view build-example-pit build-example-ball build-example-finish build-example-state build-example-pong build-example-ui
+build: build-core-examples build-editor-examples
 
 build-engine: $(ENGINE_LIB)
+
+build-editor: $(EDITOR_LIB)
+
+build-core-examples: build-example-view build-example-pit build-example-ball build-example-finish build-example-state build-example-pong build-example-ui
+
+build-editor-examples: build-example-editor
 
 build-example-pit: $(PIT_BINARY)
 
@@ -139,6 +159,8 @@ build-example-pong: $(PONG_BINARY)
 
 build-example-ui: $(UI_BINARY)
 
+build-example-editor: $(EDITOR_BINARY)
+
 $(ENGINE_LIB): $(ENGINE_OBJ)
 	@mkdir -p lib
 	$(AR) rcs $@ $^
@@ -149,6 +171,14 @@ build/obj/%.o: src/%.c
 
 build/obj/yyjson.o: lib/yyjson.c
 	@mkdir -p build/obj
+	$(CC) -c $< $(CFLAGS) -o $@
+
+$(EDITOR_LIB): $(EDITOR_OBJ) $(ENGINE_LIB)
+	@mkdir -p lib
+	$(AR) rcs $@ $(EDITOR_OBJ)
+
+build/obj/editor/%.o: src/%.c
+	@mkdir -p build/obj/editor
 	$(CC) -c $< $(CFLAGS) -o $@
 
 $(PIT_BINARY): examples/flies-in-pit/flies_in_pit.c $(ENGINE_LIB) $(ASSET_SRC)
@@ -179,6 +209,10 @@ $(UI_BINARY): examples/user-interface/user_interface.c $(ENGINE_LIB)
 	@mkdir -p build/examples
 	$(CC) $^ $(CFLAGS) -o $@ $(LIBS)
 
+$(EDITOR_BINARY): examples/editor/basic_editor.c $(EDITOR_LIB) $(ENGINE_LIB)
+	@mkdir -p build/examples/editor
+	$(CC) $^ $(CFLAGS) -o $@ $(LIBS)
+
 run-pit: $(PIT_BINARY)
 	./$(PIT_BINARY)
 
@@ -199,6 +233,9 @@ run-pong: $(PONG_BINARY)
 
 run-ui: $(UI_BINARY)
 	./$(UI_BINARY)
+
+run-editor: $(EDITOR_BINARY)
+	./$(EDITOR_BINARY)
 
 docs: $(API_MARKDOWN) $(README_HTML) $(STATIC_README_HTML)
 	$(DOXYGEN) $(DOCS_DOXYFILE)
