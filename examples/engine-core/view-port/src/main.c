@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
-#include "examples/engine-core/test-assets/elder-fly/elderfly_descriptors.h"
+#include "elder-fly/elderfly_descriptors.h"
 
 const Color background_color = (Color){255,255,255,255};
 AnimationAsset animation_elderfly = {0};

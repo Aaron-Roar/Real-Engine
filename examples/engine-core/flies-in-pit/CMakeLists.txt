@@ -1,0 +1,5 @@
+add_executable(flies_in_pit src/main.c ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/elder-fly/elderfly_descriptors.c)
+target_include_directories(flies_in_pit PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../shared)
+target_link_libraries(flies_in_pit PRIVATE rohr_engine)
+rohr_stage_example_assets(flies_in_pit engine-core/flies-in-pit)
+rohr_stage_shared_elder_fly(flies_in_pit engine-core/flies-in-pit)

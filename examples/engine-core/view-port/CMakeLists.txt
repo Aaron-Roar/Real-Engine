@@ -1,0 +1,5 @@
+add_executable(view_port src/main.c ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/elder-fly/elderfly_descriptors.c)
+target_include_directories(view_port PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../shared)
+target_link_libraries(view_port PRIVATE rohr_engine)
+rohr_stage_example_assets(view_port engine-core/view-port)
+rohr_stage_shared_elder_fly(view_port engine-core/view-port)

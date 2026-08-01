@@ -243,9 +243,18 @@ Current examples:
 Build output is separated the same way:
 
 ```text
-build/debug/examples/
-├── engine-core/
-└── editor/
+build/debug/example-projects/
+├── engine-core/<project>/
+└── editor/<project>/
+```
+
+Each example is a small project with its own `CMakeLists.txt`, `src/`, and
+optional `assets/` directory. Run an example from its output directory so its
+staged assets are the current working directory:
+
+```sh
+cd build/debug/example-projects/editor/pong
+./pong
 ```
 
 ## Contributing

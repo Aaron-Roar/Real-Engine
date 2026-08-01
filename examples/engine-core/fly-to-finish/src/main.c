@@ -205,7 +205,7 @@ int main(void) {
     }
 
     EngineResult load_result = rohr_game_state_load_file(
-        "examples/engine-core/fly-to-finish/fly_to_finish.json"
+        "assets/game.json"
     );
     if(rohr_error_check(load_result)) {
         PRINT_ENGINE_ERROR(load_result);

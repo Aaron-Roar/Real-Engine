@@ -42,7 +42,7 @@ int main(void) {
     }
     {
         EngineResult state_result = rohr_game_state_load_file(
-            "examples/engine-core/user-interface/user_interface.json"
+            "assets/game.json"
         );
         if(rohr_error_check(state_result)) {
             PRINT_ENGINE_ERROR(state_result);

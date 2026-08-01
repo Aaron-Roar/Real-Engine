@@ -1,0 +1,4 @@
+add_executable(fly_to_finish src/main.c)
+target_link_libraries(fly_to_finish PRIVATE rohr_engine)
+rohr_stage_example_assets(fly_to_finish engine-core/fly-to-finish)
+rohr_stage_shared_elder_fly(fly_to_finish engine-core/fly-to-finish)

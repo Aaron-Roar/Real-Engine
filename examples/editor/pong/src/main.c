@@ -132,7 +132,7 @@ int main(void) {
     if(!game_components_init()) {
         goto fail;
     }
-    EngineResult load_result = rohr_game_state_load_file("examples/editor/pong/pong.json");
+    EngineResult load_result = rohr_game_state_load_file("assets/pong.json");
     if(rohr_error_check(load_result)) {
         rohr_error_print_stderr(load_result.result.error);
         goto fail;

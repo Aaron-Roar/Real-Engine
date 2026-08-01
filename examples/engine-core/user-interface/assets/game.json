@@ -5,7 +5,7 @@
     "fonts": [
       {
         "name": "menu_font",
-        "file": "examples/engine-core/user-interface/JetBrainsMono-BoldItalic.ttf",
+        "file": "assets/JetBrainsMono-BoldItalic.ttf",
         "point_size": 24.0
       }
     ],

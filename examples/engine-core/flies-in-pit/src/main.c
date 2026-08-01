@@ -31,7 +31,7 @@ int main(void) {
     }
 
     EngineResult load_result = rohr_game_state_load_file(
-        "examples/engine-core/flies-in-pit/flies_in_pit.json"
+        "assets/game.json"
     );
     if(rohr_error_check(load_result)) {
         PRINT_ENGINE_ERROR(load_result);
@@ -73,7 +73,7 @@ int main(void) {
 
     rohr_engine_reset_clock();
     //Game Loop
-    rohr_graphics_recording_start("examples/engine-core/flies-in-pit/recording.mp4",60);
+    rohr_graphics_recording_start("recording.mp4",60);
     bool phase_1 = false;
     bool phase_2 = false;
     bool phase_3 = false;
