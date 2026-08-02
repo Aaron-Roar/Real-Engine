@@ -24,7 +24,7 @@ From the project root:
 
 ```sh
 nix develop
-cmake --preset default
+cmake --preset linux
 cmake --build build --target docs
 ```
 

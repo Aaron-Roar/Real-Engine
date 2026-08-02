@@ -100,6 +100,7 @@ engine/
 * `pkg-config`
 * SDL3, SDL3_image, and SDL3_ttf are vendored under `lib/` and compiled
   statically with the engine (versions 3.4.10, 3.4.4, and 3.2.2; zlib license)
+* FreeType source is vendored for self-contained Windows SDL3_ttf builds
 * `yyjson` is vendored under `lib/` (version 0.12.0, MIT)
 * `ffmpeg` for recording or converting demo media
 * Math library: `libm` / `-lm`
@@ -123,8 +124,8 @@ cmake --list-presets=test
 Configure the engine development build:
 
 ```sh
-cmake --preset default
-cmake --build --preset default --parallel
+cmake --preset linux
+cmake --build --preset linux --parallel
 ```
 
 Build all examples with development settings:
@@ -158,8 +159,8 @@ cmake --build build --target help
 Build and run the tests:
 
 ```sh
-cmake --build --preset tests --parallel
-ctest --preset default
+cmake --build --preset linux-tests --parallel
+ctest --preset linux
 ```
 
 Clean compiled engine-development outputs while preserving configuration:
@@ -171,15 +172,30 @@ cmake --build build --target clean
 Recreate the engine-development configuration when the cache needs resetting:
 
 ```sh
-cmake --preset default --fresh
+cmake --preset linux --fresh
 ```
 
 Examples and tests can be disabled for library-only builds with
 `-DROHR_BUILD_EXAMPLES=OFF` and `-DROHR_BUILD_TESTS=OFF`.
 
-Games include `rohr.h` and link `librohr_engine.a`. Editor applications include
-`rohr_editor.h`, use the `RE_` API, and link `librohr_editor.a` followed by
-`librohr_engine.a`.
+### Windows 10/11
+
+Install Visual Studio 2022 with the **Desktop development with C++** workload,
+then run from a Developer PowerShell:
+
+```powershell
+cmake --preset windows
+cmake --build --preset windows-debug --parallel
+ctest --preset windows
+```
+
+Use `windows-release` for an optimized build or `windows-examples` to build
+only the examples. SDL3, SDL3_image, SDL3_ttf, and FreeType are compiled from
+the vendored sources; no separate SDL installation or vcpkg setup is needed.
+
+Games include `rohr.h` and link the `rohr_engine` CMake target. Editor
+applications include `rohr_editor.h`, use the `RE_` API, and link the
+`rohr_editor` target.
 
 ## Nix
 
@@ -192,8 +208,8 @@ nix develop
 Then use the CMake commands above. For example:
 
 ```sh
-cmake --preset default
-cmake --build --preset default --parallel
+cmake --preset linux
+cmake --build --preset linux --parallel
 ```
 
 ## Documentation

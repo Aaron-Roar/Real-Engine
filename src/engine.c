@@ -45,6 +45,7 @@ EngineResult engine_init(void) {
         return error_result_error(ERROR_ENGINE_ALREADY_RUNNING);
     }
 
+    SDL_SetMainReady();
     if(!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         return error_result_error(ERROR_ENGINE_SDL_INIT_FAILED);
     }

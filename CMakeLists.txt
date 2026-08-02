@@ -34,8 +34,14 @@ add_subdirectory(lib/SDL_image EXCLUDE_FROM_ALL)
 
 set(SDLTTF_INSTALL OFF CACHE BOOL "Install SDL3_ttf" FORCE)
 set(SDLTTF_SAMPLES OFF CACHE BOOL "Build SDL3_ttf samples" FORCE)
-set(SDLTTF_VENDORED OFF CACHE BOOL "Use SDL_ttf dependency submodules" FORCE)
 set(SDLTTF_PLUTOSVG OFF CACHE BOOL "Build SDL_ttf color emoji support" FORCE)
+if(WIN32)
+    set(SDLTTF_VENDORED ON CACHE BOOL "Use bundled SDL_ttf dependencies" FORCE)
+    set(SDLTTF_HARFBUZZ OFF CACHE BOOL "Build SDL_ttf HarfBuzz support" FORCE)
+else()
+    set(SDLTTF_VENDORED OFF CACHE BOOL "Use bundled SDL_ttf dependencies" FORCE)
+    set(SDLTTF_HARFBUZZ ON CACHE BOOL "Build SDL_ttf HarfBuzz support" FORCE)
+endif()
 add_subdirectory(lib/SDL_ttf EXCLUDE_FROM_ALL)
 
 set(ROHR_SDL3_IMAGE_TARGET SDL3_image::SDL3_image-static)
@@ -69,6 +75,7 @@ target_include_directories(rohr_engine
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/lib
 )
+target_compile_definitions(rohr_engine PUBLIC SDL_MAIN_HANDLED)
 target_link_libraries(rohr_engine
     PUBLIC
         ${ROHR_SDL3_TARGET}
