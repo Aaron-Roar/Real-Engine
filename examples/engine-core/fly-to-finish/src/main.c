@@ -6,7 +6,7 @@
 #include <time.h>
 
 #define PRINT_ENGINE_ERROR(engine_result) \
-    fprintf(stderr, "%s\n", rohr_error_default_message((engine_result).result.error))
+    fprintf(stderr, "%s\n", rohr_error_default_message_get((engine_result).result.error))
 
 typedef struct ObstacleRecord {
     Entity entity;
@@ -39,7 +39,7 @@ const Time spawn_interval_seconds = 0.12;
 const Time player_control_delay_seconds = 2.5f;
 
 static Vec2D player_forward(Orientation orientation) {
-    return rohr_math_rotate_vector((Vec2D){0.0f, 1.0f}, orientation);
+    return rohr_math_vector_rotate((Vec2D){0.0f, 1.0f}, orientation);
 }
 
 static Color obstacle_color_for_size(float size, float speed) {
@@ -98,7 +98,7 @@ static EngineResult spawn_obstacle(ObstacleRecord records[], size_t *next_record
     rohr_physics_acceleration_set(obstacle, (Acceleration){0});
     rohr_physics_restitution_set(obstacle, 0.15f);
     rohr_physics_friction_set(obstacle, 0.45f);
-    rohr_physics_hitbox_set(obstacle, rohr_math_create_circle(size, 8));
+    rohr_physics_hitbox_set(obstacle, rohr_math_circle_create(size, 8));
     rohr_physics_dynamic_set(obstacle);
     EngineResult lifetime_result = rohr_entity_life_time_set(
         obstacle,
@@ -110,7 +110,7 @@ static EngineResult spawn_obstacle(ObstacleRecord records[], size_t *next_record
         return lifetime_result;
     }
 
-    if(records[*next_record].active && rohr_entity_alive_is(records[*next_record].entity)) {
+    if(records[*next_record].active && rohr_entity_alive_check(records[*next_record].entity)) {
         (void)rohr_entity_delete(records[*next_record].entity);
     }
 
@@ -139,7 +139,7 @@ static EngineResult reset_level(
     }
 
     for(size_t i = 0; i < MAX_OBSTACLE_RECORDS; i += 1) {
-        if(records[i].active && rohr_entity_alive_is(records[i].entity)) {
+        if(records[i].active && rohr_entity_alive_check(records[i].entity)) {
             EngineResult delete_result = rohr_entity_delete(records[i].entity);
             if(rohr_error_check(delete_result)) {
                 return delete_result;
@@ -206,7 +206,7 @@ int main(void) {
         }
     }
 
-    EngineResult load_result = rohr_game_state_load_file(
+    EngineResult load_result = rohr_game_state_file_load(
         "assets/fly-to-finish/game.json"
     );
     if(rohr_error_check(load_result)) {
@@ -259,7 +259,7 @@ int main(void) {
     player_mass = mass[player_index];
 
     srand((unsigned int)time(NULL));
-    rohr_engine_reset_clock();
+    rohr_engine_clock_reset();
     level_start_time = rohr_engine_time_get();
     while(true) {
         SDL_Event event;
@@ -272,15 +272,15 @@ int main(void) {
         bool player_control_enabled;
         size_t i;
 
-        rohr_system_clean_entities_past_lifetime();
-        event = rohr_engine_poll_event();
+        rohr_system_entities_past_lifetime_clean();
+        event = rohr_engine_event_poll();
         if(event.type == SDL_EVENT_QUIT) {
             break;
         }
-        rohr_controller_update_key_states(&keyboard);
-        rohr_controller_add_key_event(&keyboard, rohr_controller_capture_keyboard_event(&event));
+        rohr_controller_key_states_update(&keyboard);
+        rohr_controller_key_event_add(&keyboard, rohr_controller_keyboard_event_capture(&event));
 
-        if(rohr_controller_key_pressed_is(&keyboard, SDLK_R)) {
+        if(rohr_controller_key_pressed_get(&keyboard, SDLK_R)) {
             EngineResult reset_result = reset_level(
                     player,
                     player_start_position,
@@ -319,8 +319,8 @@ int main(void) {
         speed = rohr_math_vector_magnitude(player_velocity);
 
         thrust_axis = player_forward(orientations[player_index]);
-        if(player_control_enabled && rohr_controller_key_down_is(&keyboard, SDLK_W)) {
-            EngineResult thrust_result = rohr_physics_apply_force_for_one_tick(player, (Force){
+        if(player_control_enabled && rohr_controller_key_down_get(&keyboard, SDLK_W)) {
+            EngineResult thrust_result = rohr_physics_force_for_one_tick_apply(player, (Force){
                 .x = thrust_axis.x * player_mass * player_thrust_acceleration,
                 .y = thrust_axis.y * player_mass * player_thrust_acceleration
             });
@@ -329,8 +329,8 @@ int main(void) {
                 goto fail;
             }
         }
-        if(player_control_enabled && rohr_controller_key_down_is(&keyboard, SDLK_S) && speed > 0.001f) {
-            EngineResult brake_result = rohr_physics_apply_force_for_one_tick(player, (Force){
+        if(player_control_enabled && rohr_controller_key_down_get(&keyboard, SDLK_S) && speed > 0.001f) {
+            EngineResult brake_result = rohr_physics_force_for_one_tick_apply(player, (Force){
                 .x = -(player_velocity.x / speed) * player_mass * player_brake_acceleration,
                 .y = -(player_velocity.y / speed) * player_mass * player_brake_acceleration
             });
@@ -340,9 +340,9 @@ int main(void) {
             }
         }
 
-        turn_axis = rohr_controller_axis_from_keycodes(&keyboard, SDLK_UNKNOWN, SDLK_A, SDLK_UNKNOWN, SDLK_D);
+        turn_axis = rohr_controller_axis_from_keycodes_get(&keyboard, SDLK_UNKNOWN, SDLK_A, SDLK_UNKNOWN, SDLK_D);
         if(player_control_enabled && turn_axis.x != 0.0f) {
-            EngineResult torque_result = rohr_physics_apply_torque_for_one_tick(player, -turn_axis.x * player_control_torque);
+            EngineResult torque_result = rohr_physics_torque_for_one_tick_apply(player, -turn_axis.x * player_control_torque);
             if(rohr_error_check(torque_result)) {
                 PRINT_ENGINE_ERROR(torque_result);
                 goto fail;
@@ -353,11 +353,11 @@ int main(void) {
             animated_sprites[player_index].animation.time_per_frame = fmaxf(0.015f, 0.09f - speed * 0.0002f);
         }
 
-        Tick ticks_advanced = rohr_engine_update_tick();
+        Tick ticks_advanced = rohr_engine_tick_update();
         if(level_active) {
             rohr_physics_update(ticks_advanced);
         } else if(ticks_advanced > 0) {
-            rohr_system_clean_entities_past_lifetime();
+            rohr_system_entities_past_lifetime_clean();
         }
 
         if(level_active) {
@@ -372,24 +372,24 @@ int main(void) {
             }
         }
 
-        rohr_graphics_draw_background(background_color);
+        rohr_graphics_background_draw(background_color);
         for(i = 0; i < 4; i += 1) {
-            rohr_graphics_draw_hit_box_colored(
+            rohr_graphics_hit_box_colored_draw(
                 walls[i],
                 GRAPHICS_FILLED,
                 wall_color
             );
         }
-        rohr_graphics_draw_hit_box_colored(wall_mid, GRAPHICS_FILLED, obstacle_records[1].color);
-        rohr_graphics_draw_hit_box_colored(finish_line, GRAPHICS_FILLED, finish_line_color);
-        rohr_graphics_draw_hit_box_colored(player, GRAPHICS_OUTLINE, finish_line_color);
+        rohr_graphics_hit_box_colored_draw(wall_mid, GRAPHICS_FILLED, obstacle_records[1].color);
+        rohr_graphics_hit_box_colored_draw(finish_line, GRAPHICS_FILLED, finish_line_color);
+        rohr_graphics_hit_box_colored_draw(player, GRAPHICS_OUTLINE, finish_line_color);
         for(i = 0; i < (size_t)MAX_OBSTACLE_RECORDS; i += 1) {
-            if(obstacle_records[i].active && rohr_entity_alive_is(obstacle_records[i].entity)) {
-                rohr_graphics_draw_hit_box_colored(obstacle_records[i].entity, GRAPHICS_FILLED, obstacle_records[i].color);
+            if(obstacle_records[i].active && rohr_entity_alive_check(obstacle_records[i].entity)) {
+                rohr_graphics_hit_box_colored_draw(obstacle_records[i].entity, GRAPHICS_FILLED, obstacle_records[i].color);
             }
         }
-        rohr_graphics_update_sprite_frames(rohr_engine_tick_get(), rohr_engine_time_get());
-        rohr_graphics_draw_animated_sprites();
+        rohr_graphics_sprite_frames_update(rohr_engine_tick_get(), rohr_engine_time_get());
+        rohr_graphics_animated_sprites_draw();
         rohr_graphics_show();
     }
 

@@ -52,12 +52,12 @@ static void pong_draw_field(
     Entity ball,
     bool ball_on_fire
 ) {
-    rohr_graphics_draw_hit_box_colored(center_line, GRAPHICS_FILLED, foreground_color);
-    rohr_graphics_draw_hit_box_colored(wall_bottom, GRAPHICS_FILLED, foreground_color);
-    rohr_graphics_draw_hit_box_colored(wall_top, GRAPHICS_FILLED, foreground_color);
-    rohr_graphics_draw_hit_box_colored(paddle_left, GRAPHICS_FILLED, left_color);
-    rohr_graphics_draw_hit_box_colored(paddle_right, GRAPHICS_FILLED, right_color);
-    rohr_graphics_draw_hit_box_colored(
+    rohr_graphics_hit_box_colored_draw(center_line, GRAPHICS_FILLED, foreground_color);
+    rohr_graphics_hit_box_colored_draw(wall_bottom, GRAPHICS_FILLED, foreground_color);
+    rohr_graphics_hit_box_colored_draw(wall_top, GRAPHICS_FILLED, foreground_color);
+    rohr_graphics_hit_box_colored_draw(paddle_left, GRAPHICS_FILLED, left_color);
+    rohr_graphics_hit_box_colored_draw(paddle_right, GRAPHICS_FILLED, right_color);
+    rohr_graphics_hit_box_colored_draw(
         ball,
         GRAPHICS_FILLED,
         ball_on_fire ? fire_color : foreground_color
@@ -67,7 +67,7 @@ static void pong_draw_field(
 static void pong_render_camera(CameraId camera, void *context_value) {
     PongRenderContext *context = context_value;
     (void)camera;
-    rohr_graphics_draw_background(background_color);
+    rohr_graphics_background_draw(background_color);
     pong_draw_field(
         context->wall_bottom,
         context->wall_top,
@@ -100,7 +100,7 @@ static EngineResult pong_update_camera(
             if(rohr_error_check(result)) return result;
             *state = PONG_CAMERA_MOVING_TO_BALL;
         } else if(*state == PONG_CAMERA_MOVING_TO_BALL) {
-            result = rohr_camera_moving_is(camera);
+            result = rohr_camera_moving_get(camera);
             if(rohr_error_check(result)) return result;
             if(!result.result.value) {
                 result = rohr_camera_entity_attachment_set(camera, ball);
@@ -116,7 +116,7 @@ static EngineResult pong_update_camera(
         if(rohr_error_check(result)) return result;
         *state = PONG_CAMERA_RETURNING_HOME;
     } else if(*state == PONG_CAMERA_RETURNING_HOME) {
-        result = rohr_camera_moving_is(camera);
+        result = rohr_camera_moving_get(camera);
         if(rohr_error_check(result)) return result;
         if(!result.result.value) *state = PONG_CAMERA_HOME;
     }
@@ -186,8 +186,8 @@ static EngineResult pong_constrain_paddle(
 int main(void) {
     if(!example_use_executable_directory()) return 1;
     KeyboardState keyboard = {0};
-    Controller left_controller = rohr_controller_default_wasd();
-    Controller right_controller = rohr_controller_default_arrows();
+    Controller left_controller = rohr_controller_wasd_default_get();
+    Controller right_controller = rohr_controller_arrows_default_get();
     Entity wall_bottom;
     Entity wall_top;
     Entity center_line;
@@ -208,7 +208,7 @@ int main(void) {
     int serve_direction = 1;
     Time fire_expires_at = 0.0;
 
-    if(!rohr_controller_add_axis(
+    if(!rohr_controller_axis_add(
         &left_controller,
         "movement",
         (ControllerAxisBinding){
@@ -218,7 +218,7 @@ int main(void) {
             .negative_y = SDLK_D,
         }
     )) return 1;
-    if(!rohr_controller_add_axis(
+    if(!rohr_controller_axis_add(
         &right_controller,
         "movement",
         (ControllerAxisBinding){
@@ -232,7 +232,7 @@ int main(void) {
     {
         EngineResult init_result = rohr_engine_init();
         if(rohr_error_check(init_result)) {
-            rohr_error_print_stderr(init_result.result.error);
+            rohr_error_stderr_print(init_result.result.error);
             return 1;
         }
     }
@@ -240,7 +240,7 @@ int main(void) {
     {
         EngineResult graphics_result = rohr_graphics_start();
         if(rohr_error_check(graphics_result)) {
-            rohr_error_print_stderr(graphics_result.result.error);
+            rohr_error_stderr_print(graphics_result.result.error);
             rohr_engine_shutdown();
             return 1;
         }
@@ -248,44 +248,44 @@ int main(void) {
     if(!game_components_init()) {
         goto fail;
     }
-    EngineResult load_result = rohr_game_state_load_file("assets/pong/pong.json");
+    EngineResult load_result = rohr_game_state_file_load("assets/pong/pong.json");
     if(rohr_error_check(load_result)) {
-        rohr_error_print_stderr(load_result.result.error);
+        rohr_error_stderr_print(load_result.result.error);
         goto fail;
     }
     EntityResult wall_bottom_result = RE_entity_by_name_get("wall_bottom");
     if(rohr_error_check(wall_bottom_result)) {
-        rohr_error_print_stderr(wall_bottom_result.result.error);
+        rohr_error_stderr_print(wall_bottom_result.result.error);
         goto fail;
     }
     wall_bottom = wall_bottom_result.result.value;
     EntityResult wall_top_result = RE_entity_by_name_get("wall_top");
     if(rohr_error_check(wall_top_result)) {
-        rohr_error_print_stderr(wall_top_result.result.error);
+        rohr_error_stderr_print(wall_top_result.result.error);
         goto fail;
     }
     wall_top = wall_top_result.result.value;
     EntityResult center_line_result = RE_entity_by_name_get("center_line");
     if(rohr_error_check(center_line_result)) {
-        rohr_error_print_stderr(center_line_result.result.error);
+        rohr_error_stderr_print(center_line_result.result.error);
         goto fail;
     }
     center_line = center_line_result.result.value;
     EntityResult paddle_left_result = RE_entity_by_name_get("paddle_left");
     if(rohr_error_check(paddle_left_result)) {
-        rohr_error_print_stderr(paddle_left_result.result.error);
+        rohr_error_stderr_print(paddle_left_result.result.error);
         goto fail;
     }
     paddle_left = paddle_left_result.result.value;
     EntityResult paddle_right_result = RE_entity_by_name_get("paddle_right");
     if(rohr_error_check(paddle_right_result)) {
-        rohr_error_print_stderr(paddle_right_result.result.error);
+        rohr_error_stderr_print(paddle_right_result.result.error);
         goto fail;
     }
     paddle_right = paddle_right_result.result.value;
     EntityResult ball_result = RE_entity_by_name_get("ball");
     if(rohr_error_check(ball_result)) {
-        rohr_error_print_stderr(ball_result.result.error);
+        rohr_error_stderr_print(ball_result.result.error);
         goto fail;
     }
     ball = ball_result.result.value;
@@ -334,25 +334,25 @@ int main(void) {
         };
         EngineResult camera_result = rohr_camera_set(left_camera, left_camera_value);
         if(rohr_error_check(camera_result)) {
-            rohr_error_print_stderr(camera_result.result.error);
+            rohr_error_stderr_print(camera_result.result.error);
             goto fail;
         }
     }
     {
-        CameraConfig config = rohr_camera_default_config();
+        CameraConfig config = rohr_camera_config_default_get();
         CameraIdResult camera_result;
         config.position = (Position){0.0f, -field_camera_center_y};
         config.orientation = -PI_F * 0.5f;
         config.dimensions = (Vec2D){340.0f, 500.0f};
         camera_result = rohr_camera_create(config);
         if(rohr_error_check(camera_result)) {
-            rohr_error_print_stderr(camera_result.result.error);
+            rohr_error_stderr_print(camera_result.result.error);
             goto fail;
         }
         right_camera = camera_result.result.value;
     }
     {
-        ViewportConfig config = rohr_viewport_default_config();
+        ViewportConfig config = rohr_viewport_config_default_get();
         ViewportIdResult result;
         config.rectangle = (ViewportRectangle){0.0f, 0.0f, WINDOW_WIDTH * 0.5f, WINDOW_HEIGHT};
         result = rohr_viewport_create(config);
@@ -377,19 +377,19 @@ int main(void) {
             &render_context
         ))) goto fail;
 
-    rohr_engine_reset_clock();
+    rohr_engine_clock_reset();
     while(true) {
-        SDL_Event event = rohr_engine_poll_event();
+        SDL_Event event = rohr_engine_event_poll();
         Vec2D left_axis;
         Vec2D right_axis;
         EntityIndex ball_index;
         Tick ticks_advanced;
 
         if(event.type == SDL_EVENT_QUIT) break;
-        rohr_controller_update_key_states(&keyboard);
-        rohr_controller_add_key_event(
+        rohr_controller_key_states_update(&keyboard);
+        rohr_controller_key_event_add(
             &keyboard,
-            rohr_controller_capture_keyboard_event(&event)
+            rohr_controller_keyboard_event_capture(&event)
         );
         left_axis = rohr_controller_axis_get(&keyboard, &left_controller, "movement");
         right_axis = rohr_controller_axis_get(&keyboard, &right_controller, "movement");
@@ -401,7 +401,7 @@ int main(void) {
             }
         );
         if(rohr_error_check(left_velocity_result)) {
-            rohr_error_print_stderr(left_velocity_result.result.error);
+            rohr_error_stderr_print(left_velocity_result.result.error);
             goto fail;
         }
         EngineResult right_velocity_result = rohr_physics_velocity_set(
@@ -412,11 +412,11 @@ int main(void) {
             }
         );
         if(rohr_error_check(right_velocity_result)) {
-            rohr_error_print_stderr(right_velocity_result.result.error);
+            rohr_error_stderr_print(right_velocity_result.result.error);
             goto fail;
         }
 
-        ticks_advanced = rohr_engine_update_tick();
+        ticks_advanced = rohr_engine_tick_update();
         rohr_physics_update(ticks_advanced);
         if(rohr_physics_collision_report_get(ball, paddle_left) ||
                 rohr_physics_collision_report_get(ball, paddle_right)) {
@@ -439,7 +439,7 @@ int main(void) {
             left_paddle_max_y
         );
         if(rohr_error_check(left_constraint_result)) {
-            rohr_error_print_stderr(left_constraint_result.result.error);
+            rohr_error_stderr_print(left_constraint_result.result.error);
             goto fail;
         }
         EngineResult right_constraint_result = pong_constrain_paddle(
@@ -448,7 +448,7 @@ int main(void) {
             right_paddle_max_y
         );
         if(rohr_error_check(right_constraint_result)) {
-            rohr_error_print_stderr(right_constraint_result.result.error);
+            rohr_error_stderr_print(right_constraint_result.result.error);
             goto fail;
         }
 
@@ -463,7 +463,7 @@ int main(void) {
             printf("Left: %d  Right: %d\n", left_score, right_score);
             EngineResult reset_result = pong_reset_ball(ball, serve_direction);
             if(rohr_error_check(reset_result)) {
-                rohr_error_print_stderr(reset_result.result.error);
+                rohr_error_stderr_print(reset_result.result.error);
                 goto fail;
             }
         } else if(positions[ball_index].y < -goal_y) {
@@ -472,7 +472,7 @@ int main(void) {
             printf("Left: %d  Right: %d\n", left_score, right_score);
             EngineResult reset_result = pong_reset_ball(ball, serve_direction);
             if(rohr_error_check(reset_result)) {
-                rohr_error_print_stderr(reset_result.result.error);
+                rohr_error_stderr_print(reset_result.result.error);
                 goto fail;
             }
         }
@@ -492,7 +492,7 @@ int main(void) {
                     ? rohr_physics_dt_per_tick_set(slow_motion_physics_dt)
                     : rohr_physics_dt_per_tick_set(normal_physics_dt);
                 if(rohr_error_check(dt_result)) {
-                    rohr_error_print_stderr(dt_result.result.error);
+                    rohr_error_stderr_print(dt_result.result.error);
                     goto fail;
                 }
             }

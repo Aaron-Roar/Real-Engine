@@ -4,11 +4,11 @@ static void count_camera_render(CameraId camera, void *context) {
     int *count = context;
     (void)camera;
     *count += 1;
-    rohr_graphics_draw_background((Color){0, 0, 0, 255});
+    rohr_graphics_background_draw((Color){0, 0, 0, 255});
 }
 
 int main(void) {
-    CameraConfig config = rohr_camera_default_config();
+    CameraConfig config = rohr_camera_config_default_get();
     CameraId original;
     CameraIdResult first_result;
     CameraIdResult second_result;
@@ -27,14 +27,14 @@ int main(void) {
     config.position = (Position){10.0f, 20.0f};
     config.zoom = 2.0f;
     first_result = rohr_camera_create(config);
-    second_result = rohr_camera_create(rohr_camera_default_config());
+    second_result = rohr_camera_create(rohr_camera_config_default_get());
     if(rohr_error_check(first_result) || rohr_error_check(second_result) ||
             rohr_error_check(rohr_camera_active_set(first_result.result.value))) {
         rohr_engine_shutdown();
         return 1;
     }
     camera_result = rohr_camera_get(first_result.result.value);
-    screen = rohr_graphics_world_to_screen((Position){11.0f, 20.0f});
+    screen = rohr_graphics_world_to_screen_get((Position){11.0f, 20.0f});
     if(rohr_error_check(camera_result) || camera_result.result.value.zoom != 2.0f ||
             screen.x != 322.0f || screen.y != 240.0f ||
             !rohr_error_check(rohr_camera_destroy(first_result.result.value)) ||
@@ -97,7 +97,7 @@ int main(void) {
             rohr_engine_shutdown();
             return 1;
         }
-        moving_result = rohr_camera_moving_is(original);
+        moving_result = rohr_camera_moving_get(original);
         if(rohr_error_check(moving_result) || !moving_result.result.value
                 || rohr_error_check(rohr_camera_position_move(
                     original,
@@ -108,7 +108,7 @@ int main(void) {
             rohr_engine_shutdown();
             return 1;
         }
-        moving_result = rohr_camera_moving_is(original);
+        moving_result = rohr_camera_moving_get(original);
         if(rohr_error_check(moving_result) || moving_result.result.value
             || rohr_error_check(rohr_camera_zoom_set(original, 1.5f, -1.0))) {
             rohr_graphics_end();
@@ -125,11 +125,11 @@ int main(void) {
         }
     }
     {
-        ViewportConfig viewport_config = rohr_viewport_default_config();
+        ViewportConfig viewport_config = rohr_viewport_config_default_get();
         viewport_result = rohr_viewport_create(viewport_config);
     }
     if(rohr_error_check(viewport_result)
-            || rohr_viewport_default_config().fit != SCREEN_FIT_CONTAIN
+            || rohr_viewport_config_default_get().fit != SCREEN_FIT_CONTAIN
             || rohr_error_check(rohr_viewport_camera_set(
                 viewport_result.result.value,
                 original
@@ -151,7 +151,7 @@ int main(void) {
             || (rohr_engine_resume(), false)
             || rohr_error_check(rohr_viewport_disable_set(viewport_result.result.value))
             || (rohr_graphics_show(), render_count != 2)
-            || rohr_error_check(rohr_viewport_clear_camera(viewport_result.result.value))
+            || rohr_error_check(rohr_viewport_camera_clear(viewport_result.result.value))
             || rohr_error_check(rohr_viewport_destroy(viewport_result.result.value))) {
         rohr_graphics_end();
         rohr_engine_shutdown();

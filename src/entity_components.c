@@ -50,19 +50,19 @@ static GroupId next_group_id = 1;
 static GroupName entity_group_names[MAX_GROUPS] = {0};
 static bool entity_group_names_used[MAX_GROUPS] = {0};
 
-static void entity_group_destroy_storage(EntityGroup *group);
+static void entity_group_storage_destroy(EntityGroup *group);
 static EngineResult entity_group_ensure_capacity(EntityGroup *group, size_t capacity);
-static bool entity_group_storage_entity_has(const EntityGroup *group, Entity entity);
+static bool entity_group_storage_entity_check(const EntityGroup *group, Entity entity);
 static EngineResult entity_group_storage_add(EntityGroup *group, Entity entity);
 static bool entity_group_storage_remove(EntityGroup *group, Entity entity);
 static bool entity_group_storage_last(const EntityGroup *group, Entity *entity);
-static GroupIdResult entity_group_create_kind(GroupKind kind);
-static EngineResult entity_group_destroy_internal(GroupId group);
-static EngineResult entity_group_add_internal(GroupId group, Entity entity);
-static EngineResult entity_group_remove_internal(GroupId group, Entity entity);
+static GroupIdResult entity_group_kind_create(GroupKind kind);
+static EngineResult entity_group_internal_destroy(GroupId group);
+static EngineResult entity_group_internal_add(GroupId group, Entity entity);
+static EngineResult entity_group_internal_remove(GroupId group, Entity entity);
 static void entity_group_membership_destroy(EntityGroupMembership *membership);
 static EngineResult entity_group_membership_ensure_capacity(EntityGroupMembership *membership, size_t capacity);
-static bool entity_group_membership_group_has(const EntityGroupMembership *membership, GroupId group);
+static bool entity_group_membership_group_check(const EntityGroupMembership *membership, GroupId group);
 static EngineResult entity_group_membership_add(EntityGroupMembership *membership, GroupId group);
 static bool entity_group_membership_remove(EntityGroupMembership *membership, GroupId group);
 
@@ -157,7 +157,7 @@ void entity_tables_destroy(void) {
     if(entity_groups_pool.objects != NULL && entity_groups_pool.used != NULL) {
         for(i = 0; i < entity_groups_pool.capacity; i += 1) {
             if(entity_groups_pool.used[i] != 0) {
-                entity_group_destroy_storage(&entity_groups_pool.objects[i]);
+                entity_group_storage_destroy(&entity_groups_pool.objects[i]);
             }
         }
     }
@@ -182,14 +182,14 @@ void entity_tables_destroy(void) {
     next_group_id = 1;
 }
 
-static bool entity_id_valid(Entity entity) {
+static bool entity_id_check(Entity entity) {
     Entity slot = entity & 0xFFFFu;
     uint16_t generation = (uint16_t)(entity >> 16);
 
     return slot > ENTITY_INVALID && slot <= MAX_ENTITIES && generation > 0;
 }
 
-static bool entity_table_index_valid(EntityIndex index) {
+static bool entity_table_index_check(EntityIndex index) {
     return index < MAX_ENTITIES;
 }
 
@@ -205,7 +205,7 @@ static uint16_t entity_generation(Entity entity) {
     return (uint16_t)(entity >> 16);
 }
 
-static bool entity_group_id_valid(GroupId group) {
+static bool entity_group_id_check(GroupId group) {
     return group > GROUP_INVALID && group <= MAX_GROUPS;
 }
 
@@ -213,10 +213,10 @@ static EntityIndex entity_group_index(GroupId group) {
     return group - 1;
 }
 
-static bool entity_group_alive_is(GroupId group) {
+static bool entity_group_alive_check(GroupId group) {
     EntityIndex index;
 
-    if(!entity_group_id_valid(group)) {
+    if(!entity_group_id_check(group)) {
         return false;
     }
     index = entity_group_index(group);
@@ -225,7 +225,7 @@ static bool entity_group_alive_is(GroupId group) {
         && entity_groups_pool.used[index] != 0;
 }
 
-static void entity_group_destroy_storage(EntityGroup *group) {
+static void entity_group_storage_destroy(EntityGroup *group) {
     if(group == NULL) {
         return;
     }
@@ -263,7 +263,7 @@ static EngineResult entity_group_ensure_capacity(EntityGroup *group, size_t capa
     return error_result_value(true);
 }
 
-static bool entity_group_storage_entity_has(const EntityGroup *group, Entity entity) {
+static bool entity_group_storage_entity_check(const EntityGroup *group, Entity entity) {
     size_t i;
 
     if(group == NULL || group->entities.objects == NULL || group->entities.used == NULL) {
@@ -283,7 +283,7 @@ static EngineResult entity_group_storage_add(EntityGroup *group, Entity entity) 
     if(group == NULL) {
         return error_result_error(ERROR_MEMORY_POOL_NULL_POINTER);
     }
-    if(entity_group_storage_entity_has(group, entity)) {
+    if(entity_group_storage_entity_check(group, entity)) {
         return error_result_value(true);
     }
     result = entity_group_ensure_capacity(group, group->entities.count + 1);
@@ -364,7 +364,7 @@ static EngineResult entity_group_membership_ensure_capacity(EntityGroupMembershi
     return error_result_value(true);
 }
 
-static bool entity_group_membership_group_has(const EntityGroupMembership *membership, GroupId group) {
+static bool entity_group_membership_group_check(const EntityGroupMembership *membership, GroupId group) {
     size_t i;
 
     if(membership == NULL || membership->groups.objects == NULL || membership->groups.used == NULL) {
@@ -384,7 +384,7 @@ static EngineResult entity_group_membership_add(EntityGroupMembership *membershi
     if(membership == NULL) {
         return error_result_error(ERROR_MEMORY_POOL_NULL_POINTER);
     }
-    if(entity_group_membership_group_has(membership, group)) {
+    if(entity_group_membership_group_check(membership, group)) {
         return error_result_value(true);
     }
     result = entity_group_membership_ensure_capacity(membership, membership->groups.count + 1);
@@ -412,17 +412,17 @@ static bool entity_group_membership_remove(EntityGroupMembership *membership, Gr
     return false;
 }
 
-bool entity_alive_is(Entity entity) {
+bool entity_alive_check(Entity entity) {
     EntityIndex index;
 
     if(!entity_index_get(entity, &index)) {
         return false;
     }
-    return entity_index_alive_is(index);
+    return entity_index_alive_check(index);
 }
 
-bool entity_index_alive_is(EntityIndex index) {
-    if(!entity_table_index_valid(index)) {
+bool entity_index_alive_check(EntityIndex index) {
+    if(!entity_table_index_check(index)) {
         return false;
     }
     if(index >= entity_alive_pool.capacity) {
@@ -451,7 +451,7 @@ EntityResult entity_alive_at_get(uint32_t position) {
 bool entity_index_get(Entity entity, EntityIndex *index) {
     uint32_t slot;
 
-    if(index == NULL || !entity_id_valid(entity)) {
+    if(index == NULL || !entity_id_check(entity)) {
         return false;
     }
     slot = entity_slot(entity);
@@ -468,11 +468,11 @@ bool entity_index_get(Entity entity, EntityIndex *index) {
     return true;
 }
 
-EntityResult entity_from_index(EntityIndex index) {
-    if(!entity_table_index_valid(index)) {
+EntityResult entity_from_index_get(EntityIndex index) {
+    if(!entity_table_index_check(index)) {
         return ERROR_RESULT_MAKE_ERROR(EntityResult, ERROR_ENGINE_INVALID_ENTITY);
     }
-    if(!entity_index_alive_is(index)) {
+    if(!entity_index_alive_check(index)) {
         return ERROR_RESULT_MAKE_ERROR(EntityResult, ERROR_ENGINE_ENTITY_NOT_FOUND);
     }
     return ERROR_RESULT_MAKE_VALUE(EntityResult, index_to_entity[index]);
@@ -546,8 +546,8 @@ EntityResult entity_add(void) {
     return ERROR_RESULT_MAKE_VALUE(EntityResult, entity);
 }
 
-static void entity_clear_index(EntityIndex index) {
-    if(!entity_table_index_valid(index)) {
+static void entity_index_clear(EntityIndex index) {
+    if(!entity_table_index_check(index)) {
         return;
     }
     game_state_entity_clear(index);
@@ -564,8 +564,8 @@ static void entity_clear_index(EntityIndex index) {
         (void)ParentPool_release_at(&parents_pool, index);
     }
     if(index < children_pool.capacity && children_pool.used[index]) {
-        if(entity_group_alive_is(children_pool.objects[index])) {
-            (void)entity_group_destroy_internal(children_pool.objects[index]);
+        if(entity_group_alive_check(children_pool.objects[index])) {
+            (void)entity_group_internal_destroy(children_pool.objects[index]);
         }
         (void)ChildrenPool_release_at(&children_pool, index);
     }
@@ -645,7 +645,7 @@ EntityNameResult entity_name_get(Entity entity) {
     return ERROR_RESULT_MAKE_VALUE(EntityNameResult, entity_names[index]);
 }
 
-static EngineResult entity_detach_group_memberships(Entity entity, EntityIndex index) {
+static EngineResult entity_group_memberships_detach(Entity entity, EntityIndex index) {
     EngineResult result;
 
     while(
@@ -665,7 +665,7 @@ static EngineResult entity_detach_group_memberships(Entity entity, EntityIndex i
         if(group == GROUP_INVALID) {
             break;
         }
-        result = entity_group_remove_internal(group, entity);
+        result = entity_group_internal_remove(group, entity);
         if(result.kind == ERROR_RESULT_ERROR) {
             return result;
         }
@@ -673,16 +673,16 @@ static EngineResult entity_detach_group_memberships(Entity entity, EntityIndex i
     return error_result_value(true);
 }
 
-static EngineResult entity_detach_relationships(Entity entity, EntityIndex index) {
+static EngineResult entity_relationships_detach(Entity entity, EntityIndex index) {
     EngineResult result;
 
     if(index < parents_pool.capacity && parents_pool.used[index] != 0) {
-        result = entity_remove_parent(entity);
+        result = entity_parent_remove(entity);
         if(result.kind == ERROR_RESULT_ERROR) {
             return result;
         }
     }
-    while(index < children_pool.capacity && children_pool.used[index] != 0 && entity_group_alive_is(children[index])) {
+    while(index < children_pool.capacity && children_pool.used[index] != 0 && entity_group_alive_check(children[index])) {
         Entity child;
         EntityGroup *group = &entity_groups[entity_group_index(children[index])];
 
@@ -690,7 +690,7 @@ static EngineResult entity_detach_relationships(Entity entity, EntityIndex index
             break;
         }
 
-        result = entity_remove_child(entity, child);
+        result = entity_child_remove(entity, child);
         if(result.kind == ERROR_RESULT_ERROR) {
             return result;
         }
@@ -707,22 +707,22 @@ EngineResult entity_delete(Entity entity) {
     uint32_t slot;
     EngineResult result;
 
-    if(!entity_id_valid(entity)) {
+    if(!entity_id_check(entity)) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
-    if(!entity_index_get(entity, &index) || !entity_index_alive_is(index)) {
+    if(!entity_index_get(entity, &index) || !entity_index_alive_check(index)) {
         return error_result_error(ERROR_ENGINE_ENTITY_NOT_FOUND);
     }
-    result = entity_detach_relationships(entity, index);
+    result = entity_relationships_detach(entity, index);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    result = entity_detach_group_memberships(entity, index);
+    result = entity_group_memberships_detach(entity, index);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
     physics_entity_clear(entity, index);
-    entity_clear_index(index);
+    entity_index_clear(index);
     slot = entity_slot(entity);
     removed_alive_position = entity_alive_positions[slot];
     last_alive_position = (EntityIndex)(entity_id_pool.live_count - 1);
@@ -754,46 +754,46 @@ EngineResult entity_delete(Entity entity) {
     return error_result_value(true);
 }
 
-EngineResult entity_add_components(Entity entity, RohrComponentMask mask) {
+EngineResult entity_components_add(Entity entity, RohrComponentMask mask) {
     EntityIndex index;
 
-    if(!entity_id_valid(entity)) {
+    if(!entity_id_check(entity)) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
-    if(!entity_index_get(entity, &index) || !entity_index_alive_is(index)) {
+    if(!entity_index_get(entity, &index) || !entity_index_alive_check(index)) {
         return error_result_error(ERROR_ENGINE_ENTITY_NOT_FOUND);
     }
     (void)EntityMaskPool_store_at(&entity_mask_pool, index, entity_mask[index] | mask);
     return error_result_value(true);
 }
 
-EngineResult entity_delete_components(Entity entity, RohrComponentMask mask) {
+EngineResult entity_components_delete(Entity entity, RohrComponentMask mask) {
     EntityIndex index;
 
-    if(!entity_id_valid(entity)) {
+    if(!entity_id_check(entity)) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
-    if(!entity_index_get(entity, &index) || !entity_index_alive_is(index)) {
+    if(!entity_index_get(entity, &index) || !entity_index_alive_check(index)) {
         return error_result_error(ERROR_ENGINE_ENTITY_NOT_FOUND);
     }
     (void)EntityMaskPool_store_at(&entity_mask_pool, index, entity_mask[index] & ~mask);
     return error_result_value(true);
 }
 
-bool entity_components_has(Entity entity, RohrComponentMask components) {
+bool entity_components_check(Entity entity, RohrComponentMask components) {
   EntityIndex index;
 
   if(!entity_index_get(entity, &index)) {
     return false;
   }
-  if(!entity_index_alive_is(index)) {
+  if(!entity_index_alive_check(index)) {
     return false;
   }
-  return entity_index_components_has(index, components);
+  return entity_index_components_check(index, components);
 }
 
-bool entity_index_components_has(EntityIndex index, RohrComponentMask components) {
-  if(!entity_index_alive_is(index)) {
+bool entity_index_components_check(EntityIndex index, RohrComponentMask components) {
+  if(!entity_index_alive_check(index)) {
     return false;
   }
   if( (entity_mask[index] & components) == components) {
@@ -802,7 +802,7 @@ bool entity_index_components_has(EntityIndex index, RohrComponentMask components
   return false;
 }
 
-static GroupIdResult entity_group_create_kind(GroupKind kind) {
+static GroupIdResult entity_group_kind_create(GroupKind kind) {
     GroupId group;
     EntityIndex index;
     EngineResult result;
@@ -858,7 +858,7 @@ static GroupIdResult entity_group_create_kind(GroupKind kind) {
 }
 
 GroupIdResult entity_group_create(void) {
-    return entity_group_create_kind(GROUP_KIND_GENERIC);
+    return entity_group_kind_create(GROUP_KIND_GENERIC);
 }
 
 GroupIdResult entity_group_by_name_get(const char *name) {
@@ -870,7 +870,7 @@ GroupIdResult entity_group_by_name_get(const char *name) {
     for(group = 1; group <= MAX_GROUPS; group += 1) {
         EntityIndex index = entity_group_index(group);
         if(entity_group_names_used[index]
-                && entity_group_alive_is(group)
+                && entity_group_alive_check(group)
                 && strcmp(entity_group_names[index].value, name) == 0) {
             return ERROR_RESULT_MAKE_VALUE(GroupIdResult, group);
         }
@@ -883,7 +883,7 @@ EngineResult entity_group_name_set(GroupId group, const char *name) {
     GroupIdResult existing;
     size_t length;
 
-    if(!entity_group_alive_is(group)
+    if(!entity_group_alive_check(group)
             || entity_groups[entity_group_index(group)].kind != GROUP_KIND_GENERIC) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
@@ -908,7 +908,7 @@ EngineResult entity_group_name_set(GroupId group, const char *name) {
 GroupNameResult entity_group_name_get(GroupId group) {
     EntityIndex index;
 
-    if(!entity_group_alive_is(group)) {
+    if(!entity_group_alive_check(group)) {
         return ERROR_RESULT_MAKE_ERROR(GroupNameResult, ERROR_ENGINE_INVALID_ENTITY);
     }
     index = entity_group_index(group);
@@ -918,13 +918,13 @@ GroupNameResult entity_group_name_get(GroupId group) {
     return ERROR_RESULT_MAKE_VALUE(GroupNameResult, entity_group_names[index]);
 }
 
-static EngineResult entity_group_destroy_internal(GroupId group) {
+static EngineResult entity_group_internal_destroy(GroupId group) {
     EntityIndex group_index;
     EntityGroup *group_storage;
     Entity entity;
     EngineResult result;
 
-    if(!entity_group_alive_is(group)) {
+    if(!entity_group_alive_check(group)) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
     group_index = entity_group_index(group);
@@ -935,12 +935,12 @@ static EngineResult entity_group_destroy_internal(GroupId group) {
         if(!entity_group_storage_last(group_storage, &entity)) {
             break;
         }
-        result = entity_group_remove_internal(group, entity);
+        result = entity_group_internal_remove(group, entity);
         if(result.kind == ERROR_RESULT_ERROR) {
             return result;
         }
     }
-    entity_group_destroy_storage(group_storage);
+    entity_group_storage_destroy(group_storage);
     (void)EntityGroupPool_release_at(&entity_groups_pool, group_index);
     if(free_group_count < MAX_GROUPS) {
         free_group_ids[free_group_count] = group;
@@ -950,24 +950,24 @@ static EngineResult entity_group_destroy_internal(GroupId group) {
 }
 
 EngineResult entity_group_destroy(GroupId group) {
-    if(!entity_group_alive_is(group)) {
+    if(!entity_group_alive_check(group)) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
     if(entity_groups[entity_group_index(group)].kind != GROUP_KIND_GENERIC) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
-    return entity_group_destroy_internal(group);
+    return entity_group_internal_destroy(group);
 }
 
-static EngineResult entity_group_add_internal(GroupId group, Entity entity) {
+static EngineResult entity_group_internal_add(GroupId group, Entity entity) {
     EntityIndex group_index;
     EntityIndex entity_index;
     EngineResult result;
 
-    if(!entity_group_alive_is(group)) {
+    if(!entity_group_alive_check(group)) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
-    if(!entity_index_get(entity, &entity_index) || !entity_index_alive_is(entity_index)) {
+    if(!entity_index_get(entity, &entity_index) || !entity_index_alive_check(entity_index)) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
     group_index = entity_group_index(group);
@@ -990,30 +990,30 @@ static EngineResult entity_group_add_internal(GroupId group, Entity entity) {
         (void)entity_group_storage_remove(&entity_groups[group_index], entity);
         return result;
     }
-    return entity_add_components(entity, GROUP);
+    return entity_components_add(entity, GROUP);
 }
 
 EngineResult entity_group_add(GroupId group, Entity entity) {
-    if(!entity_group_alive_is(group)) {
+    if(!entity_group_alive_check(group)) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
     if(entity_groups[entity_group_index(group)].kind != GROUP_KIND_GENERIC) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
-    return entity_group_add_internal(group, entity);
+    return entity_group_internal_add(group, entity);
 }
 
-static EngineResult entity_group_remove_internal(GroupId group, Entity entity) {
+static EngineResult entity_group_internal_remove(GroupId group, Entity entity) {
     EntityIndex group_index;
     EntityIndex entity_index;
     EngineResult result;
 
-    if(!entity_group_alive_is(group)) {
+    if(!entity_group_alive_check(group)) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
     group_index = entity_group_index(group);
     (void)entity_group_storage_remove(&entity_groups[group_index], entity);
-    if(!entity_index_get(entity, &entity_index) || !entity_index_alive_is(entity_index)) {
+    if(!entity_index_get(entity, &entity_index) || !entity_index_alive_check(entity_index)) {
         return error_result_value(true);
     }
     if(entity_index < entity_group_memberships_pool.capacity && entity_group_memberships_pool.used[entity_index] != 0) {
@@ -1021,7 +1021,7 @@ static EngineResult entity_group_remove_internal(GroupId group, Entity entity) {
         if(entity_group_memberships[entity_index].groups.count == 0) {
             entity_group_membership_destroy(&entity_group_memberships[entity_index]);
             (void)EntityGroupMembershipPool_release_at(&entity_group_memberships_pool, entity_index);
-            result = entity_delete_components(entity, GROUP);
+            result = entity_components_delete(entity, GROUP);
             if(result.kind == ERROR_RESULT_ERROR) {
                 return result;
             }
@@ -1031,24 +1031,24 @@ static EngineResult entity_group_remove_internal(GroupId group, Entity entity) {
 }
 
 EngineResult entity_group_remove(GroupId group, Entity entity) {
-    if(!entity_group_alive_is(group)) {
+    if(!entity_group_alive_check(group)) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
     if(entity_groups[entity_group_index(group)].kind != GROUP_KIND_GENERIC) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
-    return entity_group_remove_internal(group, entity);
+    return entity_group_internal_remove(group, entity);
 }
 
-bool entity_group_entity_has(GroupId group, Entity entity) {
-    if(!entity_group_alive_is(group)) {
+bool entity_group_entity_check(GroupId group, Entity entity) {
+    if(!entity_group_alive_check(group)) {
         return false;
     }
-    return entity_group_storage_entity_has(&entity_groups[entity_group_index(group)], entity);
+    return entity_group_storage_entity_check(&entity_groups[entity_group_index(group)], entity);
 }
 
 EntityGroupResult entity_group_get(GroupId group) {
-    if(!entity_group_alive_is(group)) {
+    if(!entity_group_alive_check(group)) {
         return ERROR_RESULT_MAKE_ERROR(EntityGroupResult, ERROR_ENGINE_INVALID_ENTITY);
     }
     return ERROR_RESULT_MAKE_VALUE(EntityGroupResult, entity_groups[entity_group_index(group)]);
@@ -1057,7 +1057,7 @@ EntityGroupResult entity_group_get(GroupId group) {
 EntityGroupMembershipResult entity_groups_get(Entity entity) {
     EntityIndex index;
 
-    if(!entity_index_get(entity, &index) || !entity_index_alive_is(index)) {
+    if(!entity_index_get(entity, &index) || !entity_index_alive_check(index)) {
         return ERROR_RESULT_MAKE_ERROR(EntityGroupMembershipResult, ERROR_ENGINE_INVALID_ENTITY);
     }
     if(index >= entity_group_memberships_pool.capacity || entity_group_memberships_pool.used[index] == 0) {
@@ -1074,16 +1074,16 @@ static EngineResult entity_ensure_children_component(Entity parent, EntityIndex 
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
     if(children_pool.used[parent_index] == 0) {
-        group_result = entity_group_create_kind(GROUP_KIND_CHILDREN);
+        group_result = entity_group_kind_create(GROUP_KIND_CHILDREN);
         if(group_result.kind == ERROR_RESULT_ERROR) {
             return error_result_error(group_result.result.error);
         }
         if(ChildrenPool_store_at(&children_pool, parent_index, group_result.result.value).kind == ERROR_RESULT_ERROR) {
-            (void)entity_group_destroy_internal(group_result.result.value);
+            (void)entity_group_internal_destroy(group_result.result.value);
             return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED);
         }
     }
-    result = entity_add_components(parent, CHILD);
+    result = entity_components_add(parent, CHILD);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
@@ -1105,7 +1105,7 @@ EngineResult entity_parent_set(Entity child, Entity parent) {
     if(!entity_index_get(parent, &parent_index) || !entity_index_get(child, &child_index)) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
-    if(!entity_index_alive_is(parent_index) || !entity_index_alive_is(child_index)) {
+    if(!entity_index_alive_check(parent_index) || !entity_index_alive_check(child_index)) {
         return error_result_error(ERROR_ENGINE_ENTITY_NOT_FOUND);
     }
 
@@ -1115,13 +1115,13 @@ EngineResult entity_parent_set(Entity child, Entity parent) {
             if(result.kind == ERROR_RESULT_ERROR) {
                 return result;
             }
-            result = entity_group_add_internal(children[parent_index], child);
+            result = entity_group_internal_add(children[parent_index], child);
             if(result.kind == ERROR_RESULT_ERROR) {
                 return result;
             }
-            return entity_add_components(child, PARENT);
+            return entity_components_add(child, PARENT);
         }
-        result = entity_remove_parent(child);
+        result = entity_parent_remove(child);
         if(result.kind == ERROR_RESULT_ERROR) {
             return result;
         }
@@ -1131,49 +1131,49 @@ EngineResult entity_parent_set(Entity child, Entity parent) {
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    result = entity_group_add_internal(children[parent_index], child);
+    result = entity_group_internal_add(children[parent_index], child);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
     if(ParentPool_store_at(&parents_pool, child_index, parent).kind == ERROR_RESULT_ERROR) {
-        (void)entity_group_remove_internal(children[parent_index], child);
+        (void)entity_group_internal_remove(children[parent_index], child);
         return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED);
     }
-    result = entity_add_components(child, PARENT);
+    result = entity_components_add(child, PARENT);
     if(result.kind == ERROR_RESULT_ERROR) {
-        (void)entity_group_remove_internal(children[parent_index], child);
+        (void)entity_group_internal_remove(children[parent_index], child);
         (void)ParentPool_release_at(&parents_pool, child_index);
         return result;
     }
     return error_result_value(true);
 }
 
-EngineResult entity_remove_parent(Entity child) {
+EngineResult entity_parent_remove(Entity child) {
     EntityIndex child_index;
     Entity parent;
     EntityIndex parent_index;
     EngineResult result;
 
-    if(!entity_index_get(child, &child_index) || !entity_index_alive_is(child_index)) {
+    if(!entity_index_get(child, &child_index) || !entity_index_alive_check(child_index)) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
     if(child_index >= parents_pool.capacity || parents_pool.used[child_index] == 0) {
-        return entity_delete_components(child, PARENT);
+        return entity_components_delete(child, PARENT);
     }
     parent = parents[child_index];
-    if(!entity_index_get(parent, &parent_index) || !entity_index_alive_is(parent_index)) {
+    if(!entity_index_get(parent, &parent_index) || !entity_index_alive_check(parent_index)) {
         (void)ParentPool_release_at(&parents_pool, child_index);
-        return entity_delete_components(child, PARENT);
+        return entity_components_delete(child, PARENT);
     }
 
     if(parent_index < children_pool.capacity && children_pool.used[parent_index] != 0) {
         GroupId group = children[parent_index];
 
-        (void)entity_group_remove_internal(group, child);
-        if(entity_group_alive_is(group) && entity_groups[entity_group_index(group)].entities.count == 0) {
-            (void)entity_group_destroy_internal(group);
+        (void)entity_group_internal_remove(group, child);
+        if(entity_group_alive_check(group) && entity_groups[entity_group_index(group)].entities.count == 0) {
+            (void)entity_group_internal_destroy(group);
             (void)ChildrenPool_release_at(&children_pool, parent_index);
-            result = entity_delete_components(parent, CHILD);
+            result = entity_components_delete(parent, CHILD);
             if(result.kind == ERROR_RESULT_ERROR) {
                 return result;
             }
@@ -1184,33 +1184,33 @@ EngineResult entity_remove_parent(Entity child) {
     if(child_index < parents_pool.capacity && parents_pool.used[child_index]) {
         (void)ParentPool_release_at(&parents_pool, child_index);
     }
-    result = entity_delete_components(child, PARENT);
+    result = entity_components_delete(child, PARENT);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
     return error_result_value(true);
 }
 
-EngineResult entity_remove_child(Entity parent, Entity child) {
+EngineResult entity_child_remove(Entity parent, Entity child) {
     EntityIndex parent_index;
     EntityIndex child_index;
     EngineResult result;
 
-    if(!entity_index_get(parent, &parent_index) || !entity_index_alive_is(parent_index)) {
+    if(!entity_index_get(parent, &parent_index) || !entity_index_alive_check(parent_index)) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
-    if(!entity_index_get(child, &child_index) || !entity_index_alive_is(child_index)) {
+    if(!entity_index_get(child, &child_index) || !entity_index_alive_check(child_index)) {
         //Warning this child is currently not alive
         return error_result_value(true);
     }
     if(parent_index < children_pool.capacity && children_pool.used[parent_index] != 0) {
         GroupId group = children[parent_index];
 
-        (void)entity_group_remove_internal(group, child);
-        if(entity_group_alive_is(group) && entity_groups[entity_group_index(group)].entities.count == 0) {
-            (void)entity_group_destroy_internal(group);
+        (void)entity_group_internal_remove(group, child);
+        if(entity_group_alive_check(group) && entity_groups[entity_group_index(group)].entities.count == 0) {
+            (void)entity_group_internal_destroy(group);
             (void)ChildrenPool_release_at(&children_pool, parent_index);
-            result = entity_delete_components(parent, CHILD);
+            result = entity_components_delete(parent, CHILD);
             if(result.kind == ERROR_RESULT_ERROR) {
                 return result;
             }
@@ -1220,7 +1220,7 @@ EngineResult entity_remove_child(Entity parent, Entity child) {
     //Removing the parent from the child
     if(child_index < parents_pool.capacity && parents_pool.used[child_index] && parents[child_index] == parent) {
         (void)ParentPool_release_at(&parents_pool, child_index);
-        result = entity_delete_components(child, PARENT);
+        result = entity_components_delete(child, PARENT);
         if(result.kind == ERROR_RESULT_ERROR) {
             return result;
         }
@@ -1232,7 +1232,7 @@ EngineResult entity_remove_child(Entity parent, Entity child) {
 ChildrenResult entity_children_get(Entity entity) {
     EntityIndex index;
 
-    if(!entity_index_get(entity, &index) || !entity_index_alive_is(index)) {
+    if(!entity_index_get(entity, &index) || !entity_index_alive_check(index)) {
         return ERROR_RESULT_MAKE_ERROR(ChildrenResult, ERROR_ENGINE_INVALID_ENTITY);
     }
     if(index >= children_pool.capacity || children_pool.used[index] == 0) {
@@ -1243,7 +1243,7 @@ ChildrenResult entity_children_get(Entity entity) {
 ParentResult entity_parent_get(Entity entity) {
     EntityIndex index;
 
-    if(!entity_index_get(entity, &index) || !entity_index_alive_is(index)) {
+    if(!entity_index_get(entity, &index) || !entity_index_alive_check(index)) {
         return ERROR_RESULT_MAKE_ERROR(ParentResult, ERROR_ENGINE_INVALID_ENTITY);
     }
     if(index >= parents_pool.capacity || parents_pool.used[index] == 0) {
@@ -1260,11 +1260,11 @@ EngineResult entity_life_time_set(Entity entity, Time expirey_time, Tick expirey
     EntityIndex index;
     EngineResult result;
 
-    if(!entity_index_get(entity, &index) || !entity_index_alive_is(index)) {
+    if(!entity_index_get(entity, &index) || !entity_index_alive_check(index)) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
 
-    result = entity_add_components(entity, LIFETIME);
+    result = entity_components_add(entity, LIFETIME);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
@@ -1275,14 +1275,14 @@ EngineResult entity_life_time_set(Entity entity, Time expirey_time, Tick expirey
     return error_result_value(true);
 }
 
-EngineResult entity_remove_life_time(Entity entity) {
+EngineResult entity_life_time_remove(Entity entity) {
     EntityIndex index;
     EngineResult result;
 
     if(!entity_index_get(entity, &index)) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
-    result = entity_delete_components(entity, LIFETIME);
+    result = entity_components_delete(entity, LIFETIME);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }

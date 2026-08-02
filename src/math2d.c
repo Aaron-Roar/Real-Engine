@@ -4,7 +4,7 @@
 
 #include <float.h>
 
-AABB math_create_aabb(Shape world_shape) {
+AABB math_aabb_create(Shape world_shape) {
     AABB aabb = {
         .min_x =  FLT_MAX,
         .max_x = -FLT_MAX,
@@ -78,7 +78,7 @@ float math_list_minimum(Vec1DList list) {
     return min_value;
 }
 
-Vec2DList math_create_normals(Shape shape) {
+Vec2DList math_normals_create(Shape shape) {
     Vec2DList normals = {0};
     if (shape.amount_of_vertices <= 1 || shape.amount_of_vertices > MAX_VECTORS) {
         //Error
@@ -97,18 +97,18 @@ Vec2DList math_create_normals(Shape shape) {
     return normals;
 }
 
-Vec2D math_normalize_vector(Vec2D vector) {
+Vec2D math_vector_normalize(Vec2D vector) {
     return (Vec2D){
         .x = vector.x/sqrt(vector.x*vector.x + vector.y*vector.y),
         .y = vector.y/sqrt(vector.x*vector.x + vector.y*vector.y),
     };
 }
 
-Vec2DList math_normalize_vectors(Vec2DList vectors) {
+Vec2DList math_vectors_normalize(Vec2DList vectors) {
     Vec2DList normalized_vecs = {0};
     normalized_vecs.amount_of_vectors = vectors.amount_of_vectors;
     for(int i = 0; i < vectors.amount_of_vectors; i += 1) {
-        normalized_vecs.vectors[i] = math_normalize_vector(vectors.vectors[i]);
+        normalized_vecs.vectors[i] = math_vector_normalize(vectors.vectors[i]);
     }
     return normalized_vecs;
 }
@@ -117,7 +117,7 @@ float math_dot_product(Vec2D vector_1, Vec2D vector_2) {
     return vector_1.x*vector_2.x + vector_1.y*vector_2.y;
 }
 
-Shape math_create_square(float width, float height) {
+Shape math_square_create(float width, float height) {
     Shape shape = {
         .amount_of_vertices = 4,
         .vertices = {
@@ -130,7 +130,7 @@ Shape math_create_square(float width, float height) {
     return shape;
 }
 
-Shape math_create_circle(float radius, uint8_t verticies) {
+Shape math_circle_create(float radius, uint8_t verticies) {
     Shape shape = {0};
     if(verticies < MIN_VERTICIES) {
         shape.amount_of_vertices = MIN_VERTICIES;
@@ -186,8 +186,8 @@ bool math_shape_overlap_on_axes(Shape shape_1, Shape shape_2, Vec2DList axes) {
 }
 
 bool math_shape_overlap(Shape shape_1, Shape shape_2) {
-    Vec2DList shape1_normals = math_normalize_vectors(math_create_normals(shape_1));
-    Vec2DList shape2_normals = math_normalize_vectors(math_create_normals(shape_2));
+    Vec2DList shape1_normals = math_vectors_normalize(math_normals_create(shape_1));
+    Vec2DList shape2_normals = math_vectors_normalize(math_normals_create(shape_2));
 
     if (!math_shape_overlap_on_axes(shape_1, shape_2, shape1_normals)) {
         return false;
@@ -228,7 +228,7 @@ float math_axis_magnitude(Axis axis) {
     return sqrtf(axis.x * axis.x + axis.y * axis.y);
 }
 
-Vec2D math_rotate_vector(Vec2D vector, float angle) {
+Vec2D math_vector_rotate(Vec2D vector, float angle) {
     float c = cosf(angle);
     float s = sinf(angle);
 
@@ -301,7 +301,7 @@ Vec1D math_circle_overlap_depth(Vec2D centroid_1, Vec1D radius_1, Vec2D centroid
       );
 }
 
-Shape math_scale_shape_x(Shape shape, float scale) {
+Shape math_shape_x_scale(Shape shape, float scale) {
     Shape scaled_shape = shape;
 
     for (uint16_t i = 0; i < scaled_shape.amount_of_vertices; i++) {
@@ -310,7 +310,7 @@ Shape math_scale_shape_x(Shape shape, float scale) {
 
     return scaled_shape;
 }
-Shape math_scale_shape_y(Shape shape, float scale) {
+Shape math_shape_y_scale(Shape shape, float scale) {
     Shape scaled_shape = shape;
 
     for (uint16_t i = 0; i < scaled_shape.amount_of_vertices; i++) {
@@ -319,7 +319,7 @@ Shape math_scale_shape_y(Shape shape, float scale) {
 
     return scaled_shape;
 }
-Shape math_scale_shape(Shape shape, float scale) {
+Shape math_shape_scale(Shape shape, float scale) {
     Shape scaled_shape = shape;
 
     for (uint16_t i = 0; i < scaled_shape.amount_of_vertices; i++) {
@@ -330,7 +330,7 @@ Shape math_scale_shape(Shape shape, float scale) {
     return scaled_shape;
 }
 
-Shape math_add_vertex(Shape shape) {
+Shape math_vertex_add(Shape shape) {
     uint16_t amount_of_vertices = shape.amount_of_vertices + 1;
     if(amount_of_vertices >= MAX_VERTICIES) {
         return shape;
@@ -341,15 +341,15 @@ Shape math_add_vertex(Shape shape) {
 
     float radius = math_circle_radius(shape, math_polygon_centroid(shape));
     if(amount_of_vertices == 3) {
-        return math_create_circle(radius, 3);
+        return math_circle_create(radius, 3);
     }
     if(amount_of_vertices == 4) {
-        return math_create_square(radius, radius);
+        return math_square_create(radius, radius);
     }
-    return math_create_circle(radius, amount_of_vertices);
+    return math_circle_create(radius, amount_of_vertices);
 }
 
-Shape math_delete_vertex(Shape shape) {
+Shape math_vertex_delete(Shape shape) {
     uint16_t amount_of_vertices = shape.amount_of_vertices - 1;
     if(amount_of_vertices >= MAX_VERTICIES) {
         return shape;
@@ -360,10 +360,10 @@ Shape math_delete_vertex(Shape shape) {
 
     float radius = math_circle_radius(shape, math_polygon_centroid(shape));
     if(amount_of_vertices == 3) {
-        return math_create_circle(radius, 3);
+        return math_circle_create(radius, 3);
     }
     if(amount_of_vertices == 4) {
-        return math_create_square(radius, radius);
+        return math_square_create(radius, radius);
     }
-    return math_create_circle(radius, amount_of_vertices);
+    return math_circle_create(radius, amount_of_vertices);
 }

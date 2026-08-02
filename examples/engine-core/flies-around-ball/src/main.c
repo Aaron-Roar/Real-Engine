@@ -15,7 +15,7 @@ const float ball_control_acceleration = 240.0f;
 const Torque ball_control_torque = 2000000.0f;
 
 #define PRINT_ENGINE_ERROR(engine_result) \
-    fprintf(stderr, "%s\n", rohr_error_default_message((engine_result).result.error))
+    fprintf(stderr, "%s\n", rohr_error_default_message_get((engine_result).result.error))
 
 int main(void) {
     if(!example_use_executable_directory()) return 1;
@@ -39,13 +39,13 @@ int main(void) {
         }
     }
 
-    AnimationAssetResult animation_result = rohr_graphics_load_animation(elderfly_fly);
+    AnimationAssetResult animation_result = rohr_graphics_animation_load(elderfly_fly);
     if(rohr_error_check(animation_result)) {
         PRINT_ENGINE_ERROR(animation_result);
         goto fail;
     }
     animation = animation_result.result.value;
-    sprite = rohr_graphics_create_animated_sprite(animation, (Scale){3,3});
+    sprite = rohr_graphics_animated_sprite_create(animation, (Scale){3,3});
 
     EntityResult ball_result = rohr_entity_add();
     if(rohr_error_check(ball_result)) {
@@ -60,7 +60,7 @@ int main(void) {
     //set_angular_velocity(ball, 3);
     rohr_physics_acceleration_set(ball, (Acceleration){0, 0});
     rohr_physics_restitution_set(ball, 0.7);
-    Shape ball_shape = rohr_math_create_circle(50, 4);
+    Shape ball_shape = rohr_math_circle_create(50, 4);
     rohr_physics_hitbox_set(ball, ball_shape);
     rohr_physics_friction_set(ball, 0.4);
     rohr_physics_dynamic_set(ball);
@@ -82,7 +82,7 @@ int main(void) {
         rohr_physics_acceleration_set(small_fly, (Acceleration){0, 0});
         rohr_physics_restitution_set(small_fly, 0.1);
         float size = rohr_tools_random_range_float(10, 20);
-        Shape small_fly_shape = rohr_math_create_circle(size, 5);
+        Shape small_fly_shape = rohr_math_circle_create(size, 5);
         rohr_physics_hitbox_set(small_fly, small_fly_shape);
         rohr_physics_friction_set(small_fly, 0.4);
         rohr_physics_dynamic_set(small_fly);
@@ -91,10 +91,10 @@ int main(void) {
             PRINT_ENGINE_ERROR(parent_result);
             goto fail;
         }
-        sprite = rohr_graphics_create_animated_sprite(animation, (Scale){size/10, size/10});
+        sprite = rohr_graphics_animated_sprite_create(animation, (Scale){size/10, size/10});
         sprite.animation.time_per_frame = rohr_tools_random_range_float(0.005, 0.5);
-        rohr_graphics_add_animated_sprite(small_fly, sprite);
-        rohr_entity_add_components(small_fly, PARTICLE);
+        rohr_graphics_animated_sprite_add(small_fly, sprite);
+        rohr_entity_components_add(small_fly, PARTICLE);
     }
 
     ChildrenResult children_result = rohr_entity_children_get(ball);
@@ -105,20 +105,20 @@ int main(void) {
     children_group = children_result.result.value;
 
     //Game Loop
-    rohr_engine_reset_clock();
+    rohr_engine_clock_reset();
     rohr_graphics_recording_start("flies_around_ball_recording.mp4", 60);
     bool phase_1 = false;
     bool phase_2 = false;
     bool phase_3 = false;
     while (rohr_engine_time_get() < demo_duration_seconds) {
-        rohr_system_clean_entities_past_lifetime();
-        SDL_Event event = rohr_engine_poll_event();
+        rohr_system_entities_past_lifetime_clean();
+        SDL_Event event = rohr_engine_event_poll();
         if(event.type == SDL_EVENT_QUIT) {
             break;
         }
-        KeyboardEvent key_event = rohr_controller_capture_keyboard_event(&event);
-        rohr_controller_update_key_states(&keyboard);
-        rohr_controller_add_key_event(&keyboard, key_event);
+        KeyboardEvent key_event = rohr_controller_keyboard_event_capture(&event);
+        rohr_controller_key_states_update(&keyboard);
+        rohr_controller_key_event_add(&keyboard, key_event);
         if(!phase_1 && rohr_engine_time_get() > 3) {
             phase_1 = true;
         }
@@ -134,10 +134,10 @@ int main(void) {
         Time phase_time = time - ((int)(time / 4.0) * 4.0);
         float acceleration_magnitude = 50.0f + (float)time * 22.0f;
         Vec2D move_axis = rohr_controller_wasd_axis_get(&keyboard);
-        Vec2D turn_axis = rohr_controller_axis_from_keycodes(&keyboard, SDLK_UNKNOWN, SDLK_LEFT, SDLK_UNKNOWN, SDLK_RIGHT);
+        Vec2D turn_axis = rohr_controller_axis_from_keycodes_get(&keyboard, SDLK_UNKNOWN, SDLK_LEFT, SDLK_UNKNOWN, SDLK_RIGHT);
 
         if(move_axis.x != 0.0f || move_axis.y != 0.0f) {
-            EngineResult force_result = rohr_physics_apply_force_for_one_tick(ball, (Force){
+            EngineResult force_result = rohr_physics_force_for_one_tick_apply(ball, (Force){
                 .x = -move_axis.x * ball_mass * ball_control_acceleration,
                 .y = -move_axis.y * ball_mass * ball_control_acceleration
             });
@@ -147,7 +147,7 @@ int main(void) {
             }
         }
         if(turn_axis.x != 0.0f) {
-            EngineResult torque_result = rohr_physics_apply_torque_for_one_tick(ball, -turn_axis.x * ball_control_torque);
+            EngineResult torque_result = rohr_physics_torque_for_one_tick_apply(ball, -turn_axis.x * ball_control_torque);
             if(rohr_error_check(torque_result)) {
                 PRINT_ENGINE_ERROR(torque_result);
                 goto fail;
@@ -166,22 +166,22 @@ int main(void) {
         }
 
         //physics
-        Tick ticks_advanced = rohr_engine_update_tick();
+        Tick ticks_advanced = rohr_engine_tick_update();
         rohr_physics_update(ticks_advanced);
 
         //render
-        rohr_graphics_draw_background(background_color);
-        rohr_graphics_update_sprite_frames(rohr_engine_tick_get(), rohr_engine_time_get());
-        rohr_graphics_draw_animated_sprites();
+        rohr_graphics_background_draw(background_color);
+        rohr_graphics_sprite_frames_update(rohr_engine_tick_get(), rohr_engine_time_get());
+        rohr_graphics_animated_sprites_draw();
         if(phase_1) {
-            rohr_graphics_draw_hit_boxes();
+            rohr_graphics_hit_boxes_draw();
         }
         if(phase_2) {
-            rohr_graphics_draw_particles();
+            rohr_graphics_particles_draw();
         }
         if(phase_3) {
-            rohr_graphics_draw_grid();
-            rohr_graphics_draw_local_origins();
+            rohr_graphics_grid_draw();
+            rohr_graphics_local_origins_draw();
         }
         rohr_graphics_show();
 

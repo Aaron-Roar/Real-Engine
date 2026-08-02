@@ -259,7 +259,7 @@ EntityNameResult entity_name_get(Entity entity);
  * @param entity Entity id to check.
  * @return true when the entity id is valid and live.
  */
-bool entity_alive_is(Entity entity);
+bool entity_alive_check(Entity entity);
 
 /**
  * Check whether an entity table index is currently live.
@@ -267,7 +267,7 @@ bool entity_alive_is(Entity entity);
  * @param index Entity table index to check.
  * @return true when the index is live.
  */
-bool entity_index_alive_is(EntityIndex index);
+bool entity_index_alive_check(EntityIndex index);
 
 /**
  * Return the number of currently alive entities.
@@ -306,7 +306,7 @@ bool entity_index_get(Entity entity, EntityIndex *index);
  * @param index Entity table index to resolve.
  * @return EntityResult containing the entity id, or an error.
  */
-EntityResult entity_from_index(EntityIndex index);
+EntityResult entity_from_index_get(EntityIndex index);
 
 /**
  * Add a live entity and grow entity-indexed tables as needed.
@@ -330,7 +330,7 @@ EngineResult entity_delete(Entity entity);
  * @param mask Component mask bits to add.
  * @return EngineResult describing success or failure.
  */
-EngineResult entity_add_components(Entity entity, RohrComponentMask mask);
+EngineResult entity_components_add(Entity entity, RohrComponentMask mask);
 
 /**
  * Check whether an entity has all requested components.
@@ -339,7 +339,7 @@ EngineResult entity_add_components(Entity entity, RohrComponentMask mask);
  * @param components Component mask that must be present.
  * @return true when all requested bits are set.
  */
-bool entity_components_has(Entity entity, RohrComponentMask components);
+bool entity_components_check(Entity entity, RohrComponentMask components);
 
 /**
  * Check whether an entity index has all requested components.
@@ -348,7 +348,7 @@ bool entity_components_has(Entity entity, RohrComponentMask components);
  * @param components Component mask that must be present.
  * @return true when all requested bits are set.
  */
-bool entity_index_components_has(EntityIndex index, RohrComponentMask components);
+bool entity_index_components_check(EntityIndex index, RohrComponentMask components);
 
 /**
  * Create a reusable group of entity ids.
@@ -408,7 +408,7 @@ EngineResult entity_group_remove(GroupId group, Entity entity);
  * @param entity Entity id to search for.
  * @return true when entity is a member of group.
  */
-bool entity_group_entity_has(GroupId group, Entity entity);
+bool entity_group_entity_check(GroupId group, Entity entity);
 
 /**
  * Get the group component for a group id.
@@ -433,7 +433,7 @@ EntityGroupMembershipResult entity_groups_get(Entity entity);
  * @param mask Component mask bits to remove.
  * @return EngineResult describing success or failure.
  */
-EngineResult entity_delete_components(Entity entity, RohrComponentMask mask);
+EngineResult entity_components_delete(Entity entity, RohrComponentMask mask);
 
 /**
  * Set a parent-child relationship.
@@ -459,7 +459,7 @@ EngineResult entity_parent_set(Entity child, Entity parent);
  * @param child Child entity id.
  * @return EngineResult describing success or failure.
  */
-EngineResult entity_remove_parent(Entity child);
+EngineResult entity_parent_remove(Entity child);
 
 /**
  * Remove a child from a parent entity.
@@ -468,7 +468,7 @@ EngineResult entity_remove_parent(Entity child);
  * @param child Child entity id.
  * @return EngineResult describing success or failure.
  */
-EngineResult entity_remove_child(Entity parent, Entity child);
+EngineResult entity_child_remove(Entity parent, Entity child);
 
 /**
  * Get the children group id for an entity.
@@ -502,5 +502,5 @@ EngineResult entity_life_time_set(Entity entity, Time expirey_time, Tick expirey
  * @param entity Entity id to update.
  * @return EngineResult describing success or failure.
  */
-EngineResult entity_remove_life_time(Entity entity);
+EngineResult entity_life_time_remove(Entity entity);
 #endif

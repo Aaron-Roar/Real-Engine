@@ -132,7 +132,7 @@ static StateAnimation *state_find_animation(const char *name) {
     return NULL;
 }
 
-static EngineResult state_load_animation_definition(yyjson_val *definition) {
+static EngineResult state_animation_definition_load(yyjson_val *definition) {
     StateAnimation *animation;
     yyjson_val *name;
     yyjson_val *frames;
@@ -191,7 +191,7 @@ static EngineResult state_load_animation_definition(yyjson_val *definition) {
             .size = {size.x, size.y}
         };
     }
-    asset_result = graphics_load_animation(animation->descriptor);
+    asset_result = graphics_animation_load(animation->descriptor);
     if(asset_result.kind == ERROR_RESULT_ERROR) {
         *animation = (StateAnimation){0};
         return error_result_error(asset_result.result.error);
@@ -356,7 +356,7 @@ static bool state_ui_bounds(yyjson_val *value, UIRect *bounds) {
     return true;
 }
 
-static EngineResult state_load_ui_font_definition(yyjson_val *value) {
+static EngineResult state_ui_font_definition_load(yyjson_val *value) {
     yyjson_val *name;
     yyjson_val *file;
     double point_size;
@@ -383,7 +383,7 @@ static EngineResult state_load_ui_font_definition(yyjson_val *value) {
     return error_result_value(true);
 }
 
-static EngineResult state_load_ui_label_definition(yyjson_val *value) {
+static EngineResult state_ui_label_definition_load(yyjson_val *value) {
     yyjson_val *name;
     yyjson_val *text;
     yyjson_val *font;
@@ -415,7 +415,7 @@ static EngineResult state_load_ui_label_definition(yyjson_val *value) {
     return error_result_value(true);
 }
 
-static EngineResult state_load_ui_slider_definition(yyjson_val *value) {
+static EngineResult state_ui_slider_definition_load(yyjson_val *value) {
     yyjson_val *name;
     yyjson_val *range;
     yyjson_val *style;
@@ -437,7 +437,7 @@ static EngineResult state_load_ui_slider_definition(yyjson_val *value) {
     font = yyjson_obj_get(value, "font");
     value_format = yyjson_obj_get(value, "value_format");
     text_color = yyjson_obj_get(value, "text_color");
-    definition.config = ui_default_slider_config();
+    definition.config = ui_slider_config_default_get();
     if(!yyjson_is_str(name) || yyjson_get_len(name) == 0
             || yyjson_get_len(name) >= UI_DEFINITION_NAME_MAX
             || !state_vec2(yyjson_obj_get(value, "center"), &definition.config.center)
@@ -563,7 +563,7 @@ static EngineResult state_load_ui_slider_definition(yyjson_val *value) {
     return error_result_value(true);
 }
 
-static EngineResult state_load_ui_button_definition(yyjson_val *value) {
+static EngineResult state_ui_button_definition_load(yyjson_val *value) {
     yyjson_val *name;
     yyjson_val *label;
     yyjson_val *font;
@@ -613,7 +613,7 @@ static EngineResult state_load_ui_button_definition(yyjson_val *value) {
     if(text_color == NULL) {
         definition.text_color = (Color){255, 255, 255, 255};
     }
-    definition.style = ui_default_button_style();
+    definition.style = ui_button_style_default_get();
     if(style != NULL) {
 #define LOAD_UI_COLOR(Key, Field) do { \
     yyjson_val *color_value = yyjson_obj_get(style, Key); \
@@ -674,7 +674,7 @@ static bool state_optional_boolean(
     return true;
 }
 
-static EngineResult state_apply_placement(
+static EngineResult state_placement_apply(
         const StateLoadedEntity *loaded
 ) {
     yyjson_val *placement;
@@ -803,7 +803,7 @@ static EngineResult state_resolve_name(yyjson_val *value, Entity *entity) {
     return error_result_value(true);
 }
 
-static EngineResult state_load_camera(yyjson_val *camera) {
+static EngineResult state_camera_load(yyjson_val *camera) {
     yyjson_val *attachment;
     yyjson_val *transform;
     yyjson_val *entity_name;
@@ -831,11 +831,13 @@ static EngineResult state_load_camera(yyjson_val *camera) {
                 || !state_number(transform, "orientation", &orientation)) {
             return error_result_error(ERROR_ENGINE_STATE_INVALID);
         }
-        graphics_active_camera_set((Camera){
-            .position = position,
-            .orientation = (Orientation)orientation
-        });
-        return error_result_value(true);
+        return graphics_camera_set(
+            graphics_camera_active_get(),
+            (Camera){
+                .position = position,
+                .orientation = (Orientation)orientation
+            }
+        );
     }
 
     entity_name = yyjson_obj_get(attachment, "entity");
@@ -864,7 +866,7 @@ static EngineResult state_load_camera(yyjson_val *camera) {
     }
     result = state_resolve_name(entity_name, &entity);
     if(result.kind == ERROR_RESULT_ERROR) return result;
-    return graphics_attach_camera_with_options(
+    return graphics_camera_with_options_attach(
         entity,
         position_offset,
         (Orientation)orientation_offset,
@@ -1119,7 +1121,7 @@ static RohrComponentMask state_flag_mask(const char *flag) {
     return NONE;
 }
 
-static EngineResult state_load_shape(EntityIndex index, yyjson_val *value) {
+static EngineResult state_shape_load(EntityIndex index, yyjson_val *value) {
     yyjson_val *vertex;
     size_t vertex_index;
     size_t vertex_count;
@@ -1145,7 +1147,7 @@ static EngineResult state_load_shape(EntityIndex index, yyjson_val *value) {
     return error_result_value(true);
 }
 
-static EngineResult state_load_components(
+static EngineResult state_components_load(
         Entity entity,
         yyjson_val *components,
         uint64_t instance,
@@ -1249,7 +1251,7 @@ static EngineResult state_load_components(
 
     value = yyjson_obj_get(components, "hit_box");
     if(value != NULL) {
-        result = state_load_shape(index, value);
+        result = state_shape_load(index, value);
         if(result.kind == ERROR_RESULT_ERROR) return result;
     }
 
@@ -1486,11 +1488,11 @@ static EngineResult state_load_components(
             return error_result_error(ERROR_ENGINE_STATE_INVALID);
         }
         scale = (Scale){scale_value.x, scale_value.y};
-        sprite = graphics_create_animated_sprite(animation->asset, scale);
+        sprite = graphics_animated_sprite_create(animation->asset, scale);
         sprite.animation.time_per_frame = time_per_frame;
         sprite.animation.ticks_per_frame = ticks_per_frame;
         sprite.animation_frame = start_frame;
-        result = graphics_add_animated_sprite(entity, sprite);
+        result = graphics_animated_sprite_add(entity, sprite);
         if(result.kind == ERROR_RESULT_ERROR) return result;
         state_sprite_references[index] = (StateSpriteReference){
             .used = true,
@@ -1537,7 +1539,7 @@ static void state_rollback(Entity *created, size_t created_count) {
     }
 }
 
-EngineResult game_state_load_files(const char *const *paths, size_t path_count) {
+EngineResult game_state_files_load(const char *const *paths, size_t path_count) {
     StateDocument *documents;
     Entity *created;
     StateLoadedEntity *loaded;
@@ -1660,7 +1662,7 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
             font_count,
             definition
         ) {
-            result = state_load_ui_font_definition(definition);
+            result = state_ui_font_definition_load(definition);
             if(result.kind == ERROR_RESULT_ERROR) goto cleanup;
         }
     }
@@ -1676,7 +1678,7 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
             slider_count,
             definition
         ) {
-            result = state_load_ui_slider_definition(definition);
+            result = state_ui_slider_definition_load(definition);
             if(result.kind == ERROR_RESULT_ERROR) goto cleanup;
         }
     }
@@ -1692,7 +1694,7 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
             label_count,
             definition
         ) {
-            result = state_load_ui_label_definition(definition);
+            result = state_ui_label_definition_load(definition);
             if(result.kind == ERROR_RESULT_ERROR) goto cleanup;
         }
     }
@@ -1708,7 +1710,7 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
             button_count,
             definition
         ) {
-            result = state_load_ui_button_definition(definition);
+            result = state_ui_button_definition_load(definition);
             if(result.kind == ERROR_RESULT_ERROR) goto cleanup;
         }
     }
@@ -1758,7 +1760,7 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
             animation_count,
             definition
         ) {
-            result = state_load_animation_definition(definition);
+            result = state_animation_definition_load(definition);
             if(result.kind == ERROR_RESULT_ERROR) goto cleanup;
         }
     }
@@ -1820,20 +1822,20 @@ EngineResult game_state_load_files(const char *const *paths, size_t path_count) 
             result = error_result_error(ERROR_ENGINE_STATE_INVALID);
             goto cleanup;
         }
-        result = state_load_components(
+        result = state_components_load(
             loaded[created_count].entity,
             components,
             loaded[created_count].instance,
             loaded[created_count].instance_count
         );
         if(result.kind == ERROR_RESULT_ERROR) goto cleanup;
-        result = state_apply_placement(&loaded[created_count]);
+        result = state_placement_apply(&loaded[created_count]);
         if(result.kind == ERROR_RESULT_ERROR) goto cleanup;
     }
 
     for(document_index = 0; document_index < path_count; document_index += 1) {
         if(documents[document_index].camera == NULL) continue;
-        result = state_load_camera(documents[document_index].camera);
+        result = state_camera_load(documents[document_index].camera);
         if(result.kind == ERROR_RESULT_ERROR) goto cleanup;
     }
 
@@ -1890,18 +1892,18 @@ cleanup:
     return result;
 }
 
-EngineResult game_state_load_file(const char *path) {
-    return game_state_load_files(&path, 1);
+EngineResult game_state_file_load(const char *path) {
+    return game_state_files_load(&path, 1);
 }
 
-static yyjson_mut_val *state_write_vec2(yyjson_mut_doc *document, Vec2D value) {
+static yyjson_mut_val *state_vec2_write(yyjson_mut_doc *document, Vec2D value) {
     yyjson_mut_val *object = yyjson_mut_obj(document);
     yyjson_mut_obj_add_real(document, object, "x", value.x);
     yyjson_mut_obj_add_real(document, object, "y", value.y);
     return object;
 }
 
-static yyjson_mut_val *state_write_color(
+static yyjson_mut_val *state_color_write(
         yyjson_mut_doc *document,
         Color color
 ) {
@@ -1913,7 +1915,7 @@ static yyjson_mut_val *state_write_color(
     return object;
 }
 
-static yyjson_mut_val *state_write_ui_button(
+static yyjson_mut_val *state_ui_button_write(
         yyjson_mut_doc *document,
         const UIButtonDefinition *button
 ) {
@@ -1930,22 +1932,22 @@ static yyjson_mut_val *state_write_ui_button(
     yyjson_mut_obj_add_strcpy(document, definition, "label", button->label);
     if(button->font[0] != '\0') {
         yyjson_mut_obj_add_strcpy(document, definition, "font", button->font);
-        yyjson_mut_obj_add_val(document, definition, "text_color", state_write_color(document, button->text_color));
+        yyjson_mut_obj_add_val(document, definition, "text_color", state_color_write(document, button->text_color));
     }
     yyjson_mut_obj_add_real(document, bounds, "x", button->bounds.x);
     yyjson_mut_obj_add_real(document, bounds, "y", button->bounds.y);
     yyjson_mut_obj_add_real(document, bounds, "width", button->bounds.width);
     yyjson_mut_obj_add_real(document, bounds, "height", button->bounds.height);
     yyjson_mut_obj_add_val(document, definition, "bounds", bounds);
-    yyjson_mut_obj_add_val(document, style, "idle", state_write_color(document, button->style.idle));
-    yyjson_mut_obj_add_val(document, style, "hovered", state_write_color(document, button->style.hovered));
-    yyjson_mut_obj_add_val(document, style, "pressed", state_write_color(document, button->style.pressed));
-    yyjson_mut_obj_add_val(document, style, "disabled", state_write_color(document, button->style.disabled));
+    yyjson_mut_obj_add_val(document, style, "idle", state_color_write(document, button->style.idle));
+    yyjson_mut_obj_add_val(document, style, "hovered", state_color_write(document, button->style.hovered));
+    yyjson_mut_obj_add_val(document, style, "pressed", state_color_write(document, button->style.pressed));
+    yyjson_mut_obj_add_val(document, style, "disabled", state_color_write(document, button->style.disabled));
     yyjson_mut_obj_add_val(document, definition, "style", style);
     return definition;
 }
 
-static yyjson_mut_val *state_write_ui_font(
+static yyjson_mut_val *state_ui_font_write(
         yyjson_mut_doc *document,
         const UIFontDefinition *font
 ) {
@@ -1957,7 +1959,7 @@ static yyjson_mut_val *state_write_ui_font(
     return definition;
 }
 
-static yyjson_mut_val *state_write_ui_label(
+static yyjson_mut_val *state_ui_label_write(
         yyjson_mut_doc *document,
         const UILabelDefinition *label
 ) {
@@ -1970,7 +1972,7 @@ static yyjson_mut_val *state_write_ui_label(
     yyjson_mut_obj_add_strcpy(document, definition, "name", label->name);
     yyjson_mut_obj_add_strcpy(document, definition, "text", label->text);
     yyjson_mut_obj_add_strcpy(document, definition, "font", label->font);
-    yyjson_mut_obj_add_val(document, definition, "color", state_write_color(document, label->color));
+    yyjson_mut_obj_add_val(document, definition, "color", state_color_write(document, label->color));
     yyjson_mut_obj_add_real(document, bounds, "x", label->bounds.x);
     yyjson_mut_obj_add_real(document, bounds, "y", label->bounds.y);
     yyjson_mut_obj_add_real(document, bounds, "width", label->bounds.width);
@@ -1979,7 +1981,7 @@ static yyjson_mut_val *state_write_ui_label(
     return definition;
 }
 
-static yyjson_mut_val *state_write_ui_slider(
+static yyjson_mut_val *state_ui_slider_write(
         yyjson_mut_doc *document,
         const UISliderDefinition *slider
 ) {
@@ -1998,7 +2000,7 @@ static yyjson_mut_val *state_write_ui_slider(
     yyjson_mut_obj_add_strcpy(document, definition, "font", slider->font);
     yyjson_mut_obj_add_strcpy(document, definition, "value_format", slider->value_format);
     yyjson_mut_obj_add_val(document, definition, "text_color",
-        state_write_color(document, slider->text_color));
+        state_color_write(document, slider->text_color));
     yyjson_mut_obj_add_real(document, center, "x", slider->config.center.x);
     yyjson_mut_obj_add_real(document, center, "y", slider->config.center.y);
     yyjson_mut_obj_add_val(document, definition, "center", center);
@@ -2009,11 +2011,11 @@ static yyjson_mut_val *state_write_ui_slider(
     yyjson_mut_obj_add_val(document, definition, "range", range);
     yyjson_mut_obj_add_real(document, definition, "step", slider->config.step);
     yyjson_mut_obj_add_real(document, definition, "initial_value", slider->initial_value);
-    yyjson_mut_obj_add_val(document, style, "track", state_write_color(document, slider->config.style.track));
-    yyjson_mut_obj_add_val(document, style, "fill", state_write_color(document, slider->config.style.fill));
-    yyjson_mut_obj_add_val(document, style, "handle", state_write_color(document, slider->config.style.handle));
-    yyjson_mut_obj_add_val(document, style, "handle_hovered", state_write_color(document, slider->config.style.handle_hovered));
-    yyjson_mut_obj_add_val(document, style, "handle_pressed", state_write_color(document, slider->config.style.handle_pressed));
+    yyjson_mut_obj_add_val(document, style, "track", state_color_write(document, slider->config.style.track));
+    yyjson_mut_obj_add_val(document, style, "fill", state_color_write(document, slider->config.style.fill));
+    yyjson_mut_obj_add_val(document, style, "handle", state_color_write(document, slider->config.style.handle));
+    yyjson_mut_obj_add_val(document, style, "handle_hovered", state_color_write(document, slider->config.style.handle_hovered));
+    yyjson_mut_obj_add_val(document, style, "handle_pressed", state_color_write(document, slider->config.style.handle_pressed));
     yyjson_mut_obj_add_real(document, style, "track_thickness", slider->config.style.track_thickness);
     yyjson_mut_obj_add_real(document, style, "handle_width", slider->config.style.handle_width);
     yyjson_mut_obj_add_real(document, style, "handle_height", slider->config.style.handle_height);
@@ -2023,7 +2025,7 @@ static yyjson_mut_val *state_write_ui_slider(
     return definition;
 }
 
-static void state_write_named_reference(
+static void state_named_reference_write(
         yyjson_mut_doc *document,
         yyjson_mut_val *components,
         const char *key,
@@ -2034,7 +2036,7 @@ static void state_write_named_reference(
         yyjson_mut_obj_add_strcpy(document, components, key, name.result.value.value);
 }
 
-EngineResult game_state_save_file(const char *path) {
+EngineResult game_state_file_save(const char *path) {
     yyjson_mut_doc *document;
     yyjson_mut_val *root;
     yyjson_mut_val *entity_array;
@@ -2092,7 +2094,7 @@ EngineResult game_state_save_file(const char *path) {
                     document,
                     attachment_value,
                     "position_offset",
-                    state_write_vec2(document, attachment.position_offset)
+                    state_vec2_write(document, attachment.position_offset)
                 );
                 yyjson_mut_obj_add_real(
                     document,
@@ -2121,13 +2123,21 @@ EngineResult game_state_save_file(const char *path) {
             }
         }
         if(yyjson_mut_obj_size(camera) == 0) {
-            Camera camera_value = graphics_active_camera_get();
+            CameraResult camera_result = graphics_camera_get(
+                graphics_camera_active_get()
+            );
+            Camera camera_value;
+            if(camera_result.kind == ERROR_RESULT_ERROR) {
+                yyjson_mut_doc_free(document);
+                return error_result_error(camera_result.result.error);
+            }
+            camera_value = camera_result.result.value;
             yyjson_mut_val *transform = yyjson_mut_obj(document);
             yyjson_mut_obj_add_val(
                 document,
                 transform,
                 "position",
-                state_write_vec2(document, camera_value.position)
+                state_vec2_write(document, camera_value.position)
             );
             yyjson_mut_obj_add_real(
                 document,
@@ -2184,7 +2194,7 @@ EngineResult game_state_save_file(const char *path) {
                 document,
                 frame,
                 "size",
-                state_write_vec2(
+                state_vec2_write(
                     document,
                     (Vec2D){texture->size.x, texture->size.y}
                 )
@@ -2196,7 +2206,7 @@ EngineResult game_state_save_file(const char *path) {
     }
 
     for(position = 0; position < state_ui_button_count; position += 1) {
-        yyjson_mut_val *definition = state_write_ui_button(
+        yyjson_mut_val *definition = state_ui_button_write(
             document,
             &state_ui_buttons[position].definition
         );
@@ -2209,19 +2219,19 @@ EngineResult game_state_save_file(const char *path) {
     for(position = 0; position < state_ui_font_count; position += 1) {
         yyjson_mut_arr_add_val(
             ui_fonts,
-            state_write_ui_font(document, &state_ui_fonts[position].definition)
+            state_ui_font_write(document, &state_ui_fonts[position].definition)
         );
     }
     for(position = 0; position < state_ui_label_count; position += 1) {
         yyjson_mut_arr_add_val(
             ui_labels,
-            state_write_ui_label(document, &state_ui_labels[position].definition)
+            state_ui_label_write(document, &state_ui_labels[position].definition)
         );
     }
     for(position = 0; position < state_ui_slider_count; position += 1) {
         yyjson_mut_arr_add_val(
             ui_sliders,
-            state_write_ui_slider(document, &state_ui_sliders[position].definition)
+            state_ui_slider_write(document, &state_ui_sliders[position].definition)
         );
     }
 
@@ -2255,10 +2265,10 @@ EngineResult game_state_save_file(const char *path) {
         if(mask & HOLD) yyjson_mut_arr_add_str(document, flags, "hold");
         if(yyjson_mut_arr_size(flags) > 0) yyjson_mut_obj_add_val(document, components, "flags", flags);
 
-        if(positions_pool.used[index]) yyjson_mut_obj_add_val(document, components, "position", state_write_vec2(document, positions[index]));
-        if(velocities_pool.used[index]) yyjson_mut_obj_add_val(document, components, "velocity", state_write_vec2(document, velocities[index]));
-        if(accelerations_pool.used[index]) yyjson_mut_obj_add_val(document, components, "acceleration", state_write_vec2(document, accelerations[index]));
-        if(forces_pool.used[index]) yyjson_mut_obj_add_val(document, components, "force", state_write_vec2(document, forces[index]));
+        if(positions_pool.used[index]) yyjson_mut_obj_add_val(document, components, "position", state_vec2_write(document, positions[index]));
+        if(velocities_pool.used[index]) yyjson_mut_obj_add_val(document, components, "velocity", state_vec2_write(document, velocities[index]));
+        if(accelerations_pool.used[index]) yyjson_mut_obj_add_val(document, components, "acceleration", state_vec2_write(document, accelerations[index]));
+        if(forces_pool.used[index]) yyjson_mut_obj_add_val(document, components, "force", state_vec2_write(document, forces[index]));
         if(mass_pool.used[index]) yyjson_mut_obj_add_real(document, components, "mass", mass[index]);
         if(orientations_pool.used[index]) yyjson_mut_obj_add_real(document, components, "orientation", orientations[index]);
         if(angular_velocities_pool.used[index]) yyjson_mut_obj_add_real(document, components, "angular_velocity", angular_velocities[index]);
@@ -2269,11 +2279,11 @@ EngineResult game_state_save_file(const char *path) {
         if(hit_boxes_pool.used[index]) {
             yyjson_mut_val *vertices = yyjson_mut_arr(document);
             for(i = 0; i < hit_boxes[index].amount_of_vertices; i += 1)
-                yyjson_mut_arr_add_val(vertices, state_write_vec2(document, hit_boxes[index].vertices[i]));
+                yyjson_mut_arr_add_val(vertices, state_vec2_write(document, hit_boxes[index].vertices[i]));
             yyjson_mut_obj_add_val(document, components, "hit_box", vertices);
         }
-        if(targets_pool.used[index]) state_write_named_reference(document, components, "target", targets[index]);
-        if(parents_pool.used[index]) state_write_named_reference(document, components, "parent", parents[index]);
+        if(targets_pool.used[index]) state_named_reference_write(document, components, "target", targets[index]);
+        if(parents_pool.used[index]) state_named_reference_write(document, components, "parent", parents[index]);
         if(life_times_pool.used[index]) {
             yyjson_mut_val *lifetime = yyjson_mut_obj(document);
             yyjson_mut_obj_add_real(document, lifetime, "time", life_times[index].expirey_time);
@@ -2288,8 +2298,8 @@ EngineResult game_state_save_file(const char *path) {
         }
         if(axis_locks_pool.used[index]) {
             yyjson_mut_val *lock = yyjson_mut_obj(document);
-            yyjson_mut_obj_add_val(document, lock, "axis", state_write_vec2(document, axis_locks[index].axis));
-            yyjson_mut_obj_add_val(document, lock, "point", state_write_vec2(document, axis_locks[index].point_on_axis));
+            yyjson_mut_obj_add_val(document, lock, "axis", state_vec2_write(document, axis_locks[index].axis));
+            yyjson_mut_obj_add_val(document, lock, "point", state_vec2_write(document, axis_locks[index].point_on_axis));
             yyjson_mut_obj_add_val(document, components, "axis_lock", lock);
         }
         if(transform_locks_pool.used[index]) {
@@ -2297,7 +2307,7 @@ EngineResult game_state_save_file(const char *path) {
             EntityNameResult driver = entity_name_get(transform_locks[index].driver);
             if(driver.kind == ERROR_RESULT_VALUE) {
                 yyjson_mut_obj_add_strcpy(document, lock, "driver", driver.result.value.value);
-                yyjson_mut_obj_add_val(document, lock, "local_offset", state_write_vec2(document, transform_locks[index].local_offset));
+                yyjson_mut_obj_add_val(document, lock, "local_offset", state_vec2_write(document, transform_locks[index].local_offset));
                 yyjson_mut_obj_add_real(document, lock, "local_angle", transform_locks[index].local_angle);
                 yyjson_mut_obj_add_bool(document, lock, "lock_position", transform_locks[index].lock_position);
                 yyjson_mut_obj_add_bool(document, lock, "lock_orientation", transform_locks[index].lock_orientation);
@@ -2315,8 +2325,8 @@ EngineResult game_state_save_file(const char *path) {
                 yyjson_mut_obj_add_str(document, joint, "type", type);
                 yyjson_mut_obj_add_strcpy(document, joint, "a", a.result.value.value);
                 yyjson_mut_obj_add_strcpy(document, joint, "b", b.result.value.value);
-                yyjson_mut_obj_add_val(document, joint, "local_anchor_a", state_write_vec2(document, joints[index].local_anchor_a));
-                yyjson_mut_obj_add_val(document, joint, "local_anchor_b", state_write_vec2(document, joints[index].local_anchor_b));
+                yyjson_mut_obj_add_val(document, joint, "local_anchor_a", state_vec2_write(document, joints[index].local_anchor_a));
+                yyjson_mut_obj_add_val(document, joint, "local_anchor_b", state_vec2_write(document, joints[index].local_anchor_b));
                 yyjson_mut_obj_add_real(document, joint, "rest_length", joints[index].rest_length);
                 yyjson_mut_obj_add_real(document, joint, "stiffness", joints[index].stiffness);
                 yyjson_mut_obj_add_real(document, joint, "damping", joints[index].damping);
@@ -2341,7 +2351,7 @@ EngineResult game_state_save_file(const char *path) {
                 document,
                 sprite,
                 "scale",
-                state_write_vec2(
+                state_vec2_write(
                     document,
                     (Vec2D){reference->scale.x, reference->scale.y}
                 )
@@ -2434,7 +2444,7 @@ static bool state_template_copy_array(
     return true;
 }
 
-EngineResult game_state_save_template_file(const char *path) {
+EngineResult game_state_template_file_save(const char *path) {
     yyjson_mut_doc *document;
     yyjson_mut_val *root;
     yyjson_mut_val *groups;

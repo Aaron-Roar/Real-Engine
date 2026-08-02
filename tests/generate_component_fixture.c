@@ -8,10 +8,10 @@ int main(int argc, char **argv) {
     }
 
     RE_component_registry_init(&registry);
-    if(!RE_component_registry_add_tag(&registry, "DEAD")) {
+    if(!RE_component_registry_tag_add(&registry, "DEAD")) {
         return 1;
     }
-    if(!RE_component_registry_add_component(
+    if(!RE_component_registry_component_add(
             &registry,
             (RE_ComponentDefinition){
                 .name = "HEALTH",
@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
             })) {
         return 1;
     }
-    if(!RE_component_registry_add_component(
+    if(!RE_component_registry_component_add(
             &registry,
             (RE_ComponentDefinition){
                 .name = "INVENTORY",

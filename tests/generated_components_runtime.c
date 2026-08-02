@@ -38,11 +38,11 @@ int main(void) {
     second = second_result.result.value;
     third = third_result.result.value;
 
-    if(!game_dead_set(first) || !game_dead_has(first)) {
+    if(!game_dead_set(first) || !game_dead_check(first)) {
         return 1;
     }
     game_dead_remove(first);
-    if(game_dead_has(first)) {
+    if(game_dead_check(first)) {
         return 1;
     }
 
@@ -66,13 +66,13 @@ int main(void) {
     }
 
     game_health_remove(second);
-    if(game_health_has(second) || !game_health_has(third)) {
+    if(game_health_check(second) || !game_health_check(third)) {
         return 1;
     }
 
     inventory.count = 1;
     game_inventory_destroy_hook_set(inventory_destroy);
-    if(!game_inventory_set(first, inventory) || !game_inventory_has(first)) {
+    if(!game_inventory_set(first, inventory) || !game_inventory_check(first)) {
         return 1;
     }
     inventory.count = 2;
@@ -81,7 +81,7 @@ int main(void) {
     }
 
     game_components_clear(first);
-    if(game_health_has(first) || game_inventory_has(first) || game_dead_has(first) ||
+    if(game_health_check(first) || game_inventory_check(first) || game_dead_check(first) ||
             inventory_destroy_count != 2) {
         return 1;
     }

@@ -52,7 +52,7 @@ void RE_component_registry_init(RE_ComponentRegistry *registry);
  * @return true when the tag exists after the call, false for invalid input,
  * conflicts, or exhausted capacity.
  */
-bool RE_component_registry_add_tag(RE_ComponentRegistry *registry, const char *name);
+bool RE_component_registry_tag_add(RE_ComponentRegistry *registry, const char *name);
 
 /**
  * Register a typed data component.
@@ -62,7 +62,7 @@ bool RE_component_registry_add_tag(RE_ComponentRegistry *registry, const char *n
  * @return true when the component exists after the call, false for invalid
  * input, conflicts, or exhausted capacity.
  */
-bool RE_component_registry_add_component(
+bool RE_component_registry_component_add(
     RE_ComponentRegistry *registry,
     RE_ComponentDefinition definition
 );

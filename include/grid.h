@@ -31,15 +31,15 @@ typedef struct {
 } BooleanPairs;
 
 /** Add an entity to every grid cell touched by its AABB. */
-void add_entity_to_grids(Entity entity);
+void grid_entity_add(Entity entity);
 /** Check whether an entity pair has already been processed. */
-bool grid_pair_checked_is(Entity entity_1, Entity entity_2);
+bool grid_pair_checked_get(Entity entity_1, Entity entity_2);
 /** Mark an entity pair as processed. */
-void add_pair(Entity entity_1, Entity entity_2);
+void grid_pair_add(Entity entity_1, Entity entity_2);
 /** Clear all grid cells and checked-pair state. */
-void clear_grid(void);
+void grid_clear(void);
 /** Recompute and store an entity AABB from its world hitbox. */
-void grid_update_aabb(Entity entity);
+void grid_aabb_update(Entity entity);
 /** Global collision grid. */
 extern Grid grid;
 /** Global checked-pair table. */

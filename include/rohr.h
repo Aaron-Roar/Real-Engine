@@ -38,7 +38,7 @@ void rohr_engine_shutdown(void);
 /**
  * @brief Updates accumulated engine time from the platform clock.
  */
-void rohr_engine_update_time(void);
+void rohr_engine_time_update(void);
 
 /**
  * @brief Returns the current engine time in seconds.
@@ -66,7 +66,7 @@ void rohr_engine_resume(void);
  * @brief Updates elapsed time and consumes every complete fixed tick.
  * @return Number of ticks consumed by this update.
  */
-Tick rohr_engine_update_tick(void);
+Tick rohr_engine_tick_update(void);
 
 /** Sets the real-time duration required for one engine tick. */
 EngineResult rohr_engine_time_per_tick_set(Time time_per_tick);
@@ -77,7 +77,7 @@ Time rohr_engine_time_per_tick_get(void);
  * @brief Polls one SDL event.
  * @return SDL event value returned by the engine event poller.
  */
-SDL_Event rohr_engine_poll_event(void);
+SDL_Event rohr_engine_event_poll(void);
 
 /**
  * @brief Checks whether the engine is paused.
@@ -88,7 +88,7 @@ bool rohr_engine_paused_is(void);
 /**
  * @brief Resets the engine clock baseline.
  */
-void rohr_engine_reset_clock(void);
+void rohr_engine_clock_reset(void);
 
 /**
  * @brief Creates a successful boolean engine result.
@@ -116,7 +116,7 @@ EngineResult rohr_error_result_error(EngineError error);
  * @param error Error code to describe.
  * @return Static string describing error.
  */
-const char *rohr_error_default_message(EngineError error);
+const char *rohr_error_default_message_get(EngineError error);
 
 /**
  * @brief Returns the symbolic name for an engine error.
@@ -129,12 +129,12 @@ const char *rohr_error_string(EngineError error);
  * @brief Prints an engine error message to stderr.
  * @param error Error code to print.
  */
-void rohr_error_print_stderr(EngineError error);
+void rohr_error_stderr_print(EngineError error);
 
 /**
  * @brief Prints buffered console log messages.
  */
-void rohr_console_print_logs(void);
+void rohr_console_logs_print(void);
 
 /**
  * @brief Initializes the engine console.
@@ -164,7 +164,7 @@ void rohr_console_write(LogSourceType source, const char *fmt, ...);
  * @brief Checks whether the console is active.
  * @return true when active, false otherwise.
  */
-bool rohr_console_active_is(void);
+bool rohr_console_active_get(void);
 
 /**
  * @brief Writes a formatted debug message when debug logging is enabled.
@@ -184,14 +184,14 @@ void rohr_console_debug_set(bool state);
  * @param entity Stable entity id to inspect.
  * @return true when the entity is alive, false otherwise.
  */
-bool rohr_entity_alive_is(Entity entity);
+bool rohr_entity_alive_check(Entity entity);
 
 /**
  * @brief Checks whether an entity table index currently contains a live entity.
  * @param index Component table index to inspect.
  * @return true when the index contains a live entity, false otherwise.
  */
-bool rohr_entity_index_alive_is(EntityIndex index);
+bool rohr_entity_index_alive_check(EntityIndex index);
 
 /**
  * @brief Returns the number of currently alive entities.
@@ -222,7 +222,7 @@ EntityIndexResult rohr_entity_index_get(Entity entity);
  * @param index Component table index to inspect.
  * @return EntityResult containing the entity id, or an error.
  */
-EntityResult rohr_entity_from_index(EntityIndex index);
+EntityResult rohr_entity_from_index_get(EntityIndex index);
 
 /**
  * @brief Creates a new entity.
@@ -244,10 +244,10 @@ EntityResult rohr_entity_by_name_get(const char *name);
 EntityNameResult rohr_entity_name_get(Entity entity);
 
 /** Loads and merges one JSON game-state file. */
-EngineResult rohr_game_state_load_file(const char *path);
+EngineResult rohr_game_state_file_load(const char *path);
 
 /** Loads multiple JSON files with cross-file name resolution. */
-EngineResult rohr_game_state_load_files(const char *const *paths, size_t path_count);
+EngineResult rohr_game_state_files_load(const char *const *paths, size_t path_count);
 
 /** @brief Finds a UI button definition loaded from JSON. */
 UIButtonDefinitionResult rohr_ui_button_by_name_get(const char *name);
@@ -262,10 +262,10 @@ UILabelDefinitionResult rohr_ui_label_by_name_get(const char *name);
 UISliderDefinitionResult rohr_ui_slider_by_name_get(const char *name);
 
 /** Saves all named live entities to a JSON game-state file. */
-EngineResult rohr_game_state_save_file(const char *path);
+EngineResult rohr_game_state_file_save(const char *path);
 
 /** Saves retained authored definitions without expanding prototypes. */
-EngineResult rohr_game_state_save_template_file(const char *path);
+EngineResult rohr_game_state_template_file_save(const char *path);
 
 /**
  * @brief Deletes an entity and releases its slot for reuse.
@@ -280,7 +280,7 @@ EngineResult rohr_entity_delete(Entity entity);
  * @param mask Component mask to add.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_entity_add_components(Entity entity, RohrComponentMask mask);
+EngineResult rohr_entity_components_add(Entity entity, RohrComponentMask mask);
 
 /**
  * @brief Checks whether an entity has all requested components.
@@ -288,7 +288,7 @@ EngineResult rohr_entity_add_components(Entity entity, RohrComponentMask mask);
  * @param components Component mask to test.
  * @return true when entity has every requested component, false otherwise.
  */
-bool rohr_entity_components_has(Entity entity, RohrComponentMask components);
+bool rohr_entity_components_check(Entity entity, RohrComponentMask components);
 
 /**
  * @brief Checks whether an entity table index has all requested components.
@@ -296,7 +296,7 @@ bool rohr_entity_components_has(Entity entity, RohrComponentMask components);
  * @param components Component mask to test.
  * @return true when index has every requested component, false otherwise.
  */
-bool rohr_entity_index_components_has(EntityIndex index, RohrComponentMask components);
+bool rohr_entity_index_components_check(EntityIndex index, RohrComponentMask components);
 
 /**
  * @brief Creates a reusable entity group.
@@ -342,7 +342,7 @@ EngineResult rohr_entity_group_remove(GroupId group, Entity entity);
  * @param entity Entity id to search for.
  * @return true when entity belongs to the group.
  */
-bool rohr_entity_group_entity_has(GroupId group, Entity entity);
+bool rohr_entity_group_entity_check(GroupId group, Entity entity);
 
 /**
  * @brief Returns an entity group.
@@ -364,7 +364,7 @@ EntityGroupMembershipResult rohr_entity_groups_get(Entity entity);
  * @param mask Component mask to remove.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_entity_delete_components(Entity entity, RohrComponentMask mask);
+EngineResult rohr_entity_components_delete(Entity entity, RohrComponentMask mask);
 
 /**
  * @brief Adds a child relationship from parent to child.
@@ -387,7 +387,7 @@ EngineResult rohr_entity_parent_set(Entity child, Entity parent);
  * @param child Child entity id.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_entity_remove_parent(Entity child);
+EngineResult rohr_entity_parent_remove(Entity child);
 
 /**
  * @brief Removes a child relationship from a parent entity.
@@ -395,7 +395,7 @@ EngineResult rohr_entity_remove_parent(Entity child);
  * @param child Child entity id.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_entity_remove_child(Entity parent, Entity child);
+EngineResult rohr_entity_child_remove(Entity parent, Entity child);
 
 /**
  * @brief Returns the children group assigned to an entity.
@@ -425,18 +425,18 @@ EngineResult rohr_entity_life_time_set(Entity entity, Time expirey_time, Tick ex
  * @param entity Stable entity id to modify.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_entity_remove_life_time(Entity entity);
+EngineResult rohr_entity_life_time_remove(Entity entity);
 
 /** Sets an explicit simulation delta per engine tick. */
 EngineResult rohr_physics_dt_per_tick_set(Time dt);
 /** Returns the current physics delta per tick. */
 Time rohr_physics_dt_per_tick_get(void);
 /** Restores the engine time-per-tick default. */
-void rohr_physics_use_engine_time_per_tick(void);
+void rohr_physics_engine_time_per_tick_use(void);
 /** Advances physics using the supplied number of elapsed engine ticks. */
 void rohr_physics_update(Tick ticks);
 /** Advances physics once with an explicit exceptional delta. */
-void rohr_physics_update_dt(Time dt);
+void rohr_physics_dt_update(Time dt);
 
 /**
  * @brief Translates a local shape into world space.
@@ -476,7 +476,7 @@ Vec1D rohr_physics_circle_moment_of_inertia(Shape circle, Mass mass_value);
  * @param index Entity table index to inspect.
  * @return true when index is live and held, false otherwise.
  */
-bool rohr_physics_entity_held_is(EntityIndex index);
+bool rohr_physics_entity_held_get(EntityIndex index);
 
 /**
  * @brief Sets an entity acceleration component value.
@@ -618,14 +618,14 @@ EngineResult rohr_physics_group_velocity_away_from_entity_set(GroupId group, flo
  * @param entity Entity to modify.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_stop_entity(Entity entity);
+EngineResult rohr_physics_entity_stop(Entity entity);
 
 /**
  * @brief Sets velocity to zero for every live entity in a group.
  * @param group Group id to update.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_group_stop_entities(GroupId group);
+EngineResult rohr_physics_group_entities_stop(GroupId group);
 
 /**
  * @brief Applies an immediate linear impulse to an entity velocity.
@@ -633,7 +633,7 @@ EngineResult rohr_physics_group_stop_entities(GroupId group);
  * @param impulse Impulse vector.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_apply_impulse(Entity entity, Vec2D impulse);
+EngineResult rohr_physics_impulse_apply(Entity entity, Vec2D impulse);
 
 /**
  * @brief Sets an entity position component value.
@@ -673,7 +673,7 @@ EngineResult rohr_physics_force_component_set(Entity entity, Force force);
  * @param f Force vector.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_apply_force_for_one_tick(Entity entity, Force f);
+EngineResult rohr_physics_force_for_one_tick_apply(Entity entity, Force f);
 
 /**
  * @brief Sets an entity torque component value.
@@ -697,7 +697,7 @@ EngineResult rohr_physics_torque_component_set(Entity entity, Torque torque);
  * @param t Torque value.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_apply_torque_for_one_tick(Entity entity, Torque t);
+EngineResult rohr_physics_torque_for_one_tick_apply(Entity entity, Torque t);
 
 /**
  * @brief Sets an entity hitbox component value.
@@ -708,7 +708,7 @@ EngineResult rohr_physics_apply_torque_for_one_tick(Entity entity, Torque t);
 EngineResult rohr_physics_hitbox_set(Entity entity, Shape hitbox);
 
 /** Return the default collision filtering configuration. */
-CollisionFilterConfig rohr_physics_collision_filter_default_config(void);
+CollisionFilterConfig rohr_physics_collision_filter_config_default_get(void);
 /** Replace an entity's collision category and whitelist. */
 EngineResult rohr_physics_collision_filter_set(Entity entity, CollisionFilterConfig config);
 /** Return an entity's collision filtering configuration. */
@@ -722,7 +722,7 @@ EngineResult rohr_physics_collision_with_all_set(Entity entity);
 /** Prevent an entity from colliding with every category. */
 EngineResult rohr_physics_collision_with_none_set(Entity entity);
 /** Return whether two entities mutually permit collision checks. */
-bool rohr_physics_collision_between_is(Entity entity_1, Entity entity_2);
+bool rohr_physics_collision_between_check(Entity entity_1, Entity entity_2);
 
 /**
  * @brief Sets an entity orientation component value.
@@ -774,28 +774,28 @@ EngineResult rohr_physics_static_set(Entity entity);
  * @param entity Entity to modify.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_hold_entity(Entity entity);
+EngineResult rohr_physics_entity_hold(Entity entity);
 
 /**
  * @brief Removes HOLD without changing STATIC or DYNAMIC state.
  * @param entity Entity to modify.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_unhold_entity(Entity entity);
+EngineResult rohr_physics_entity_unhold(Entity entity);
 
 /**
  * @brief Adds HOLD to every live entity in a group.
  * @param group Group id to update.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_group_hold_entities(GroupId group);
+EngineResult rohr_physics_group_entities_hold(GroupId group);
 
 /**
  * @brief Removes HOLD from every live entity in a group.
  * @param group Group id to update.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_group_unhold_entities(GroupId group);
+EngineResult rohr_physics_group_entities_unhold(GroupId group);
 
 /**
  * @brief Locks an entity orientation between minimum and maximum angles.
@@ -849,7 +849,7 @@ EngineResult rohr_physics_transform_lock_set(
  * @param entity Entity to modify.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_remove_transform_lock(Entity entity);
+EngineResult rohr_physics_transform_lock_remove(Entity entity);
 
 /**
  * @brief Locks one entity to another using their current transform offset.
@@ -1008,7 +1008,7 @@ bool rohr_physics_collision_report_get(Entity entity, Entity target);
  * @param hex_color_code Hex color value.
  * @return Color created from hex_color_code.
  */
-Color rohr_graphics_create_color_hex(uint32_t hex_color_code);
+Color rohr_graphics_color_hex_create(uint32_t hex_color_code);
 
 /**
  * @brief Starts the graphics system.
@@ -1026,22 +1026,22 @@ void rohr_graphics_end(void);
  * @param event Destination for the SDL event.
  * @return true when an event was read, false otherwise.
  */
-bool rohr_graphics_poll_events(SDL_Event *event);
+bool rohr_graphics_events_poll(SDL_Event *event);
 
 /**
  * @brief Draws the frame background.
  * @param color Background color.
  */
-void rohr_graphics_draw_background(Color color);
+void rohr_graphics_background_draw(Color color);
 
 /**
  * @brief Draws a filled rectangle in logical screen coordinates.
  * @return true when SDL accepted the draw command.
  */
-bool rohr_graphics_draw_screen_rect(float x, float y, float width, float height, Color color);
+bool rohr_graphics_screen_rect_draw(float x, float y, float width, float height, Color color);
 
 /** @brief Draws a centered rotated rectangle in logical screen space. */
-bool rohr_graphics_draw_screen_quad(Position center, float width, float height, float angle, Color color);
+bool rohr_graphics_screen_quad_draw(Position center, float width, float height, float angle, Color color);
 
 /**
  * @brief Presents the current graphics frame.
@@ -1053,7 +1053,7 @@ void rohr_graphics_show(void);
  * @param entity Entity whose hitbox should be drawn.
  * @param fill_type Fill mode for drawing.
  */
-void rohr_graphics_draw_hit_box(Entity entity, Fill fill_type);
+void rohr_graphics_hit_box_draw(Entity entity, Fill fill_type);
 
 /**
  * @brief Draws one entity hitbox with a caller supplied color.
@@ -1061,12 +1061,12 @@ void rohr_graphics_draw_hit_box(Entity entity, Fill fill_type);
  * @param fill_type Fill mode for drawing.
  * @param color Color to draw with.
  */
-void rohr_graphics_draw_hit_box_colored(Entity entity, Fill fill_type, Color color);
+void rohr_graphics_hit_box_colored_draw(Entity entity, Fill fill_type, Color color);
 
 /**
  * @brief Draws hitboxes for all renderable hitbox entities.
  */
-void rohr_graphics_draw_hit_boxes(void);
+void rohr_graphics_hit_boxes_draw(void);
 
 /**
  * @brief Draws one joint using an engineering-style debug symbol.
@@ -1074,42 +1074,42 @@ void rohr_graphics_draw_hit_boxes(void);
  * @param color Symbol color.
  * @return true when the symbol was drawn successfully.
  */
-bool rohr_graphics_draw_joint(Entity joint, Color color);
+bool rohr_graphics_joint_draw(Entity joint, Color color);
 
 /**
  * @brief Draws all live joints using engineering-style debug symbols.
  * @param color Symbol color.
  */
-void rohr_graphics_draw_joints(Color color);
+void rohr_graphics_joints_draw(Color color);
 
 /**
  * @brief Loads a texture asset.
  * @param text_desc Texture descriptor containing load settings.
  * @return TextureAssetResult containing the asset, or an error.
  */
-TextureAssetResult rohr_graphics_load_texture(TextureDescriptor text_desc);
+TextureAssetResult rohr_graphics_texture_load(TextureDescriptor text_desc);
 
 /** @brief Loads a caller-owned font asset. */
-FontAssetResult rohr_graphics_load_font(FontDescriptor descriptor);
+FontAssetResult rohr_graphics_font_load(FontDescriptor descriptor);
 
 /** @brief Destroys a font after its text assets have been destroyed. */
-void rohr_graphics_destroy_font(FontAsset *font);
+void rohr_graphics_font_destroy(FontAsset *font);
 
 /** @brief Creates reusable caller-owned text. */
-TextAssetResult rohr_graphics_create_text(const FontAsset *font, const char *value, Color color);
+TextAssetResult rohr_graphics_text_create(const FontAsset *font, const char *value, Color color);
 
 /** @brief Destroys reusable text. */
-void rohr_graphics_destroy_text(TextAsset *text);
+void rohr_graphics_text_destroy(TextAsset *text);
 
 /** @brief Draws text in logical screen coordinates. */
-bool rohr_graphics_draw_text(const TextAsset *text, Position position);
+bool rohr_graphics_text_draw(const TextAsset *text, Position position);
 
 /**
  * @brief Loads an animation asset.
  * @param anim_desc Animation descriptor containing load settings.
  * @return AnimationAssetResult containing the asset, or an error.
  */
-AnimationAssetResult rohr_graphics_load_animation(AnimationDescriptor anim_desc);
+AnimationAssetResult rohr_graphics_animation_load(AnimationDescriptor anim_desc);
 
 /**
  * @brief Creates an animated sprite from an animation asset.
@@ -1117,7 +1117,7 @@ AnimationAssetResult rohr_graphics_load_animation(AnimationDescriptor anim_desc)
  * @param scale Sprite scale.
  * @return Animated sprite value.
  */
-AnimatedSprite rohr_graphics_create_animated_sprite(AnimationAsset asset_ptr, Scale scale);
+AnimatedSprite rohr_graphics_animated_sprite_create(AnimationAsset asset_ptr, Scale scale);
 
 /**
  * @brief Adds an animated sprite to an entity.
@@ -1125,50 +1125,38 @@ AnimatedSprite rohr_graphics_create_animated_sprite(AnimationAsset asset_ptr, Sc
  * @param sprite Animated sprite component value.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_graphics_add_animated_sprite(Entity entity, AnimatedSprite sprite);
+EngineResult rohr_graphics_animated_sprite_add(Entity entity, AnimatedSprite sprite);
 
 /**
  * @brief Draws all animated sprite components.
  */
-void rohr_graphics_draw_animated_sprites(void);
+void rohr_graphics_animated_sprites_draw(void);
 
 /**
  * @brief Updates animated sprite frames.
  * @param current_tick Current engine tick.
  * @param current_time Current engine time.
  */
-void rohr_graphics_update_sprite_frames(Tick current_tick, Time current_time);
+void rohr_graphics_sprite_frames_update(Tick current_tick, Time current_time);
 
 /**
  * @brief Scales textures attached to an entity.
  * @param entity Entity to modify.
  * @param scale Scale value.
  */
-void rohr_graphics_scale_textures(Entity entity, Scale scale);
-
-/**
- * @brief Replaces the active camera transform.
- * @param camera World-space camera position and orientation.
- */
-void rohr_graphics_active_camera_set(Camera camera);
-
-/**
- * @brief Returns the active camera transform.
- * @return Current world-space camera transform.
- */
-Camera rohr_graphics_active_camera_get(void);
+void rohr_graphics_textures_scale(Entity entity, Scale scale);
 
 /**
  * @brief Translates the active camera in world space.
  * @param translation World-space translation to add.
  */
-void rohr_graphics_move_camera(Vec2D translation);
+void rohr_graphics_camera_move(Vec2D translation);
 
 /**
  * @brief Rotates the active camera counterclockwise.
  * @param radians Rotation in radians to add.
  */
-void rohr_graphics_rotate_camera(Orientation radians);
+void rohr_graphics_camera_rotate(Orientation radians);
 
 /**
  * @brief Attaches the camera to an entity's position and orientation.
@@ -1181,7 +1169,7 @@ void rohr_graphics_rotate_camera(Orientation radians);
  * @param orientation_offset Orientation offset in radians.
  * @return EngineResult describing success or a missing transform.
  */
-EngineResult rohr_graphics_attach_camera(
+EngineResult rohr_graphics_camera_attach(
     Entity entity,
     Vec2D position_offset,
     Orientation orientation_offset
@@ -1202,7 +1190,7 @@ EngineResult rohr_graphics_attach_camera(
  * @param follow_orientation Whether to inherit entity orientation.
  * @return EngineResult describing success or a missing required transform.
  */
-EngineResult rohr_graphics_attach_camera_with_options(
+EngineResult rohr_graphics_camera_with_options_attach(
     Entity entity,
     Vec2D position_offset,
     Orientation orientation_offset,
@@ -1213,13 +1201,13 @@ EngineResult rohr_graphics_attach_camera_with_options(
 /**
  * @brief Detaches the camera and preserves its current world transform.
  */
-void rohr_graphics_detach_camera(void);
+void rohr_graphics_camera_detach(void);
 
 /**
  * @brief Reports whether the camera is attached to a live entity transform.
  * @return true when attached to a valid entity transform.
  */
-bool rohr_graphics_camera_attached_is(void);
+bool rohr_graphics_camera_attached_get(void);
 
 /**
  * @brief Returns the active camera attachment description.
@@ -1228,7 +1216,7 @@ bool rohr_graphics_camera_attached_is(void);
 CameraAttachmentResult rohr_graphics_camera_attachment_get(void);
 
 /** Returns defaults for a full-screen camera with unit zoom. */
-CameraConfig rohr_camera_default_config(void);
+CameraConfig rohr_camera_config_default_get(void);
 /** Creates an engine-owned camera. */
 CameraIdResult rohr_camera_create(CameraConfig config);
 /** Destroys a non-active camera. */
@@ -1266,15 +1254,15 @@ EngineResult rohr_camera_position_move(CameraId camera, Vec2D translation, Time 
 EngineResult rohr_camera_position_set(CameraId camera, Position position, Time duration);
 EngineResult rohr_camera_position_from_entity_set(CameraId camera, Entity entity, Time duration);
 EngineResult rohr_camera_entity_attachment_set(CameraId camera, Entity entity);
-EngineResult rohr_camera_moving_is(CameraId camera);
+EngineResult rohr_camera_moving_get(CameraId camera);
 EngineResult rohr_camera_zoom_set(CameraId camera, float zoom, Time duration);
 CameraZoomResult rohr_camera_zoom_get(CameraId camera);
 
-ViewportConfig rohr_viewport_default_config(void);
+ViewportConfig rohr_viewport_config_default_get(void);
 ViewportIdResult rohr_viewport_create(ViewportConfig config);
 EngineResult rohr_viewport_destroy(ViewportId viewport);
 EngineResult rohr_viewport_camera_set(ViewportId viewport, CameraId camera);
-EngineResult rohr_viewport_clear_camera(ViewportId viewport);
+EngineResult rohr_viewport_camera_clear(ViewportId viewport);
 EngineResult rohr_viewport_enable_set(ViewportId viewport);
 EngineResult rohr_viewport_disable_set(ViewportId viewport);
 
@@ -1283,14 +1271,14 @@ EngineResult rohr_viewport_disable_set(ViewportId viewport);
  * @param pos World position.
  * @return Screen-space position.
  */
-Position rohr_graphics_world_to_screen(Position pos);
+Position rohr_graphics_world_to_screen_get(Position pos);
 
 /**
  * @brief Converts a screen position to world coordinates.
  * @param screen Screen-space position.
  * @return World-space position.
  */
-Position rohr_graphics_screen_to_world(Position screen);
+Position rohr_graphics_screen_to_world_get(Position screen);
 
 /**
  * @brief Returns the current mouse position in screen coordinates.
@@ -1301,7 +1289,7 @@ Position rohr_graphics_mouse_screen_position_get(void);
 /**
  * @brief Draws the spatial grid overlay.
  */
-void rohr_graphics_draw_grid(void);
+void rohr_graphics_grid_draw(void);
 
 /**
  * @brief Starts recording rendered frames to a video file.
@@ -1314,33 +1302,33 @@ bool rohr_graphics_recording_start(const char *output_path, int fps);
 /**
  * @brief Draws active particle components.
  */
-void rohr_graphics_draw_particles(void);
+void rohr_graphics_particles_draw(void);
 
 /**
  * @brief Draws local origin markers for entities.
  */
-void rohr_graphics_draw_local_origins(void);
+void rohr_graphics_local_origins_draw(void);
 
 /**
  * @brief Creates normalized edge normals for a shape.
  * @param shape Shape to inspect.
  * @return List of normal vectors.
  */
-Vec2DList rohr_math_create_normals(Shape shape);
+Vec2DList rohr_math_normals_create(Shape shape);
 
 /**
  * @brief Normalizes a vector.
  * @param vector Vector to normalize.
  * @return Normalized vector.
  */
-Vec2D rohr_math_normalize_vector(Vec2D vector);
+Vec2D rohr_math_vector_normalize(Vec2D vector);
 
 /**
  * @brief Normalizes all vectors in a list.
  * @param vectors Vector list to normalize.
  * @return Normalized vector list.
  */
-Vec2DList rohr_math_normalize_vectors(Vec2DList vectors);
+Vec2DList rohr_math_vectors_normalize(Vec2DList vectors);
 
 /**
  * @brief Calculates the dot product of two vectors.
@@ -1356,7 +1344,7 @@ float rohr_math_dot_product(Vec2D vector_1, Vec2D vector_2);
  * @param height Rectangle height.
  * @return Shape containing rectangle vertices.
  */
-Shape rohr_math_create_square(float width, float height);
+Shape rohr_math_square_create(float width, float height);
 
 /**
  * @brief Creates a circle approximation shape.
@@ -1364,7 +1352,7 @@ Shape rohr_math_create_square(float width, float height);
  * @param verticies Number of vertices used to approximate the circle.
  * @return Shape containing circle vertices.
  */
-Shape rohr_math_create_circle(float radius, uint8_t verticies);
+Shape rohr_math_circle_create(float radius, uint8_t verticies);
 
 /**
  * @brief Projects a shape onto an axis.
@@ -1418,7 +1406,7 @@ float rohr_math_vector_magnitude(Vec2D vector);
  * @param angle Angle in radians.
  * @return Rotated vector.
  */
-Vec2D rohr_math_rotate_vector(Vec2D vector, float angle);
+Vec2D rohr_math_vector_rotate(Vec2D vector, float angle);
 
 /**
  * @brief Calculates a circle radius from its shape and centroid.
@@ -1460,7 +1448,7 @@ float rohr_math_projection_overlap(Projection projection_1, Projection projectio
  * @param scale Uniform scale value.
  * @return Scaled shape.
  */
-Shape rohr_math_scale_shape(Shape shape, float scale);
+Shape rohr_math_shape_scale(Shape shape, float scale);
 
 /**
  * @brief Scales a shape along the y axis.
@@ -1468,7 +1456,7 @@ Shape rohr_math_scale_shape(Shape shape, float scale);
  * @param scale Y-axis scale value.
  * @return Scaled shape.
  */
-Shape rohr_math_scale_shape_y(Shape shape, float scale);
+Shape rohr_math_shape_y_scale(Shape shape, float scale);
 
 /**
  * @brief Scales a shape along the x axis.
@@ -1476,7 +1464,7 @@ Shape rohr_math_scale_shape_y(Shape shape, float scale);
  * @param scale X-axis scale value.
  * @return Scaled shape.
  */
-Shape rohr_math_scale_shape_x(Shape shape, float scale);
+Shape rohr_math_shape_x_scale(Shape shape, float scale);
 
 /**
  * @brief Calculates a polygon centroid.
@@ -1490,52 +1478,52 @@ Vec2D rohr_math_polygon_centroid(Shape shape);
  * @param shape Shape to modify.
  * @return Shape with an additional vertex slot.
  */
-Shape rohr_math_add_vertex(Shape shape);
+Shape rohr_math_vertex_add(Shape shape);
 
 /**
  * @brief Deletes the last vertex slot from a shape.
  * @param shape Shape to modify.
  * @return Shape with one fewer vertex slot.
  */
-Shape rohr_math_delete_vertex(Shape shape);
+Shape rohr_math_vertex_delete(Shape shape);
 
 /**
  * @brief Creates an axis-aligned bounding box for a world-space shape.
  * @param world_shape World-space shape.
  * @return Axis-aligned bounding box.
  */
-AABB rohr_math_create_aabb(Shape world_shape);
+AABB rohr_math_aabb_create(Shape world_shape);
 
 /**
  * @brief Runs one physics-system update.
  * @param dt Simulation delta time in seconds.
  */
-void rohr_system_update_physics(double dt);
+void rohr_system_physics_update(double dt);
 
 /**
  * @brief Deletes entities whose lifetime has expired.
  */
-void rohr_system_clean_entities_past_lifetime(void);
+void rohr_system_entities_past_lifetime_clean(void);
 
 /**
  * @brief Updates keyboard key states for the frame.
  * @param keyboard Keyboard state table to update.
  */
-void rohr_controller_update_key_states(KeyboardState *keyboard);
+void rohr_controller_key_states_update(KeyboardState *keyboard);
 
 /**
  * @brief Adds a keyboard event to a keyboard state table.
  * @param keyboard Keyboard state table to modify.
  * @param key_event Keyboard event to add.
  */
-void rohr_controller_add_key_event(KeyboardState *keyboard, KeyboardEvent key_event);
+void rohr_controller_key_event_add(KeyboardState *keyboard, KeyboardEvent key_event);
 
 /**
  * @brief Converts an SDL event into a Rohr keyboard event.
  * @param sdl_event SDL event to inspect.
  * @return KeyboardEvent derived from sdl_event.
  */
-KeyboardEvent rohr_controller_capture_keyboard_event(const SDL_Event *sdl_event);
+KeyboardEvent rohr_controller_keyboard_event_capture(const SDL_Event *sdl_event);
 
 /**
  * @brief Checks whether an SDL keycode is currently held or was pressed this frame.
@@ -1543,7 +1531,7 @@ KeyboardEvent rohr_controller_capture_keyboard_event(const SDL_Event *sdl_event)
  * @param keycode SDL keycode to check.
  * @return true when the key is down or pressed.
  */
-bool rohr_controller_key_down_is(const KeyboardState *keyboard, SDL_Keycode keycode);
+bool rohr_controller_key_down_get(const KeyboardState *keyboard, SDL_Keycode keycode);
 
 /**
  * @brief Checks whether an SDL keycode was pressed this frame.
@@ -1551,7 +1539,7 @@ bool rohr_controller_key_down_is(const KeyboardState *keyboard, SDL_Keycode keyc
  * @param keycode SDL keycode to check.
  * @return true when the key was pressed this frame.
  */
-bool rohr_controller_key_pressed_is(const KeyboardState *keyboard, SDL_Keycode keycode);
+bool rohr_controller_key_pressed_get(const KeyboardState *keyboard, SDL_Keycode keycode);
 
 /**
  * @brief Checks whether an SDL keycode was released this frame.
@@ -1559,7 +1547,7 @@ bool rohr_controller_key_pressed_is(const KeyboardState *keyboard, SDL_Keycode k
  * @param keycode SDL keycode to check.
  * @return true when the key was released this frame.
  */
-bool rohr_controller_key_released_is(const KeyboardState *keyboard, SDL_Keycode keycode);
+bool rohr_controller_key_released_get(const KeyboardState *keyboard, SDL_Keycode keycode);
 
 /**
  * @brief Returns normalized movement input from supplied up/left/down/right SDL keycodes.
@@ -1574,7 +1562,7 @@ bool rohr_controller_key_released_is(const KeyboardState *keyboard, SDL_Keycode 
  * @param right SDL keycode for positive X.
  * @return Direction vector from the supplied directional keys.
  */
-Vec2D rohr_controller_axis_from_keycodes(
+Vec2D rohr_controller_axis_from_keycodes_get(
         const KeyboardState *keyboard,
         SDL_Keycode up,
         SDL_Keycode left,
@@ -1600,19 +1588,19 @@ Vec2D rohr_controller_arrow_axis_get(const KeyboardState *keyboard);
  * @brief Returns an enabled, empty, game-owned controller.
  * @return Controller ready for named axes and buttons.
  */
-Controller rohr_controller_default(void);
+Controller rohr_controller_default_get(void);
 
 /**
  * @brief Returns a game-owned controller with W/A/S/D axis bindings.
  * @return Default enabled W/A/S/D controller.
  */
-Controller rohr_controller_default_wasd(void);
+Controller rohr_controller_wasd_default_get(void);
 
 /**
  * @brief Returns a game-owned controller with arrow-key axis bindings.
  * @return Default enabled arrow-key controller.
  */
-Controller rohr_controller_default_arrows(void);
+Controller rohr_controller_arrows_default_get(void);
 
 /**
  * @brief Replaces the axis mapping on a caller-owned controller.
@@ -1636,14 +1624,14 @@ Vec2D rohr_controller_default_axis_get(
 );
 
 /** @brief Adds or replaces a named axis without allocating memory. */
-bool rohr_controller_add_axis(
+bool rohr_controller_axis_add(
     Controller *controller,
     const char *name,
     ControllerAxisBinding binding
 );
 
 /** @brief Adds or replaces a named button without allocating memory. */
-bool rohr_controller_add_button(
+bool rohr_controller_button_add(
     Controller *controller,
     const char *name,
     SDL_Keycode keycode
@@ -1657,21 +1645,21 @@ Vec2D rohr_controller_axis_get(
 );
 
 /** @brief Checks whether a named button is held or newly pressed. */
-bool rohr_controller_button_down_is(
+bool rohr_controller_button_down_get(
     const KeyboardState *keyboard,
     const Controller *controller,
     const char *name
 );
 
 /** @brief Checks whether a named button was pressed this frame. */
-bool rohr_controller_button_pressed_is(
+bool rohr_controller_button_pressed_get(
     const KeyboardState *keyboard,
     const Controller *controller,
     const char *name
 );
 
 /** @brief Checks whether a named button was released this frame. */
-bool rohr_controller_button_released_is(
+bool rohr_controller_button_released_get(
     const KeyboardState *keyboard,
     const Controller *controller,
     const char *name
@@ -1681,27 +1669,27 @@ bool rohr_controller_button_released_is(
  * @brief Prints a mouse event for debugging.
  * @param event Mouse event to print.
  */
-void rohr_controller_print_mouse_event(MouseEvent event);
+void rohr_controller_mouse_event_print(MouseEvent event);
 
 /**
  * @brief Updates mouse button states for the frame.
  * @param mouse Mouse state table to update.
  */
-void rohr_controller_update_mouse_states(MouseState *mouse);
+void rohr_controller_mouse_states_update(MouseState *mouse);
 
 /**
  * @brief Adds a mouse event to a mouse state table.
  * @param mouse Mouse state table to modify.
  * @param mouse_event Mouse event to add.
  */
-void rohr_controller_add_mouse_event(MouseState *mouse, MouseEvent mouse_event);
+void rohr_controller_mouse_event_add(MouseState *mouse, MouseEvent mouse_event);
 
 /**
  * @brief Converts an SDL event into a Rohr mouse event.
  * @param sdl_event SDL event to inspect.
  * @return MouseEvent derived from sdl_event.
  */
-MouseEvent rohr_controller_capture_mouse_event(const SDL_Event *sdl_event);
+MouseEvent rohr_controller_mouse_event_capture(const SDL_Event *sdl_event);
 
 /**
  * @brief Converts the current logical screen-space mouse position to world space.
@@ -1714,7 +1702,7 @@ Position rohr_controller_mouse_world_position_get(const MouseState *mouse);
  * @brief Adds an entity to the spatial grid tables.
  * @param entity Entity to add.
  */
-void rohr_grid_add_entity_to_grids(Entity entity);
+void rohr_grid_entity_add(Entity entity);
 
 /**
  * @brief Checks whether a pair of entities has already been processed.
@@ -1722,14 +1710,14 @@ void rohr_grid_add_entity_to_grids(Entity entity);
  * @param entity_2 Second entity.
  * @return true when the pair was already checked, false otherwise.
  */
-bool rohr_grid_pair_checked_is(Entity entity_1, Entity entity_2);
+bool rohr_grid_pair_checked_get(Entity entity_1, Entity entity_2);
 
 /**
  * @brief Stores a processed entity pair.
  * @param entity_1 First entity.
  * @param entity_2 Second entity.
  */
-void rohr_grid_add_pair(Entity entity_1, Entity entity_2);
+void rohr_grid_pair_add(Entity entity_1, Entity entity_2);
 
 /**
  * @brief Clears spatial grid state.
@@ -1740,7 +1728,7 @@ void rohr_grid_clear(void);
  * @brief Updates an entity axis-aligned bounding box in the grid.
  * @param entity Entity to update.
  */
-void rohr_grid_update_aabb(Entity entity);
+void rohr_grid_aabb_update(Entity entity);
 
 /**
  * @brief Delays execution for a number of seconds.
@@ -1790,7 +1778,7 @@ int rohr_tools_random_range(int min, int max);
 float rohr_tools_random_range_float(float min, float max);
 
 /** @brief Starts a UI frame with logical screen-space pointer input. */
-void rohr_ui_begin_frame(UIInput input);
+void rohr_ui_frame_begin(UIInput input);
 
 /**
  * @brief Draws and updates one button identified by a stable string.
@@ -1810,16 +1798,16 @@ void rohr_ui_label(const TextAsset *text, UIRect bounds);
 void rohr_ui_button_disabled(UIRect bounds, const UIButtonStyle *style);
 
 /** @brief Returns whether UI consumed pointer input during this frame. */
-bool rohr_ui_pointer_consumed_is(void);
+bool rohr_ui_pointer_consumed_get(void);
 
 /** @brief Finishes the current UI frame. */
-void rohr_ui_end_frame(void);
+void rohr_ui_frame_end(void);
 
 /** @brief Returns the default button colors. */
-UIButtonStyle rohr_ui_default_button_style(void);
+UIButtonStyle rohr_ui_button_style_default_get(void);
 
 /** @brief Returns the default slider configuration and 0..1 range. */
-UISliderConfig rohr_ui_default_slider_config(void);
+UISliderConfig rohr_ui_slider_config_default_get(void);
 
 /** @brief Draws and updates a caller-owned slider value. */
 UISliderResult rohr_ui_slider(const char *id, float value, const UISliderConfig *config);

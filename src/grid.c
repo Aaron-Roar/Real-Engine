@@ -52,13 +52,13 @@ void grid_tables_destroy(void) {
     (void)AABBPool_destroy(&aabbs_pool);
 }
 
-bool grid_pair_checked_is(Entity entity_1, Entity entity_2) {
+bool grid_pair_checked_get(Entity entity_1, Entity entity_2) {
     if(entity_1 >= MAX_ENTITIES || entity_2 >= MAX_ENTITIES) {
         return true;
     }
     return pair_checked.pairs[entity_1][entity_2];
 }
-void add_pair(Entity entity_1, Entity entity_2) {
+void grid_pair_add(Entity entity_1, Entity entity_2) {
     if(entity_1 >= MAX_ENTITIES || entity_2 >= MAX_ENTITIES) {
         return;
     }
@@ -66,19 +66,19 @@ void add_pair(Entity entity_1, Entity entity_2) {
     pair_checked.pairs[entity_2][entity_1] = true;
 }
 
-void grid_update_aabb(Entity entity) {
+void grid_aabb_update(Entity entity) {
     if(entity >= MAX_ENTITIES) {
         return;
     }
-    (void)AABBPool_store_at(&aabbs_pool, entity, math_create_aabb(world_hit_boxes[entity]));
+    (void)AABBPool_store_at(&aabbs_pool, entity, math_aabb_create(world_hit_boxes[entity]));
 }
 
-void clear_grid(void) {
+void grid_clear(void) {
     memset(&grid, 0, sizeof(Grid));
     memset(&pair_checked, 0, sizeof(BooleanPairs));
 }
 
-uint32_t world_x_to_col(Vec1D x) {
+uint32_t world_x_to_col_get(Vec1D x) {
     float col = ((GRID_COLS - 1)/2) + (x/(CELL_SIZE));
     if(col >= GRID_COLS) {
         return GRID_COLS - 1;
@@ -89,7 +89,7 @@ uint32_t world_x_to_col(Vec1D x) {
     return col;
 }
 
-uint32_t world_y_to_row(Vec1D y) {
+uint32_t world_y_to_row_get(Vec1D y) {
     float row = ((GRID_ROWS - 1)/2) + (y/(CELL_SIZE));
     if(row >= GRID_ROWS) {
         return GRID_ROWS - 1;
@@ -113,15 +113,15 @@ void add_entity_to_grid(Entity entity, uint32_t row, uint32_t col) {
     }
 }
 
-void add_entity_to_grids(Entity entity) {
+void grid_entity_add(Entity entity) {
     if(entity >= MAX_ENTITIES) {
         return;
     }
     AABB aabb = aabbs[entity];
-    uint32_t top_row = world_y_to_row(aabb.max_y);
-    uint32_t bot_row = world_y_to_row(aabb.min_y);
-    uint32_t left_col = world_x_to_col(aabb.min_x);
-    uint32_t right_col = world_x_to_col(aabb.max_x);
+    uint32_t top_row = world_y_to_row_get(aabb.max_y);
+    uint32_t bot_row = world_y_to_row_get(aabb.min_y);
+    uint32_t left_col = world_x_to_col_get(aabb.min_x);
+    uint32_t right_col = world_x_to_col_get(aabb.max_x);
 
     for(uint32_t row = bot_row; row <= top_row; row += 1) {
         for(uint32_t col = left_col; col <= right_col; col += 1) {

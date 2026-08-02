@@ -154,12 +154,12 @@ EngineResult error_result_error(EngineError error);
  * @param error Error code to describe.
  * @return Static string owned by the error module.
  */
-const char *error_default_message(EngineError error);
+const char *error_default_message_get(EngineError error);
 
 /**
  * Get the human-readable message for an EngineError.
  *
- * This currently aliases error_default_message().
+ * This currently aliases error_default_message_get().
  *
  * @param error Error code to describe.
  * @return Static string owned by the error module.
@@ -167,6 +167,6 @@ const char *error_default_message(EngineError error);
 const char *error_string(EngineError error);
 
 /** Print an EngineError message to stderr. */
-void error_print_stderr(EngineError error);
+void error_stderr_print(EngineError error);
 
 #endif

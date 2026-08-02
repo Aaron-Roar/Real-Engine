@@ -19,7 +19,7 @@ static const RohrCollisionCategoryMask spring_category = UINT64_C(1) << 4;
 
 static bool result_ok(EngineResult result) {
     if(!rohr_error_check(result)) return true;
-    rohr_error_print_stderr(result.result.error);
+    rohr_error_stderr_print(result.result.error);
     return false;
 }
 
@@ -34,7 +34,7 @@ static Entity body_create(Position position, Vec2D dimensions,
             !result_ok(rohr_physics_orientation_set(entity, 0.0f)) ||
             !result_ok(rohr_physics_hitbox_set(
                 entity,
-                rohr_math_create_square(dimensions.x, dimensions.y)
+                rohr_math_square_create(dimensions.x, dimensions.y)
             )) ||
             !result_ok(rohr_physics_restitution_set(entity, 0.75f)) ||
             !result_ok(rohr_physics_friction_set(entity, 0.35f)) ||
@@ -128,19 +128,19 @@ int main(void) {
                 2.5f
             ))) goto fail;
 
-    rohr_engine_reset_clock();
+    rohr_engine_clock_reset();
     while(true) {
-        SDL_Event event = rohr_engine_poll_event();
-        KeyboardEvent key_event = rohr_controller_capture_keyboard_event(&event);
-        rohr_controller_update_key_states(&keyboard);
-        rohr_controller_add_key_event(&keyboard, key_event);
-        if(event.type == SDL_EVENT_QUIT || rohr_controller_key_pressed_is(&keyboard, SDLK_ESCAPE)) break;
+        SDL_Event event = rohr_engine_event_poll();
+        KeyboardEvent key_event = rohr_controller_keyboard_event_capture(&event);
+        rohr_controller_key_states_update(&keyboard);
+        rohr_controller_key_event_add(&keyboard, key_event);
+        if(event.type == SDL_EVENT_QUIT || rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) break;
 
         if(rohr_engine_time_get() >= next_throw) {
             Entity body = bodies[throw_index % BODY_COUNT];
             Force impulse = throws[throw_index % (sizeof(throws) / sizeof(throws[0]))];
-            if(!result_ok(rohr_physics_apply_impulse(body, impulse)) ||
-                    !result_ok(rohr_physics_apply_torque_for_one_tick(
+            if(!result_ok(rohr_physics_impulse_apply(body, impulse)) ||
+                    !result_ok(rohr_physics_torque_for_one_tick_apply(
                         body,
                         (throw_index % 2 == 0 ? 1.0f : -1.0f) * 1800.0f
                     ))) goto fail;
@@ -148,16 +148,16 @@ int main(void) {
             next_throw += 1.5;
         }
 
-        rohr_physics_update(rohr_engine_update_tick());
-        rohr_graphics_draw_background(background_color);
-        for(uint32_t i = 0; i < 4; i += 1) rohr_graphics_draw_hit_box_colored(walls[i], GRAPHICS_FILLED, wall_color);
-        rohr_graphics_draw_hit_box_colored(bodies[0], GRAPHICS_FILLED, pin_color);
-        rohr_graphics_draw_hit_box_colored(bodies[1], GRAPHICS_FILLED, pin_color);
-        rohr_graphics_draw_hit_box_colored(bodies[2], GRAPHICS_FILLED, weld_color);
-        rohr_graphics_draw_hit_box_colored(bodies[3], GRAPHICS_FILLED, weld_secondary_color);
-        rohr_graphics_draw_hit_box_colored(bodies[4], GRAPHICS_FILLED, spring_color);
-        rohr_graphics_draw_hit_box_colored(bodies[5], GRAPHICS_FILLED, spring_color);
-        rohr_graphics_draw_joints(joint_color);
+        rohr_physics_update(rohr_engine_tick_update());
+        rohr_graphics_background_draw(background_color);
+        for(uint32_t i = 0; i < 4; i += 1) rohr_graphics_hit_box_colored_draw(walls[i], GRAPHICS_FILLED, wall_color);
+        rohr_graphics_hit_box_colored_draw(bodies[0], GRAPHICS_FILLED, pin_color);
+        rohr_graphics_hit_box_colored_draw(bodies[1], GRAPHICS_FILLED, pin_color);
+        rohr_graphics_hit_box_colored_draw(bodies[2], GRAPHICS_FILLED, weld_color);
+        rohr_graphics_hit_box_colored_draw(bodies[3], GRAPHICS_FILLED, weld_secondary_color);
+        rohr_graphics_hit_box_colored_draw(bodies[4], GRAPHICS_FILLED, spring_color);
+        rohr_graphics_hit_box_colored_draw(bodies[5], GRAPHICS_FILLED, spring_color);
+        rohr_graphics_joints_draw(joint_color);
         rohr_graphics_show();
     }
 

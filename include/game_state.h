@@ -22,10 +22,10 @@
  * @param path_count Number of entries in paths.
  * @return EngineResult describing success or failure.
  */
-EngineResult game_state_load_files(const char *const *paths, size_t path_count);
+EngineResult game_state_files_load(const char *const *paths, size_t path_count);
 
 /** Load entities from one JSON state file. */
-EngineResult game_state_load_file(const char *path);
+EngineResult game_state_file_load(const char *path);
 
 /** Find a UI button definition loaded from JSON by its authored name. */
 UIButtonDefinitionResult ui_button_by_name_get(const char *name);
@@ -45,7 +45,7 @@ UISliderDefinitionResult ui_slider_by_name_get(const char *name);
  * Unnamed entities are omitted because stable cross-session references require
  * names. Runtime-derived collision reports and grid state are omitted.
  */
-EngineResult game_state_save_file(const char *path);
+EngineResult game_state_file_save(const char *path);
 
 /**
  * Save retained authored state definitions without expanding prototypes.
@@ -54,6 +54,6 @@ EngineResult game_state_save_file(const char *path);
  * documents. It preserves count, placement, and variation declarations but
  * does not capture runtime mutations.
  */
-EngineResult game_state_save_template_file(const char *path);
+EngineResult game_state_template_file_save(const char *path);
 
 #endif

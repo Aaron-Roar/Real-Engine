@@ -10,15 +10,15 @@ int main(void) {
     CollisionFilterConfigResult filter;
     EngineResult result = rohr_engine_init();
     if(rohr_error_check(result)) {
-        fprintf(stderr, "%s\n", rohr_error_default_message(result.result.error));
+        fprintf(stderr, "%s\n", rohr_error_default_message_get(result.result.error));
         return 1;
     }
 
     first = rohr_entity_add();
     second = rohr_entity_add();
     if(first.kind == ERROR_RESULT_ERROR || second.kind == ERROR_RESULT_ERROR ||
-            rohr_error_check(rohr_physics_hitbox_set(first.result.value, rohr_math_create_square(1.0f, 1.0f))) ||
-            rohr_error_check(rohr_physics_hitbox_set(second.result.value, rohr_math_create_square(1.0f, 1.0f)))) {
+            rohr_error_check(rohr_physics_hitbox_set(first.result.value, rohr_math_square_create(1.0f, 1.0f))) ||
+            rohr_error_check(rohr_physics_hitbox_set(second.result.value, rohr_math_square_create(1.0f, 1.0f)))) {
         rohr_engine_shutdown();
         return 1;
     }
@@ -26,7 +26,7 @@ int main(void) {
     if(filter.kind == ERROR_RESULT_ERROR ||
             filter.result.value.category != ROHR_COLLISION_CATEGORY_DEFAULT ||
             filter.result.value.collides_with != ROHR_COLLISION_CATEGORY_ALL ||
-            !rohr_physics_collision_between_is(first.result.value, second.result.value)) {
+            !rohr_physics_collision_between_check(first.result.value, second.result.value)) {
         rohr_engine_shutdown();
         return 1;
     }
@@ -34,14 +34,14 @@ int main(void) {
             rohr_error_check(rohr_physics_collision_category_set(second.result.value, enemy)) ||
             rohr_error_check(rohr_physics_collision_with_set(first.result.value, enemy)) ||
             rohr_error_check(rohr_physics_collision_with_none_set(second.result.value)) ||
-            rohr_physics_collision_between_is(first.result.value, second.result.value)) {
+            rohr_physics_collision_between_check(first.result.value, second.result.value)) {
         rohr_engine_shutdown();
         return 1;
     }
     if(rohr_error_check(rohr_physics_collision_with_set(second.result.value, player)) ||
-            !rohr_physics_collision_between_is(first.result.value, second.result.value) ||
+            !rohr_physics_collision_between_check(first.result.value, second.result.value) ||
             rohr_error_check(rohr_physics_collision_with_all_set(first.result.value)) ||
-            !rohr_physics_collision_between_is(first.result.value, second.result.value)) {
+            !rohr_physics_collision_between_check(first.result.value, second.result.value)) {
         rohr_engine_shutdown();
         return 1;
     }
@@ -50,7 +50,7 @@ int main(void) {
         rohr_engine_shutdown();
         return 1;
     }
-    rohr_system_update_physics(0.0);
+    rohr_system_physics_update(0.0);
     if(!rohr_physics_collision_report_get(first.result.value, second.result.value)) {
         rohr_engine_shutdown();
         return 1;
