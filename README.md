@@ -12,11 +12,6 @@ Pull requests are welcome. Contributions such as new features, improved examples
 
 These GIFs are generated from the example programs in `examples/`.
 
-### Flies in Pit Example
-
-![Flies in Pit example](docs/assets/flies_in_pit.gif)
-
-[Higher-quality MP4](docs/assets/flies_in_pit.mp4)
 
 ### Soft Body Example
 
@@ -24,6 +19,11 @@ These GIFs are generated from the example programs in `examples/`.
 
 [Higher-quality MP4](docs/assets/soft_body.mp4)
 
+### Flies in Pit Example
+
+![Flies in Pit example](docs/assets/flies_in_pit.gif)
+
+[Higher-quality MP4](docs/assets/flies_in_pit.mp4)
 ## What It Does
 
 Rohr Engine currently focuses on data-oriented 2D simulation:
