@@ -157,7 +157,7 @@ static Entity static_triangle_create(Position a, Position b, Position c) {
     entity = result.result.value;
     if(!result_ok(rohr_physics_position_set(entity, center)) ||
             !result_ok(rohr_physics_hitbox_set(entity, triangle)) ||
-            !result_ok(rohr_physics_static_set(entity)) ||
+            !result_ok(rohr_physics_dynamic_set(entity)) ||
             !result_ok(rohr_physics_friction_set(entity, rigid_friction)) ||
             !result_ok(rohr_physics_restitution_set(entity, collision_restitution)) ||
             !result_ok(rohr_physics_collision_category_set(entity, room_category)) ||
@@ -484,7 +484,7 @@ int main(void) {
                 rohr_camera_active_get(), camera_default_zoom, 0.0))) goto fail;
 
     rohr_engine_clock_reset();
-    if(!rohr_graphics_recording_start("example.mp4", recording_fps)) goto fail;
+    //if(!rohr_graphics_recording_start("example.mp4", recording_fps)) goto fail;
     while(!recording_complete) {
         SDL_Event event = rohr_engine_event_poll();
         KeyboardEvent key_event = rohr_controller_keyboard_event_capture(&event);

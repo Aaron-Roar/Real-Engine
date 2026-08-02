@@ -138,8 +138,8 @@ int main(void) {
 
         if(move_axis.x != 0.0f || move_axis.y != 0.0f) {
             EngineResult force_result = rohr_physics_force_for_one_tick_apply(ball, (Force){
-                .x = -move_axis.x * ball_mass * ball_control_acceleration,
-                .y = -move_axis.y * ball_mass * ball_control_acceleration
+                .x = move_axis.x * ball_mass * ball_control_acceleration,
+                .y = move_axis.y * ball_mass * ball_control_acceleration
             });
             if(rohr_error_check(force_result)) {
                 PRINT_ENGINE_ERROR(force_result);
