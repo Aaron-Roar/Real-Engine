@@ -642,6 +642,8 @@ EngineResult rohr_physics_apply_impulse(Entity entity, Vec2D impulse);
  * @return EngineResult describing success or failure.
  */
 EngineResult rohr_physics_position_set(Entity entity, Position p);
+/** Returns an entity's world position. */
+PositionResult rohr_physics_position_get(Entity entity);
 
 /**
  * @brief Sets an entity mass component value.
@@ -700,7 +702,7 @@ EngineResult rohr_physics_torque_component_set(Entity entity, Torque torque);
 EngineResult rohr_physics_apply_torque_for_one_tick(Entity entity, Torque t);
 
 /**
- * @brief Sets an entity hitbox component value.
+ * @brief Sets an entity hitbox component value without enabling physical collision response.
  * @param entity Entity to modify.
  * @param hitbox Local-space hitbox shape.
  * @return EngineResult describing success or failure.
@@ -739,6 +741,21 @@ EngineResult rohr_physics_orientation_set(Entity entity, Orientation angle);
  * @return EngineResult describing success or failure.
  */
 EngineResult rohr_physics_angular_velocity_set(Entity entity, AngularVelocity v);
+
+/**
+ * @brief Returns an entity angular velocity.
+ * @param entity Entity to inspect.
+ * @return AngularVelocityResult containing radians per second, or an error.
+ */
+AngularVelocityResult rohr_physics_angular_velocity_get(Entity entity);
+
+/** Sets the absolute angular-velocity limit applied before orientation integration. */
+EngineResult rohr_physics_angular_velocity_maximum_set(
+    Entity entity,
+    AngularVelocity maximum
+);
+/** Returns an entity's configured absolute angular-velocity limit. */
+AngularVelocityResult rohr_physics_angular_velocity_maximum_get(Entity entity);
 
 /**
  * @brief Returns an entity hitbox transformed into world space.

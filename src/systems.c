@@ -148,6 +148,21 @@ void system_update_angular_velocities(double dt) {
     }
 }
 
+static void system_angular_velocity_maximums_apply(void) {
+    for(uint32_t alive_position = 0; alive_position < entity_alive_count_get();
+            alive_position += 1) {
+        EntityIndex i;
+        AngularVelocity maximum;
+
+        if(!system_alive_index_at(alive_position, &i) ||
+                i >= angular_velocity_maximums_pool.capacity ||
+                !angular_velocity_maximums_pool.used[i]) continue;
+        maximum = angular_velocity_maximums[i];
+        if(angular_velocities[i] > maximum) angular_velocities[i] = maximum;
+        if(angular_velocities[i] < -maximum) angular_velocities[i] = -maximum;
+    }
+}
+
 void system_update_velocities(double dt) {
     for(uint32_t alive_position = 0; alive_position < entity_alive_count_get(); alive_position += 1) {
         EntityIndex i;
@@ -689,14 +704,10 @@ void system_add_entities_to_grid(void) {
 void system_apply_collisions_tuned(void) {
     for(int row = 0; row < GRID_ROWS; row += 1) {
         for(int col = 0; col < GRID_COLS; col += 1) {
+            Cell *cell = &grid.cells[row][col];
 
-            for(int i = 0; i < MAX_ENTITIES; i += 1) {
-                if(grid.cells[row][col].entity_present[i]) {
-                    for(int j = 0; j < MAX_ENTITIES; j +=1 ) {
-                        if(i == j) {
-                            continue;
-                        }
-                        if(grid.cells[row][col].entity_present[j]) {
+            for(uint16_t i = 0; i < cell->entity_count; i += 1) {
+                    for(uint16_t j = i + 1; j < cell->entity_count; j += 1) {
                             EntityIndex entity_1 = grid.cells[row][col].entities[i];
                             EntityIndex entity_2 = grid.cells[row][col].entities[j];
                             Entity entity_1_id;
@@ -733,13 +744,8 @@ void system_apply_collisions_tuned(void) {
                                 system_collision_report_by_index_set(entity_2, entity_1, false);
 
                             }
-
-                        }
                     }
-                }
-
             }
-
         }
     }
 }
@@ -1448,6 +1454,7 @@ static void system_apply_soft_body_node_rigid_collisions(void) {
             Vec2D relative_velocity;
             float normal_velocity;
             float impulse_magnitude;
+            float restitution;
 
             if(node == rigid || !entity_index_alive_is(rigid) ||
                     !entity_index_components_has(rigid, HIT_BOX | COLLISION) ||
@@ -1466,11 +1473,61 @@ static void system_apply_soft_body_node_rigid_collisions(void) {
             relative_velocity = math_vector_subtract(velocities[rigid], velocities[node]);
             normal_velocity = math_dot_product(relative_velocity, collision.normal);
             if(normal_velocity >= 0.0f) continue;
-            impulse_magnitude = -(1.0f + 0.25f) * normal_velocity / inverse_mass_sum;
+            restitution = fminf(
+                restitutions_pool.used[node] ? restitutions[node] : 0.25f,
+                restitutions_pool.used[rigid] ? restitutions[rigid] : 0.25f
+            );
+            impulse_magnitude = -(1.0f + restitution) * normal_velocity / inverse_mass_sum;
             velocities[node].x -= collision.normal.x * impulse_magnitude * inverse_mass_node;
             velocities[node].y -= collision.normal.y * impulse_magnitude * inverse_mass_node;
             velocities[rigid].x += collision.normal.x * impulse_magnitude * inverse_mass_rigid;
             velocities[rigid].y += collision.normal.y * impulse_magnitude * inverse_mass_rigid;
+            {
+                float node_friction = frictions_pool.used[node] ? frictions[node] : 0.0f;
+                float rigid_friction = frictions_pool.used[rigid] ? frictions[rigid] : 0.0f;
+                float coefficient = sqrtf(node_friction * rigid_friction);
+                Vec2D tangent = {-collision.normal.y, collision.normal.x};
+                Vec2D rigid_offset = {
+                    positions[node].x + collision.normal.x * soft_body_nodes[node].radius - positions[rigid].x,
+                    positions[node].y + collision.normal.y * soft_body_nodes[node].radius - positions[rigid].y
+                };
+                float inverse_inertia_rigid = 0.0f;
+                float tangent_speed;
+                float tangent_impulse;
+                float maximum_friction;
+                float denominator;
+
+                if(physics_entity_movable_is(rigid) &&
+                        entity_index_components_has(rigid, MASS | HIT_BOX)) {
+                    float inertia = physics_polygon_moment_of_inertia(
+                        hit_boxes[rigid], mass[rigid]);
+                    if(inertia > 0.0f) inverse_inertia_rigid = 1.0f / inertia;
+                }
+                {
+                    Vec2D angular_velocity = math_angular_velocity_cross_vec(
+                        angular_velocities[rigid], rigid_offset);
+                    relative_velocity = (Vec2D){
+                        velocities[rigid].x + angular_velocity.x - velocities[node].x,
+                        velocities[rigid].y + angular_velocity.y - velocities[node].y
+                    };
+                }
+                tangent_speed = math_dot_product(relative_velocity, tangent);
+                denominator = inverse_mass_sum +
+                    powf(math_cross_2d(rigid_offset, tangent), 2.0f) * inverse_inertia_rigid;
+                if(coefficient <= 0.0f || denominator <= 0.0f) continue;
+                tangent_impulse = -tangent_speed / denominator;
+                maximum_friction = fabsf(impulse_magnitude) * coefficient;
+                tangent_impulse = fmaxf(-maximum_friction,
+                    fminf(tangent_impulse, maximum_friction));
+                velocities[node].x -= tangent.x * tangent_impulse * inverse_mass_node;
+                velocities[node].y -= tangent.y * tangent_impulse * inverse_mass_node;
+                velocities[rigid].x += tangent.x * tangent_impulse * inverse_mass_rigid;
+                velocities[rigid].y += tangent.y * tangent_impulse * inverse_mass_rigid;
+                angular_velocities[rigid] += math_cross_2d(
+                    rigid_offset,
+                    (Vec2D){tangent.x * tangent_impulse, tangent.y * tangent_impulse}
+                ) * inverse_inertia_rigid;
+            }
         }
     }
 }
@@ -1484,6 +1541,7 @@ void system_update_physics(double dt) {
     system_apply_torques();
     system_update_velocities(dt);
     system_update_angular_velocities(dt);
+    system_angular_velocity_maximums_apply();
     system_update_orientations(dt);
     system_update_positions(dt);
     system_apply_axis_locks();

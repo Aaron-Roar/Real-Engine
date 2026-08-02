@@ -67,6 +67,9 @@ typedef float Mass;
 /** Torque value. */
 typedef Orientation Torque;
 
+ERROR_DECLARE_RESULT_TYPE(PositionResult, Position);
+ERROR_DECLARE_RESULT_TYPE(AngularVelocityResult, AngularVelocity);
+
 /** Constraint that locks movement onto an axis through a point. */
 typedef struct AxisLock {
     /** Axis to constrain movement along. */
@@ -172,7 +175,7 @@ typedef struct Joint {
 } Joint;
 
 #define SOFT_BODY_MAX_NODES 64
-#define SOFT_BODY_MAX_BEAMS 128
+#define SOFT_BODY_MAX_BEAMS 256
 #define SOFT_BODY_MAX_TRIANGLES 128
 
 /** Entity-owned collection of soft-body topology entities. */
@@ -276,6 +279,7 @@ extern CollisionReportPool collision_reports_pool;
 extern CollisionFilterConfigPool collision_filters_pool;
 extern OrientationPool orientations_pool;
 extern AngularVelocityPool angular_velocities_pool;
+extern AngularVelocityPool angular_velocity_maximums_pool;
 extern AngularAccelerationPool angular_accelerations_pool;
 extern TorquePool torques_pool;
 extern AngularVelocityPool torque_angular_accelerations_pool;
@@ -301,6 +305,7 @@ extern SoftBodyTrianglePool soft_body_triangles_pool;
 #define collision_filters collision_filters_pool.objects
 #define orientations orientations_pool.objects
 #define angular_velocities angular_velocities_pool.objects
+#define angular_velocity_maximums angular_velocity_maximums_pool.objects
 #define angular_accelerations angular_accelerations_pool.objects
 #define torques torques_pool.objects
 #define torque_angular_accelerations torque_angular_accelerations_pool.objects
@@ -398,6 +403,7 @@ EngineResult physics_group_stop_entities(GroupId group);
 EngineResult physics_apply_impulse(Entity entity, Vec2D impulse);
 /** Set an entity's world position. */
 EngineResult physics_position_set(Entity entity, Position p);
+PositionResult physics_position_get(Entity entity);
 /** Set an entity's mass and add the MASS component. */
 EngineResult physics_mass_set(Entity entity, Mass m);
 /** Create a force entity targeting the given entity. */
@@ -412,7 +418,7 @@ EntityResult physics_torque_create(Entity entity, Torque t);
 EngineResult physics_torque_component_set(Entity entity, Torque torque);
 /** Create a torque entity that applies for one physics tick. */
 EngineResult physics_apply_torque_for_one_tick(Entity entity, Torque t);
-/** Set an entity's hitbox and add collision/hitbox components. */
+/** Set an entity's hitbox. This does not enable physical collision response. */
 EngineResult physics_hitbox_set(Entity entity, Shape hitbox);
 /** Return the default collision filter: default category against all categories. */
 CollisionFilterConfig physics_collision_filter_default_config(void);
@@ -434,6 +440,10 @@ bool physics_collision_between_is(Entity entity_1, Entity entity_2);
 EngineResult physics_orientation_set(Entity entity, Orientation angle);
 /** Set an entity's angular velocity. */
 EngineResult physics_angular_velocity_set(Entity entity, AngularVelocity v);
+/** Return an entity's angular velocity. */
+AngularVelocityResult physics_angular_velocity_get(Entity entity);
+EngineResult physics_angular_velocity_maximum_set(Entity entity, AngularVelocity maximum);
+AngularVelocityResult physics_angular_velocity_maximum_get(Entity entity);
 /** Get an entity's current world-space hitbox. */
 ShapeResult physics_global_hit_box_get(Entity entity);
 /** Set an entity's collision restitution. */

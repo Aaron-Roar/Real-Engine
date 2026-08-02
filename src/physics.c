@@ -43,6 +43,7 @@ ShapePool world_hit_boxes_pool = {0};
 CollisionReportPool collision_reports_pool = {0};
 CollisionFilterConfigPool collision_filters_pool = {0};
 AngularVelocityPool angular_velocities_pool = {0};
+AngularVelocityPool angular_velocity_maximums_pool = {0};
 AngularAccelerationPool angular_accelerations_pool = {0};
 AngularVelocityPool torque_angular_accelerations_pool = {0};
 TorquePool torques_pool = {0};
@@ -98,6 +99,7 @@ EngineResult physics_tables_init(void) {
     if(CollisionReportPool_init(&collision_reports_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(CollisionFilterConfigPool_init(&collision_filters_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(AngularVelocityPool_init(&angular_velocities_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
+    if(AngularVelocityPool_init(&angular_velocity_maximums_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(AngularAccelerationPool_init(&angular_accelerations_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(AngularVelocityPool_init(&torque_angular_accelerations_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(TorquePool_init(&torques_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
@@ -146,6 +148,7 @@ EngineResult physics_tables_ensure_capacity(size_t capacity) {
     if(new_capacity > collision_reports_pool.capacity && CollisionReportPool_expand(&collision_reports_pool, new_capacity - collision_reports_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
     if(new_capacity > collision_filters_pool.capacity && CollisionFilterConfigPool_expand(&collision_filters_pool, new_capacity - collision_filters_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
     if(new_capacity > angular_velocities_pool.capacity && AngularVelocityPool_expand(&angular_velocities_pool, new_capacity - angular_velocities_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
+    if(new_capacity > angular_velocity_maximums_pool.capacity && AngularVelocityPool_expand(&angular_velocity_maximums_pool, new_capacity - angular_velocity_maximums_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
     if(new_capacity > angular_accelerations_pool.capacity && AngularAccelerationPool_expand(&angular_accelerations_pool, new_capacity - angular_accelerations_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
     if(new_capacity > torque_angular_accelerations_pool.capacity && AngularVelocityPool_expand(&torque_angular_accelerations_pool, new_capacity - torque_angular_accelerations_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
     if(new_capacity > torques_pool.capacity && TorquePool_expand(&torques_pool, new_capacity - torques_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
@@ -175,6 +178,7 @@ void physics_tables_destroy(void) {
     (void)CollisionReportPool_destroy(&collision_reports_pool);
     (void)CollisionFilterConfigPool_destroy(&collision_filters_pool);
     (void)AngularVelocityPool_destroy(&angular_velocities_pool);
+    (void)AngularVelocityPool_destroy(&angular_velocity_maximums_pool);
     (void)AngularAccelerationPool_destroy(&angular_accelerations_pool);
     (void)AngularVelocityPool_destroy(&torque_angular_accelerations_pool);
     (void)TorquePool_destroy(&torques_pool);
@@ -202,6 +206,10 @@ static void physics_soft_body_entity_list_remove(Entity *values, uint32_t *count
 }
 
 void physics_entity_clear(Entity entity, EntityIndex index) {
+    if(index < angular_velocity_maximums_pool.capacity &&
+            angular_velocity_maximums_pool.used[index]) {
+        (void)AngularVelocityPool_release_at(&angular_velocity_maximums_pool, index);
+    }
     if(index < soft_bodies_pool.capacity && soft_bodies_pool.used[index]) {
         SoftBody body = soft_bodies[index];
         for(uint32_t i = 0; i < body.triangle_count; i += 1) {
@@ -678,6 +686,19 @@ EngineResult physics_position_set(Entity entity, Position p) {
     return error_result_value(true);
 }
 
+PositionResult physics_position_get(Entity entity) {
+    EntityIndex index;
+    EngineResult result = physics_live_index_get(entity, &index);
+
+    if(result.kind == ERROR_RESULT_ERROR) {
+        return ERROR_RESULT_MAKE_ERROR(PositionResult, result.result.error);
+    }
+    if(!positions_pool.used[index]) {
+        return ERROR_RESULT_MAKE_ERROR(PositionResult, ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    return ERROR_RESULT_MAKE_VALUE(PositionResult, positions[index]);
+}
+
 EngineResult physics_mass_set(Entity entity, Mass m) {
     EntityIndex index;
     EngineResult result = physics_live_index_get(entity, &index);
@@ -873,7 +894,7 @@ EngineResult physics_hitbox_set(Entity entity, Shape hitbox) {
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    entity_mask[index] |= COLLISION | HIT_BOX;
+    entity_mask[index] |= HIT_BOX;
     (void)ShapePool_store_at(&hit_boxes_pool, index, hitbox);
     console_debug_write(LOG_ENGINE, "Set Entity: %d to have a hit box\n", entity);
     return error_result_value(true);
@@ -975,6 +996,47 @@ EngineResult physics_angular_velocity_set(Entity entity, AngularVelocity v) {
     (void)AngularVelocityPool_store_at(&angular_velocities_pool, index, v);
     console_debug_write(LOG_ENGINE, "Set Entity: %d Angular Velocity: %f\n", entity, v);
     return error_result_value(true);
+}
+
+AngularVelocityResult physics_angular_velocity_get(Entity entity) {
+    EntityIndex index;
+    EngineResult result = physics_live_index_get(entity, &index);
+
+    if(result.kind == ERROR_RESULT_ERROR) {
+        return ERROR_RESULT_MAKE_ERROR(AngularVelocityResult, result.result.error);
+    }
+    if(!angular_velocities_pool.used[index]) {
+        return ERROR_RESULT_MAKE_ERROR(AngularVelocityResult, ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    return ERROR_RESULT_MAKE_VALUE(AngularVelocityResult, angular_velocities[index]);
+}
+
+EngineResult physics_angular_velocity_maximum_set(
+        Entity entity, AngularVelocity maximum) {
+    EntityIndex index;
+    EngineResult result = physics_live_index_get(entity, &index);
+
+    if(result.kind == ERROR_RESULT_ERROR) return result;
+    if(maximum < 0.0f) return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    if(AngularVelocityPool_store_at(
+            &angular_velocity_maximums_pool, index, maximum).kind == ERROR_RESULT_ERROR) {
+        return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
+    }
+    return error_result_value(true);
+}
+
+AngularVelocityResult physics_angular_velocity_maximum_get(Entity entity) {
+    EntityIndex index;
+    EngineResult result = physics_live_index_get(entity, &index);
+
+    if(result.kind == ERROR_RESULT_ERROR) {
+        return ERROR_RESULT_MAKE_ERROR(AngularVelocityResult, result.result.error);
+    }
+    if(!angular_velocity_maximums_pool.used[index]) {
+        return ERROR_RESULT_MAKE_ERROR(AngularVelocityResult, ERROR_ENGINE_COMPONENT_MISSING);
+    }
+    return ERROR_RESULT_MAKE_VALUE(
+        AngularVelocityResult, angular_velocity_maximums[index]);
 }
 
 EngineResult physics_angular_acceleration_set(

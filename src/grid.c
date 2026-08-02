@@ -101,16 +101,14 @@ uint32_t world_y_to_row(Vec1D y) {
 }
 
 void add_entity_to_grid(Entity entity, uint32_t row, uint32_t col) {
+    Cell *cell;
+
     if(entity >= MAX_ENTITIES || row >= GRID_ROWS || col >= GRID_COLS) {
         return;
     }
-    for(int i = 0; i < MAX_ENTITIES; i += 1) {
-        if(!grid.cells[row][col].entity_present[i]) {
-            grid.cells[row][col].entities[i] = entity;
-            grid.cells[row][col].entity_present[i] = true;
-            return;
-        }
-    }
+    cell = &grid.cells[row][col];
+    if(cell->entity_count >= GRID_CELL_ENTITY_CAPACITY) return;
+    cell->entities[cell->entity_count++] = entity;
 }
 
 void add_entity_to_grids(Entity entity) {

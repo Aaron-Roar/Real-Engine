@@ -49,7 +49,20 @@ int main(void) {
             rohr_error_check(rohr_physics_position_set(rigid_body.result.value, (Position){0.0f, 0.0f})) ||
             rohr_error_check(rohr_physics_mass_set(rigid_body.result.value, 4.0f)) ||
             rohr_error_check(rohr_physics_velocity_set(rigid_body.result.value, (Velocity){0})) ||
+            rohr_error_check(rohr_physics_angular_velocity_set(rigid_body.result.value, 10.0f)) ||
             rohr_error_check(rohr_physics_dynamic_set(rigid_body.result.value))) goto fail;
+    {
+        AngularVelocityResult angular_velocity =
+            rohr_physics_angular_velocity_get(rigid_body.result.value);
+        if(rohr_error_check(angular_velocity) || angular_velocity.result.value != 10.0f) goto fail;
+        if(rohr_error_check(rohr_physics_angular_velocity_maximum_set(
+                    rigid_body.result.value, 1.0f))) goto fail;
+        rohr_system_update_physics(0.1);
+        angular_velocity = rohr_physics_angular_velocity_get(rigid_body.result.value);
+        if(rohr_error_check(angular_velocity) ||
+                angular_velocity.result.value > 1.0f ||
+                angular_velocity.result.value < -1.0f) goto fail;
+    }
     rigid_anchor = rohr_physics_joint_anchor_create(
         rigid_body.result.value, (Vec2D){0.0f, 15.0f});
     if(rohr_error_check(rigid_anchor)) goto fail;
@@ -71,6 +84,10 @@ int main(void) {
         collision_node = rohr_physics_soft_body_node_create(
             collision_body.result.value, (Position){11.0f, 0.0f}, 1.0f, 3.0f);
         if(rohr_error_check(collision_node)) goto fail;
+        if(rohr_error_check(rohr_physics_friction_set(collision_node.result.value, 0.5f)) ||
+                rohr_error_check(rohr_physics_restitution_set(collision_node.result.value, 0.3f)) ||
+                rohr_error_check(rohr_physics_friction_set(wall.result.value, 0.5f)) ||
+                rohr_error_check(rohr_physics_restitution_set(wall.result.value, 0.3f))) goto fail;
         if(rohr_error_check(rohr_physics_position_set(wall.result.value, (Position){0.0f, 0.0f}))) goto fail;
         if(rohr_error_check(rohr_physics_hitbox_set(
                     wall.result.value, rohr_math_create_square(20.0f, 20.0f)))) goto fail;
@@ -78,7 +95,9 @@ int main(void) {
         rohr_system_update_physics(0.0);
         collision_node_index = rohr_entity_index_get(collision_node.result.value);
         if(rohr_error_check(collision_node_index) ||
-                positions[collision_node_index.result.value].x <= 11.0f) goto fail;
+                positions[collision_node_index.result.value].x <= 11.0f ||
+                frictions[collision_node_index.result.value] != 0.5f ||
+                restitutions[collision_node_index.result.value] != 0.3f) goto fail;
     }
     rohr_engine_shutdown();
     return 0;

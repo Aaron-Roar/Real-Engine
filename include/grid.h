@@ -5,16 +5,18 @@
 /** Width and height of one grid cell in world units. */
 #define CELL_SIZE 20
 /** Number of grid rows. */
-#define GRID_ROWS 25
+#define GRID_ROWS 35
 /** Number of grid columns. */
-#define GRID_COLS 25
+#define GRID_COLS 425
+/** Maximum entities stored in one broad-phase cell. */
+#define GRID_CELL_ENTITY_CAPACITY 512
 
 /** Grid cell containing entities that overlap the cell. */
 typedef struct {
-    /** Entity ids stored in this cell. */
-    Entity entities[MAX_ENTITIES];
-    /** Occupancy flags for entity slots. */
-    bool entity_present[MAX_ENTITIES];
+    /** Entity ids stored densely in this cell. */
+    Entity entities[GRID_CELL_ENTITY_CAPACITY];
+    /** Number of occupied entity slots. */
+    uint16_t entity_count;
 } Cell;
 
 /** Fixed broad-phase collision grid. */

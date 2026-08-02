@@ -148,6 +148,7 @@ EngineResult rohr_physics_stop_entity(Entity entity) { return physics_stop_entit
 EngineResult rohr_physics_group_stop_entities(GroupId group) { return physics_group_stop_entities(group); }
 EngineResult rohr_physics_apply_impulse(Entity entity, Vec2D impulse) { return physics_apply_impulse(entity, impulse); }
 EngineResult rohr_physics_position_set(Entity entity, Position p) { return physics_position_set(entity, p); }
+PositionResult rohr_physics_position_get(Entity entity) { return physics_position_get(entity); }
 EngineResult rohr_physics_mass_set(Entity entity, Mass m) { return physics_mass_set(entity, m); }
 EntityResult rohr_physics_force_create(Entity entity, Force f) { return physics_force_create(entity, f); }
 EngineResult rohr_physics_force_component_set(Entity entity, Force force) {
@@ -170,6 +171,9 @@ EngineResult rohr_physics_collision_with_none_set(Entity entity) { return physic
 bool rohr_physics_collision_between_is(Entity entity_1, Entity entity_2) { return physics_collision_between_is(entity_1, entity_2); }
 EngineResult rohr_physics_orientation_set(Entity entity, Orientation angle) { return physics_orientation_set(entity, angle); }
 EngineResult rohr_physics_angular_velocity_set(Entity entity, AngularVelocity v) { return physics_angular_velocity_set(entity, v); }
+AngularVelocityResult rohr_physics_angular_velocity_get(Entity entity) { return physics_angular_velocity_get(entity); }
+EngineResult rohr_physics_angular_velocity_maximum_set(Entity entity, AngularVelocity maximum) { return physics_angular_velocity_maximum_set(entity, maximum); }
+AngularVelocityResult rohr_physics_angular_velocity_maximum_get(Entity entity) { return physics_angular_velocity_maximum_get(entity); }
 ShapeResult rohr_physics_global_hit_box_get(Entity entity) { return physics_global_hit_box_get(entity); }
 EngineResult rohr_physics_restitution_set(Entity entity, Restitution restitution) { return physics_restitution_set(entity, restitution); }
 EngineResult rohr_physics_dynamic_set(Entity entity) { return physics_dynamic_set(entity); }
