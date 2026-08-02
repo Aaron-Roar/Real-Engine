@@ -1162,6 +1162,14 @@ Sets an entity position component value.
 
 **Returns:** EngineResult describing success or failure.
 
+### `rohr_physics_position_get`
+
+```c
+PositionResult rohr_physics_position_get(Entity entity);
+```
+
+ Returns an entity's world position.
+
 ### `rohr_physics_mass_set`
 
 ```c
@@ -1273,7 +1281,7 @@ Applies torque to an entity for one physics tick.
 EngineResult rohr_physics_hitbox_set(Entity entity, Shape hitbox);
 ```
 
-Sets an entity hitbox component value.
+Sets an entity hitbox component value without enabling physical collision response.
 
 | Parameter | Description |
 | --- | --- |
@@ -1375,6 +1383,36 @@ Sets an entity angular velocity component value.
 | `v` | Angular velocity value. |
 
 **Returns:** EngineResult describing success or failure.
+
+### `rohr_physics_angular_velocity_get`
+
+```c
+AngularVelocityResult rohr_physics_angular_velocity_get(Entity entity);
+```
+
+Returns an entity angular velocity.
+
+| Parameter | Description |
+| --- | --- |
+| `entity` | Entity to inspect. |
+
+**Returns:** AngularVelocityResult containing radians per second, or an error.
+
+### `rohr_physics_angular_velocity_maximum_set`
+
+```c
+EngineResult rohr_physics_angular_velocity_maximum_set( Entity entity, AngularVelocity maximum );
+```
+
+ Sets the absolute angular-velocity limit applied before orientation integration.
+
+### `rohr_physics_angular_velocity_maximum_get`
+
+```c
+AngularVelocityResult rohr_physics_angular_velocity_maximum_get(Entity entity);
+```
+
+ Returns an entity's configured absolute angular-velocity limit.
 
 ### `rohr_physics_global_hit_box_get`
 
