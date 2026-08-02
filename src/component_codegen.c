@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
-static bool RE_identifier_valid(const char *value) {
+static bool RE_identifier_check(const char *value) {
     size_t i;
 
     if(value == NULL || value[0] == '\0') {
@@ -21,7 +21,7 @@ static bool RE_identifier_valid(const char *value) {
     return true;
 }
 
-static bool RE_registry_name_exists(
+static bool RE_registry_name_check(
         const RE_ComponentRegistry *registry,
         const char *name
         ) {
@@ -51,10 +51,10 @@ void RE_component_registry_init(RE_ComponentRegistry *registry) {
     memset(registry, 0, sizeof(*registry));
 }
 
-bool RE_component_registry_add_tag(RE_ComponentRegistry *registry, const char *name) {
+bool RE_component_registry_tag_add(RE_ComponentRegistry *registry, const char *name) {
     size_t i;
 
-    if(registry == NULL || !RE_identifier_valid(name)) {
+    if(registry == NULL || !RE_identifier_check(name)) {
         return false;
     }
     for(i = 0; i < registry->tag_count; i += 1) {
@@ -62,7 +62,7 @@ bool RE_component_registry_add_tag(RE_ComponentRegistry *registry, const char *n
             return true;
         }
     }
-    if(RE_registry_name_exists(registry, name)) {
+    if(RE_registry_name_check(registry, name)) {
         return false;
     }
     if(RE_registry_count(registry) >= RE_GAME_COMPONENT_LIMIT) {
@@ -73,14 +73,14 @@ bool RE_component_registry_add_tag(RE_ComponentRegistry *registry, const char *n
     return true;
 }
 
-bool RE_component_registry_add_component(
+bool RE_component_registry_component_add(
         RE_ComponentRegistry *registry,
         RE_ComponentDefinition definition
         ) {
     size_t i;
 
-    if(registry == NULL || !RE_identifier_valid(definition.name) ||
-            !RE_identifier_valid(definition.type_name) ||
+    if(registry == NULL || !RE_identifier_check(definition.name) ||
+            !RE_identifier_check(definition.type_name) ||
             definition.type_declaration == NULL ||
             definition.type_declaration[0] == '\0') {
         return false;
@@ -94,7 +94,7 @@ bool RE_component_registry_add_component(
                 ) == 0;
         }
     }
-    if(RE_registry_name_exists(registry, definition.name)) {
+    if(RE_registry_name_check(registry, definition.name)) {
         return false;
     }
     if(RE_registry_count(registry) >= RE_GAME_COMPONENT_LIMIT) {
@@ -105,7 +105,7 @@ bool RE_component_registry_add_component(
     return true;
 }
 
-static bool RE_lower_identifier(const char *name, char *output, size_t size) {
+static bool RE_identifier_lower(const char *name, char *output, size_t size) {
     size_t i;
     size_t length;
 
@@ -132,7 +132,7 @@ static const char *RE_path_basename(const char *path) {
     return basename;
 }
 
-static bool RE_generate_header(
+static bool RE_header_generate(
         const RE_ComponentRegistry *registry,
         FILE *header
         ) {
@@ -173,7 +173,7 @@ static bool RE_generate_header(
     }
 
     for(i = 0; i < registry->tag_count; i += 1) {
-        if(!RE_lower_identifier(registry->tags[i], lower_name, sizeof(lower_name))) {
+        if(!RE_identifier_lower(registry->tags[i], lower_name, sizeof(lower_name))) {
             return false;
         }
         if(fprintf(header,
@@ -187,7 +187,7 @@ static bool RE_generate_header(
 
     for(i = 0; i < registry->component_count; i += 1) {
         const RE_ComponentDefinition *component = &registry->components[i];
-        if(!RE_lower_identifier(component->name, lower_name, sizeof(lower_name))) {
+        if(!RE_identifier_lower(component->name, lower_name, sizeof(lower_name))) {
             return false;
         }
         if(fprintf(header,
@@ -216,7 +216,7 @@ static bool RE_generate_header(
     return fprintf(header, "#endif\n") >= 0;
 }
 
-static bool RE_generate_source_prelude(FILE *source, const char *header_name) {
+static bool RE_source_prelude_generate(FILE *source, const char *header_name) {
     return fprintf(source,
         "#include \"%s\"\n\n"
         "#include <stdlib.h>\n"
@@ -317,7 +317,7 @@ static bool RE_generate_source_prelude(FILE *source, const char *header_name) {
         "    return game_entity_state_find(entity, &entity_index, &dense_index) &&\n"
         "        (game_entity_states.masks[dense_index] & bit) == bit;\n"
         "}\n\n"
-        "static void game_entity_state_clear_bit(Entity entity, GameComponentMask bit) {\n"
+        "static void game_entity_state_bit_clear(Entity entity, GameComponentMask bit) {\n"
         "    EntityIndex entity_index;\n"
         "    EntityIndex moved_index;\n"
         "    size_t dense_index;\n"
@@ -343,9 +343,9 @@ static bool RE_generate_source_prelude(FILE *source, const char *header_name) {
         header_name) >= 0;
 }
 
-static bool RE_generate_tag_source(FILE *source, const char *name) {
+static bool RE_tag_source_generate(FILE *source, const char *name) {
     char lower_name[128];
-    if(!RE_lower_identifier(name, lower_name, sizeof(lower_name))) {
+    if(!RE_identifier_lower(name, lower_name, sizeof(lower_name))) {
         return false;
     }
     return fprintf(source,
@@ -356,14 +356,14 @@ static bool RE_generate_tag_source(FILE *source, const char *name) {
         "    return game_entity_state_has_bit(entity, GAME_TAG_%s);\n"
         "}\n\n"
         "void game_%s_remove(Entity entity) {\n"
-        "    game_entity_state_clear_bit(entity, GAME_TAG_%s);\n"
+        "    game_entity_state_bit_clear(entity, GAME_TAG_%s);\n"
         "}\n\n",
         lower_name, name,
         lower_name, name,
         lower_name, name) >= 0;
 }
 
-static bool RE_generate_component_source(
+static bool RE_component_source_generate(
         FILE *source,
         const RE_ComponentDefinition *component
         ) {
@@ -371,7 +371,7 @@ static bool RE_generate_component_source(
     const char *type = component->type_name;
     const char *symbol = component->name;
 
-    if(!RE_lower_identifier(symbol, name, sizeof(name))) {
+    if(!RE_identifier_lower(symbol, name, sizeof(name))) {
         return false;
     }
     if(fprintf(source,
@@ -510,7 +510,7 @@ static bool RE_generate_component_source(
         "        }\n"
         "    }\n"
         "    game_%s_pool.count -= 1;\n"
-        "    game_entity_state_clear_bit(entity, GAME_COMPONENT_%s);\n"
+        "    game_entity_state_bit_clear(entity, GAME_COMPONENT_%s);\n"
         "}\n\n",
         name, name, name,
         name, name, name,
@@ -518,7 +518,7 @@ static bool RE_generate_component_source(
         symbol) >= 0;
 }
 
-static bool RE_generate_source_epilogue(
+static bool RE_source_epilogue_generate(
         const RE_ComponentRegistry *registry,
         FILE *source
         ) {
@@ -534,13 +534,13 @@ static bool RE_generate_source_epilogue(
         return false;
     }
     for(i = 0; i < registry->component_count; i += 1) {
-        if(!RE_lower_identifier(registry->components[i].name, lower_name, sizeof(lower_name)) ||
+        if(!RE_identifier_lower(registry->components[i].name, lower_name, sizeof(lower_name)) ||
                 fprintf(source, "    game_%s_remove(entity);\n", lower_name) < 0) {
             return false;
         }
     }
     for(i = 0; i < registry->tag_count; i += 1) {
-        if(!RE_lower_identifier(registry->tags[i], lower_name, sizeof(lower_name)) ||
+        if(!RE_identifier_lower(registry->tags[i], lower_name, sizeof(lower_name)) ||
                 fprintf(source, "    game_%s_remove(entity);\n", lower_name) < 0) {
             return false;
         }
@@ -549,7 +549,7 @@ static bool RE_generate_source_epilogue(
         return false;
     }
     for(i = 0; i < registry->component_count; i += 1) {
-        if(!RE_lower_identifier(registry->components[i].name, lower_name, sizeof(lower_name)) ||
+        if(!RE_identifier_lower(registry->components[i].name, lower_name, sizeof(lower_name)) ||
                 fprintf(source,
                     "    if(game_%s_destroy_hook != NULL) {\n"
                     "        size_t i;\n"
@@ -602,16 +602,16 @@ bool RE_component_registry_generate(
         return false;
     }
 
-    success = RE_generate_header(registry, header) &&
-        RE_generate_source_prelude(source, RE_path_basename(header_path));
+    success = RE_header_generate(registry, header) &&
+        RE_source_prelude_generate(source, RE_path_basename(header_path));
     for(i = 0; success && i < registry->tag_count; i += 1) {
-        success = RE_generate_tag_source(source, registry->tags[i]);
+        success = RE_tag_source_generate(source, registry->tags[i]);
     }
     for(i = 0; success && i < registry->component_count; i += 1) {
-        success = RE_generate_component_source(source, &registry->components[i]);
+        success = RE_component_source_generate(source, &registry->components[i]);
     }
     if(success) {
-        success = RE_generate_source_epilogue(registry, source);
+        success = RE_source_epilogue_generate(registry, source);
     }
     if(fclose(header) != 0 || fclose(source) != 0) {
         success = false;

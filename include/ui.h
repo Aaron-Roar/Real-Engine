@@ -128,7 +128,7 @@ typedef struct UISliderDefinition {
 ERROR_DECLARE_RESULT_TYPE(UISliderDefinitionResult, UISliderDefinition);
 
 /** Start a UI frame with pointer coordinates in logical screen space. */
-void ui_begin_frame(UIInput input);
+void ui_frame_begin(UIInput input);
 
 /**
  * Draw and update a button identified by a stable, non-empty string.
@@ -149,16 +149,16 @@ void ui_label(const TextAsset *text, UIRect bounds);
 void ui_button_disabled(UIRect bounds, const UIButtonStyle *style);
 
 /** Return whether a UI control consumed pointer input this frame. */
-bool ui_pointer_consumed_is(void);
+bool ui_pointer_consumed_get(void);
 
 /** Finish a UI frame and release stale pointer capture when appropriate. */
-void ui_end_frame(void);
+void ui_frame_end(void);
 
 /** Return the engine default button colors. */
-UIButtonStyle ui_default_button_style(void);
+UIButtonStyle ui_button_style_default_get(void);
 
 /** Return default slider geometry, 0..1 range, and colors. */
-UISliderConfig ui_default_slider_config(void);
+UISliderConfig ui_slider_config_default_get(void);
 
 /** Draw and update a slider while leaving its value owned by the caller. */
 UISliderResult ui_slider(

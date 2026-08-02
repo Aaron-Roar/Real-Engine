@@ -26,7 +26,7 @@ int main(void) {
             rohr_error_check(rohr_physics_acceleration_set(body, (Acceleration){0})) ||
             rohr_error_check(rohr_physics_mass_set(body, 1.0f)) ||
             rohr_error_check(rohr_physics_hitbox_set(
-                body, rohr_math_create_square(2.0f, 2.0f))) ||
+                body, rohr_math_square_create(2.0f, 2.0f))) ||
             rohr_error_check(rohr_physics_dynamic_set(body)) ||
             rohr_error_check(rohr_physics_restitution_set(body, 0.0f)) ||
             rohr_error_check(rohr_physics_collision_category_set(
@@ -36,15 +36,15 @@ int main(void) {
 
     if(rohr_error_check(rohr_physics_position_set(sensor, (Position){0.0f, 0.0f})) ||
             rohr_error_check(rohr_physics_hitbox_set(
-                sensor, rohr_math_create_square(10.0f, 10.0f))) ||
+                sensor, rohr_math_square_create(10.0f, 10.0f))) ||
             rohr_error_check(rohr_physics_static_set(sensor)) ||
             rohr_error_check(rohr_physics_collision_category_set(
                 sensor, sensor_category)) ||
             rohr_error_check(rohr_physics_collision_with_set(
                 sensor, body_category))) goto fail;
-    if(rohr_entity_components_has(sensor, COLLISION)) goto fail;
+    if(rohr_entity_components_check(sensor, COLLISION)) goto fail;
 
-    rohr_system_update_physics(1.0);
+    rohr_system_physics_update(1.0);
     body_position = rohr_physics_position_get(body);
     body_index = rohr_entity_index_get(body);
     if(rohr_error_check(body_position) || rohr_error_check(body_index) ||
@@ -62,7 +62,7 @@ int main(void) {
         goto fail;
     }
 
-    rohr_system_update_physics(1.0);
+    rohr_system_physics_update(1.0);
     body_position = rohr_physics_position_get(body);
     if(rohr_error_check(body_position) ||
             fabsf(body_position.result.value.x - 9.0f) > 0.0001f ||

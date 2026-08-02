@@ -213,13 +213,13 @@ void physics_entity_clear(Entity entity, EntityIndex index) {
     if(index < soft_bodies_pool.capacity && soft_bodies_pool.used[index]) {
         SoftBody body = soft_bodies[index];
         for(uint32_t i = 0; i < body.triangle_count; i += 1) {
-            if(entity_alive_is(body.triangles[i])) (void)entity_delete(body.triangles[i]);
+            if(entity_alive_check(body.triangles[i])) (void)entity_delete(body.triangles[i]);
         }
         for(uint32_t i = 0; i < body.beam_count; i += 1) {
-            if(entity_alive_is(body.beams[i])) (void)entity_delete(body.beams[i]);
+            if(entity_alive_check(body.beams[i])) (void)entity_delete(body.beams[i]);
         }
         for(uint32_t i = 0; i < body.node_count; i += 1) {
-            if(entity_alive_is(body.nodes[i])) (void)entity_delete(body.nodes[i]);
+            if(entity_alive_check(body.nodes[i])) (void)entity_delete(body.nodes[i]);
         }
         (void)SoftBodyPool_release_at(&soft_bodies_pool, index);
     }
@@ -229,7 +229,7 @@ void physics_entity_clear(Entity entity, EntityIndex index) {
         for(EntityIndex connected = 0; connected < soft_body_beams_pool.capacity; connected += 1) {
             if(!soft_body_beams_pool.used[connected] ||
                     (soft_body_beams[connected].node_a != entity && soft_body_beams[connected].node_b != entity)) continue;
-            EntityResult connected_entity = entity_from_index(connected);
+            EntityResult connected_entity = entity_from_index_get(connected);
             if(connected_entity.kind == ERROR_RESULT_VALUE) (void)entity_delete(connected_entity.result.value);
         }
         for(EntityIndex connected = 0; connected < soft_body_triangles_pool.capacity; connected += 1) {
@@ -238,7 +238,7 @@ void physics_entity_clear(Entity entity, EntityIndex index) {
             if(!soft_body_triangles_pool.used[connected]) continue;
             triangle = soft_body_triangles[connected];
             if(triangle.node_a != entity && triangle.node_b != entity && triangle.node_c != entity) continue;
-            connected_entity = entity_from_index(connected);
+            connected_entity = entity_from_index_get(connected);
             if(connected_entity.kind == ERROR_RESULT_VALUE) (void)entity_delete(connected_entity.result.value);
         }
         if(entity_index_get(owner, &body_index) && body_index < soft_bodies_pool.capacity && soft_bodies_pool.used[body_index]) {
@@ -273,7 +273,7 @@ void physics_entity_clear(Entity entity, EntityIndex index) {
     for(EntityIndex joint_index = 0; joint_index < joints_pool.capacity; joint_index += 1) {
         if(!joints_pool.used[joint_index] ||
                 (joints[joint_index].a != entity && joints[joint_index].b != entity)) continue;
-        EntityResult joint_entity = entity_from_index(joint_index);
+        EntityResult joint_entity = entity_from_index_get(joint_index);
         if(joint_entity.kind == ERROR_RESULT_VALUE && joint_entity.result.value != entity) {
             (void)entity_delete(joint_entity.result.value);
         }
@@ -418,8 +418,8 @@ Collision physics_sat_collision(Shape shape_1, Shape shape_2)
         .depth = FLT_MAX
     };
 
-    Vec2DList shape1_axes = math_normalize_vectors(math_create_normals(shape_1));
-    Vec2DList shape2_axes = math_normalize_vectors(math_create_normals(shape_2));
+    Vec2DList shape1_axes = math_vectors_normalize(math_normals_create(shape_1));
+    Vec2DList shape2_axes = math_vectors_normalize(math_normals_create(shape_2));
 
     collision = physics_sat_collision_on_axes(shape_1, shape_2, shape1_axes, collision);
 
@@ -470,26 +470,26 @@ static EngineResult physics_live_index_get(Entity entity, EntityIndex *index) {
     if(!entity_index_get(entity, index)) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
-    if(!entity_index_alive_is(*index)) {
+    if(!entity_index_alive_check(*index)) {
         return error_result_error(ERROR_ENGINE_ENTITY_NOT_FOUND);
     }
     return error_result_value(true);
 }
 
-bool physics_entity_held_is(EntityIndex index) {
-    if(!entity_index_alive_is(index)) {
+bool physics_entity_held_get(EntityIndex index) {
+    if(!entity_index_alive_check(index)) {
         return false;
     }
-    return entity_index_components_has(index, HOLD);
+    return entity_index_components_check(index, HOLD);
 }
 
-bool physics_entity_movable_is(EntityIndex index) {
-    if(!entity_index_alive_is(index)) {
+bool physics_entity_movable_get(EntityIndex index) {
+    if(!entity_index_alive_check(index)) {
         return false;
     }
-    return entity_index_components_has(index, DYNAMIC)
-        && !entity_index_components_has(index, STATIC)
-        && !physics_entity_held_is(index);
+    return entity_index_components_check(index, DYNAMIC)
+        && !entity_index_components_check(index, STATIC)
+        && !physics_entity_held_get(index);
 }
 
 static Vec2D physics_direction_between_positions(Position from, Position to) {
@@ -511,7 +511,7 @@ static Vec2D physics_direction_between_positions(Position from, Position to) {
 typedef EngineResult (*PhysicsGroupEntityTargetFn)(Entity entity, float magnitude, Entity target);
 typedef EngineResult (*PhysicsGroupEntityFn)(Entity entity);
 
-static EngineResult physics_group_apply_entity_target(GroupId group, float magnitude, Entity target, PhysicsGroupEntityTargetFn fn) {
+static EngineResult physics_group_entity_target_apply(GroupId group, float magnitude, Entity target, PhysicsGroupEntityTargetFn fn) {
     EntityGroupResult group_result;
     EntityGroup group_storage;
     size_t i;
@@ -535,7 +535,7 @@ static EngineResult physics_group_apply_entity_target(GroupId group, float magni
             continue;
         }
         entity = group_storage.entities.objects[i];
-        if(!entity_alive_is(entity)) {
+        if(!entity_alive_check(entity)) {
             continue;
         }
         result = fn(entity, magnitude, target);
@@ -546,7 +546,7 @@ static EngineResult physics_group_apply_entity_target(GroupId group, float magni
     return error_result_value(true);
 }
 
-static EngineResult physics_group_apply_entity(GroupId group, PhysicsGroupEntityFn fn) {
+static EngineResult physics_group_entity_apply(GroupId group, PhysicsGroupEntityFn fn) {
     EntityGroupResult group_result;
     EntityGroup group_storage;
     size_t i;
@@ -570,7 +570,7 @@ static EngineResult physics_group_apply_entity(GroupId group, PhysicsGroupEntity
             continue;
         }
         entity = group_storage.entities.objects[i];
-        if(!entity_alive_is(entity)) {
+        if(!entity_alive_check(entity)) {
             continue;
         }
         result = fn(entity);
@@ -628,22 +628,22 @@ EngineResult physics_velocity_away_from_entity_set(Entity entity, float speed, E
 }
 
 EngineResult physics_group_velocity_toward_entity_set(GroupId group, float speed, Entity target) {
-    return physics_group_apply_entity_target(group, speed, target, physics_velocity_toward_entity_set);
+    return physics_group_entity_target_apply(group, speed, target, physics_velocity_toward_entity_set);
 }
 
 EngineResult physics_group_velocity_away_from_entity_set(GroupId group, float speed, Entity target) {
-    return physics_group_apply_entity_target(group, speed, target, physics_velocity_away_from_entity_set);
+    return physics_group_entity_target_apply(group, speed, target, physics_velocity_away_from_entity_set);
 }
 
-EngineResult physics_stop_entity(Entity entity) {
+EngineResult physics_entity_stop(Entity entity) {
     return physics_velocity_set(entity, (Velocity){0});
 }
 
-EngineResult physics_group_stop_entities(GroupId group) {
-    return physics_group_apply_entity(group, physics_stop_entity);
+EngineResult physics_group_entities_stop(GroupId group) {
+    return physics_group_entity_apply(group, physics_entity_stop);
 }
 
-EngineResult physics_apply_impulse(Entity entity, Vec2D impulse) {
+EngineResult physics_impulse_apply(Entity entity, Vec2D impulse) {
     EntityIndex index;
     Velocity velocity;
     EngineResult result = physics_live_index_get(entity, &index);
@@ -651,7 +651,7 @@ EngineResult physics_apply_impulse(Entity entity, Vec2D impulse) {
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    if(!entity_index_components_has(index, MASS)) {
+    if(!entity_index_components_check(index, MASS)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
     }
     if(mass[index] == 0.0f) {
@@ -725,7 +725,7 @@ EntityResult physics_force_create(Entity entity, Force f) {
     }
     Entity force_entity = force_result.result.value;
     EntityIndex force_index;
-    if(!(entity_index_get(force_entity, &force_index) && entity_index_alive_is(force_index))) {
+    if(!(entity_index_get(force_entity, &force_index) && entity_index_alive_check(force_index))) {
         return ERROR_RESULT_MAKE_ERROR(EntityResult, ERROR_ENGINE_ENTITY_NOT_FOUND);
     }
     (void)ForcePool_store_at(&forces_pool, force_index, f);
@@ -750,7 +750,7 @@ EngineResult physics_force_component_set(Entity entity, Force force) {
     return error_result_value(true);
 }
 
-EngineResult physics_apply_force_for_one_tick(Entity entity, Force f) {
+EngineResult physics_force_for_one_tick_apply(Entity entity, Force f) {
     EntityResult force_result = physics_force_create(entity, f);
     EngineResult result;
 
@@ -826,11 +826,11 @@ EngineResult physics_acceleration_away_from_entity_set(Entity entity, float acce
 }
 
 EngineResult physics_group_acceleration_toward_entity_set(GroupId group, float acceleration_magnitude, Entity target) {
-    return physics_group_apply_entity_target(group, acceleration_magnitude, target, physics_acceleration_toward_entity_set);
+    return physics_group_entity_target_apply(group, acceleration_magnitude, target, physics_acceleration_toward_entity_set);
 }
 
 EngineResult physics_group_acceleration_away_from_entity_set(GroupId group, float acceleration_magnitude, Entity target) {
-    return physics_group_apply_entity_target(group, acceleration_magnitude, target, physics_acceleration_away_from_entity_set);
+    return physics_group_entity_target_apply(group, acceleration_magnitude, target, physics_acceleration_away_from_entity_set);
 }
 
 EntityResult physics_torque_create(Entity entity, Torque t) {
@@ -847,7 +847,7 @@ EntityResult physics_torque_create(Entity entity, Torque t) {
     }
     Entity torque_entity = torque_result.result.value;
     EntityIndex torque_index;
-    if(!(entity_index_get(torque_entity, &torque_index) && entity_index_alive_is(torque_index))) {
+    if(!(entity_index_get(torque_entity, &torque_index) && entity_index_alive_check(torque_index))) {
         return ERROR_RESULT_MAKE_ERROR(EntityResult, ERROR_ENGINE_ENTITY_NOT_FOUND);
     }
     (void)TorquePool_store_at(&torques_pool, torque_index, t);
@@ -872,7 +872,7 @@ EngineResult physics_torque_component_set(Entity entity, Torque torque) {
     return error_result_value(true);
 }
 
-EngineResult physics_apply_torque_for_one_tick(Entity entity, Torque t) {
+EngineResult physics_torque_for_one_tick_apply(Entity entity, Torque t) {
     EntityResult torque_result = physics_torque_create(entity, t);
     EngineResult result;
 
@@ -900,7 +900,7 @@ EngineResult physics_hitbox_set(Entity entity, Shape hitbox) {
     return error_result_value(true);
 }
 
-CollisionFilterConfig physics_collision_filter_default_config(void) {
+CollisionFilterConfig physics_collision_filter_config_default_get(void) {
     return (CollisionFilterConfig) {
         .category = ROHR_COLLISION_CATEGORY_DEFAULT,
         .collides_with = ROHR_COLLISION_CATEGORY_ALL
@@ -912,7 +912,7 @@ EngineResult physics_collision_filter_set(Entity entity, CollisionFilterConfig c
     EngineResult result = physics_live_index_get(entity, &index);
 
     if(result.kind == ERROR_RESULT_ERROR) return result;
-    if(!entity_index_components_has(index, HIT_BOX)) {
+    if(!entity_index_components_check(index, HIT_BOX)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
     }
     if(CollisionFilterConfigPool_store_at(&collision_filters_pool, index, config).kind
@@ -930,11 +930,11 @@ CollisionFilterConfigResult physics_collision_filter_get(Entity entity) {
     if(result.kind == ERROR_RESULT_ERROR) {
         return ERROR_RESULT_MAKE_ERROR(CollisionFilterConfigResult, result.result.error);
     }
-    if(!entity_index_components_has(index, HIT_BOX)) {
+    if(!entity_index_components_check(index, HIT_BOX)) {
         return ERROR_RESULT_MAKE_ERROR(CollisionFilterConfigResult, ERROR_ENGINE_COMPONENT_MISSING);
     }
-    if(!entity_index_components_has(index, COLLISION_FILTER)) {
-        return ERROR_RESULT_MAKE_VALUE(CollisionFilterConfigResult, physics_collision_filter_default_config());
+    if(!entity_index_components_check(index, COLLISION_FILTER)) {
+        return ERROR_RESULT_MAKE_VALUE(CollisionFilterConfigResult, physics_collision_filter_config_default_get());
     }
     return ERROR_RESULT_MAKE_VALUE(CollisionFilterConfigResult, collision_filters[index]);
 }
@@ -963,7 +963,7 @@ EngineResult physics_collision_with_none_set(Entity entity) {
     return physics_collision_with_set(entity, ROHR_COLLISION_CATEGORY_NONE);
 }
 
-bool physics_collision_between_is(Entity entity_1, Entity entity_2) {
+bool physics_collision_between_check(Entity entity_1, Entity entity_2) {
     CollisionFilterConfigResult first = physics_collision_filter_get(entity_1);
     CollisionFilterConfigResult second = physics_collision_filter_get(entity_2);
 
@@ -1066,8 +1066,8 @@ ShapeResult physics_global_hit_box_get(Entity entity) {
     RohrComponentMask filter = HIT_BOX;
     EntityIndex index;
 
-    if((entity_index_get(entity, &index) && entity_index_alive_is(index))) {
-        if( entity_index_components_has(index, filter) ) {
+    if((entity_index_get(entity, &index) && entity_index_alive_check(index))) {
+        if( entity_index_components_check(index, filter) ) {
             return ERROR_RESULT_MAKE_VALUE(ShapeResult, world_hit_boxes[index]);
         }
         return ERROR_RESULT_MAKE_ERROR(ShapeResult, ERROR_ENGINE_COMPONENT_MISSING);
@@ -1093,7 +1093,7 @@ EngineResult physics_restitution_set(Entity entity, Restitution restitution) {
         (void)RestitutionPool_store_at(&restitutions_pool, index, restitution);
         console_debug_write(LOG_ENGINE, "Set Entity: %d Restitution: %f\n", entity, restitution);
      }
-     return entity_add_components(entity, COLLISION);
+     return entity_components_add(entity, COLLISION);
 }
 EngineResult physics_dynamic_set(Entity entity) {
     EntityIndex index;
@@ -1102,11 +1102,11 @@ EngineResult physics_dynamic_set(Entity entity) {
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    result = entity_add_components(entity, DYNAMIC);
+    result = entity_components_add(entity, DYNAMIC);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    result = entity_delete_components(entity, STATIC);
+    result = entity_components_delete(entity, STATIC);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
@@ -1120,11 +1120,11 @@ EngineResult physics_static_set(Entity entity) {
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    result = entity_add_components(entity, STATIC);
+    result = entity_components_add(entity, STATIC);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    result = entity_delete_components(entity, DYNAMIC);
+    result = entity_components_delete(entity, DYNAMIC);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
@@ -1132,14 +1132,14 @@ EngineResult physics_static_set(Entity entity) {
     return error_result_value(true);
 }
 
-EngineResult physics_hold_entity(Entity entity) {
+EngineResult physics_entity_hold(Entity entity) {
     EntityIndex index;
     EngineResult result = physics_live_index_get(entity, &index);
 
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    result = entity_add_components(entity, HOLD);
+    result = entity_components_add(entity, HOLD);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
@@ -1147,14 +1147,14 @@ EngineResult physics_hold_entity(Entity entity) {
     return error_result_value(true);
 }
 
-EngineResult physics_unhold_entity(Entity entity) {
+EngineResult physics_entity_unhold(Entity entity) {
     EntityIndex index;
     EngineResult result = physics_live_index_get(entity, &index);
 
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    result = entity_delete_components(entity, HOLD);
+    result = entity_components_delete(entity, HOLD);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
@@ -1162,12 +1162,12 @@ EngineResult physics_unhold_entity(Entity entity) {
     return error_result_value(true);
 }
 
-EngineResult physics_group_hold_entities(GroupId group) {
-    return physics_group_apply_entity(group, physics_hold_entity);
+EngineResult physics_group_entities_hold(GroupId group) {
+    return physics_group_entity_apply(group, physics_entity_hold);
 }
 
-EngineResult physics_group_unhold_entities(GroupId group) {
-    return physics_group_apply_entity(group, physics_unhold_entity);
+EngineResult physics_group_entities_unhold(GroupId group) {
+    return physics_group_entity_apply(group, physics_entity_unhold);
 }
 
 EngineResult physics_angle_lock_set(Entity entity, Orientation min, Orientation max) {
@@ -1177,7 +1177,7 @@ EngineResult physics_angle_lock_set(Entity entity, Orientation min, Orientation 
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    result = entity_add_components(entity, ANGLE_LOCK);
+    result = entity_components_add(entity, ANGLE_LOCK);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
@@ -1194,11 +1194,11 @@ EngineResult physics_axis_lock_set(Entity entity, Axis axis, Position axis_point
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    result = entity_add_components(entity, AXIS_LOCK);
+    result = entity_components_add(entity, AXIS_LOCK);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    Axis normalized_axis = math_normalize_vector(axis);
+    Axis normalized_axis = math_vector_normalize(axis);
     (void)AxisLockPool_store_at(&axis_locks_pool, index, (AxisLock){
         .axis = (Axis){
             .x = normalized_axis.x,
@@ -1247,7 +1247,7 @@ EngineResult physics_transform_lock_set(
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    result = entity_add_components(driven, TRANSFORM_LOCK);
+    result = entity_components_add(driven, TRANSFORM_LOCK);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
@@ -1261,14 +1261,14 @@ EngineResult physics_transform_lock_set(
     });
     return error_result_value(true);
 }
-EngineResult physics_remove_transform_lock(Entity entity) {
+EngineResult physics_transform_lock_remove(Entity entity) {
     EntityIndex index;
     EngineResult result = physics_live_index_get(entity, &index);
 
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    result = entity_delete_components(entity, TRANSFORM_LOCK);
+    result = entity_components_delete(entity, TRANSFORM_LOCK);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
@@ -1302,7 +1302,7 @@ EngineResult physics_transform_lock_current_transform_set(
         .y = positions[driven_index].y - positions[driver_index].y
     };
 
-    Vec2D local_offset = math_rotate_vector(
+    Vec2D local_offset = math_vector_rotate(
         world_offset,
         -orientations[driver_index]
     );
@@ -1429,16 +1429,16 @@ JointAnchorPositionResult physics_joint_anchor_world_position_get(JointAnchorId 
 
     if(!physics_joint_anchor_slot_get(anchor, &slot) ||
             !entity_index_get(joint_anchors[slot].entity, &entity_index) ||
-            !entity_index_alive_is(entity_index)) {
+            !entity_index_alive_check(entity_index)) {
         return ERROR_RESULT_MAKE_ERROR(JointAnchorPositionResult, ERROR_ENGINE_ENTITY_NOT_FOUND);
     }
     local_position = joint_anchors[slot].centroid_offset;
-    if(entity_index_components_has(entity_index, HIT_BOX)) {
+    if(entity_index_components_check(entity_index, HIT_BOX)) {
         Vec2D centroid = math_polygon_centroid(hit_boxes[entity_index]);
         local_position.x += centroid.x;
         local_position.y += centroid.y;
     }
-    rotated = math_rotate_vector(local_position, orientations[entity_index]);
+    rotated = math_vector_rotate(local_position, orientations[entity_index]);
     return ERROR_RESULT_MAKE_VALUE(JointAnchorPositionResult, ((Position){
         .x = positions[entity_index].x + rotated.x,
         .y = positions[entity_index].y + rotated.y
@@ -1464,7 +1464,7 @@ EngineResult physics_joint_anchor_remove(JointAnchorId anchor) {
     for(EntityIndex index = 0; index < joints_pool.capacity; index += 1) {
         if(!joints_pool.used[index] ||
                 (joints[index].anchor_a != anchor && joints[index].anchor_b != anchor)) continue;
-        EntityResult joint_entity = entity_from_index(index);
+        EntityResult joint_entity = entity_from_index_get(index);
         if(joint_entity.kind == ERROR_RESULT_VALUE) (void)entity_delete(joint_entity.result.value);
     }
     joint_anchor_used[slot] = false;
@@ -1545,7 +1545,7 @@ EntityResult physics_joint_create(
     EntityResult joint_result;
     EngineResult result;
 
-    if(!(entity_index_get(a, &a_index) && entity_index_alive_is(a_index)) || !(entity_index_get(b, &b_index) && entity_index_alive_is(b_index))) {
+    if(!(entity_index_get(a, &a_index) && entity_index_alive_check(a_index)) || !(entity_index_get(b, &b_index) && entity_index_alive_check(b_index))) {
         return ERROR_RESULT_MAKE_ERROR(EntityResult, ERROR_ENGINE_INVALID_ENTITY);
     }
 
@@ -1555,18 +1555,18 @@ EntityResult physics_joint_create(
     }
     Entity joint = joint_result.result.value;
     EntityIndex joint_index;
-    if(!(entity_index_get(joint, &joint_index) && entity_index_alive_is(joint_index))) {
+    if(!(entity_index_get(joint, &joint_index) && entity_index_alive_check(joint_index))) {
         return ERROR_RESULT_MAKE_ERROR(EntityResult, ERROR_ENGINE_ENTITY_NOT_FOUND);
     }
 
     Vec2D world_anchor_a = {
-        .x = positions[a_index].x + math_rotate_vector(local_anchor_a, orientations[a_index]).x,
-        .y = positions[a_index].y + math_rotate_vector(local_anchor_a, orientations[a_index]).y
+        .x = positions[a_index].x + math_vector_rotate(local_anchor_a, orientations[a_index]).x,
+        .y = positions[a_index].y + math_vector_rotate(local_anchor_a, orientations[a_index]).y
     };
 
     Vec2D world_anchor_b = {
-        .x = positions[b_index].x + math_rotate_vector(local_anchor_b, orientations[b_index]).x,
-        .y = positions[b_index].y + math_rotate_vector(local_anchor_b, orientations[b_index]).y
+        .x = positions[b_index].x + math_vector_rotate(local_anchor_b, orientations[b_index]).x,
+        .y = positions[b_index].y + math_vector_rotate(local_anchor_b, orientations[b_index]).y
     };
 
     Vec2D delta = {
@@ -1615,7 +1615,7 @@ SoftBodyResult physics_soft_body_get(Entity soft_body) {
     EngineResult result = physics_live_index_get(soft_body, &index);
 
     if(result.kind == ERROR_RESULT_ERROR) return ERROR_RESULT_MAKE_ERROR(SoftBodyResult, result.result.error);
-    if(!entity_index_components_has(index, SOFT_BODY) || !soft_bodies_pool.used[index]) {
+    if(!entity_index_components_check(index, SOFT_BODY) || !soft_bodies_pool.used[index]) {
         return ERROR_RESULT_MAKE_ERROR(SoftBodyResult, ERROR_ENGINE_COMPONENT_MISSING);
     }
     return ERROR_RESULT_MAKE_VALUE(SoftBodyResult, soft_bodies[index]);
@@ -1628,7 +1628,7 @@ EntityResult physics_soft_body_node_create(Entity soft_body, Position position,
     EntityResult node;
     EngineResult result = physics_live_index_get(soft_body, &body_index);
 
-    if(result.kind == ERROR_RESULT_ERROR || !entity_index_components_has(body_index, SOFT_BODY) ||
+    if(result.kind == ERROR_RESULT_ERROR || !entity_index_components_check(body_index, SOFT_BODY) ||
             !soft_bodies_pool.used[body_index] || node_mass <= 0.0f || radius <= 0.0f) {
         return ERROR_RESULT_MAKE_ERROR(EntityResult, ERROR_ENGINE_STATE_INVALID);
     }
@@ -1662,7 +1662,7 @@ SoftBodyNodeResult physics_soft_body_node_get(Entity node) {
     EngineResult result = physics_live_index_get(node, &index);
 
     if(result.kind == ERROR_RESULT_ERROR) return ERROR_RESULT_MAKE_ERROR(SoftBodyNodeResult, result.result.error);
-    if(!entity_index_components_has(index, SOFT_BODY_NODE) || !soft_body_nodes_pool.used[index]) {
+    if(!entity_index_components_check(index, SOFT_BODY_NODE) || !soft_body_nodes_pool.used[index]) {
         return ERROR_RESULT_MAKE_ERROR(SoftBodyNodeResult, ERROR_ENGINE_COMPONENT_MISSING);
     }
     return ERROR_RESULT_MAKE_VALUE(SoftBodyNodeResult, soft_body_nodes[index]);
@@ -1674,7 +1674,7 @@ EngineResult physics_soft_body_node_collision_filter_set(Entity node,
     EngineResult result = physics_live_index_get(node, &index);
 
     if(result.kind == ERROR_RESULT_ERROR) return result;
-    if(!entity_index_components_has(index, SOFT_BODY_NODE) || !soft_body_nodes_pool.used[index]) {
+    if(!entity_index_components_check(index, SOFT_BODY_NODE) || !soft_body_nodes_pool.used[index]) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
     }
     soft_body_nodes[index].category = category;
@@ -1687,10 +1687,10 @@ EngineResult physics_soft_body_node_force_for_one_tick_apply(Entity node, Force 
     EngineResult result = physics_live_index_get(node, &index);
 
     if(result.kind == ERROR_RESULT_ERROR) return result;
-    if(!entity_index_components_has(index, SOFT_BODY_NODE)) {
+    if(!entity_index_components_check(index, SOFT_BODY_NODE)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
     }
-    return physics_apply_force_for_one_tick(node, force);
+    return physics_force_for_one_tick_apply(node, force);
 }
 
 EngineResult physics_soft_body_node_impulse_apply(Entity node, Vec2D impulse) {
@@ -1698,10 +1698,10 @@ EngineResult physics_soft_body_node_impulse_apply(Entity node, Vec2D impulse) {
     EngineResult result = physics_live_index_get(node, &index);
 
     if(result.kind == ERROR_RESULT_ERROR) return result;
-    if(!entity_index_components_has(index, SOFT_BODY_NODE)) {
+    if(!entity_index_components_check(index, SOFT_BODY_NODE)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
     }
-    return physics_apply_impulse(node, impulse);
+    return physics_impulse_apply(node, impulse);
 }
 
 EngineResult physics_soft_body_force_for_one_tick_apply(Entity soft_body, Force force) {
@@ -1713,7 +1713,7 @@ EngineResult physics_soft_body_force_for_one_tick_apply(Entity soft_body, Force 
     body = body_result.result.value;
     for(uint32_t i = 0; i < body.node_count; i += 1) {
         EntityIndex index;
-        if(!entity_index_get(body.nodes[i], &index) || !entity_index_alive_is(index) || mass[index] <= 0.0f) {
+        if(!entity_index_get(body.nodes[i], &index) || !entity_index_alive_check(index) || mass[index] <= 0.0f) {
             return error_result_error(ERROR_ENGINE_ENTITY_NOT_FOUND);
         }
         total_mass += mass[index];
@@ -1743,7 +1743,7 @@ EngineResult physics_soft_body_torque_for_one_tick_apply(Entity soft_body, Torqu
     body = body_result.result.value;
     for(uint32_t i = 0; i < body.node_count; i += 1) {
         EntityIndex index;
-        if(!entity_index_get(body.nodes[i], &index) || !entity_index_alive_is(index) || mass[index] <= 0.0f) {
+        if(!entity_index_get(body.nodes[i], &index) || !entity_index_alive_check(index) || mass[index] <= 0.0f) {
             return error_result_error(ERROR_ENGINE_ENTITY_NOT_FOUND);
         }
         center.x += positions[index].x * mass[index];
@@ -1786,7 +1786,7 @@ SoftBodyNodeAnchorPinResult physics_soft_body_node_to_anchor_pin_create(
     EngineResult pin_result;
 
     if(physics_live_index_get(node, &node_index).kind == ERROR_RESULT_ERROR ||
-            !entity_index_components_has(node_index, SOFT_BODY_NODE) ||
+            !entity_index_components_check(node_index, SOFT_BODY_NODE) ||
             !soft_body_nodes_pool.used[node_index]) {
         return ERROR_RESULT_MAKE_ERROR(SoftBodyNodeAnchorPinResult, ERROR_ENGINE_COMPONENT_MISSING);
     }
@@ -1826,9 +1826,9 @@ EntityResult physics_soft_body_beam_create(Entity soft_body, Entity node_a, Enti
     if(physics_live_index_get(soft_body, &body_index).kind == ERROR_RESULT_ERROR ||
             physics_live_index_get(node_a, &a_index).kind == ERROR_RESULT_ERROR ||
             physics_live_index_get(node_b, &b_index).kind == ERROR_RESULT_ERROR || node_a == node_b ||
-            !entity_index_components_has(body_index, SOFT_BODY) ||
-            !entity_index_components_has(a_index, SOFT_BODY_NODE) ||
-            !entity_index_components_has(b_index, SOFT_BODY_NODE) ||
+            !entity_index_components_check(body_index, SOFT_BODY) ||
+            !entity_index_components_check(a_index, SOFT_BODY_NODE) ||
+            !entity_index_components_check(b_index, SOFT_BODY_NODE) ||
             soft_body_nodes[a_index].soft_body != soft_body ||
             soft_body_nodes[b_index].soft_body != soft_body || stiffness < 0.0f || damping < 0.0f) {
         return ERROR_RESULT_MAKE_ERROR(EntityResult, ERROR_ENGINE_STATE_INVALID);
@@ -1863,7 +1863,7 @@ SoftBodyBeamResult physics_soft_body_beam_get(Entity beam) {
     EntityIndex index;
     EngineResult result = physics_live_index_get(beam, &index);
     if(result.kind == ERROR_RESULT_ERROR) return ERROR_RESULT_MAKE_ERROR(SoftBodyBeamResult, result.result.error);
-    if(!entity_index_components_has(index, SOFT_BODY_BEAM) || !soft_body_beams_pool.used[index]) {
+    if(!entity_index_components_check(index, SOFT_BODY_BEAM) || !soft_body_beams_pool.used[index]) {
         return ERROR_RESULT_MAKE_ERROR(SoftBodyBeamResult, ERROR_ENGINE_COMPONENT_MISSING);
     }
     return ERROR_RESULT_MAKE_VALUE(SoftBodyBeamResult, soft_body_beams[index]);
@@ -1877,13 +1877,13 @@ EntityResult physics_soft_body_triangle_create(Entity soft_body, Entity node_a, 
     EntityResult triangle;
 
     if(physics_live_index_get(soft_body, &body_index).kind == ERROR_RESULT_ERROR ||
-            !entity_index_components_has(body_index, SOFT_BODY) ||
+            !entity_index_components_check(body_index, SOFT_BODY) ||
             node_a == node_b || node_b == node_c || node_a == node_c) {
         return ERROR_RESULT_MAKE_ERROR(EntityResult, ERROR_ENGINE_STATE_INVALID);
     }
     for(uint32_t i = 0; i < 3; i += 1) {
         if(physics_live_index_get(nodes_to_check[i], &indices[i]).kind == ERROR_RESULT_ERROR ||
-                !entity_index_components_has(indices[i], SOFT_BODY_NODE) ||
+                !entity_index_components_check(indices[i], SOFT_BODY_NODE) ||
                 soft_body_nodes[indices[i]].soft_body != soft_body) {
             return ERROR_RESULT_MAKE_ERROR(EntityResult, ERROR_ENGINE_STATE_INVALID);
         }
@@ -1912,7 +1912,7 @@ SoftBodyTriangleResult physics_soft_body_triangle_get(Entity triangle) {
     EntityIndex index;
     EngineResult result = physics_live_index_get(triangle, &index);
     if(result.kind == ERROR_RESULT_ERROR) return ERROR_RESULT_MAKE_ERROR(SoftBodyTriangleResult, result.result.error);
-    if(!entity_index_components_has(index, SOFT_BODY_TRIANGLE) || !soft_body_triangles_pool.used[index]) {
+    if(!entity_index_components_check(index, SOFT_BODY_TRIANGLE) || !soft_body_triangles_pool.used[index]) {
         return ERROR_RESULT_MAKE_ERROR(SoftBodyTriangleResult, ERROR_ENGINE_COMPONENT_MISSING);
     }
     return ERROR_RESULT_MAKE_VALUE(SoftBodyTriangleResult, soft_body_triangles[index]);
@@ -1944,7 +1944,7 @@ bool physics_collision_report_get(Entity entity, Entity target) {
     EntityIndex index;
     EntityIndex target_index;
 
-    if(!(entity_index_get(entity, &index) && entity_index_alive_is(index)) || !(entity_index_get(target, &target_index) && entity_index_alive_is(target_index))) {
+    if(!(entity_index_get(entity, &index) && entity_index_alive_check(index)) || !(entity_index_get(target, &target_index) && entity_index_alive_check(target_index))) {
         return false;
     }
     if(collision_reports[index].collisions[target_index] && collision_reports[target_index].collisions[index]) {
@@ -1964,16 +1964,16 @@ Time physics_dt_per_tick_get(void) {
     return physics_dt_overwritten ? physics_dt_per_tick : engine_time_per_tick_get();
 }
 
-void physics_use_engine_time_per_tick(void) {
+void physics_engine_time_per_tick_use(void) {
     physics_dt_per_tick = 0.0;
     physics_dt_overwritten = false;
 }
 
 void physics_update(Tick ticks) {
     if(ticks == 0) return;
-    system_update_physics(physics_dt_per_tick_get() * (Time)ticks);
+    system_physics_update(physics_dt_per_tick_get() * (Time)ticks);
 }
 
-void physics_update_dt(Time dt) {
-    if(dt > 0.0) system_update_physics(dt);
+void physics_dt_update(Time dt) {
+    if(dt > 0.0) system_physics_update(dt);
 }

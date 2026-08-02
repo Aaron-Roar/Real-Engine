@@ -203,7 +203,7 @@ Vec2D get_mouse_coordinates(void) {
     };
 }
 
-EditorInput sdl_event_to_editor_input(SDL_Event event)
+EditorInput sdl_event_to_editor_input_get(SDL_Event event)
 {
     EditorInput input = {
         .key = EDITOR_KEY_NONE,
@@ -506,7 +506,7 @@ EditorInput sdl_event_to_editor_input(SDL_Event event)
     return input;
 }
 
-LevelEditorMode editor_input_to_mode(LevelEditorMode current_mode, EditorInput input) {
+LevelEditorMode editor_input_to_mode_get(LevelEditorMode current_mode, EditorInput input) {
 
     //Check MODE DEDICATED EDITOR_KEYS
     switch(input.key) {
@@ -809,7 +809,7 @@ EngineResult editor_select(EditorInput input) {
                 continue;
             }
             if(collision_reports[selection_index].collisions[i]) {
-                EntityResult selected_result = entity_from_index(i);
+                EntityResult selected_result = entity_from_index_get(i);
                 if(selected_result.kind == ERROR_RESULT_VALUE) {
                     selected_entity = selected_result.result.value;
                     console_write(LOG_APP, "Selected Entity: %d\n", i);
@@ -876,68 +876,68 @@ EngineResult editor_rotate_left(EditorInput input) {
 EngineResult editor_scale_all_up(EditorInput input) {
     EntityIndex selected_index;
     if(!entity_index_get(selected_entity, &selected_index)) { return error_result_value(true); }
-    Shape shape = math_scale_shape(hit_boxes[selected_index], 1 + SCALE_INCREMENT);
+    Shape shape = math_shape_scale(hit_boxes[selected_index], 1 + SCALE_INCREMENT);
     EngineResult result = physics_hitbox_set(selected_entity, shape);
     if(result.kind == ERROR_RESULT_ERROR) { return result; }
-    graphics_scale_textures(selected_entity, (Scale){1 + SCALE_INCREMENT,1 + SCALE_INCREMENT});
+    graphics_textures_scale(selected_entity, (Scale){1 + SCALE_INCREMENT,1 + SCALE_INCREMENT});
     return error_result_value(true);
 }
 EngineResult editor_scale_all_down(EditorInput input) {
     EntityIndex selected_index;
     if(!entity_index_get(selected_entity, &selected_index)) { return error_result_value(true); }
-    Shape shape = math_scale_shape(hit_boxes[selected_index], 1 - SCALE_INCREMENT);
+    Shape shape = math_shape_scale(hit_boxes[selected_index], 1 - SCALE_INCREMENT);
     EngineResult result = physics_hitbox_set(selected_entity, shape);
     if(result.kind == ERROR_RESULT_ERROR) { return result; }
-    graphics_scale_textures(selected_entity, (Scale){1 - SCALE_INCREMENT,1 - SCALE_INCREMENT});
+    graphics_textures_scale(selected_entity, (Scale){1 - SCALE_INCREMENT,1 - SCALE_INCREMENT});
     return error_result_value(true);
 }
 EngineResult editor_scale_x_up(EditorInput input) {
     EntityIndex selected_index;
     if(!entity_index_get(selected_entity, &selected_index)) { return error_result_value(true); }
-    Shape shape = math_scale_shape_x(hit_boxes[selected_index], 1 + SCALE_INCREMENT);
+    Shape shape = math_shape_x_scale(hit_boxes[selected_index], 1 + SCALE_INCREMENT);
     EngineResult result = physics_hitbox_set(selected_entity, shape);
     if(result.kind == ERROR_RESULT_ERROR) { return result; }
-    graphics_scale_textures(selected_entity, (Scale){1 + SCALE_INCREMENT,1});
+    graphics_textures_scale(selected_entity, (Scale){1 + SCALE_INCREMENT,1});
     return error_result_value(true);
 }
 EngineResult editor_scale_x_down(EditorInput input) {
     EntityIndex selected_index;
     if(!entity_index_get(selected_entity, &selected_index)) { return error_result_value(true); }
-    Shape shape = math_scale_shape_x(hit_boxes[selected_index], 1 - SCALE_INCREMENT);
+    Shape shape = math_shape_x_scale(hit_boxes[selected_index], 1 - SCALE_INCREMENT);
     EngineResult result = physics_hitbox_set(selected_entity, shape);
     if(result.kind == ERROR_RESULT_ERROR) { return result; }
-    graphics_scale_textures(selected_entity, (Scale){1 - SCALE_INCREMENT,1});
+    graphics_textures_scale(selected_entity, (Scale){1 - SCALE_INCREMENT,1});
     return error_result_value(true);
 }
 EngineResult editor_scale_y_up(EditorInput input) {
     EntityIndex selected_index;
     if(!entity_index_get(selected_entity, &selected_index)) { return error_result_value(true); }
-    Shape shape = math_scale_shape_y(hit_boxes[selected_index], 1 + SCALE_INCREMENT);
+    Shape shape = math_shape_y_scale(hit_boxes[selected_index], 1 + SCALE_INCREMENT);
     EngineResult result = physics_hitbox_set(selected_entity, shape);
     if(result.kind == ERROR_RESULT_ERROR) { return result; }
-    graphics_scale_textures(selected_entity, (Scale){1,1 + SCALE_INCREMENT});
+    graphics_textures_scale(selected_entity, (Scale){1,1 + SCALE_INCREMENT});
     return error_result_value(true);
 }
 EngineResult editor_scale_y_down(EditorInput input) {
     EntityIndex selected_index;
     if(!entity_index_get(selected_entity, &selected_index)) { return error_result_value(true); }
-    Shape shape = math_scale_shape_y(hit_boxes[selected_index], 1 - SCALE_INCREMENT);
+    Shape shape = math_shape_y_scale(hit_boxes[selected_index], 1 - SCALE_INCREMENT);
     EngineResult result = physics_hitbox_set(selected_entity, shape);
     if(result.kind == ERROR_RESULT_ERROR) { return result; }
-    graphics_scale_textures(selected_entity, (Scale){1,1 - SCALE_INCREMENT});
+    graphics_textures_scale(selected_entity, (Scale){1,1 - SCALE_INCREMENT});
     return error_result_value(true);
 }
 
-EngineResult editor_shape_add_vertex(EditorInput input) {
+EngineResult editor_shape_vertex_add(EditorInput input) {
     EntityIndex selected_index;
     if(!entity_index_get(selected_entity, &selected_index)) { return error_result_value(true); }
-    Shape new_shape = math_add_vertex(hit_boxes[selected_index]);
+    Shape new_shape = math_vertex_add(hit_boxes[selected_index]);
     return physics_hitbox_set(selected_entity, new_shape);
 }
-EngineResult editor_shape_remove_vertex(EditorInput input) {
+EngineResult editor_shape_vertex_remove(EditorInput input) {
     EntityIndex selected_index;
     if(!entity_index_get(selected_entity, &selected_index)) { return error_result_value(true); }
-    Shape new_shape = math_delete_vertex(hit_boxes[selected_index]);
+    Shape new_shape = math_vertex_delete(hit_boxes[selected_index]);
     return physics_hitbox_set(selected_entity, new_shape);
 }
 EngineResult editor_move_up(EditorInput input) {
@@ -970,7 +970,7 @@ EngineResult editor_move_right(EditorInput input) {
 }
 
 EngineResult editor_pause_engine(EditorInput input) {
-    if(engine_paused_is()) {
+    if(engine_paused_get()) {
         engine_resume();
     }
     else {
@@ -1026,9 +1026,9 @@ EngineResult resolve_mode(LevelEditorMode mode, EditorInput input) {
         case EDITOR_SCALE_Y_DOWN:
             return editor_scale_y_down(input);
         case EDITOR_SHAPE_ADD_VERTEX:
-            return editor_shape_add_vertex(input);
+            return editor_shape_vertex_add(input);
         case EDITOR_SHAPE_REMOVE_VERTEX:
-            return editor_shape_remove_vertex(input);
+            return editor_shape_vertex_remove(input);
         default:
             return error_result_value(true);
     }
@@ -1036,7 +1036,7 @@ EngineResult resolve_mode(LevelEditorMode mode, EditorInput input) {
 }
 
 EngineResult bind_selection_to_mouse(void) {
-    return physics_position_set(selection, graphics_screen_to_world(get_mouse_coordinates()));
+    return physics_position_set(selection, graphics_screen_to_world_get(get_mouse_coordinates()));
 }
 
 void print_mode(LevelEditorMode mode) {
@@ -1212,12 +1212,12 @@ EngineResult level_editor_init(void) {
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    Shape selection_hit_box = math_create_circle(0.1, 5);
+    Shape selection_hit_box = math_circle_create(0.1, 5);
     result = physics_hitbox_set(selection, selection_hit_box);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    result = entity_delete_components(selection, COLLISION);
+    result = entity_components_delete(selection, COLLISION);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
@@ -1226,12 +1226,12 @@ EngineResult level_editor_init(void) {
 }
 
 EngineResult level_editor_update(void) {
-        SDL_Event event = engine_poll_event();
-        EditorInput input = sdl_event_to_editor_input(event);
+        SDL_Event event = engine_event_poll();
+        EditorInput input = sdl_event_to_editor_input_get(event);
         EngineResult result;
 
         prev_mode = current_mode;
-        current_mode = editor_input_to_mode(current_mode, input);
+        current_mode = editor_input_to_mode_get(current_mode, input);
         //if(prev_mode != current_mode) {
         //    print_mode(current_mode);
         //}

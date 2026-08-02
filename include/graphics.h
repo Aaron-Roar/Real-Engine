@@ -257,7 +257,7 @@ typedef struct Color {
 /**
  * Create a color from a 32-bit RGBA hex value.
  */
-Color graphics_creat_color_hex(uint32_t hex_color_code);
+Color graphics_color_hex_create(uint32_t hex_color_code);
 
 /**
  * Create the SDL window and renderer.
@@ -272,16 +272,16 @@ void graphics_end(void);
 /**
  * Poll graphics events and report whether the window should remain open.
  */
-bool graphics_poll_events(SDL_Event *event);
+bool graphics_events_poll(SDL_Event *event);
 
 /** Clear the render target with a background color. */
-void graphics_draw_background(Color color);
+void graphics_background_draw(Color color);
 
 /** Draw a filled rectangle in logical screen coordinates. */
-bool graphics_draw_screen_rect(float x, float y, float width, float height, Color color);
+bool graphics_screen_rect_draw(float x, float y, float width, float height, Color color);
 
 /** Draw a centered, rotated rectangle in logical screen coordinates. */
-bool graphics_draw_screen_quad(
+bool graphics_screen_quad_draw(
     Position center,
     float width,
     float height,
@@ -293,61 +293,55 @@ bool graphics_draw_screen_quad(
 void graphics_show(void);
 
 /** Draw one entity hitbox. */
-void graphics_draw_hit_box(Entity entity, Fill fill_type);
+void graphics_hit_box_draw(Entity entity, Fill fill_type);
 
 /** Draw one entity hitbox with a caller supplied color. */
-void graphics_draw_hit_box_colored(Entity entity, Fill fill_type, Color color);
+void graphics_hit_box_colored_draw(Entity entity, Fill fill_type, Color color);
 
 /** Draw every live entity hitbox. */
-void graphics_draw_hit_boxes(void);
+void graphics_hit_boxes_draw(void);
 
 /** Load a texture from a descriptor. */
-TextureAssetResult graphics_load_texture(TextureDescriptor text_desc);
+TextureAssetResult graphics_texture_load(TextureDescriptor text_desc);
 
 /** Load a font. The caller must destroy successful assets. */
-FontAssetResult graphics_load_font(FontDescriptor descriptor);
+FontAssetResult graphics_font_load(FontDescriptor descriptor);
 
 /** Close a loaded font after all text assets using it are destroyed. */
-void graphics_destroy_font(FontAsset *font);
+void graphics_font_destroy(FontAsset *font);
 
 /** Create reusable text. An empty string produces an empty text asset. */
-TextAssetResult graphics_create_text(const FontAsset *font, const char *value, Color color);
+TextAssetResult graphics_text_create(const FontAsset *font, const char *value, Color color);
 
 /** Destroy reusable text. */
-void graphics_destroy_text(TextAsset *text);
+void graphics_text_destroy(TextAsset *text);
 
 /** Draw reusable text with its top-left corner in logical screen space. */
-bool graphics_draw_text(const TextAsset *text, Position position);
+bool graphics_text_draw(const TextAsset *text, Position position);
 
 /** Load an animation from texture descriptors. */
-AnimationAssetResult graphics_load_animation(AnimationDescriptor anim_desc);
+AnimationAssetResult graphics_animation_load(AnimationDescriptor anim_desc);
 
 /** Create sprite runtime state from an animation asset. */
-AnimatedSprite graphics_create_animated_sprite(AnimationAsset asset_ptr, Scale scale);
+AnimatedSprite graphics_animated_sprite_create(AnimationAsset asset_ptr, Scale scale);
 
 /** Attach an animated sprite to an entity. */
-EngineResult graphics_add_animated_sprite(Entity entity, AnimatedSprite sprite);
+EngineResult graphics_animated_sprite_add(Entity entity, AnimatedSprite sprite);
 
 /** Draw all live animated sprites. */
-void graphics_draw_animated_sprites(void);
+void graphics_animated_sprites_draw(void);
 
 /** Update frame state for all live animated sprites. */
-void graphics_update_sprite_frames(Tick current_tick, Time current_time);
+void graphics_sprite_frames_update(Tick current_tick, Time current_time);
 
 /** Scale an entity's animated sprite textures. */
-void graphics_scale_textures(Entity entity, Scale scale);
-
-/** Replace the active camera transform. */
-void graphics_active_camera_set(Camera camera);
-
-/** Return the active camera transform. */
-Camera graphics_active_camera_get(void);
+void graphics_textures_scale(Entity entity, Scale scale);
 
 /** Translate the active camera in world space. */
-void graphics_move_camera(Vec2D translation);
+void graphics_camera_move(Vec2D translation);
 
 /** Rotate the active camera counterclockwise by radians. */
-void graphics_rotate_camera(Orientation radians);
+void graphics_camera_rotate(Orientation radians);
 
 /**
  * Attach the camera to an entity transform.
@@ -355,14 +349,14 @@ void graphics_rotate_camera(Orientation radians);
  * The position offset is expressed in the entity's local space. The
  * orientation offset is added to the entity's orientation.
  */
-EngineResult graphics_attach_camera(
+EngineResult graphics_camera_attach(
     Entity entity,
     Vec2D position_offset,
     Orientation orientation_offset
 );
 
 /** Attach a camera with independent position and orientation following. */
-EngineResult graphics_attach_camera_with_options(
+EngineResult graphics_camera_with_options_attach(
     Entity entity,
     Vec2D position_offset,
     Orientation orientation_offset,
@@ -371,22 +365,22 @@ EngineResult graphics_attach_camera_with_options(
 );
 
 /** Detach the camera while preserving its resolved world transform. */
-void graphics_detach_camera(void);
+void graphics_camera_detach(void);
 
 /** Report whether the camera is attached to a live entity transform. */
-bool graphics_camera_attached_is(void);
+bool graphics_camera_attached_get(void);
 
 /** Copy the active attachment description to the caller. */
 bool graphics_camera_attachment_get(CameraAttachment *attachment);
 
-CameraConfig graphics_camera_default_config(void);
+CameraConfig graphics_camera_config_default_get(void);
 CameraIdResult graphics_camera_create(CameraConfig config);
 EngineResult graphics_camera_destroy(CameraId camera);
 EngineResult graphics_camera_active_set(CameraId camera);
 CameraId graphics_camera_active_get(void);
 CameraResult graphics_camera_get(CameraId camera);
 EngineResult graphics_camera_set(CameraId camera, Camera value);
-EngineResult graphics_camera_attach_to(
+EngineResult graphics_camera_attachment_set(
     CameraId camera,
     Entity entity,
     Vec2D position_offset,
@@ -394,7 +388,7 @@ EngineResult graphics_camera_attach_to(
     bool follow_position,
     bool follow_orientation
 );
-EngineResult graphics_camera_detach_from(CameraId camera);
+EngineResult graphics_camera_attachment_remove(CameraId camera);
 
 /** Register the drawing callback invoked automatically when this camera is needed. */
 EngineResult graphics_camera_render_callback_set(
@@ -417,35 +411,35 @@ EngineResult graphics_camera_position_from_entity_set(CameraId camera, Entity en
 /** Immediately attach to and follow an entity's position. */
 EngineResult graphics_camera_entity_attachment_set(CameraId camera, Entity entity);
 /** Return success with true while a timed movement is active. */
-EngineResult graphics_camera_moving_is(CameraId camera);
+EngineResult graphics_camera_moving_get(CameraId camera);
 /** Scale over engine-tick time; non-positive duration is immediate. */
 EngineResult graphics_camera_zoom_set(CameraId camera, float zoom, Time duration);
 CameraZoomResult graphics_camera_zoom_get(CameraId camera);
 
 /** Return a disabled, full-window viewport using contain fitting. */
-ViewportConfig graphics_viewport_default_config(void);
+ViewportConfig graphics_viewport_config_default_get(void);
 ViewportIdResult graphics_viewport_create(ViewportConfig config);
 EngineResult graphics_viewport_destroy(ViewportId viewport);
 /** Assign a camera without transferring ownership. */
 EngineResult graphics_viewport_camera_set(ViewportId viewport, CameraId camera);
-EngineResult graphics_viewport_clear_camera(ViewportId viewport);
+EngineResult graphics_viewport_camera_clear(ViewportId viewport);
 EngineResult graphics_viewport_enable_set(ViewportId viewport);
 EngineResult graphics_viewport_disable_set(ViewportId viewport);
 
 /** Convert world coordinates to logical screen coordinates. */
-Position graphics_world_to_screen(Position pos);
+Position graphics_world_to_screen_get(Position pos);
 
 /** Convert logical screen coordinates to world coordinates. */
-Position graphics_screen_to_world(Position screen);
+Position graphics_screen_to_world_get(Position screen);
 
 /** Convert SDL window coordinates to logical screen coordinates. */
-Position graphics_window_to_screen(Position window);
+Position graphics_window_to_screen_get(Position window);
 
 /** Get the mouse position in logical screen coordinates. */
 Position graphics_mouse_screen_position_get(void);
 
 /** Draw the editor/debug grid. */
-void graphics_draw_grid(void);
+void graphics_grid_draw(void);
 
 /** Start recording frames to an output file through ffmpeg. */
 bool graphics_recording_start(
@@ -454,14 +448,14 @@ bool graphics_recording_start(
 );
 
 /** Draw all particle entities. */
-void graphics_draw_particles(void);
+void graphics_particles_draw(void);
 
 /** Draw local origin axes for all live hitbox entities. */
-void graphics_draw_local_origins(void);
+void graphics_local_origins_draw(void);
 /** Draw one joint using its engineering-style debug symbol. */
-bool graphics_draw_joint(Entity joint, Color color);
+bool graphics_joint_draw(Entity joint, Color color);
 /** Draw every live joint using engineering-style debug symbols. */
-void graphics_draw_joints(Color color);
+void graphics_joints_draw(Color color);
 /** Draw a soft body's deforming surfaces, beams, and collision nodes. */
-bool graphics_draw_soft_body(Entity soft_body, Color surface, Color beam, Color node);
+bool graphics_soft_body_draw(Entity soft_body, Color surface, Color beam, Color node);
 #endif

@@ -10,7 +10,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-bool platform_process_command_exists(const char *command);
+bool platform_process_command_check(const char *command);
 FILE *platform_process_open_write(const char *command);
 int platform_process_close(FILE *process);
 

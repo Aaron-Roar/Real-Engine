@@ -11,10 +11,10 @@
  *
  * @param dt Delta time in seconds.
  */
-void system_update_physics(double dt);
+void system_physics_update(double dt);
 
 /**
  * Delete entities whose lifetime has expired.
  */
-void system_clean_entities_past_lifetime(void);
+void system_entities_past_lifetime_clean(void);
 #endif

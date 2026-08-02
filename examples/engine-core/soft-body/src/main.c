@@ -86,7 +86,7 @@ static const int recording_fps;
 
 static bool result_ok(EngineResult result) {
     if(!rohr_error_check(result)) return true;
-    rohr_error_print_stderr(result.result.error);
+    rohr_error_stderr_print(result.result.error);
     return false;
 }
 
@@ -97,7 +97,7 @@ static Entity wall_create(Position position, Vec2D dimensions) {
     wall = result.result.value;
     if(!result_ok(rohr_physics_position_set(wall, position)) ||
             !result_ok(rohr_physics_hitbox_set(
-                wall, rohr_math_create_square(dimensions.x, dimensions.y))) ||
+                wall, rohr_math_square_create(dimensions.x, dimensions.y))) ||
             !result_ok(rohr_physics_static_set(wall)) ||
             !result_ok(rohr_physics_friction_set(wall, rigid_friction)) ||
             !result_ok(rohr_physics_restitution_set(wall, collision_restitution)) ||
@@ -173,7 +173,7 @@ static Entity particle_create(Position position) {
     particle = result.result.value;
     if(!result_ok(rohr_physics_position_set(particle, position)) ||
             !result_ok(rohr_physics_hitbox_set(
-                particle, rohr_math_create_circle(particle_radius, 8))) ||
+                particle, rohr_math_circle_create(particle_radius, 8))) ||
             !result_ok(rohr_physics_mass_set(particle, particle_mass)) ||
             !result_ok(rohr_physics_velocity_set(particle, (Velocity){0})) ||
             !result_ok(rohr_physics_acceleration_set(particle, gravity)) ||
@@ -184,7 +184,7 @@ static Entity particle_create(Position position) {
             !result_ok(rohr_physics_collision_category_set(
                 particle, particle_category)) ||
             !result_ok(rohr_physics_collision_with_all_set(particle)) ||
-            !result_ok(rohr_entity_add_components(particle, PARTICLE))) {
+            !result_ok(rohr_entity_components_add(particle, PARTICLE))) {
         return ENTITY_INVALID;
     }
     return particle;
@@ -290,9 +290,9 @@ static bool wheel_soft_body_create(Wheel *wheel, Position center) {
 static bool wheel_create(Wheel *wheel, Entity chassis, Position center,
         Vec2D chassis_hub_offset) {
     if(wheel == NULL) return false;
-    wheel->hub = rigid_body_create(center, rohr_math_create_circle(hub_radius, 12), hub_mass,
+    wheel->hub = rigid_body_create(center, rohr_math_circle_create(hub_radius, 12), hub_mass,
         chassis_category, particle_category);
-    wheel->disk = rigid_body_create(center, rohr_math_create_circle(disk_radius, 16), disk_mass,
+    wheel->disk = rigid_body_create(center, rohr_math_circle_create(disk_radius, 16), disk_mass,
         disk_category, room_category | soft_node_category | particle_category);
     if(wheel->hub == ENTITY_INVALID || wheel->disk == ENTITY_INVALID ||
             !anchored_joint_set(chassis, chassis_hub_offset, wheel->hub,
@@ -403,7 +403,7 @@ int main(void) {
     Entity cabin;
     Wheel wheels[WHEEL_COUNT] = {0};
     KeyboardState keyboard = {0};
-    Controller controller = rohr_controller_default();
+    Controller controller = rohr_controller_default_get();
     Tick zoom_end_tick = 0;
     Tick recording_end_tick = 0;
     bool collision_zoom_started = false;
@@ -413,7 +413,7 @@ int main(void) {
     if(!example_use_executable_directory() || !result_ok(rohr_engine_init())) return 1;
     if(!result_ok(rohr_engine_time_per_tick_set(physics_tick_time)) ||
             !result_ok(rohr_graphics_start())) goto fail;
-    if(!rohr_controller_add_axis(&controller, "torque", (ControllerAxisBinding){
+    if(!rohr_controller_axis_add(&controller, "torque", (ControllerAxisBinding){
                 .positive_x = SDLK_D,
                 .negative_x = SDLK_A,
                 .positive_y = SDLK_UNKNOWN,
@@ -450,7 +450,7 @@ int main(void) {
         }
     }
     chassis = rigid_body_create((Position){0.0f, chassis_center_y},
-        rohr_math_create_square(chassis_dimensions.x, chassis_dimensions.y), chassis_mass,
+        rohr_math_square_create(chassis_dimensions.x, chassis_dimensions.y), chassis_mass,
         chassis_category, room_category | particle_category);
     cabin = rigid_body_create(
         (Position){cabin_offset.x, chassis_center_y + cabin_offset.y},
@@ -478,25 +478,25 @@ int main(void) {
         if(!result_ok(rohr_physics_angular_velocity_maximum_set(
                     wheels[i].disk, maximum_wheel_angular_velocity))) goto fail;
     }
-    if(!result_ok(rohr_graphics_attach_camera_with_options(
+    if(!result_ok(rohr_graphics_camera_with_options_attach(
                 chassis, (Vec2D){0}, 0.0f, true, false))) goto fail;
     if(!result_ok(rohr_camera_zoom_set(
                 rohr_camera_active_get(), camera_default_zoom, 0.0))) goto fail;
 
-    rohr_engine_reset_clock();
+    rohr_engine_clock_reset();
     if(!rohr_graphics_recording_start("example.mp4", recording_fps)) goto fail;
     while(!recording_complete) {
-        SDL_Event event = rohr_engine_poll_event();
-        KeyboardEvent key_event = rohr_controller_capture_keyboard_event(&event);
-        rohr_controller_update_key_states(&keyboard);
-        rohr_controller_add_key_event(&keyboard, key_event);
+        SDL_Event event = rohr_engine_event_poll();
+        KeyboardEvent key_event = rohr_controller_keyboard_event_capture(&event);
+        rohr_controller_key_states_update(&keyboard);
+        rohr_controller_key_event_add(&keyboard, key_event);
         if(event.type == SDL_EVENT_QUIT ||
-                rohr_controller_key_pressed_is(&keyboard, SDLK_ESCAPE)) break;
+                rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) break;
         {
-            Tick ticks = rohr_engine_update_tick();
+            Tick ticks = rohr_engine_tick_update();
             Tick current_tick = rohr_engine_tick_get();
             if(collision_slow_motion_active && current_tick >= zoom_end_tick) {
-                rohr_physics_use_engine_time_per_tick();
+                rohr_physics_engine_time_per_tick_use();
                 if(!result_ok(rohr_camera_zoom_set(
                             rohr_camera_active_get(), camera_default_zoom,
                             camera_collision_zoom_out_duration))) goto fail;
@@ -505,7 +505,7 @@ int main(void) {
             if(ticks > 0) {
                 Vec2D torque_axis = rohr_controller_axis_get(
                     &keyboard, &controller, "torque");
-                if(!result_ok(rohr_physics_apply_torque_for_one_tick(
+                if(!result_ok(rohr_physics_torque_for_one_tick_apply(
                             wheels[0].disk, -torque_axis.x * control_torque))) goto fail;
             }
             rohr_physics_update(ticks);
@@ -529,28 +529,28 @@ int main(void) {
                 }
             }
         }
-        rohr_graphics_draw_background(background_color);
-        rohr_graphics_draw_grid();
+        rohr_graphics_background_draw(background_color);
+        rohr_graphics_grid_draw();
         for(uint32_t i = 0; i < LEVEL_WALL_COUNT; i += 1) {
-            rohr_graphics_draw_hit_box_colored(walls[i], GRAPHICS_FILLED, wall_color);
+            rohr_graphics_hit_box_colored_draw(walls[i], GRAPHICS_FILLED, wall_color);
         }
         for(uint32_t i = 0; i < RAMP_TRIANGLE_COUNT; i += 1) {
-            rohr_graphics_draw_hit_box_colored(ramp[i], GRAPHICS_FILLED, ramp_color);
+            rohr_graphics_hit_box_colored_draw(ramp[i], GRAPHICS_FILLED, ramp_color);
         }
         for(uint32_t i = 0; i < PIT_PARTICLE_COUNT; i += 1) {
-            rohr_graphics_draw_hit_box_colored(
+            rohr_graphics_hit_box_colored_draw(
                 particles[i], GRAPHICS_FILLED, particle_color);
         }
         for(uint32_t i = 0; i < WHEEL_COUNT; i += 1) {
-            (void)rohr_graphics_draw_soft_body(
+            (void)rohr_graphics_soft_body_draw(
                 wheels[i].soft_body, surface_color, beam_color, node_color);
-            rohr_graphics_draw_hit_box_colored(
+            rohr_graphics_hit_box_colored_draw(
                 wheels[i].disk, GRAPHICS_FILLED, disk_color);
         }
-        rohr_graphics_draw_hit_box_colored(chassis, GRAPHICS_FILLED, chassis_color);
-        rohr_graphics_draw_hit_box_colored(cabin, GRAPHICS_FILLED, cabin_color);
+        rohr_graphics_hit_box_colored_draw(chassis, GRAPHICS_FILLED, chassis_color);
+        rohr_graphics_hit_box_colored_draw(cabin, GRAPHICS_FILLED, cabin_color);
         for(uint32_t i = 0; i < WHEEL_COUNT; i += 1) {
-            rohr_graphics_draw_hit_box_colored(
+            rohr_graphics_hit_box_colored_draw(
                 wheels[i].hub, GRAPHICS_FILLED, hub_color);
         }
         rohr_graphics_show();

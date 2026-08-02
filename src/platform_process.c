@@ -1,7 +1,7 @@
 #include "platform_process.h"
 #include <stdlib.h>
 
-bool platform_process_command_exists(const char *command) {
+bool platform_process_command_check(const char *command) {
     char check_command[256];
 
     if(command == NULL) {

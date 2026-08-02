@@ -35,7 +35,7 @@ static bool ui_point_in_rect(Position point, UIRect rect) {
         point.y >= rect.y && point.y < rect.y + rect.height;
 }
 
-UIButtonStyle ui_default_button_style(void) {
+UIButtonStyle ui_button_style_default_get(void) {
     return (UIButtonStyle){
         .idle = {55, 65, 81, 255},
         .hovered = {75, 86, 105, 255},
@@ -44,7 +44,7 @@ UIButtonStyle ui_default_button_style(void) {
     };
 }
 
-UISliderConfig ui_default_slider_config(void) {
+UISliderConfig ui_slider_config_default_get(void) {
     return (UISliderConfig){
         .center = {0.0f, 0.0f},
         .length = 160.0f,
@@ -125,7 +125,7 @@ static bool ui_point_in_oriented_square(
             <= size * 0.5f;
 }
 
-void ui_begin_frame(UIInput input) {
+void ui_frame_begin(UIInput input) {
     ui_context.input = input;
     ui_context.active_seen = false;
     ui_context.pointer_claimed = false;
@@ -140,7 +140,7 @@ UIButtonResult ui_button(
     const UIButtonStyle *style
 ) {
     UIButtonResult result = {0};
-    UIButtonStyle resolved_style = style == NULL ? ui_default_button_style() : *style;
+    UIButtonStyle resolved_style = style == NULL ? ui_button_style_default_get() : *style;
     uint64_t button_id = ui_hash_id(id);
     bool contains_pointer;
 
@@ -178,7 +178,7 @@ UIButtonResult ui_button(
         ui_context.pointer_consumed = true;
     }
 
-    graphics_draw_screen_rect(
+    graphics_screen_rect_draw(
         bounds.x,
         bounds.y,
         bounds.width,
@@ -197,7 +197,7 @@ UISliderResult ui_slider_with_text(
         const UISliderText *text
 ) {
     UISliderResult result = {.value = value};
-    UISliderConfig resolved = config == NULL ? ui_default_slider_config() : *config;
+    UISliderConfig resolved = config == NULL ? ui_slider_config_default_get() : *config;
     uint64_t slider_id = ui_hash_id(id);
     Vec2D axis;
     float amount;
@@ -331,7 +331,7 @@ UISliderResult ui_slider_with_text(
         resolved.center.x - axis.x * resolved.length * 0.5f,
         resolved.center.y - axis.y * resolved.length * 0.5f,
     };
-    (void)graphics_draw_screen_quad(
+    (void)graphics_screen_quad_draw(
         resolved.center,
         resolved.length,
         resolved.style.track_thickness,
@@ -349,7 +349,7 @@ UISliderResult ui_slider_with_text(
                 resolved.style.step_button_size,
                 resolved.style.step_button_size,
             };
-            (void)graphics_draw_screen_quad(
+            (void)graphics_screen_quad_draw(
                 step_centers[step_index],
                 resolved.style.step_button_size,
                 resolved.style.step_button_size,
@@ -368,7 +368,7 @@ UISliderResult ui_slider_with_text(
             start.x + axis.x * fill_length * 0.5f,
             start.y + axis.y * fill_length * 0.5f,
         };
-        (void)graphics_draw_screen_quad(
+        (void)graphics_screen_quad_draw(
             fill_center,
             fill_length,
             resolved.style.track_thickness,
@@ -380,7 +380,7 @@ UISliderResult ui_slider_with_text(
         start.x + axis.x * resolved.length * amount,
         start.y + axis.y * resolved.length * amount,
     };
-    (void)graphics_draw_screen_quad(
+    (void)graphics_screen_quad_draw(
         handle_center,
         resolved.style.handle_width,
         resolved.style.handle_height,
@@ -422,13 +422,13 @@ void ui_label(const TextAsset *text, UIRect bounds) {
         .x = bounds.x + (bounds.width - text->size.x) * 0.5f,
         .y = bounds.y + (bounds.height - text->size.y) * 0.5f,
     };
-    (void)graphics_draw_text(text, position);
+    (void)graphics_text_draw(text, position);
 }
 
 void ui_button_disabled(UIRect bounds, const UIButtonStyle *style) {
-    UIButtonStyle resolved_style = style == NULL ? ui_default_button_style() : *style;
+    UIButtonStyle resolved_style = style == NULL ? ui_button_style_default_get() : *style;
 
-    graphics_draw_screen_rect(
+    graphics_screen_rect_draw(
         bounds.x,
         bounds.y,
         bounds.width,
@@ -437,11 +437,11 @@ void ui_button_disabled(UIRect bounds, const UIButtonStyle *style) {
     );
 }
 
-bool ui_pointer_consumed_is(void) {
+bool ui_pointer_consumed_get(void) {
     return ui_context.pointer_consumed;
 }
 
-void ui_end_frame(void) {
+void ui_frame_end(void) {
     if(!ui_context.frame_active) {
         return;
     }

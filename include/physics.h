@@ -358,9 +358,9 @@ Collision physics_sat_collision(Shape shape_1, Shape shape_2);
 Vec1D physics_circle_moment_of_inertia(Shape circle, Mass mass_value);
 
 /** Check whether an entity index has HOLD. */
-bool physics_entity_held_is(EntityIndex index);
+bool physics_entity_held_get(EntityIndex index);
 /** Check whether an entity index can be moved by physics update stages. */
-bool physics_entity_movable_is(EntityIndex index);
+bool physics_entity_movable_get(EntityIndex index);
 
 /** Set an entity's base linear acceleration. */
 EngineResult physics_acceleration_set(Entity entity, Acceleration a);
@@ -396,11 +396,11 @@ EngineResult physics_group_velocity_toward_entity_set(GroupId group, float speed
 /** Set velocity away from an entity for every live entity in a group. */
 EngineResult physics_group_velocity_away_from_entity_set(GroupId group, float speed, Entity target);
 /** Set an entity's velocity to zero. */
-EngineResult physics_stop_entity(Entity entity);
+EngineResult physics_entity_stop(Entity entity);
 /** Set velocity to zero for every live entity in a group. */
-EngineResult physics_group_stop_entities(GroupId group);
+EngineResult physics_group_entities_stop(GroupId group);
 /** Apply an immediate linear impulse to an entity's velocity. */
-EngineResult physics_apply_impulse(Entity entity, Vec2D impulse);
+EngineResult physics_impulse_apply(Entity entity, Vec2D impulse);
 /** Set an entity's world position. */
 EngineResult physics_position_set(Entity entity, Position p);
 PositionResult physics_position_get(Entity entity);
@@ -411,17 +411,17 @@ EntityResult physics_force_create(Entity entity, Force f);
 /** Set force component data directly on an existing entity. */
 EngineResult physics_force_component_set(Entity entity, Force force);
 /** Create a force entity that applies for one physics tick. */
-EngineResult physics_apply_force_for_one_tick(Entity entity, Force f);
+EngineResult physics_force_for_one_tick_apply(Entity entity, Force f);
 /** Create a torque entity targeting the given entity. */
 EntityResult physics_torque_create(Entity entity, Torque t);
 /** Set torque component data directly on an existing entity. */
 EngineResult physics_torque_component_set(Entity entity, Torque torque);
 /** Create a torque entity that applies for one physics tick. */
-EngineResult physics_apply_torque_for_one_tick(Entity entity, Torque t);
+EngineResult physics_torque_for_one_tick_apply(Entity entity, Torque t);
 /** Set an entity's hitbox. This does not enable physical collision response. */
 EngineResult physics_hitbox_set(Entity entity, Shape hitbox);
 /** Return the default collision filter: default category against all categories. */
-CollisionFilterConfig physics_collision_filter_default_config(void);
+CollisionFilterConfig physics_collision_filter_config_default_get(void);
 /** Replace an entity's complete collision filter. */
 EngineResult physics_collision_filter_set(Entity entity, CollisionFilterConfig config);
 /** Return an entity's collision filter. Colliders without an override use defaults. */
@@ -435,7 +435,7 @@ EngineResult physics_collision_with_all_set(Entity entity);
 /** Prevent an entity from colliding with every category. */
 EngineResult physics_collision_with_none_set(Entity entity);
 /** Return whether two entities mutually permit collision checks. */
-bool physics_collision_between_is(Entity entity_1, Entity entity_2);
+bool physics_collision_between_check(Entity entity_1, Entity entity_2);
 /** Set an entity's orientation in radians. */
 EngineResult physics_orientation_set(Entity entity, Orientation angle);
 /** Set an entity's angular velocity. */
@@ -453,13 +453,13 @@ EngineResult physics_dynamic_set(Entity entity);
 /** Mark an entity static and remove DYNAMIC. */
 EngineResult physics_static_set(Entity entity);
 /** Add HOLD so physics update stages preserve current values. */
-EngineResult physics_hold_entity(Entity entity);
+EngineResult physics_entity_hold(Entity entity);
 /** Remove HOLD without changing STATIC or DYNAMIC state. */
-EngineResult physics_unhold_entity(Entity entity);
+EngineResult physics_entity_unhold(Entity entity);
 /** Add HOLD to every live entity in a group. */
-EngineResult physics_group_hold_entities(GroupId group);
+EngineResult physics_group_entities_hold(GroupId group);
 /** Remove HOLD from every live entity in a group. */
-EngineResult physics_group_unhold_entities(GroupId group);
+EngineResult physics_group_entities_unhold(GroupId group);
 /** Add or update an angle lock constraint. */
 EngineResult physics_angle_lock_set(Entity entity, Orientation min, Orientation max);
 /** Add or update an axis lock constraint. */
@@ -490,7 +490,7 @@ EngineResult physics_transform_lock_set(
 );
 
 /** Remove a transform lock from an entity. */
-EngineResult physics_remove_transform_lock(Entity entity);
+EngineResult physics_transform_lock_remove(Entity entity);
 
 /**
  * Add a transform lock using the current relative transform as the offset.
@@ -600,9 +600,9 @@ EngineResult physics_dt_per_tick_set(Time dt);
 /** Return the explicit delta or the engine time per tick when using defaults. */
 Time physics_dt_per_tick_get(void);
 /** Return physics timing to the engine time-per-tick default. */
-void physics_use_engine_time_per_tick(void);
+void physics_engine_time_per_tick_use(void);
 /** Advance physics for a number of elapsed engine ticks. */
 void physics_update(Tick ticks);
 /** Advance physics once using an explicit exceptional delta. */
-void physics_update_dt(Time dt);
+void physics_dt_update(Time dt);
 #endif

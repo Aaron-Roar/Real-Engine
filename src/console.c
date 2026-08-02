@@ -56,7 +56,7 @@ static void console_store_log(LogSourceType source, ConsoleLogString input) {
     }
 }
 
-void console_print_logs(void) {
+void console_logs_print(void) {
     int first_log = log_count == MAX_LOGS ? log_index : 0;
 
     for(int i = 0; i < log_count; i += 1) {
@@ -123,7 +123,7 @@ void console_debug_write(LogSourceType source, const char *fmt, ...)
     va_end(args);
 }
 
-bool console_active_is(void) {
+bool console_active_get(void) {
     return console_active;
 }
 

@@ -3,7 +3,7 @@
 #include "example_runtime.h"
 
 #define PRINT_ENGINE_ERROR(engine_result) \
-    fprintf(stderr, "%s\n", rohr_error_default_message((engine_result).result.error))
+    fprintf(stderr, "%s\n", rohr_error_default_message_get((engine_result).result.error))
 
 int main(void) {
     if(!example_use_executable_directory()) return 1;
@@ -43,7 +43,7 @@ int main(void) {
         }
     }
     {
-        EngineResult state_result = rohr_game_state_load_file(
+        EngineResult state_result = rohr_game_state_file_load(
             "assets/user-interface/game.json"
         );
         if(rohr_error_check(state_result)) {
@@ -100,7 +100,7 @@ int main(void) {
         slider_value = value_slider.initial_value;
     }
     {
-        FontAssetResult font_result = rohr_graphics_load_font((FontDescriptor){
+        FontAssetResult font_result = rohr_graphics_font_load((FontDescriptor){
             .file = font_definition.file,
             .point_size = font_definition.point_size,
         });
@@ -110,7 +110,7 @@ int main(void) {
         }
         font = font_result.result.value;
 
-        TextAssetResult title_result = rohr_graphics_create_text(
+        TextAssetResult title_result = rohr_graphics_text_create(
             &font,
             title_definition.text,
             title_definition.color
@@ -121,7 +121,7 @@ int main(void) {
         }
         title = title_result.result.value;
 
-        TextAssetResult play_result = rohr_graphics_create_text(
+        TextAssetResult play_result = rohr_graphics_text_create(
             &font,
             play_definition.text,
             play_definition.color
@@ -132,7 +132,7 @@ int main(void) {
         }
         play_label = play_result.result.value;
 
-        TextAssetResult settings_result = rohr_graphics_create_text(
+        TextAssetResult settings_result = rohr_graphics_text_create(
             &font,
             settings_button.label,
             settings_button.text_color
@@ -143,7 +143,7 @@ int main(void) {
         }
         settings_label = settings_result.result.value;
 
-        TextAssetResult quit_result = rohr_graphics_create_text(
+        TextAssetResult quit_result = rohr_graphics_text_create(
             &font,
             "Quit",
             (Color){240, 244, 250, 255}
@@ -154,7 +154,7 @@ int main(void) {
         }
         quit_label = quit_result.result.value;
 
-        TextAssetResult description_result = rohr_graphics_create_text(
+        TextAssetResult description_result = rohr_graphics_text_create(
             &font,
             description_definition.text,
             description_definition.color
@@ -165,7 +165,7 @@ int main(void) {
         }
         description = description_result.result.value;
 
-        TextAssetResult slider_label_result = rohr_graphics_create_text(
+        TextAssetResult slider_label_result = rohr_graphics_text_create(
             &font, value_slider.label, value_slider.text_color
         );
         if(rohr_error_check(slider_label_result)) {
@@ -173,7 +173,7 @@ int main(void) {
             goto fail;
         }
         slider_label = slider_label_result.result.value;
-        TextAssetResult minus_result = rohr_graphics_create_text(
+        TextAssetResult minus_result = rohr_graphics_text_create(
             &font, "-", value_slider.text_color
         );
         if(rohr_error_check(minus_result)) {
@@ -181,7 +181,7 @@ int main(void) {
             goto fail;
         }
         slider_minus = minus_result.result.value;
-        TextAssetResult plus_result = rohr_graphics_create_text(
+        TextAssetResult plus_result = rohr_graphics_text_create(
             &font, "+", value_slider.text_color
         );
         if(rohr_error_check(plus_result)) {
@@ -191,7 +191,7 @@ int main(void) {
         slider_plus = plus_result.result.value;
         char value_text[UI_LABEL_MAX];
         snprintf(value_text, sizeof(value_text), value_slider.value_format, slider_value);
-        TextAssetResult value_result = rohr_graphics_create_text(
+        TextAssetResult value_result = rohr_graphics_text_create(
             &font, value_text, value_slider.text_color
         );
         if(rohr_error_check(value_result)) {
@@ -202,19 +202,19 @@ int main(void) {
     }
 
     while(running) {
-        SDL_Event event = rohr_engine_poll_event();
+        SDL_Event event = rohr_engine_event_poll();
 
         if(event.type == SDL_EVENT_QUIT) {
             break;
         }
-        rohr_controller_update_mouse_states(&mouse);
-        rohr_controller_add_mouse_event(
+        rohr_controller_mouse_states_update(&mouse);
+        rohr_controller_mouse_event_add(
             &mouse,
-            rohr_controller_capture_mouse_event(&event)
+            rohr_controller_mouse_event_capture(&event)
         );
 
-        rohr_graphics_draw_background((Color){18, 22, 30, 255});
-        rohr_ui_begin_frame((UIInput){
+        rohr_graphics_background_draw((Color){18, 22, 30, 255});
+        rohr_ui_frame_begin((UIInput){
             .pointer = rohr_graphics_mouse_screen_position_get(),
             .primary_button = mouse.button_states[MOUSE_BUTTON_LEFT],
         });
@@ -252,8 +252,8 @@ int main(void) {
         if(slider.changed) {
             char value_text[UI_LABEL_MAX];
             snprintf(value_text, sizeof(value_text), value_slider.value_format, slider_value);
-            rohr_graphics_destroy_text(&slider_value_label);
-            TextAssetResult value_result = rohr_graphics_create_text(
+            rohr_graphics_text_destroy(&slider_value_label);
+            TextAssetResult value_result = rohr_graphics_text_create(
                 &font, value_text, value_slider.text_color
             );
             if(rohr_error_check(value_result)) {
@@ -268,35 +268,35 @@ int main(void) {
         if(settings.clicked) printf("Settings clicked\n");
         if(quit.clicked) running = false;
 
-        rohr_ui_end_frame();
+        rohr_ui_frame_end();
         rohr_graphics_show();
     }
 
-    rohr_graphics_destroy_text(&slider_plus);
-    rohr_graphics_destroy_text(&slider_minus);
-    rohr_graphics_destroy_text(&slider_value_label);
-    rohr_graphics_destroy_text(&slider_label);
-    rohr_graphics_destroy_text(&description);
-    rohr_graphics_destroy_text(&quit_label);
-    rohr_graphics_destroy_text(&settings_label);
-    rohr_graphics_destroy_text(&play_label);
-    rohr_graphics_destroy_text(&title);
-    rohr_graphics_destroy_font(&font);
+    rohr_graphics_text_destroy(&slider_plus);
+    rohr_graphics_text_destroy(&slider_minus);
+    rohr_graphics_text_destroy(&slider_value_label);
+    rohr_graphics_text_destroy(&slider_label);
+    rohr_graphics_text_destroy(&description);
+    rohr_graphics_text_destroy(&quit_label);
+    rohr_graphics_text_destroy(&settings_label);
+    rohr_graphics_text_destroy(&play_label);
+    rohr_graphics_text_destroy(&title);
+    rohr_graphics_font_destroy(&font);
     rohr_graphics_end();
     rohr_engine_shutdown();
     return 0;
 
 fail:
-    rohr_graphics_destroy_text(&slider_plus);
-    rohr_graphics_destroy_text(&slider_minus);
-    rohr_graphics_destroy_text(&slider_value_label);
-    rohr_graphics_destroy_text(&slider_label);
-    rohr_graphics_destroy_text(&description);
-    rohr_graphics_destroy_text(&quit_label);
-    rohr_graphics_destroy_text(&settings_label);
-    rohr_graphics_destroy_text(&play_label);
-    rohr_graphics_destroy_text(&title);
-    rohr_graphics_destroy_font(&font);
+    rohr_graphics_text_destroy(&slider_plus);
+    rohr_graphics_text_destroy(&slider_minus);
+    rohr_graphics_text_destroy(&slider_value_label);
+    rohr_graphics_text_destroy(&slider_label);
+    rohr_graphics_text_destroy(&description);
+    rohr_graphics_text_destroy(&quit_label);
+    rohr_graphics_text_destroy(&settings_label);
+    rohr_graphics_text_destroy(&play_label);
+    rohr_graphics_text_destroy(&title);
+    rohr_graphics_font_destroy(&font);
     rohr_graphics_end();
     rohr_engine_shutdown();
     return 1;

@@ -8,7 +8,7 @@ int main(int argc, char **argv) {
     }
 
     RE_component_registry_init(&registry);
-    if(!RE_component_registry_add_component(
+    if(!RE_component_registry_component_add(
             &registry,
             (RE_ComponentDefinition){
                 .name = "BALL_ON_FIRE",

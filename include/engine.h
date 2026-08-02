@@ -31,7 +31,7 @@ void engine_shutdown(void);
  *
  * If the engine is paused, delta time is set to zero.
  */
-void engine_update_time(void);
+void engine_time_update(void);
 
 /**
  * Get accumulated engine time in seconds.
@@ -58,7 +58,7 @@ void engine_pause(void);
 void engine_resume(void);
 
 /** Update elapsed time and consume every complete fixed tick. */
-Tick engine_update_tick(void);
+Tick engine_tick_update(void);
 
 /** Set the real-time duration required for one engine tick. */
 EngineResult engine_time_per_tick_set(Time time_per_tick);
@@ -70,17 +70,17 @@ Time engine_time_per_tick_get(void);
  *
  * @return The next SDL event, or a zeroed SDL_Event when no event is pending.
  */
-SDL_Event engine_poll_event(void);
+SDL_Event engine_event_poll(void);
 
 /**
  * Check whether the engine is paused.
  *
  * @return true when paused, false otherwise.
  */
-bool engine_paused_is(void);
+bool engine_paused_get(void);
 
 /**
  * Reset the internal timing baseline without advancing time.
  */
-void engine_reset_clock(void);
+void engine_clock_reset(void);
 #endif

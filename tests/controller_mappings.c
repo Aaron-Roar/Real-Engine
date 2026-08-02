@@ -2,15 +2,15 @@
 
 int main(void) {
     KeyboardState keyboard = {0};
-    Controller first = rohr_controller_default_wasd();
-    Controller second = rohr_controller_default_arrows();
+    Controller first = rohr_controller_wasd_default_get();
+    Controller second = rohr_controller_arrows_default_get();
     Vec2D first_axis;
     Vec2D second_axis;
 
     if(rohr_error_check(rohr_engine_init())) {
         return 1;
     }
-    if(!rohr_controller_add_axis(
+    if(!rohr_controller_axis_add(
             &first,
             "aim",
             (ControllerAxisBinding){
@@ -19,13 +19,13 @@ int main(void) {
                 .positive_y = SDLK_W,
                 .negative_y = SDLK_S,
             }) ||
-            !rohr_controller_add_button(&first, "fire", SDLK_SPACE) ||
-            !rohr_controller_add_button(&second, "fire", SDLK_RETURN)) {
+            !rohr_controller_button_add(&first, "fire", SDLK_SPACE) ||
+            !rohr_controller_button_add(&second, "fire", SDLK_RETURN)) {
         rohr_engine_shutdown();
         return 1;
     }
 
-    rohr_controller_add_key_event(
+    rohr_controller_key_event_add(
         &keyboard,
         (KeyboardEvent){
             .keycode = SDLK_D,
@@ -33,7 +33,7 @@ int main(void) {
             .state = KEY_STATE_PRESSED,
         }
     );
-    rohr_controller_add_key_event(
+    rohr_controller_key_event_add(
         &keyboard,
         (KeyboardEvent){
             .keycode = SDLK_SPACE,
@@ -41,7 +41,7 @@ int main(void) {
             .state = KEY_STATE_PRESSED,
         }
     );
-    rohr_controller_add_key_event(
+    rohr_controller_key_event_add(
         &keyboard,
         (KeyboardEvent){
             .keycode = SDLK_UP,
@@ -59,10 +59,10 @@ int main(void) {
     }
     first_axis = rohr_controller_axis_get(&keyboard, &first, "aim");
     if(first_axis.x != 1.0f || first_axis.y != 0.0f ||
-            !rohr_controller_button_down_is(&keyboard, &first, "fire") ||
-            !rohr_controller_button_pressed_is(&keyboard, &first, "fire") ||
-            rohr_controller_button_down_is(&keyboard, &second, "fire") ||
-            rohr_controller_button_down_is(&keyboard, &first, "missing")) {
+            !rohr_controller_button_down_get(&keyboard, &first, "fire") ||
+            !rohr_controller_button_pressed_get(&keyboard, &first, "fire") ||
+            rohr_controller_button_down_get(&keyboard, &second, "fire") ||
+            rohr_controller_button_down_get(&keyboard, &first, "missing")) {
         rohr_engine_shutdown();
         return 1;
     }

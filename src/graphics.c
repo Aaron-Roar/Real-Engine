@@ -149,15 +149,15 @@ static bool graphics_camera_slot(CameraId id, size_t *slot) {
     return true;
 }
 
-CameraConfig graphics_camera_default_config(void) {
+CameraConfig graphics_camera_config_default_get(void) {
     return (CameraConfig){
         .dimensions = {WINDOW_WIDTH, WINDOW_HEIGHT},
         .zoom = 1.0f,
     };
 }
 
-static Camera graphics_camera_from_config(CameraConfig config) {
-    CameraConfig defaults = graphics_camera_default_config();
+static Camera graphics_camera_from_config_get(CameraConfig config) {
+    CameraConfig defaults = graphics_camera_config_default_get();
     if(config.dimensions.x <= 0.0f) config.dimensions.x = defaults.dimensions.x;
     if(config.dimensions.y <= 0.0f) config.dimensions.y = defaults.dimensions.y;
     if(config.zoom <= 0.0f) config.zoom = defaults.zoom;
@@ -203,7 +203,7 @@ static void graphics_recording_disable(const char *reason) {
 }
 
 EngineResult graphics_tables_init(void) {
-    CameraConfig default_config = graphics_camera_default_config();
+    CameraConfig default_config = graphics_camera_config_default_get();
     memset(cameras, 0, sizeof(cameras));
     memset(camera_attachments, 0, sizeof(camera_attachments));
     memset(camera_runtime, 0, sizeof(camera_runtime));
@@ -214,7 +214,7 @@ EngineResult graphics_tables_init(void) {
     cameras_used[0] = true;
     camera_generations[0] = 1;
     active_camera = graphics_camera_id(0);
-    camera = graphics_camera_from_config(default_config);
+    camera = graphics_camera_from_config_get(default_config);
     cameras[0] = camera;
     camera_runtime[0].enabled = true;
     camera_attachment = (ActiveCameraAttachment){0};
@@ -271,7 +271,7 @@ bool graphics_recording_start(const char *output_path, int fps) {
         return false;
     }
 
-    if(!platform_process_command_exists("ffmpeg")) {
+    if(!platform_process_command_check("ffmpeg")) {
         console_write(
             LOG_ENGINE,
             "FFmpeg was not found; recording disabled\n"
@@ -296,7 +296,7 @@ bool graphics_recording_start(const char *output_path, int fps) {
 
     return true;
 }
-static bool graphics_recording_open_ffmpeg(int width, int height) {
+static bool graphics_recording_ffmpeg_open(int width, int height) {
     char command[1024];
 
     snprintf(
@@ -413,7 +413,7 @@ static bool graphics_record_frame(void)
     }
 
     if(screen_recorder.ffmpeg_pipe == NULL) {
-        if(!graphics_recording_open_ffmpeg(
+        if(!graphics_recording_ffmpeg_open(
             RECORDING_WIDTH,
             RECORDING_HEIGHT
         )) {
@@ -473,7 +473,7 @@ void graphics_recording_stop(void) {
     );
 }
 
-void graphics_draw_grid(void) {
+void graphics_grid_draw(void) {
     Color grid_color = {100, 100, 100, 255};
 
     SDL_SetRenderDrawColor(
@@ -500,14 +500,14 @@ void graphics_draw_grid(void) {
         float world_x =
             grid_min_x + col * CELL_SIZE;
 
-        Position top = graphics_world_to_screen(
+        Position top = graphics_world_to_screen_get(
             (Position){
                 .x = world_x,
                 .y = grid_max_y
             }
         );
 
-        Position bottom = graphics_world_to_screen(
+        Position bottom = graphics_world_to_screen_get(
             (Position){
                 .x = world_x,
                 .y = grid_min_y
@@ -525,14 +525,14 @@ void graphics_draw_grid(void) {
         float world_y =
             grid_min_y + row * CELL_SIZE;
 
-        Position left = graphics_world_to_screen(
+        Position left = graphics_world_to_screen_get(
             (Position){
                 .x = grid_min_x,
                 .y = world_y
             }
         );
 
-        Position right = graphics_world_to_screen(
+        Position right = graphics_world_to_screen_get(
             (Position){
                 .x = grid_max_x,
                 .y = world_y
@@ -548,10 +548,10 @@ void graphics_draw_grid(void) {
     }
 }
 
-void graphics_scale_textures(Entity entity, Scale scale) {
+void graphics_textures_scale(Entity entity, Scale scale) {
     EntityIndex index;
 
-    if(!entity_index_get(entity, &index) || !entity_components_has(entity, ANIMATED_SPRITE)) {
+    if(!entity_index_get(entity, &index) || !entity_components_check(entity, ANIMATED_SPRITE)) {
         return;
     }
     for(int i = 0; i < MAX_TEXTURES; i += 1) {
@@ -560,7 +560,7 @@ void graphics_scale_textures(Entity entity, Scale scale) {
     }
 }
 
-Color graphics_creat_color_hex(uint32_t hex_color_code) {
+Color graphics_color_hex_create(uint32_t hex_color_code) {
   return (Color) {
     .red = (hex_color_code >> 16) & 0xFF,
     .green = (hex_color_code >> 8)  & 0xFF,
@@ -569,7 +569,7 @@ Color graphics_creat_color_hex(uint32_t hex_color_code) {
   };
 }
 
-Color graphics_create_color_rgba(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha) {
+Color graphics_color_rgba_create(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha) {
   return (Color){
       .red = red,
       .blue = blue,
@@ -593,7 +593,7 @@ CameraIdResult graphics_camera_create(CameraConfig config) {
             camera_generations[slot] += 1;
             if(camera_generations[slot] == 0) camera_generations[slot] = 1;
             cameras_used[slot] = true;
-            cameras[slot] = graphics_camera_from_config(config);
+            cameras[slot] = graphics_camera_from_config_get(config);
             camera_attachments[slot] = (ActiveCameraAttachment){0};
             camera_runtime[slot] = (CameraRuntime){.enabled = true};
             camera_motion[slot] = (CameraMotion){0};
@@ -641,7 +641,7 @@ EngineResult graphics_camera_set(CameraId id, Camera value) {
     if(!graphics_camera_slot(id, &slot)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
     }
-    value = graphics_camera_from_config((CameraConfig){
+    value = graphics_camera_from_config_get((CameraConfig){
         .position = value.position,
         .orientation = value.orientation,
         .dimensions = value.dimensions,
@@ -708,7 +708,7 @@ static bool graphics_resolve_camera_attachment(void) {
     }
 
     if(camera_attachment.value.follow_orientation) {
-        world_offset = math_rotate_vector(
+        world_offset = math_vector_rotate(
             camera_attachment.value.position_offset,
             orientations[index]
         );
@@ -727,32 +727,11 @@ static bool graphics_resolve_camera_attachment(void) {
     return true;
 }
 
-void graphics_active_camera_set(Camera value) {
-    size_t slot;
-    camera_attachment = (ActiveCameraAttachment){0};
-    camera = graphics_camera_from_config((CameraConfig){
-        .position = value.position,
-        .orientation = value.orientation,
-        .dimensions = value.dimensions,
-        .zoom = value.zoom,
-    });
-    if(graphics_camera_slot(active_camera, &slot)) {
-        camera_motion[slot] = (CameraMotion){0};
-        camera_zoom_motion[slot] = (CameraZoomMotion){0};
-    }
-    graphics_camera_store_active();
-}
-
-Camera graphics_active_camera_get(void) {
-    (void)graphics_resolve_camera_attachment();
-    return camera;
-}
-
-void graphics_move_camera(Vec2D translation) {
+void graphics_camera_move(Vec2D translation) {
     (void)graphics_camera_position_move(active_camera, translation, 0.0);
 }
 
-void graphics_rotate_camera(Orientation radians) {
+void graphics_camera_rotate(Orientation radians) {
     if(graphics_resolve_camera_attachment()) {
         camera_attachment.value.orientation_offset += radians;
     }
@@ -760,12 +739,12 @@ void graphics_rotate_camera(Orientation radians) {
     graphics_camera_store_active();
 }
 
-EngineResult graphics_attach_camera(
+EngineResult graphics_camera_attach(
     Entity entity,
     Vec2D position_offset,
     Orientation orientation_offset
 ) {
-    return graphics_attach_camera_with_options(
+    return graphics_camera_with_options_attach(
         entity,
         position_offset,
         orientation_offset,
@@ -774,7 +753,7 @@ EngineResult graphics_attach_camera(
     );
 }
 
-EngineResult graphics_attach_camera_with_options(
+EngineResult graphics_camera_with_options_attach(
     Entity entity,
     Vec2D position_offset,
     Orientation orientation_offset,
@@ -810,13 +789,13 @@ EngineResult graphics_attach_camera_with_options(
     return error_result_value(true);
 }
 
-void graphics_detach_camera(void) {
+void graphics_camera_detach(void) {
     (void)graphics_resolve_camera_attachment();
     camera_attachment = (ActiveCameraAttachment){0};
     graphics_camera_store_active();
 }
 
-bool graphics_camera_attached_is(void) {
+bool graphics_camera_attached_get(void) {
     return graphics_resolve_camera_attachment();
 }
 
@@ -828,7 +807,7 @@ bool graphics_camera_attachment_get(CameraAttachment *attachment) {
     return true;
 }
 
-EngineResult graphics_camera_attach_to(
+EngineResult graphics_camera_attachment_set(
         CameraId id,
         Entity entity,
         Vec2D position_offset,
@@ -844,7 +823,7 @@ EngineResult graphics_camera_attach_to(
     camera_motion[slot] = (CameraMotion){0};
     EngineResult result = graphics_camera_active_set(id);
     if(error_check(result)) return result;
-    result = graphics_attach_camera_with_options(
+    result = graphics_camera_with_options_attach(
         entity,
         position_offset,
         orientation_offset,
@@ -856,7 +835,7 @@ EngineResult graphics_camera_attach_to(
     return result;
 }
 
-EngineResult graphics_camera_detach_from(CameraId id) {
+EngineResult graphics_camera_attachment_remove(CameraId id) {
     CameraId previous = active_camera;
     size_t slot;
     if(!graphics_camera_slot(id, &slot)) {
@@ -865,13 +844,13 @@ EngineResult graphics_camera_detach_from(CameraId id) {
     camera_motion[slot] = (CameraMotion){0};
     EngineResult result = graphics_camera_active_set(id);
     if(error_check(result)) return result;
-    graphics_detach_camera();
+    graphics_camera_detach();
     graphics_camera_store_active();
     if(previous != id) (void)graphics_camera_active_set(previous);
     return error_result_value(true);
 }
 
-static ScreenConfig graphics_screen_default_config(void) {
+static ScreenConfig graphics_screen_config_default_get(void) {
     return (ScreenConfig){
         .camera = active_camera,
         .width = WINDOW_WIDTH,
@@ -986,7 +965,7 @@ static EngineResult graphics_camera_begin(CameraId camera_id) {
         if(result.kind == ERROR_RESULT_ERROR) return result;
     }
     if(!graphics_screen_for_camera(camera_id, &screen_slot)) {
-        ScreenConfig config = graphics_screen_default_config();
+        ScreenConfig config = graphics_screen_config_default_get();
         ScreenIdResult result;
         config.camera = camera_id;
         config.width = width;
@@ -1060,7 +1039,7 @@ static EngineResult graphics_camera_resolve_and_detach(CameraId camera_id, Camer
     CameraResult camera_result;
     EngineResult result;
     if(value == NULL) return error_result_error(ERROR_ENGINE_STATE_INVALID);
-    result = graphics_camera_detach_from(camera_id);
+    result = graphics_camera_attachment_remove(camera_id);
     if(result.kind == ERROR_RESULT_ERROR) return result;
     camera_result = graphics_camera_get(camera_id);
     if(camera_result.kind == ERROR_RESULT_ERROR) {
@@ -1144,7 +1123,7 @@ EngineResult graphics_camera_entity_attachment_set(CameraId camera_id, Entity en
     if(result.kind == ERROR_RESULT_ERROR) {
         return error_result_error(result.result.error);
     }
-    return graphics_camera_attach_to(
+    return graphics_camera_attachment_set(
         camera_id,
         entity,
         (Vec2D){0.0f, 0.0f},
@@ -1154,7 +1133,7 @@ EngineResult graphics_camera_entity_attachment_set(CameraId camera_id, Entity en
     );
 }
 
-EngineResult graphics_camera_moving_is(CameraId camera_id) {
+EngineResult graphics_camera_moving_get(CameraId camera_id) {
     size_t slot;
     if(!graphics_camera_slot(camera_id, &slot)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
@@ -1199,7 +1178,7 @@ CameraZoomResult graphics_camera_zoom_get(CameraId camera_id) {
     return ERROR_RESULT_MAKE_VALUE(CameraZoomResult, cameras[slot].zoom);
 }
 
-ViewportConfig graphics_viewport_default_config(void) {
+ViewportConfig graphics_viewport_config_default_get(void) {
     return (ViewportConfig){
         .rectangle = {0.0f, 0.0f, WINDOW_WIDTH, WINDOW_HEIGHT},
         .fit = SCREEN_FIT_CONTAIN,
@@ -1208,7 +1187,7 @@ ViewportConfig graphics_viewport_default_config(void) {
 
 ViewportIdResult graphics_viewport_create(ViewportConfig config) {
     size_t slot;
-    ViewportConfig defaults = graphics_viewport_default_config();
+    ViewportConfig defaults = graphics_viewport_config_default_get();
     if(config.rectangle.width <= 0.0f) config.rectangle.width = defaults.rectangle.width;
     if(config.rectangle.height <= 0.0f) config.rectangle.height = defaults.rectangle.height;
     if(config.fit < SCREEN_FIT_NONE || config.fit > SCREEN_FIT_COVER) {
@@ -1253,7 +1232,7 @@ EngineResult graphics_viewport_camera_set(ViewportId id, CameraId camera_id) {
     return error_result_value(true);
 }
 
-EngineResult graphics_viewport_clear_camera(ViewportId id) {
+EngineResult graphics_viewport_camera_clear(ViewportId id) {
     size_t slot;
     if(!graphics_viewport_slot(id, &slot)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
@@ -1280,7 +1259,7 @@ EngineResult graphics_viewport_disable_set(ViewportId id) {
     return error_result_value(true);
 }
 
-Position graphics_world_to_screen(Position world) {
+Position graphics_world_to_screen_get(Position world) {
     float output_x = 0.0f;
     float output_y = 0.0f;
     float output_width = WINDOW_WIDTH;
@@ -1297,7 +1276,7 @@ Position graphics_world_to_screen(Position world) {
         .x = world.x - camera.position.x,
         .y = world.y - camera.position.y
     };
-    Vec2D camera_space = math_rotate_vector(relative, -camera.orientation);
+    Vec2D camera_space = math_vector_rotate(relative, -camera.orientation);
     float scale_x = camera.zoom * output_width / camera.dimensions.x;
     float scale_y = camera.zoom * output_height / camera.dimensions.y;
 
@@ -1307,7 +1286,7 @@ Position graphics_world_to_screen(Position world) {
     };
 }
 
-Position graphics_screen_to_world(Position screen) {
+Position graphics_screen_to_world_get(Position screen) {
     float output_x = 0.0f;
     float output_y = 0.0f;
     float output_width = WINDOW_WIDTH;
@@ -1326,7 +1305,7 @@ Position graphics_screen_to_world(Position screen) {
         .y = (output_y + output_height * 0.5f - screen.y)
             * camera.dimensions.y / (camera.zoom * output_height)
     };
-    Vec2D relative = math_rotate_vector(camera_space, camera.orientation);
+    Vec2D relative = math_vector_rotate(camera_space, camera.orientation);
 
     return (Position){
         .x = relative.x + camera.position.x,
@@ -1334,7 +1313,7 @@ Position graphics_screen_to_world(Position screen) {
     };
 }
 
-Position graphics_window_to_screen(Position window) {
+Position graphics_window_to_screen_get(Position window) {
     float screen_x;
     float screen_y;
 
@@ -1360,7 +1339,7 @@ Position graphics_mouse_screen_position_get(void) {
         return (Position){0};
     }
     SDL_GetMouseState(&window_x, &window_y);
-    return graphics_window_to_screen((Position){window_x, window_y});
+    return graphics_window_to_screen_get((Position){window_x, window_y});
 }
 
 EngineResult graphics_start(void) {
@@ -1458,7 +1437,7 @@ void graphics_end(void) {
 
 }
 
-bool graphics_poll_events(SDL_Event *event) {
+bool graphics_events_poll(SDL_Event *event) {
     while (SDL_PollEvent(event)) {
         if (event->type == SDL_EVENT_QUIT) {
             return false;
@@ -1467,13 +1446,13 @@ bool graphics_poll_events(SDL_Event *event) {
     return true;
 }
 
-void graphics_draw_background(Color color) {
+void graphics_background_draw(Color color) {
     /* as you can see from this, rendering draws over whatever was drawn before it. */
     SDL_SetRenderDrawColor(sdl_renderer, color.red, color.green, color.blue, color.alpha);
     SDL_RenderClear(sdl_renderer);  /* start with a blank canvas. */
 }
 
-bool graphics_draw_screen_rect(float x, float y, float width, float height, Color color) {
+bool graphics_screen_rect_draw(float x, float y, float width, float height, Color color) {
     SDL_FRect rect = {
         .x = x,
         .y = y,
@@ -1490,7 +1469,7 @@ bool graphics_draw_screen_rect(float x, float y, float width, float height, Colo
     return SDL_RenderFillRect(sdl_renderer, &rect);
 }
 
-bool graphics_draw_screen_quad(
+bool graphics_screen_quad_draw(
     Position center,
     float width,
     float height,
@@ -1532,12 +1511,12 @@ bool graphics_draw_screen_quad(
     return SDL_RenderGeometry(sdl_renderer, NULL, vertices, 4, indices, 6);
 }
 
-void graphics_draw_rect(Shape rect, Position pos) {
+void graphics_rect_draw(Shape rect, Position pos) {
     SDL_FRect sdl_rect;
     (void)rect;
     /* draw a filled rectangle in the middle of the canvas. */
     SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 255, SDL_ALPHA_OPAQUE);  /* blue, full alpha */
-    Position screen_loc = graphics_world_to_screen(pos);
+    Position screen_loc = graphics_world_to_screen_get(pos);
     sdl_rect.x = screen_loc.x;
     sdl_rect.y = screen_loc.y;
     sdl_rect.w = 20;
@@ -1545,7 +1524,7 @@ void graphics_draw_rect(Shape rect, Position pos) {
     SDL_RenderFillRect(sdl_renderer, &sdl_rect);
 }
 
-static void graphics_draw_empty_viewport(ViewportRectangle rectangle) {
+static void graphics_empty_viewport_draw(ViewportRectangle rectangle) {
     SDL_FRect background = {
         rectangle.x,
         rectangle.y,
@@ -1568,7 +1547,7 @@ static void graphics_draw_empty_viewport(ViewportRectangle rectangle) {
     }
 }
 
-static void graphics_update_camera_motions(void) {
+static void graphics_camera_motions_update(void) {
     Tick current_tick = engine_tick_get();
     size_t slot;
     for(slot = 0; slot < MAX_CAMERAS; slot += 1) {
@@ -1618,14 +1597,14 @@ static void graphics_render_viewport_cameras(void) {
         rendered[camera_slot] = true;
         runtime = &camera_runtime[camera_slot];
         if(!runtime->enabled || runtime->callback == NULL
-                || (runtime->pause_with_engine && engine_paused_is())) continue;
+                || (runtime->pause_with_engine && engine_paused_get())) continue;
         if(graphics_camera_begin(camera_id).kind == ERROR_RESULT_ERROR) continue;
         runtime->callback(camera_id, runtime->context);
         (void)graphics_camera_end();
     }
 }
 
-static void graphics_draw_viewports(void) {
+static void graphics_viewports_draw(void) {
     size_t viewport_slot;
     bool has_enabled_viewport = false;
     (void)SDL_SetRenderTarget(sdl_renderer, NULL);
@@ -1659,7 +1638,7 @@ static void graphics_draw_viewports(void) {
         };
         (void)SDL_SetRenderClipRect(sdl_renderer, &clip);
         if(!graphics_screen_for_camera(viewport->camera, &screen_slot)) {
-            graphics_draw_empty_viewport(viewport->rectangle);
+            graphics_empty_viewport_draw(viewport->rectangle);
             continue;
         }
         SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
@@ -1699,9 +1678,9 @@ static void graphics_draw_viewports(void) {
 }
 
 void graphics_show(void) {
-    graphics_update_camera_motions();
+    graphics_camera_motions_update();
     graphics_render_viewport_cameras();
-    graphics_draw_viewports();
+    graphics_viewports_draw();
       if(screen_recorder.recording) {
         if(!graphics_record_frame()) {
             graphics_recording_stop();
@@ -1710,7 +1689,7 @@ void graphics_show(void) {
     SDL_RenderPresent(sdl_renderer);
 }
 
-bool graphics_draw_shape_outline(Shape shape, Color color) {
+bool graphics_shape_outline_draw(Shape shape, Color color) {
     if (shape.amount_of_vertices < 2) {
         return false;
     }
@@ -1718,7 +1697,7 @@ bool graphics_draw_shape_outline(Shape shape, Color color) {
     SDL_FPoint points[MAX_VERTICIES + 1];
 
     for (int i = 0; i < shape.amount_of_vertices; i++) {
-        Position screen_loc = graphics_world_to_screen(shape.vertices[i]);
+        Position screen_loc = graphics_world_to_screen_get(shape.vertices[i]);
         points[i].x = screen_loc.x;
         points[i].y = screen_loc.y;
     }
@@ -1729,7 +1708,7 @@ bool graphics_draw_shape_outline(Shape shape, Color color) {
     return SDL_RenderLines(sdl_renderer, points, shape.amount_of_vertices + 1);
 }
 
-bool graphics_draw_shape_filled(Shape shape, Color color)
+bool graphics_shape_filled_draw(Shape shape, Color color)
 {
     if (shape.amount_of_vertices < 3) {
         return false;
@@ -1738,7 +1717,7 @@ bool graphics_draw_shape_filled(Shape shape, Color color)
     SDL_Vertex vertices[MAX_VERTICIES];
 
     for (int i = 0; i < shape.amount_of_vertices; i++) {
-        Position screen_loc = graphics_world_to_screen(shape.vertices[i]);
+        Position screen_loc = graphics_world_to_screen_get(shape.vertices[i]);
         vertices[i].position.x = screen_loc.x;
         vertices[i].position.y = screen_loc.y;
 
@@ -1770,48 +1749,48 @@ bool graphics_draw_shape_filled(Shape shape, Color color)
     );
 }
 
-void graphics_draw_hit_box(Entity entity, Fill fill_type) {
+void graphics_hit_box_draw(Entity entity, Fill fill_type) {
     ShapeResult shape_result = physics_global_hit_box_get(entity);
     if(shape_result.kind == ERROR_RESULT_ERROR) {
         return;
     }
     Shape shape = shape_result.result.value;
     if(fill_type == GRAPHICS_FILLED) {
-        graphics_draw_shape_filled(shape, hit_box_color);
+        graphics_shape_filled_draw(shape, hit_box_color);
     }
     else {
-        graphics_draw_shape_outline(shape, hit_box_color);
+        graphics_shape_outline_draw(shape, hit_box_color);
     }
 }
 
-void graphics_draw_hit_box_colored(Entity entity, Fill fill_type, Color color) {
+void graphics_hit_box_colored_draw(Entity entity, Fill fill_type, Color color) {
     ShapeResult shape_result = physics_global_hit_box_get(entity);
     if(shape_result.kind == ERROR_RESULT_ERROR) {
         return;
     }
     Shape shape = shape_result.result.value;
     if(fill_type == GRAPHICS_FILLED) {
-        graphics_draw_shape_filled(shape, color);
+        graphics_shape_filled_draw(shape, color);
     }
     else {
-        graphics_draw_shape_outline(shape, color);
+        graphics_shape_outline_draw(shape, color);
     }
 }
 
-void graphics_draw_hit_boxes(void) {
+void graphics_hit_boxes_draw(void) {
   for(int i = 0; i < MAX_ENTITIES; i += 1) {
-    if(entity_index_alive_is(i)) {
-        if( entity_index_components_has(i, HIT_BOX)) {
-            EntityResult entity_result = entity_from_index(i);
+    if(entity_index_alive_check(i)) {
+        if( entity_index_components_check(i, HIT_BOX)) {
+            EntityResult entity_result = entity_from_index_get(i);
             if(entity_result.kind == ERROR_RESULT_VALUE) {
-                graphics_draw_hit_box(entity_result.result.value, GRAPHICS_OUTLINE);
+                graphics_hit_box_draw(entity_result.result.value, GRAPHICS_OUTLINE);
             }
         }
     }
   }
 }
 
-void graphics_draw_particle(Entity entity, Fill fill_type) {
+void graphics_particle_draw(Entity entity, Fill fill_type) {
     EntityIndex index;
 
     if(!entity_index_get(entity, &index)) {
@@ -1823,30 +1802,30 @@ void graphics_draw_particle(Entity entity, Fill fill_type) {
     }
     Shape shape = shape_result.result.value;
     float radius = math_circle_radius(shape,math_polygon_centroid(shape));
-    Shape circle = math_create_circle(radius, 10);
+    Shape circle = math_circle_create(radius, 10);
     Shape world_circle = physics_shape_world_translate(circle, positions[index], 0);
     if(fill_type == GRAPHICS_FILLED) {
-        graphics_draw_shape_filled(world_circle, particle_color);
+        graphics_shape_filled_draw(world_circle, particle_color);
     }
     else {
-        graphics_draw_shape_outline(world_circle, particle_color);
+        graphics_shape_outline_draw(world_circle, particle_color);
     }
 }
-void graphics_draw_particles(void) {
+void graphics_particles_draw(void) {
   for(int i = 0; i < MAX_ENTITIES; i += 1) {
-    if(entity_index_alive_is(i)) {
-        if( entity_index_components_has(i, HIT_BOX)) {
-          if( entity_index_components_has(i, PARTICLE)) {
-              EntityResult entity_result = entity_from_index(i);
+    if(entity_index_alive_check(i)) {
+        if( entity_index_components_check(i, HIT_BOX)) {
+          if( entity_index_components_check(i, PARTICLE)) {
+              EntityResult entity_result = entity_from_index_get(i);
               if(entity_result.kind == ERROR_RESULT_VALUE) {
-                  graphics_draw_particle(entity_result.result.value, GRAPHICS_OUTLINE);
+                  graphics_particle_draw(entity_result.result.value, GRAPHICS_OUTLINE);
               }
           }
         }
     }
   }
 }
-TextureAssetResult graphics_load_texture(TextureDescriptor text_desc) {
+TextureAssetResult graphics_texture_load(TextureDescriptor text_desc) {
         SDL_Surface *surface = NULL;
         char *png_path = NULL;
         TextureAsset asset = {0};
@@ -1871,7 +1850,7 @@ TextureAssetResult graphics_load_texture(TextureDescriptor text_desc) {
         return ERROR_RESULT_MAKE_VALUE(TextureAssetResult, asset);
 }
 
-FontAssetResult graphics_load_font(FontDescriptor descriptor) {
+FontAssetResult graphics_font_load(FontDescriptor descriptor) {
     FontAsset asset = {0};
 
     if(descriptor.file == NULL || descriptor.point_size <= 0.0f || !ttf_initialized) {
@@ -1884,7 +1863,7 @@ FontAssetResult graphics_load_font(FontDescriptor descriptor) {
     return ERROR_RESULT_MAKE_VALUE(FontAssetResult, asset);
 }
 
-void graphics_destroy_font(FontAsset *font) {
+void graphics_font_destroy(FontAsset *font) {
     if(font == NULL || font->font == NULL) {
         return;
     }
@@ -1892,7 +1871,7 @@ void graphics_destroy_font(FontAsset *font) {
     *font = (FontAsset){0};
 }
 
-TextAssetResult graphics_create_text(const FontAsset *font, const char *value, Color color) {
+TextAssetResult graphics_text_create(const FontAsset *font, const char *value, Color color) {
     TextAsset asset = {0};
     int width;
     int height;
@@ -1922,7 +1901,7 @@ TextAssetResult graphics_create_text(const FontAsset *font, const char *value, C
     return ERROR_RESULT_MAKE_VALUE(TextAssetResult, asset);
 }
 
-void graphics_destroy_text(TextAsset *text) {
+void graphics_text_destroy(TextAsset *text) {
     if(text == NULL) {
         return;
     }
@@ -1932,21 +1911,21 @@ void graphics_destroy_text(TextAsset *text) {
     *text = (TextAsset){0};
 }
 
-bool graphics_draw_text(const TextAsset *text, Position position) {
+bool graphics_text_draw(const TextAsset *text, Position position) {
     if(text == NULL || text->text == NULL) {
         return false;
     }
     return TTF_DrawRendererText(text->text, position.x, position.y);
 }
 
-AnimationAssetResult graphics_load_animation(AnimationDescriptor anim_desc) {
+AnimationAssetResult graphics_animation_load(AnimationDescriptor anim_desc) {
     AnimationAsset asset = {0};
     asset.texture_list.amount = anim_desc.amount_of_descriptors;
     asset.ticks_per_frame = anim_desc.ticks_per_frame;
     asset.time_per_frame = anim_desc.time_per_frame;
 
     for(int i = 0; i < anim_desc.amount_of_descriptors; i += 1) {
-        TextureAssetResult texture_result = graphics_load_texture(anim_desc.texture_descriptors[i]);
+        TextureAssetResult texture_result = graphics_texture_load(anim_desc.texture_descriptors[i]);
         if(texture_result.kind == ERROR_RESULT_ERROR) {
             return ERROR_RESULT_MAKE_ERROR(AnimationAssetResult, texture_result.result.error);
         }
@@ -1956,7 +1935,7 @@ AnimationAssetResult graphics_load_animation(AnimationDescriptor anim_desc) {
     return ERROR_RESULT_MAKE_VALUE(AnimationAssetResult, asset);
 }
 
-AnimatedSprite graphics_create_animated_sprite(AnimationAsset asset_ptr, Scale scale) {
+AnimatedSprite graphics_animated_sprite_create(AnimationAsset asset_ptr, Scale scale) {
     AnimatedSprite sprite = {0};
     sprite.animation = asset_ptr;
     sprite.animation_frame = 0;
@@ -1968,7 +1947,7 @@ AnimatedSprite graphics_create_animated_sprite(AnimationAsset asset_ptr, Scale s
     return sprite;
 }
 
-void graphics_update_sprite_frame(AnimatedSprite *sprite, Tick current_tick, Time current_time) {
+void graphics_sprite_frame_update(AnimatedSprite *sprite, Tick current_tick, Time current_time) {
     bool frame_need_update_tick = (sprite->animation.ticks_per_frame <= (current_tick - sprite->last_update_tick)) && (sprite->animation.ticks_per_frame != 0);
     bool frame_need_update_time = (sprite->animation.time_per_frame <= (current_time - sprite->last_update_time) && (sprite->animation.time_per_frame != 0));
 
@@ -1979,7 +1958,7 @@ void graphics_update_sprite_frame(AnimatedSprite *sprite, Tick current_tick, Tim
     }
 }
 
-void graphics_draw_texture(TextureAsset texture_asset, Position pos, Orientation ort) {
+void graphics_texture_draw(TextureAsset texture_asset, Position pos, Orientation ort) {
     SDL_FRect dst_rect = {0};
     float output_width = WINDOW_WIDTH;
     float output_height = WINDOW_HEIGHT;
@@ -1989,7 +1968,7 @@ void graphics_draw_texture(TextureAsset texture_asset, Position pos, Orientation
         output_width = (float)screens[screen_slot].width;
         output_height = (float)screens[screen_slot].height;
     }
-    Position screen_loc = graphics_world_to_screen(pos);
+    Position screen_loc = graphics_world_to_screen_get(pos);
     dst_rect.w = texture_asset.size.x * camera.zoom
         * output_width / camera.dimensions.x;
     dst_rect.h = texture_asset.size.y * camera.zoom
@@ -2013,55 +1992,55 @@ void graphics_draw_texture(TextureAsset texture_asset, Position pos, Orientation
     );
 }
 
-void graphics_draw_sprite(AnimatedSprite sprite, Position pos, Orientation ort) {
+void graphics_sprite_draw(AnimatedSprite sprite, Position pos, Orientation ort) {
     TextureAsset asset = {0};
     asset = sprite.animation.texture_list.textures[sprite.animation_frame];
     asset.size.x = asset.size.x * sprite.scale.x;
     asset.size.y = asset.size.y * sprite.scale.y;
 
-    graphics_draw_texture(asset, pos, ort);
+    graphics_texture_draw(asset, pos, ort);
 }
 
-EngineResult graphics_add_animated_sprite(Entity entity, AnimatedSprite sprite) {
+EngineResult graphics_animated_sprite_add(Entity entity, AnimatedSprite sprite) {
     EntityIndex index;
     EngineResult result;
 
-    if(!entity_index_get(entity, &index) || !entity_index_alive_is(index)) {
+    if(!entity_index_get(entity, &index) || !entity_index_alive_check(index)) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
     (void)AnimatedSpritePool_store_at(&animated_sprites_pool, index, sprite);
-    result = entity_add_components(entity, ANIMATED_SPRITE);
+    result = entity_components_add(entity, ANIMATED_SPRITE);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
     return error_result_value(true);
 }
 
-void graphics_draw_animated_sprites(void) {
+void graphics_animated_sprites_draw(void) {
     RohrComponentMask filter = ANIMATED_SPRITE;
     for(int i = 0; i < MAX_ENTITIES; i += 1) {
-        if(entity_index_alive_is(i) && entity_index_components_has(i, filter)) {
-            graphics_draw_sprite(animated_sprites[i], positions[i], orientations[i]);
+        if(entity_index_alive_check(i) && entity_index_components_check(i, filter)) {
+            graphics_sprite_draw(animated_sprites[i], positions[i], orientations[i]);
         }
     }
 }
 
-void graphics_update_sprite_frames(Tick current_tick, Time current_time) {
+void graphics_sprite_frames_update(Tick current_tick, Time current_time) {
     RohrComponentMask filter = ANIMATED_SPRITE;
     for(int i = 0; i < MAX_ENTITIES; i += 1) {
-        if(entity_index_alive_is(i) && entity_index_components_has(i, filter)) {
-            graphics_update_sprite_frame(&animated_sprites[i], current_tick, current_time);
+        if(entity_index_alive_check(i) && entity_index_components_check(i, filter)) {
+            graphics_sprite_frame_update(&animated_sprites[i], current_tick, current_time);
         }
     }
 }
 
-void graphics_draw_local_origin(Entity entity) {
+void graphics_local_origin_draw(Entity entity) {
     EntityIndex index;
 
     if(!entity_index_get(entity, &index)) {
         return;
     }
-    if (!entity_components_has(entity, HIT_BOX)) {
+    if (!entity_components_check(entity, HIT_BOX)) {
         return;
     }
 
@@ -2128,13 +2107,13 @@ void graphics_draw_local_origin(Entity entity) {
     };
 
     Position screen_origin =
-        graphics_world_to_screen(origin);
+        graphics_world_to_screen_get(origin);
 
     Position screen_x_positive =
-        graphics_world_to_screen(x_positive);
+        graphics_world_to_screen_get(x_positive);
 
     Position screen_y_positive =
-        graphics_world_to_screen(y_positive);
+        graphics_world_to_screen_get(y_positive);
 
     /* Positive local X axis */
     SDL_SetRenderDrawColor(
@@ -2165,17 +2144,17 @@ void graphics_draw_local_origin(Entity entity) {
     );
 }
 
-void graphics_draw_local_origins(void) {
+void graphics_local_origins_draw(void) {
     for(int i = 0; i < MAX_ENTITIES; i += 1) {
-        if(!entity_index_alive_is(i)) {
+        if(!entity_index_alive_check(i)) {
             continue;
         }
-        if (!entity_index_components_has(i, HIT_BOX)) {
+        if (!entity_index_components_check(i, HIT_BOX)) {
             continue;
         }
-        EntityResult entity_result = entity_from_index(i);
+        EntityResult entity_result = entity_from_index_get(i);
         if(entity_result.kind == ERROR_RESULT_VALUE) {
-            graphics_draw_local_origin(entity_result.result.value);
+            graphics_local_origin_draw(entity_result.result.value);
         }
     }
 }
@@ -2193,11 +2172,11 @@ static bool graphics_joint_world_anchors_get(Joint joint, Position *anchor_a, Po
         *anchor_b = second.result.value;
         return true;
     }
-    if(!entity_index_get(joint.a, &a_index) || !entity_index_alive_is(a_index) ||
-            !entity_index_get(joint.b, &b_index) || !entity_index_alive_is(b_index)) return false;
+    if(!entity_index_get(joint.a, &a_index) || !entity_index_alive_check(a_index) ||
+            !entity_index_get(joint.b, &b_index) || !entity_index_alive_check(b_index)) return false;
     {
-        Vec2D offset_a = math_rotate_vector(joint.local_anchor_a, orientations[a_index]);
-        Vec2D offset_b = math_rotate_vector(joint.local_anchor_b, orientations[b_index]);
+        Vec2D offset_a = math_vector_rotate(joint.local_anchor_a, orientations[a_index]);
+        Vec2D offset_b = math_vector_rotate(joint.local_anchor_b, orientations[b_index]);
         *anchor_a = (Position){positions[a_index].x + offset_a.x, positions[a_index].y + offset_a.y};
         *anchor_b = (Position){positions[b_index].x + offset_b.x, positions[b_index].y + offset_b.y};
     }
@@ -2258,7 +2237,7 @@ static bool graphics_joint_spring_symbol_draw(Position start, Position end) {
     return SDL_RenderLines(sdl_renderer, points, 10);
 }
 
-bool graphics_draw_joint(Entity joint_entity, Color color) {
+bool graphics_joint_draw(Entity joint_entity, Color color) {
     EntityIndex index;
     Joint joint;
     Position world_a;
@@ -2268,12 +2247,12 @@ bool graphics_draw_joint(Entity joint_entity, Color color) {
     Position center;
 
     if(sdl_renderer == NULL || !entity_index_get(joint_entity, &index) ||
-            !entity_index_alive_is(index) || !entity_index_components_has(index, JOINT) ||
+            !entity_index_alive_check(index) || !entity_index_components_check(index, JOINT) ||
             index >= joints_pool.capacity || !joints_pool.used[index]) return false;
     joint = joints[index];
     if(!graphics_joint_world_anchors_get(joint, &world_a, &world_b)) return false;
-    screen_a = graphics_world_to_screen(world_a);
-    screen_b = graphics_world_to_screen(world_b);
+    screen_a = graphics_world_to_screen_get(world_a);
+    screen_b = graphics_world_to_screen_get(world_b);
     center = (Position){(screen_a.x + screen_b.x) * 0.5f, (screen_a.y + screen_b.y) * 0.5f};
     if(!SDL_SetRenderDrawColor(sdl_renderer, color.red, color.green, color.blue, color.alpha)) return false;
     switch(joint.type) {
@@ -2288,18 +2267,18 @@ bool graphics_draw_joint(Entity joint_entity, Color color) {
     }
 }
 
-void graphics_draw_joints(Color color) {
+void graphics_joints_draw(Color color) {
     for(EntityIndex index = 0; index < joints_pool.capacity; index += 1) {
         EntityResult joint;
 
-        if(!joints_pool.used[index] || !entity_index_alive_is(index) ||
-                !entity_index_components_has(index, JOINT)) continue;
-        joint = entity_from_index(index);
-        if(joint.kind == ERROR_RESULT_VALUE) (void)graphics_draw_joint(joint.result.value, color);
+        if(!joints_pool.used[index] || !entity_index_alive_check(index) ||
+                !entity_index_components_check(index, JOINT)) continue;
+        joint = entity_from_index_get(index);
+        if(joint.kind == ERROR_RESULT_VALUE) (void)graphics_joint_draw(joint.result.value, color);
     }
 }
 
-bool graphics_draw_soft_body(Entity soft_body_entity, Color surface_color,
+bool graphics_soft_body_draw(Entity soft_body_entity, Color surface_color,
         Color beam_color, Color node_color) {
     SoftBodyResult body_result = physics_soft_body_get(soft_body_entity);
     SoftBody body;
@@ -2315,7 +2294,7 @@ bool graphics_draw_soft_body(Entity soft_body_entity, Color surface_color,
                 !entity_index_get(triangle.result.value.node_b, &indices[1]) ||
                 !entity_index_get(triangle.result.value.node_c, &indices[2])) continue;
         for(uint32_t vertex = 0; vertex < 3; vertex += 1) shape.vertices[vertex] = positions[indices[vertex]];
-        (void)graphics_draw_shape_filled(shape, surface_color);
+        (void)graphics_shape_filled_draw(shape, surface_color);
     }
     if(!SDL_SetRenderDrawColor(sdl_renderer, beam_color.red, beam_color.green,
             beam_color.blue, beam_color.alpha)) return false;
@@ -2327,8 +2306,8 @@ bool graphics_draw_soft_body(Entity soft_body_entity, Color surface_color,
         Position screen_b;
         if(beam.kind == ERROR_RESULT_ERROR || !entity_index_get(beam.result.value.node_a, &a) ||
                 !entity_index_get(beam.result.value.node_b, &b)) continue;
-        screen_a = graphics_world_to_screen(positions[a]);
-        screen_b = graphics_world_to_screen(positions[b]);
+        screen_a = graphics_world_to_screen_get(positions[a]);
+        screen_b = graphics_world_to_screen_get(positions[b]);
         (void)SDL_RenderLine(sdl_renderer, screen_a.x, screen_a.y, screen_b.x, screen_b.y);
     }
     for(uint32_t i = 0; i < body.node_count; i += 1) {
@@ -2336,9 +2315,9 @@ bool graphics_draw_soft_body(Entity soft_body_entity, Color surface_color,
         EntityIndex index;
         Shape shape;
         if(node.kind == ERROR_RESULT_ERROR || !entity_index_get(body.nodes[i], &index)) continue;
-        shape = physics_shape_world_translate(math_create_circle(node.result.value.radius, 12),
+        shape = physics_shape_world_translate(math_circle_create(node.result.value.radius, 12),
             positions[index], 0.0f);
-        (void)graphics_draw_shape_filled(shape, node_color);
+        (void)graphics_shape_filled_draw(shape, node_color);
     }
     return true;
 }

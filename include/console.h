@@ -35,7 +35,7 @@ typedef enum LogSourceType {
 } LogSourceType;
 
 /** Print stored logs. */
-void console_print_logs(void);
+void console_logs_print(void);
 /** Initialize console state. */
 void console_init(void);
 /** Shut down console state. */
@@ -49,7 +49,7 @@ bool console_read(ConsoleLogString *input);
 /** Write a formatted message to the console. */
 void console_write(LogSourceType source, const char *fmt, ...);
 /** Check whether the console is active. */
-bool console_active_is(void);
+bool console_active_get(void);
 /** Write a formatted debug message when debug output is enabled. */
 void console_debug_write(LogSourceType source, const char *fmt, ...);
 /** Set console debug output state. */

@@ -92,7 +92,7 @@ EngineResult engine_init(void) {
 void engine_pause(void) {
     engine_paused = true;
 }
-bool engine_paused_is(void) {
+bool engine_paused_get(void) {
     if(engine_paused) {
         return true;
     }
@@ -104,7 +104,7 @@ void engine_resume(void) {
     engine_paused = false;
 }
 
-void engine_update_time(void) {
+void engine_time_update(void) {
     SDLTime current_counter = SDL_GetPerformanceCounter();
 
     Time real_dt =
@@ -120,9 +120,9 @@ void engine_update_time(void) {
     engine_tick_accumulator += real_dt;
 }
 
-Tick engine_update_tick(void) {
+Tick engine_tick_update(void) {
     Tick ticks_advanced;
-    engine_update_time();
+    engine_time_update();
     if(engine_paused || !engine_running) {
         return 0;
     }
@@ -142,7 +142,7 @@ Tick engine_tick_get(void) {
 Time engine_time_get(void) {
     return engine_time;
 }
-void engine_reset_clock(void) {
+void engine_clock_reset(void) {
     sdl_prev_counter = SDL_GetPerformanceCounter();
     engine_tick_accumulator = 0.0;
 }
@@ -165,7 +165,7 @@ void engine_shutdown(void) {
     SDL_Quit();
 }
 
-SDL_Event engine_poll_event(void) {
+SDL_Event engine_event_poll(void) {
     while (SDL_PollEvent(&sdl_event)) {
         return sdl_event;
     }
