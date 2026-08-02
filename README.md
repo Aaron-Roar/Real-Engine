@@ -86,7 +86,7 @@ engine/
 ├── examples/
 │   ├── engine-core/       # Games using only librohr_engine
 │   └── editor/            # Programs using librohr_editor
-├── lib/                   # Generated engine and editor static libraries
+├── lib/                   # Vendored third-party source dependencies
 └── build/                 # Generated objects, binaries, and docs
 ```
 
@@ -98,8 +98,8 @@ engine/
 * C standard library
 * CMake 3.20 or newer
 * `pkg-config`
-* `sdl3`
-* `sdl3-image`
+* SDL3, SDL3_image, and SDL3_ttf are vendored under `lib/` and compiled
+  statically with the engine (versions 3.4.10, 3.4.4, and 3.2.2; zlib license)
 * `yyjson` is vendored under `lib/` (version 0.12.0, MIT)
 * `ffmpeg` for recording or converting demo media
 * Math library: `libm` / `-lm`

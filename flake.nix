@@ -82,9 +82,23 @@
         ];
 
         buildInputs = with pkgs; [
-          sdl3
-          sdl3-image
-          sdl3-ttf
+          alsa-lib
+          freetype
+          harfbuzz
+          libdecor
+          libx11
+          libxcb
+          libxcursor
+          libxext
+          libxfixes
+          libxi
+          libxkbcommon
+          libxrandr
+          libxscrnsaver
+          libxtst
+          pipewire
+          pulseaudio
+          wayland
         ];
       };
     };

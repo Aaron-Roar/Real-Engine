@@ -178,7 +178,7 @@ static bool RE_header_generate(
         }
         if(fprintf(header,
                 "bool game_%s_set(Entity entity);\n"
-                "bool game_%s_has(Entity entity);\n"
+                "bool game_%s_check(Entity entity);\n"
                 "void game_%s_remove(Entity entity);\n\n",
                 lower_name, lower_name, lower_name) < 0) {
             return false;
@@ -198,7 +198,7 @@ static bool RE_header_generate(
                 "bool game_%s_set(Entity entity, %s value);\n"
                 "Game%sResult game_%s_get(Entity entity);\n"
                 "%s *game_%s_addr_get(Entity entity);\n"
-                "bool game_%s_has(Entity entity);\n"
+                "bool game_%s_check(Entity entity);\n"
                 "void game_%s_remove(Entity entity);\n\n",
                 component->type_declaration,
                 component->type_name, component->type_name,
@@ -311,7 +311,7 @@ static bool RE_source_prelude_generate(FILE *source, const char *header_name) {
         "    game_entity_states.count += 1;\n"
         "    return true;\n"
         "}\n\n"
-        "static bool game_entity_state_has_bit(Entity entity, GameComponentMask bit) {\n"
+        "static bool game_entity_state_bit_check(Entity entity, GameComponentMask bit) {\n"
         "    EntityIndex entity_index;\n"
         "    size_t dense_index;\n"
         "    return game_entity_state_find(entity, &entity_index, &dense_index) &&\n"
@@ -352,8 +352,8 @@ static bool RE_tag_source_generate(FILE *source, const char *name) {
         "bool game_%s_set(Entity entity) {\n"
         "    return game_entity_state_bit_set(entity, GAME_TAG_%s);\n"
         "}\n\n"
-        "bool game_%s_has(Entity entity) {\n"
-        "    return game_entity_state_has_bit(entity, GAME_TAG_%s);\n"
+        "bool game_%s_check(Entity entity) {\n"
+        "    return game_entity_state_bit_check(entity, GAME_TAG_%s);\n"
         "}\n\n"
         "void game_%s_remove(Entity entity) {\n"
         "    game_entity_state_bit_clear(entity, GAME_TAG_%s);\n"
@@ -480,7 +480,7 @@ static bool RE_component_source_generate(
             "    }\n"
             "    return &game_%s_pool.values[dense_index];\n"
             "}\n\n"
-            "bool game_%s_has(Entity entity) {\n"
+            "bool game_%s_check(Entity entity) {\n"
             "    EntityIndex entity_index;\n"
             "    size_t dense_index;\n"
             "    return game_%s_find(entity, &entity_index, &dense_index);\n"

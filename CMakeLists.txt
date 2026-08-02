@@ -10,60 +10,36 @@ set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
-find_package(SDL3 CONFIG QUIET)
-find_package(SDL3_image CONFIG QUIET)
-find_package(SDL3_ttf CONFIG QUIET)
+set(SDL_SHARED OFF CACHE BOOL "Build SDL3 as a shared library" FORCE)
+set(SDL_STATIC ON CACHE BOOL "Build SDL3 as a static library" FORCE)
+set(SDL_DEPS_SHARED OFF CACHE BOOL "Load SDL platform dependencies dynamically" FORCE)
+set(SDL_ALSA_SHARED OFF CACHE BOOL "Load ALSA dynamically" FORCE)
+set(SDL_PIPEWIRE_SHARED OFF CACHE BOOL "Load PipeWire dynamically" FORCE)
+set(SDL_PULSEAUDIO_SHARED OFF CACHE BOOL "Load PulseAudio dynamically" FORCE)
+set(SDL_X11_SHARED OFF CACHE BOOL "Load X11 dynamically" FORCE)
+set(SDL_TEST_LIBRARY OFF CACHE BOOL "Build the SDL3 test library" FORCE)
+set(SDL_TESTS OFF CACHE BOOL "Build SDL3 tests" FORCE)
+set(SDL_EXAMPLES OFF CACHE BOOL "Build SDL3 examples" FORCE)
+set(SDL_INSTALL OFF CACHE BOOL "Install SDL3" FORCE)
+add_subdirectory(lib/SDL EXCLUDE_FROM_ALL)
 
-set(ROHR_SDL3_TARGET "")
-foreach(candidate SDL3::SDL3 SDL3::SDL3-shared SDL3::SDL3-static)
-    if(TARGET ${candidate})
-        set(ROHR_SDL3_TARGET ${candidate})
-        break()
-    endif()
-endforeach()
+set(ROHR_SDL3_TARGET SDL3::SDL3-static)
 
-set(ROHR_SDL3_IMAGE_TARGET "")
-foreach(candidate
-    SDL3_image::SDL3_image
-    SDL3_image::SDL3_image-shared
-    SDL3_image::SDL3_image-static
-)
-    if(TARGET ${candidate})
-        set(ROHR_SDL3_IMAGE_TARGET ${candidate})
-        break()
-    endif()
-endforeach()
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build bundled libraries statically" FORCE)
+set(SDLIMAGE_INSTALL OFF CACHE BOOL "Install SDL3_image" FORCE)
+set(SDLIMAGE_SAMPLES OFF CACHE BOOL "Build SDL3_image samples" FORCE)
+set(SDLIMAGE_TESTS OFF CACHE BOOL "Build SDL3_image tests" FORCE)
+set(SDLIMAGE_VENDORED OFF CACHE BOOL "Use SDL_image codec submodules" FORCE)
+add_subdirectory(lib/SDL_image EXCLUDE_FROM_ALL)
 
-set(ROHR_SDL3_TTF_TARGET "")
-foreach(candidate
-    SDL3_ttf::SDL3_ttf
-    SDL3_ttf::SDL3_ttf-shared
-    SDL3_ttf::SDL3_ttf-static
-)
-    if(TARGET ${candidate})
-        set(ROHR_SDL3_TTF_TARGET ${candidate})
-        break()
-    endif()
-endforeach()
+set(SDLTTF_INSTALL OFF CACHE BOOL "Install SDL3_ttf" FORCE)
+set(SDLTTF_SAMPLES OFF CACHE BOOL "Build SDL3_ttf samples" FORCE)
+set(SDLTTF_VENDORED OFF CACHE BOOL "Use SDL_ttf dependency submodules" FORCE)
+set(SDLTTF_PLUTOSVG OFF CACHE BOOL "Build SDL_ttf color emoji support" FORCE)
+add_subdirectory(lib/SDL_ttf EXCLUDE_FROM_ALL)
 
-if(NOT ROHR_SDL3_TARGET OR NOT ROHR_SDL3_IMAGE_TARGET OR NOT ROHR_SDL3_TTF_TARGET)
-    find_package(PkgConfig REQUIRED)
-
-    if(NOT ROHR_SDL3_TARGET)
-        pkg_check_modules(SDL3 REQUIRED IMPORTED_TARGET sdl3)
-        set(ROHR_SDL3_TARGET PkgConfig::SDL3)
-    endif()
-
-    if(NOT ROHR_SDL3_IMAGE_TARGET)
-        pkg_check_modules(SDL3_IMAGE REQUIRED IMPORTED_TARGET sdl3-image)
-        set(ROHR_SDL3_IMAGE_TARGET PkgConfig::SDL3_IMAGE)
-    endif()
-
-    if(NOT ROHR_SDL3_TTF_TARGET)
-        pkg_check_modules(SDL3_TTF REQUIRED IMPORTED_TARGET sdl3-ttf)
-        set(ROHR_SDL3_TTF_TARGET PkgConfig::SDL3_TTF)
-    endif()
-endif()
+set(ROHR_SDL3_IMAGE_TARGET SDL3_image::SDL3_image-static)
+set(ROHR_SDL3_TTF_TARGET SDL3_ttf::SDL3_ttf-static)
 
 set(ROHR_ENGINE_SOURCES
     src/console.c
@@ -150,10 +126,6 @@ if(ROHR_BUILD_TESTS)
     )
 
     add_test(NAME engine_lifecycle COMMAND engine_lifecycle_test)
-    set_tests_properties(engine_lifecycle
-        PROPERTIES
-            ENVIRONMENT "SDL_VIDEODRIVER=dummy"
-    )
 
     add_executable(controller_mappings_test tests/controller_mappings.c)
     target_link_libraries(controller_mappings_test PRIVATE rohr_engine)
@@ -167,7 +139,6 @@ if(ROHR_BUILD_TESTS)
     target_link_libraries(cameras_test PRIVATE rohr_engine)
     set_target_properties(cameras_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
     add_test(NAME cameras COMMAND cameras_test)
-    set_tests_properties(cameras PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy")
 
     add_executable(timing_test tests/timing.c)
     target_link_libraries(timing_test PRIVATE rohr_engine)
@@ -256,6 +227,19 @@ if(ROHR_BUILD_TESTS)
             -DGENERATOR=$<TARGET_FILE:component_fixture_generator>
             -DOUTPUT_DIRECTORY=${CMAKE_BINARY_DIR}/tests/deterministic_components
             -P ${CMAKE_SOURCE_DIR}/tests/check_component_generation.cmake
+    )
+
+    set_tests_properties(
+        engine_lifecycle
+        controller_mappings
+        cameras
+        timing
+        joints
+        soft_body
+        collision_sensor
+        editor_component_registry
+        generated_components
+        PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy"
     )
 
     add_custom_target(rohr_tests)
