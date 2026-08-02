@@ -18,11 +18,11 @@ These GIFs are generated from the example programs in `examples/`.
 
 [Higher-quality MP4](docs/assets/flies_in_pit.mp4)
 
-### Flies Around Ball Example
+### Soft Body Example
 
-![Flies Around Ball example](docs/assets/flies_around_ball.gif)
+![Soft Body example](docs/assets/soft_body.gif)
 
-[Higher-quality MP4](docs/assets/flies_around_ball.mp4)
+[Higher-quality MP4](docs/assets/soft_body.mp4)
 
 ## What It Does
 
