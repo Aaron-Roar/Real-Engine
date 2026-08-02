@@ -184,6 +184,11 @@ if(ROHR_BUILD_TESTS)
     set_target_properties(soft_body_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
     add_test(NAME soft_body COMMAND soft_body_test)
 
+    add_executable(collision_sensor_test tests/collision_sensor.c)
+    target_link_libraries(collision_sensor_test PRIVATE rohr_engine)
+    set_target_properties(collision_sensor_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+    add_test(NAME collision_sensor COMMAND collision_sensor_test)
+
     add_executable(editor_component_registry_test
         tests/editor_component_registry.c
     )
