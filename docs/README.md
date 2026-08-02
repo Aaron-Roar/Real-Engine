@@ -34,9 +34,15 @@ The generated HTML is written to:
 build/docs/html/index.html
 ```
 
-Generated documentation is not committed. The committed documentation source is
-the Doxygen comments in `include/`, this `docs/` directory, and the Doxygen
-configuration.
+The `docs` target also refreshes the committed Markdown API references. To
+regenerate only those references, run:
+
+```sh
+cmake --build build --target generate_public_api
+```
+
+Generated HTML is not committed. The Markdown API references are committed and
+are generated from the Doxygen comments in the public headers under `include/`.
 
 ## Useful Pages
 

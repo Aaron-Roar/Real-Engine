@@ -67,10 +67,10 @@ Initialize an empty component registry without allocating memory.
 | --- | --- |
 | `registry` | Registry to initialize. |
 
-### `RE_component_registry_add_tag`
+### `RE_component_registry_tag_add`
 
 ```c
-bool RE_component_registry_add_tag(RE_ComponentRegistry *registry, const char *name);
+bool RE_component_registry_tag_add(RE_ComponentRegistry *registry, const char *name);
 ```
 
 Register a tag by name, or succeed without duplication if it already exists.
@@ -82,10 +82,10 @@ Register a tag by name, or succeed without duplication if it already exists.
 
 **Returns:** true when the tag exists after the call, false for invalid input, conflicts, or exhausted capacity.
 
-### `RE_component_registry_add_component`
+### `RE_component_registry_component_add`
 
 ```c
-bool RE_component_registry_add_component( RE_ComponentRegistry *registry, RE_ComponentDefinition definition );
+bool RE_component_registry_component_add( RE_ComponentRegistry *registry, RE_ComponentDefinition definition );
 ```
 
 Register a typed data component.
