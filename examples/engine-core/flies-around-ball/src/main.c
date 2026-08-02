@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include "elderfly_descriptors.h"
 
-const Color background_color = (Color){255,255,255,255};
+const Color background_color = {255,255,255,255};
 const int amount_of_entities = 20;
 AnimationAsset animation = {0};
 AnimatedSprite sprite = {0};

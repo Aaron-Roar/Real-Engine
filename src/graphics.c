@@ -172,8 +172,8 @@ static Camera graphics_camera_from_config_get(CameraConfig config) {
 MEMORY_DEFINE_OBJECT_POOL(AnimatedSpritePool, AnimatedSprite)
 
 AnimatedSpritePool animated_sprites_pool = {0};
-const Color hit_box_color = (Color){255,0,0,255};
-const Color particle_color = (Color){0,0,255,255};
+const Color hit_box_color = {255,0,0,255};
+const Color particle_color = {0,0,255,255};
 
 #include <stdint.h>
 

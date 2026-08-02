@@ -18,13 +18,13 @@ enum {
     MAX_OBSTACLE_RECORDS = 256
 };
 
-const Color background_color = (Color){245, 247, 250, 255};
-const Color finish_line_color = (Color){40, 190, 110, 255};
-const Color wall_color = (Color){90, 100, 115, 255};
-const Color small_obstacle_color = (Color){245, 220, 60, 255};
-const Color small_medium_obstacle_color = (Color){45, 120, 225, 255};
-const Color tiny_fast_obstacle_color = (Color){245, 130, 35, 255};
-const Color massive_slow_obstacle_color = (Color){210, 45, 55, 255};
+const Color background_color = {245, 247, 250, 255};
+const Color finish_line_color = {40, 190, 110, 255};
+const Color wall_color = {90, 100, 115, 255};
+const Color small_obstacle_color = {245, 220, 60, 255};
+const Color small_medium_obstacle_color = {45, 120, 225, 255};
+const Color tiny_fast_obstacle_color = {245, 130, 35, 255};
+const Color massive_slow_obstacle_color = {210, 45, 55, 255};
 
 const float screen_left = -320.0f;
 const float screen_right = 320.0f;

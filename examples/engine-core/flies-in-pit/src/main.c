@@ -2,7 +2,7 @@
 #include "example_runtime.h"
 #include <stdio.h>
 
-const Color background_color = (Color){255,255,255,255};
+const Color background_color = {255,255,255,255};
 const Time demo_duration_seconds = 30.0;
 const Mass large_fly_mass = 50.0f;
 const float large_fly_control_acceleration = 240.0f;
