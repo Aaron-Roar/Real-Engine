@@ -52,6 +52,7 @@ set(ROHR_ENGINE_SOURCES
     src/engine.c
     src/error.c
     src/entity_components.c
+    src/entity_pair_set.c
     src/graphics.c
     src/grid.c
     src/math2d.c
@@ -167,6 +168,12 @@ if(ROHR_BUILD_TESTS)
     set_target_properties(collision_sensor_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
     add_test(NAME collision_sensor COMMAND collision_sensor_test)
 
+    add_executable(entity_pair_set_test tests/entity_pair_set.c)
+    target_include_directories(entity_pair_set_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(entity_pair_set_test PRIVATE rohr_engine)
+    set_target_properties(entity_pair_set_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+    add_test(NAME entity_pair_set COMMAND entity_pair_set_test)
+
     add_executable(editor_component_registry_test
         tests/editor_component_registry.c
     )
@@ -244,6 +251,7 @@ if(ROHR_BUILD_TESTS)
         joints
         soft_body
         collision_sensor
+        entity_pair_set
         editor_component_registry
         generated_components
         PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy"
@@ -258,6 +266,8 @@ if(ROHR_BUILD_TESTS)
         timing_test
         joints_test
         soft_body_test
+        collision_sensor_test
+        entity_pair_set_test
         editor_component_registry_test
         generated_components_test
     )
