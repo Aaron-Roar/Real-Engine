@@ -417,7 +417,7 @@ int main(void) {
             goto fail;
         }
 
-        ticks_advanced = rohr_engine_tick_update();
+        ticks_advanced = rohr_system_tick_update();
         rohr_physics_update(ticks_advanced);
         if(rohr_physics_contact_check(ball, paddle_left) ||
                 rohr_physics_contact_check(ball, paddle_right)) {

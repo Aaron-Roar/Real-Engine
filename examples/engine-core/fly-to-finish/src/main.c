@@ -272,7 +272,6 @@ int main(void) {
         bool player_control_enabled;
         size_t i;
 
-        rohr_system_entities_past_lifetime_clean();
         event = rohr_engine_event_poll();
         rohr_controller_key_states_update(&keyboard);
         rohr_controller_key_event_add(&keyboard, rohr_controller_keyboard_event_capture(&event));
@@ -352,11 +351,9 @@ int main(void) {
             animated_sprites[player_index].animation.time_per_frame = fmaxf(0.015f, 0.09f - speed * 0.0002f);
         }
 
-        Tick ticks_advanced = rohr_engine_tick_update();
+        Tick ticks_advanced = rohr_system_tick_update();
         if(level_active) {
             rohr_physics_update(ticks_advanced);
-        } else if(ticks_advanced > 0) {
-            rohr_system_entities_past_lifetime_clean();
         }
 
         if(level_active) {

@@ -71,11 +71,10 @@ int main(void) {
     //Game Loop
     //rohr_graphics_recording_start("examples/engine-core/view-port/recording.mp4",60);
     while(true) {
-        rohr_system_entities_past_lifetime_clean();
         //rohr_level_editor_update(renderer);
 
         //physics
-        Tick ticks_advanced = rohr_engine_tick_update();
+        Tick ticks_advanced = rohr_system_tick_update();
         Time tick_time = rohr_engine_time_per_tick_get() * (Time)ticks_advanced;
         rohr_physics_update(ticks_advanced);
 

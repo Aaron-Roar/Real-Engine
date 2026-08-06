@@ -128,11 +128,10 @@ Tick engine_tick_update(void) {
         return 0;
     }
     ticks_advanced = (Tick)(engine_tick_accumulator / engine_time_per_tick);
-    if(ticks_advanced == 0) {
-        return 0;
+    if(ticks_advanced > 0) {
+        engine_tick_accumulator -= (Time)ticks_advanced * engine_time_per_tick;
+        engine_tick_count += ticks_advanced;
     }
-    engine_tick_accumulator -= (Time)ticks_advanced * engine_time_per_tick;
-    engine_tick_count += ticks_advanced;
     return ticks_advanced;
 }
 

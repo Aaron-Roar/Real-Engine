@@ -11,7 +11,6 @@ Time rohr_engine_time_get(void) { return engine_time_get(); }
 Tick rohr_engine_tick_get(void) { return engine_tick_get(); }
 void rohr_engine_pause(void) { engine_pause(); }
 void rohr_engine_resume(void) { engine_resume(); }
-Tick rohr_engine_tick_update(void) { return engine_tick_update(); }
 EngineResult rohr_engine_time_per_tick_set(Time value) { return engine_time_per_tick_set(value); }
 Time rohr_engine_time_per_tick_get(void) { return engine_time_per_tick_get(); }
 SDL_Event rohr_engine_event_poll(void) { return engine_event_poll(); }
@@ -358,6 +357,7 @@ Shape rohr_math_vertex_delete(Shape shape) { return math_vertex_delete(shape); }
 AABB rohr_math_aabb_create(Shape world_shape) { return math_aabb_create(world_shape); }
 
 void rohr_system_physics_update(double dt) { system_physics_update(dt); }
+Tick rohr_system_tick_update(void) { return system_tick_update(); }
 void rohr_system_entities_past_lifetime_clean(void) { system_entities_past_lifetime_clean(); }
 
 void rohr_controller_key_states_update(KeyboardState *keyboard) { controller_key_states_update(keyboard); }

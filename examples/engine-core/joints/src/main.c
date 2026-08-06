@@ -149,7 +149,7 @@ int main(void) {
             next_throw += 1.5;
         }
 
-        rohr_physics_update(rohr_engine_tick_update());
+        rohr_physics_update(rohr_system_tick_update());
         rohr_graphics_background_draw(background_color);
         for(uint32_t i = 0; i < 4; i += 1) rohr_graphics_hit_box_colored_draw(walls[i], GRAPHICS_FILLED, wall_color);
         rohr_graphics_hit_box_colored_draw(bodies[0], GRAPHICS_FILLED, pin_color);

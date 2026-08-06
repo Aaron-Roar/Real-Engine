@@ -110,7 +110,6 @@ int main(void) {
     bool phase_2 = false;
     bool phase_3 = false;
     while(true) {
-        rohr_system_entities_past_lifetime_clean();
         SDL_Event event = rohr_engine_event_poll();
         KeyboardEvent key_event = rohr_controller_keyboard_event_capture(&event);
         rohr_controller_key_states_update(&keyboard);
@@ -164,7 +163,7 @@ int main(void) {
         }
 
         //physics
-        Tick ticks_advanced = rohr_engine_tick_update();
+        Tick ticks_advanced = rohr_system_tick_update();
         rohr_physics_update(ticks_advanced);
 
         //render

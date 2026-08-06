@@ -62,12 +62,6 @@ void rohr_engine_pause(void);
  */
 void rohr_engine_resume(void);
 
-/**
- * @brief Updates elapsed time and consumes every complete fixed tick.
- * @return Number of ticks consumed by this update.
- */
-Tick rohr_engine_tick_update(void);
-
 /** Sets the real-time duration required for one engine tick. */
 EngineResult rohr_engine_time_per_tick_set(Time time_per_tick);
 /** Returns the real-time duration required for one engine tick. */
@@ -1643,6 +1637,12 @@ AABB rohr_math_aabb_create(Shape world_shape);
  * @param dt Simulation delta time in seconds.
  */
 void rohr_system_physics_update(double dt);
+
+/**
+ * @brief Advances engine time and clears expired entities.
+ * @return Number of complete fixed ticks consumed by this update.
+ */
+Tick rohr_system_tick_update(void);
 
 /**
  * @brief Deletes entities whose lifetime has expired.

@@ -1013,6 +1013,13 @@ void system_entities_past_lifetime_clean(void) {
     }
 }
 
+Tick system_tick_update(void) {
+    Tick ticks = engine_tick_update();
+
+    system_entities_past_lifetime_clean();
+    return ticks;
+}
+
 static Velocity system_point_velocity(Entity entity, Vec2D world_offset) {
     EntityIndex index;
 

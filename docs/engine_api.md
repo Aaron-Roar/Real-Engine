@@ -90,16 +90,6 @@ void rohr_engine_resume(void);
 
 Resumes engine time-dependent updates.
 
-### `rohr_engine_tick_update`
-
-```c
-Tick rohr_engine_tick_update(void);
-```
-
-Updates elapsed time and consumes every complete fixed tick.
-
-**Returns:** Number of ticks consumed by this update.
-
 ### `rohr_engine_time_per_tick_set`
 
 ```c
@@ -2892,6 +2882,17 @@ Creates an axis-aligned bounding box for a world-space shape.
 **Returns:** Axis-aligned bounding box.
 
 ## Systems
+
+### `rohr_system_tick_update`
+
+```c
+Tick rohr_system_tick_update(void);
+```
+
+Advances engine time, consumes every complete fixed tick, and deletes entities
+whose time-based or tick-based lifetimes have expired.
+
+**Returns:** Number of complete ticks consumed by this update.
 
 ### `rohr_system_physics_update`
 

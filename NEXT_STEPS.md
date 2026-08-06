@@ -60,6 +60,10 @@ Add the UI canvas, asset browser, richer level tools, and build/run integration
 after the project model and generator are stable. The editor authors game
 structure; developers continue to write custom gameplay rules in C.
 
+Add reusable editor and UI drawing tools for lines, arrows, handles, selection
+outlines, relationship links, axes, and transform gizmos. Keep these tools
+available through direct C APIs so they are useful outside Rohr Editor.
+
 ## 4. Composable UI Entities
 
 Replace the widget-specific direction with a small UI-specific entity and
@@ -138,6 +142,11 @@ Add more joint types and configuration options while keeping joint ownership
 and lifetimes explicit. Document the intended effect of each option on the
 physics pipeline and existing simulation behavior before implementation.
 
+Add bounded joint-result information and current/previous joint state tracking
+similar to overlap and contact queries. Expose useful values such as applied
+constraint impulse or force, current error, relative velocity, limit state,
+and whether a joint entered, stayed in, or exited a limit or broken state.
+
 ## 9. Flexible Obstacle Prototype
 
 Build flexible obstacles in a game first by composing particles with spring or
@@ -189,12 +198,24 @@ pipeline.
 The intended effect on collision and simulation behavior must be documented
 before this work begins.
 
+Evaluate a sparse broad-phase interaction candidate list so narrow-phase
+checks iterate likely pairs instead of all entity combinations. Keep the
+current interaction table authoritative, avoid duplicate pair processing, and
+adopt the extra index only when profiling demonstrates a useful scaling gain.
+
 ## 16. Configurable Platform and Renderer Setup
 
 Replace compile-time-only window settings with a small initialization
 descriptor. Allow applications to select the title, logical resolution,
 window size, flags, VSync, initialized subsystems, and a headless mode for
 tests or simulation tools.
+
+## 17. Module and File Naming Cleanup
+
+Audit and rename modules, source files, headers, and internal symbols so their
+names match their current responsibilities and the public API conventions.
+Perform this as focused mechanical changes, preserve subsystem boundaries, and
+avoid combining naming-only changes with simulation or ownership changes.
 
 ## Later Features
 
