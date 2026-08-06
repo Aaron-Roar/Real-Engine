@@ -274,11 +274,10 @@ int main(void) {
 
         rohr_system_entities_past_lifetime_clean();
         event = rohr_engine_event_poll();
-        if(event.type == SDL_EVENT_QUIT) {
-            break;
-        }
         rohr_controller_key_states_update(&keyboard);
         rohr_controller_key_event_add(&keyboard, rohr_controller_keyboard_event_capture(&event));
+        if(event.type == SDL_EVENT_QUIT ||
+                rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) break;
 
         if(rohr_controller_key_pressed_get(&keyboard, SDLK_R)) {
             EngineResult reset_result = reset_level(

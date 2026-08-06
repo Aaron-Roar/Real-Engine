@@ -7,6 +7,7 @@
 
 int main(void) {
     if(!example_use_executable_directory()) return 1;
+    KeyboardState keyboard = {0};
     MouseState mouse = {0};
     bool running = true;
     FontAsset font = {0};
@@ -204,9 +205,13 @@ int main(void) {
     while(running) {
         SDL_Event event = rohr_engine_event_poll();
 
-        if(event.type == SDL_EVENT_QUIT) {
-            break;
-        }
+        rohr_controller_key_states_update(&keyboard);
+        rohr_controller_key_event_add(
+            &keyboard,
+            rohr_controller_keyboard_event_capture(&event)
+        );
+        if(event.type == SDL_EVENT_QUIT ||
+                rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) break;
         rohr_controller_mouse_states_update(&mouse);
         rohr_controller_mouse_event_add(
             &mouse,
@@ -258,7 +263,7 @@ int main(void) {
             );
             if(rohr_error_check(value_result)) {
                 PRINT_ENGINE_ERROR(value_result);
-                running = false;
+                goto fail;
             } else {
                 slider_value_label = value_result.result.value;
             }

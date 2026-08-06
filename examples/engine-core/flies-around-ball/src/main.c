@@ -9,7 +9,6 @@ const Color background_color = {255,255,255,255};
 const int amount_of_entities = 20;
 AnimationAsset animation = {0};
 AnimatedSprite sprite = {0};
-const Time demo_duration_seconds = 30.0;
 const Mass ball_mass = 5000.0f;
 const float ball_control_acceleration = 240.0f;
 const Torque ball_control_torque = 2000000.0f;
@@ -110,15 +109,14 @@ int main(void) {
     bool phase_1 = false;
     bool phase_2 = false;
     bool phase_3 = false;
-    while (rohr_engine_time_get() < demo_duration_seconds) {
+    while(true) {
         rohr_system_entities_past_lifetime_clean();
         SDL_Event event = rohr_engine_event_poll();
-        if(event.type == SDL_EVENT_QUIT) {
-            break;
-        }
         KeyboardEvent key_event = rohr_controller_keyboard_event_capture(&event);
         rohr_controller_key_states_update(&keyboard);
         rohr_controller_key_event_add(&keyboard, key_event);
+        if(event.type == SDL_EVENT_QUIT ||
+                rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) break;
         if(!phase_1 && rohr_engine_time_get() > 3) {
             phase_1 = true;
         }

@@ -11,7 +11,7 @@
 #define WHEEL_NODE_COUNT (ANCHOR_NODE_COUNT + OUTER_NODE_COUNT)
 #define RAMP_TRIANGLE_COUNT 4
 #define LEVEL_WALL_COUNT 5
-#define PIT_PARTICLE_COUNT 100
+#define PIT_PARTICLE_COUNT 200
 #define PIT_PARTICLE_COLUMNS 20
 
 typedef struct Wheel {
@@ -80,9 +80,7 @@ static const float camera_default_zoom;
 static const float camera_collision_zoom;
 static const Time camera_collision_zoom_duration;
 static const Time camera_collision_zoom_out_duration;
-static const Time recording_after_zoom_duration;
 static const float camera_collision_physics_scale;
-static const int recording_fps;
 
 static bool result_ok(EngineResult result) {
     if(!rohr_error_check(result)) return true;
@@ -374,7 +372,7 @@ static const Position ramp_weld_points[RAMP_TRIANGLE_COUNT - 1] = {
     {300.0f, -197.5f},
     {340.0f, -180.0f}
 };
-static const float particle_radius = 8.0f;
+static const float particle_radius = 3.0f;
 static const Mass particle_mass = 2;
 static const float particle_spacing = 17.0f;
 static const Position particle_spawn_origin = {438.5f, -170.0f};
@@ -382,9 +380,7 @@ static const float camera_default_zoom = 1.0f;
 static const float camera_collision_zoom = 2.0f;
 static const Time camera_collision_zoom_duration = 5.0;
 static const Time camera_collision_zoom_out_duration = 3.0;
-static const Time recording_after_zoom_duration = 2.0;
 static const float camera_collision_physics_scale = 0.2f;
-static const int recording_fps = 60;
 
 int main(void) {
     const float wheel_horizontal_offset =
@@ -405,10 +401,8 @@ int main(void) {
     KeyboardState keyboard = {0};
     Controller controller = rohr_controller_default_get();
     Tick zoom_end_tick = 0;
-    Tick recording_end_tick = 0;
     bool collision_zoom_started = false;
     bool collision_slow_motion_active = false;
-    bool recording_complete = false;
 
     if(!example_use_executable_directory() || !result_ok(rohr_engine_init())) return 1;
     if(!result_ok(rohr_engine_time_per_tick_set(physics_tick_time)) ||
@@ -484,8 +478,7 @@ int main(void) {
                 rohr_camera_active_get(), camera_default_zoom, 0.0))) goto fail;
 
     rohr_engine_clock_reset();
-    //if(!rohr_graphics_recording_start("example.mp4", recording_fps)) goto fail;
-    while(!recording_complete) {
+    while(true) {
         SDL_Event event = rohr_engine_event_poll();
         KeyboardEvent key_event = rohr_controller_keyboard_event_capture(&event);
         rohr_controller_key_states_update(&keyboard);
@@ -519,10 +512,6 @@ int main(void) {
                                 physics_tick_time * camera_collision_physics_scale))) goto fail;
                     zoom_end_tick = current_tick + (Tick)ceil(
                         camera_collision_zoom_duration / physics_tick_time);
-                    recording_end_tick = current_tick + (Tick)ceil(
-                        (camera_collision_zoom_duration +
-                            camera_collision_zoom_out_duration +
-                            recording_after_zoom_duration) / physics_tick_time);
                     collision_zoom_started = true;
                     collision_slow_motion_active = true;
                     break;
@@ -554,10 +543,6 @@ int main(void) {
                 wheels[i].hub, GRAPHICS_FILLED, hub_color);
         }
         rohr_graphics_show();
-        if(collision_zoom_started &&
-                rohr_engine_tick_get() >= recording_end_tick) {
-            recording_complete = true;
-        }
     }
     rohr_graphics_end();
     rohr_engine_shutdown();

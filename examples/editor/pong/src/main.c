@@ -385,12 +385,13 @@ int main(void) {
         EntityIndex ball_index;
         Tick ticks_advanced;
 
-        if(event.type == SDL_EVENT_QUIT) break;
         rohr_controller_key_states_update(&keyboard);
         rohr_controller_key_event_add(
             &keyboard,
             rohr_controller_keyboard_event_capture(&event)
         );
+        if(event.type == SDL_EVENT_QUIT ||
+                rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) break;
         left_axis = rohr_controller_axis_get(&keyboard, &left_controller, "movement");
         right_axis = rohr_controller_axis_get(&keyboard, &right_controller, "movement");
         EngineResult left_velocity_result = rohr_physics_velocity_set(

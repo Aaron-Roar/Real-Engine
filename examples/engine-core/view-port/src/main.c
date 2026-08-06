@@ -8,7 +8,6 @@
 const Color background_color = {255,255,255,255};
 AnimationAsset animation_elderfly = {0};
 AnimatedSprite sprite_elderfly = {0};
-const Time demo_duration_seconds = 10.0;
 const float camera_move_speed = 100.0f;
 const float camera_turn_speed = PI_F * 0.5f;
 
@@ -71,7 +70,7 @@ int main(void) {
     rohr_engine_clock_reset();
     //Game Loop
     //rohr_graphics_recording_start("examples/engine-core/view-port/recording.mp4",60);
-    while (rohr_engine_time_get() < demo_duration_seconds) {
+    while(true) {
         rohr_system_entities_past_lifetime_clean();
         //rohr_level_editor_update(renderer);
 
@@ -87,14 +86,13 @@ int main(void) {
         rohr_graphics_show();
 
         SDL_Event sdl_event = rohr_engine_event_poll();
-        if(sdl_event.type == SDL_EVENT_QUIT) {
-            break;
-        }
         KeyboardEvent key_event = rohr_controller_keyboard_event_capture(&sdl_event);
         MouseEvent mouse_event = rohr_controller_mouse_event_capture(&sdl_event);
 
         rohr_controller_key_states_update(&keyboard);
         rohr_controller_key_event_add(&keyboard, key_event);
+        if(sdl_event.type == SDL_EVENT_QUIT ||
+                rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) break;
         Vec2D move_axis = rohr_controller_wasd_axis_get(&keyboard);
         Vec2D camera_move_axis = rohr_controller_axis_from_keycodes_get(
             &keyboard,

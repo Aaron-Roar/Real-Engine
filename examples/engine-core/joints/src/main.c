@@ -134,7 +134,8 @@ int main(void) {
         KeyboardEvent key_event = rohr_controller_keyboard_event_capture(&event);
         rohr_controller_key_states_update(&keyboard);
         rohr_controller_key_event_add(&keyboard, key_event);
-        if(event.type == SDL_EVENT_QUIT || rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) break;
+        if(event.type == SDL_EVENT_QUIT ||
+                rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) break;
 
         if(rohr_engine_time_get() >= next_throw) {
             Entity body = bodies[throw_index % BODY_COUNT];
