@@ -58,6 +58,15 @@ typedef struct UIFontDefinition {
     float point_size;
 } UIFontDefinition;
 
+typedef struct UIPhysicsDebugPanel {
+    FontAsset font;
+    TextAsset text;
+} UIPhysicsDebugPanel;
+
+EngineResult ui_physics_debug_panel_init(UIPhysicsDebugPanel *panel, FontDescriptor font);
+void ui_physics_debug_panel_draw(UIPhysicsDebugPanel *panel);
+void ui_physics_debug_panel_destroy(UIPhysicsDebugPanel *panel);
+
 ERROR_DECLARE_RESULT_TYPE(UIFontDefinitionResult, UIFontDefinition);
 
 /** Authored standalone label data in logical screen coordinates. */

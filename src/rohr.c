@@ -258,6 +258,7 @@ TextureAssetResult rohr_graphics_texture_load(TextureDescriptor text_desc) { ret
 FontAssetResult rohr_graphics_font_load(FontDescriptor descriptor) { return graphics_font_load(descriptor); }
 void rohr_graphics_font_destroy(FontAsset *font) { graphics_font_destroy(font); }
 TextAssetResult rohr_graphics_text_create(const FontAsset *font, const char *value, Color color) { return graphics_text_create(font, value, color); }
+bool rohr_graphics_text_value_set(TextAsset *text, const char *value) { return graphics_text_value_set(text, value); }
 void rohr_graphics_text_destroy(TextAsset *text) { graphics_text_destroy(text); }
 bool rohr_graphics_text_draw(const TextAsset *text, Position position) { return graphics_text_draw(text, position); }
 AnimationAssetResult rohr_graphics_animation_load(AnimationDescriptor anim_desc) { return graphics_animation_load(anim_desc); }
@@ -443,6 +444,11 @@ float rohr_tools_random_range_float(float min, float max) { return tools_random_
 void rohr_ui_frame_begin(UIInput input) { ui_frame_begin(input); }
 UIButtonResult rohr_ui_button(const char *id, const TextAsset *label, UIRect bounds, const UIButtonStyle *style) { return ui_button(id, label, bounds, style); }
 void rohr_ui_label(const TextAsset *text, UIRect bounds) { ui_label(text, bounds); }
+EngineResult rohr_ui_physics_debug_panel_init(UIPhysicsDebugPanel *panel, FontDescriptor font) { return ui_physics_debug_panel_init(panel, font); }
+void rohr_ui_physics_debug_panel_draw(UIPhysicsDebugPanel *panel) { ui_physics_debug_panel_draw(panel); }
+void rohr_ui_physics_debug_panel_destroy(UIPhysicsDebugPanel *panel) { ui_physics_debug_panel_destroy(panel); }
+PhysicsDebugStats rohr_physics_debug_stats_get(void) { return physics_debug_stats_get(); }
+void rohr_physics_debug_stats_enabled_set(bool enabled) { physics_debug_stats_enabled_set(enabled); }
 void rohr_ui_button_disabled(UIRect bounds, const UIButtonStyle *style) { ui_button_disabled(bounds, style); }
 bool rohr_ui_pointer_consumed_get(void) { return ui_pointer_consumed_get(); }
 void rohr_ui_frame_end(void) { ui_frame_end(); }

@@ -312,6 +312,7 @@ void graphics_font_destroy(FontAsset *font);
 
 /** Create reusable text. An empty string produces an empty text asset. */
 TextAssetResult graphics_text_create(const FontAsset *font, const char *value, Color color);
+bool graphics_text_value_set(TextAsset *text, const char *value);
 
 /** Destroy reusable text. */
 void graphics_text_destroy(TextAsset *text);

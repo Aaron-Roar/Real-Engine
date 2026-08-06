@@ -1234,6 +1234,7 @@ void rohr_graphics_font_destroy(FontAsset *font);
 
 /** @brief Creates reusable caller-owned text. */
 TextAssetResult rohr_graphics_text_create(const FontAsset *font, const char *value, Color color);
+bool rohr_graphics_text_value_set(TextAsset *text, const char *value);
 
 /** @brief Destroys reusable text. */
 void rohr_graphics_text_destroy(TextAsset *text);
@@ -1906,6 +1907,11 @@ UIButtonResult rohr_ui_button(
 
 /** @brief Draws reusable text centered inside bounds. */
 void rohr_ui_label(const TextAsset *text, UIRect bounds);
+EngineResult rohr_ui_physics_debug_panel_init(UIPhysicsDebugPanel *panel, FontDescriptor font);
+void rohr_ui_physics_debug_panel_draw(UIPhysicsDebugPanel *panel);
+void rohr_ui_physics_debug_panel_destroy(UIPhysicsDebugPanel *panel);
+PhysicsDebugStats rohr_physics_debug_stats_get(void);
+void rohr_physics_debug_stats_enabled_set(bool enabled);
 
 /** @brief Draws a disabled button that cannot capture input. */
 void rohr_ui_button_disabled(UIRect bounds, const UIButtonStyle *style);

@@ -17,6 +17,7 @@ const Torque ball_control_torque = 2000000.0f;
     fprintf(stderr, "%s\n", rohr_error_default_message_get((engine_result).result.error))
 
 int main(void) {
+    UIPhysicsDebugPanel debug_panel = {0};
     if(!example_use_executable_directory()) return 1;
     GroupId children_group = GROUP_INVALID;
     KeyboardState keyboard = {0};
@@ -38,6 +39,8 @@ int main(void) {
         }
     }
 
+    if(rohr_error_check(rohr_ui_physics_debug_panel_init(&debug_panel,
+            (FontDescriptor){"assets/debug/JetBrainsMono-BoldItalic.ttf", 11.0f}))) goto fail;
     AnimationAssetResult animation_result = rohr_graphics_animation_load(elderfly_fly);
     if(rohr_error_check(animation_result)) {
         PRINT_ENGINE_ERROR(animation_result);
@@ -181,14 +184,17 @@ int main(void) {
         if(phase_3) {
             rohr_graphics_local_origins_draw();
         }
+        rohr_ui_physics_debug_panel_draw(&debug_panel);
         rohr_graphics_show();
 
     }
     rohr_graphics_end();
+    rohr_ui_physics_debug_panel_destroy(&debug_panel);
     rohr_engine_shutdown();
     return 0;
 
 fail:
+    rohr_ui_physics_debug_panel_destroy(&debug_panel);
     rohr_graphics_end();
     rohr_engine_shutdown();
     return 1;

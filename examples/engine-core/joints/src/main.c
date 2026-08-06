@@ -69,6 +69,7 @@ static bool room_create(Entity walls[4]) {
 }
 
 int main(void) {
+    UIPhysicsDebugPanel debug_panel = {0};
     Entity walls[4];
     Entity bodies[BODY_COUNT];
     Entity pin_joint;
@@ -90,6 +91,8 @@ int main(void) {
     if(!example_use_executable_directory() || !result_ok(rohr_engine_init())) return 1;
     if(!result_ok(rohr_engine_time_per_tick_set(1.0 / 120.0)) ||
             !result_ok(rohr_graphics_start())) goto fail;
+    if(!result_ok(rohr_ui_physics_debug_panel_init(&debug_panel,
+            (FontDescriptor){"assets/debug/JetBrainsMono-BoldItalic.ttf", 11.0f}))) goto fail;
     if(!room_create(walls)) goto fail;
 
     bodies[0] = body_create((Position){-220.0f, 110.0f}, (Vec2D){70.0f, 22.0f}, 3.0f, pin_category, true);
@@ -161,14 +164,17 @@ int main(void) {
         rohr_graphics_joints_draw(joint_color);
         rohr_graphics_aabb_tree_debug_set(true);
         rohr_graphics_aabb_tree_draw();
+        rohr_ui_physics_debug_panel_draw(&debug_panel);
         rohr_graphics_show();
     }
 
     rohr_graphics_end();
+    rohr_ui_physics_debug_panel_destroy(&debug_panel);
     rohr_engine_shutdown();
     return 0;
 
 fail:
+    rohr_ui_physics_debug_panel_destroy(&debug_panel);
     fprintf(stderr, "joints example failed\n");
     rohr_graphics_end();
     rohr_engine_shutdown();

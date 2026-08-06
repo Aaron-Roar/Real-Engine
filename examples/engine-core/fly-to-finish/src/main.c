@@ -167,6 +167,7 @@ static EngineResult reset_level(
 }
 
 int main(void) {
+    UIPhysicsDebugPanel debug_panel = {0};
     if(!example_use_executable_directory()) return 1;
     KeyboardState keyboard = {0};
     ObstacleRecord obstacle_records[MAX_OBSTACLE_RECORDS] = {0};
@@ -206,6 +207,8 @@ int main(void) {
         }
     }
 
+    if(rohr_error_check(rohr_ui_physics_debug_panel_init(&debug_panel,
+            (FontDescriptor){"assets/debug/JetBrainsMono-BoldItalic.ttf", 11.0f}))) goto fail;
     EngineResult load_result = rohr_game_state_file_load(
         "assets/fly-to-finish/game.json"
     );
@@ -388,14 +391,17 @@ int main(void) {
         rohr_graphics_animated_sprites_draw();
         rohr_graphics_aabb_tree_debug_set(true);
         rohr_graphics_aabb_tree_draw();
+        rohr_ui_physics_debug_panel_draw(&debug_panel);
         rohr_graphics_show();
     }
 
     rohr_graphics_end();
+    rohr_ui_physics_debug_panel_destroy(&debug_panel);
     rohr_engine_shutdown();
     return 0;
 
 fail:
+    rohr_ui_physics_debug_panel_destroy(&debug_panel);
     rohr_graphics_end();
     rohr_engine_shutdown();
     return 1;

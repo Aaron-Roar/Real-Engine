@@ -27,6 +27,13 @@ function(rohr_stage_example_assets target project_dir)
     rohr_example_runtime_dir(runtime_dir ${project_dir})
     get_filename_component(project_name ${project_dir} NAME)
     set_target_properties(${target} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${runtime_dir})
+    add_custom_command(TARGET ${target} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${runtime_dir}/assets/debug
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${ROHR_EXAMPLES_SOURCE_DIR}/engine-core/user-interface/assets/JetBrainsMono-BoldItalic.ttf
+            ${runtime_dir}/assets/debug/JetBrainsMono-BoldItalic.ttf
+        VERBATIM
+    )
     if(EXISTS ${ROHR_EXAMPLES_SOURCE_DIR}/${project_dir}/assets)
         add_custom_target(${target}_assets ALL
             COMMAND ${CMAKE_COMMAND} -E copy_directory

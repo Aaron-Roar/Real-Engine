@@ -15,6 +15,7 @@ const float camera_turn_speed = PI_F * 0.5f;
     fprintf(stderr, "%s\n", rohr_error_default_message_get((engine_result).result.error))
 
 int main(void) {
+    UIPhysicsDebugPanel debug_panel = {0};
     if(!example_use_executable_directory()) return 1;
     {
         EngineResult init_result = rohr_engine_init();
@@ -35,6 +36,8 @@ int main(void) {
         }
     }
 
+    if(rohr_error_check(rohr_ui_physics_debug_panel_init(&debug_panel,
+            (FontDescriptor){"assets/debug/JetBrainsMono-BoldItalic.ttf", 11.0f}))) goto fail;
     EntityResult water_smash_result = rohr_entity_add();
     if(rohr_error_check(water_smash_result)) {
         PRINT_ENGINE_ERROR(water_smash_result);
@@ -84,6 +87,7 @@ int main(void) {
         rohr_graphics_animated_sprites_draw();
         rohr_graphics_aabb_tree_debug_set(true);
         rohr_graphics_aabb_tree_draw();
+        rohr_ui_physics_debug_panel_draw(&debug_panel);
         rohr_graphics_show();
 
         SDL_Event sdl_event = rohr_engine_event_poll();
@@ -139,10 +143,12 @@ int main(void) {
 
     }
     rohr_graphics_end();
+    rohr_ui_physics_debug_panel_destroy(&debug_panel);
     rohr_engine_shutdown();
     return 0;
 
 fail:
+    rohr_ui_physics_debug_panel_destroy(&debug_panel);
     rohr_graphics_end();
     rohr_engine_shutdown();
     return 1;

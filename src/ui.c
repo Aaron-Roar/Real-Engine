@@ -1,6 +1,8 @@
 #include <stdint.h>
 #include <math.h>
 #include "ui.h"
+#include "physics.h"
+#include <stdio.h>
 
 typedef struct UIContext {
     UIInput input;
@@ -423,6 +425,60 @@ void ui_label(const TextAsset *text, UIRect bounds) {
         .y = bounds.y + (bounds.height - text->size.y) * 0.5f,
     };
     (void)graphics_text_draw(text, position);
+}
+
+EngineResult ui_physics_debug_panel_init(UIPhysicsDebugPanel *panel, FontDescriptor descriptor) {
+    FontAssetResult font;
+    TextAssetResult text;
+
+    if(panel == NULL) return (EngineResult){.kind = ERROR_RESULT_ERROR,
+        .result.error = ERROR_ENGINE_TEXT_CREATE_FAILED};
+    *panel = (UIPhysicsDebugPanel){0};
+    font = graphics_font_load(descriptor);
+    if(font.kind == ERROR_RESULT_ERROR) return (EngineResult){.kind = ERROR_RESULT_ERROR,
+        .result.error = font.result.error};
+    panel->font = font.result.value;
+    text = graphics_text_create(&panel->font, "Physics", (Color){255, 255, 255, 255});
+    if(text.kind == ERROR_RESULT_ERROR) {
+        graphics_font_destroy(&panel->font);
+        return (EngineResult){.kind = ERROR_RESULT_ERROR, .result.error = text.result.error};
+    }
+    panel->text = text.result.value;
+    physics_debug_stats_enabled_set(true);
+    return (EngineResult){.kind = ERROR_RESULT_VALUE};
+}
+
+void ui_physics_debug_panel_draw(UIPhysicsDebugPanel *panel) {
+    PhysicsDebugStats stats;
+    char value[512];
+    float width;
+    float height;
+
+    if(panel == NULL || panel->text.text == NULL) return;
+    stats = physics_debug_stats_get();
+    (void)snprintf(value, sizeof(value),
+        "Physics %.3f ms\nBuild %.3f  Query %.3f ms\n"
+        "Narrow %.3f  Response %.3f ms\nColliders %zu  Nodes %zu  Height %d\n"
+        "Candidates %zu  Tests %zu\nOverlaps %zu  Contacts %zu",
+        stats.total_ms, stats.broadphase_build_ms, stats.broadphase_query_ms,
+        stats.narrowphase_ms, stats.response_ms, stats.collider_count,
+        stats.tree_node_count, stats.tree_height, stats.candidate_pair_count,
+        stats.narrowphase_test_count, stats.overlap_count, stats.contact_count);
+    if(!graphics_text_value_set(&panel->text, value)) return;
+    width = panel->text.size.x + 12.0f;
+    height = panel->text.size.y + 12.0f;
+    (void)graphics_screen_rect_draw(WINDOW_WIDTH - width - 5.0f, 5.0f, width, height,
+        (Color){0, 0, 0, 190});
+    ui_label(&panel->text,
+        (UIRect){WINDOW_WIDTH - width - 5.0f, 5.0f, width, height});
+}
+
+void ui_physics_debug_panel_destroy(UIPhysicsDebugPanel *panel) {
+    if(panel == NULL) return;
+    graphics_text_destroy(&panel->text);
+    graphics_font_destroy(&panel->font);
+    physics_debug_stats_enabled_set(false);
+    *panel = (UIPhysicsDebugPanel){0};
 }
 
 void ui_button_disabled(UIRect bounds, const UIButtonStyle *style) {

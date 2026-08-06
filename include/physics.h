@@ -1,7 +1,26 @@
 #ifndef PHYSICS_H
 #define PHYSICS_H
+#include <stddef.h>
 #include "math2d.h"
 #include "entity_components.h"
+
+typedef struct PhysicsDebugStats {
+    double total_ms;
+    double broadphase_build_ms;
+    double broadphase_query_ms;
+    double narrowphase_ms;
+    double response_ms;
+    size_t collider_count;
+    size_t tree_node_count;
+    int tree_height;
+    size_t candidate_pair_count;
+    size_t narrowphase_test_count;
+    size_t overlap_count;
+    size_t contact_count;
+} PhysicsDebugStats;
+
+PhysicsDebugStats physics_debug_stats_get(void);
+void physics_debug_stats_enabled_set(bool enabled);
 /** Result type for functions that return a Shape. */
 ERROR_DECLARE_RESULT_TYPE(ShapeResult, Shape);
 

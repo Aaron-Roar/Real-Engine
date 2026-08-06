@@ -12,6 +12,30 @@
 Shape system_generate_global_hitbox(Entity entity);
 
 AABBTree physics_broadphase_tree = {.root = AABB_TREE_NODE_INVALID};
+static PhysicsDebugStats physics_debug_stats;
+static bool physics_debug_stats_enabled;
+
+static double system_elapsed_ms(uint64_t start) {
+    return (double)(SDL_GetPerformanceCounter() - start) * 1000.0 /
+        (double)SDL_GetPerformanceFrequency();
+}
+
+PhysicsDebugStats system_physics_debug_stats_get(void) {
+    return physics_debug_stats;
+}
+
+PhysicsDebugStats physics_debug_stats_get(void) {
+    return system_physics_debug_stats_get();
+}
+
+void system_physics_debug_stats_enabled_set(bool enabled) {
+    physics_debug_stats_enabled = enabled;
+    if(!enabled) physics_debug_stats = (PhysicsDebugStats){0};
+}
+
+void physics_debug_stats_enabled_set(bool enabled) {
+    system_physics_debug_stats_enabled_set(enabled);
+}
 
 EngineResult physics_broadphase_init(void) {
     return aabb_tree_init(&physics_broadphase_tree, 0);
@@ -729,15 +753,24 @@ static bool system_broadphase_pair_apply(Entity target, void *context) {
     OverlapInfo overlap;
     bool responds;
     ContactInfo contact;
+    uint64_t started;
 
     if(query == NULL || target <= query->source ||
             !entity_index_get(target, &target_index) ||
-            !entity_index_alive_check(target_index) ||
-            !physics_collision_between_check(query->source, target)) return true;
+            !entity_index_alive_check(target_index)) return true;
+    if(physics_debug_stats_enabled) physics_debug_stats.candidate_pair_count += 1;
+    if(!physics_collision_between_check(query->source, target)) return true;
+    if(physics_debug_stats_enabled) {
+        physics_debug_stats.narrowphase_test_count += 1;
+        started = SDL_GetPerformanceCounter();
+    }
     overlap = system_entity_overlap_get(query->source_index, target_index);
+    if(physics_debug_stats_enabled) physics_debug_stats.narrowphase_ms += system_elapsed_ms(started);
     if(!overlap.detected) return true;
+    if(physics_debug_stats_enabled) physics_debug_stats.overlap_count += 1;
     responds = entity_index_components_check(query->source_index, COLLISION) &&
         entity_index_components_check(target_index, COLLISION);
+    if(physics_debug_stats_enabled) started = SDL_GetPerformanceCounter();
     contact = responds
         ? system_resolve_collision(query->source_index, target_index, overlap)
         : (ContactInfo){0};
@@ -750,10 +783,12 @@ static bool system_broadphase_pair_apply(Entity target, void *context) {
             (responds ? PHYSICS_INTERACTION_CONTACT : 0)
     );
     if(responds) {
+        if(physics_debug_stats_enabled) physics_debug_stats.contact_count += 1;
         system_separate_entities(query->source_index, target_index, overlap);
         system_generate_global_hitbox_by_index(query->source_index);
         system_generate_global_hitbox_by_index(target_index);
     }
+    if(physics_debug_stats_enabled) physics_debug_stats.response_ms += system_elapsed_ms(started);
     return true;
 }
 
@@ -768,6 +803,7 @@ static void system_broadphase_build(void) {
         if(!system_alive_index_at(alive_position, &index) ||
                 !entity_index_components_check(index, HIT_BOX) ||
                 !system_entity_from_index_get(index, &entity)) continue;
+        if(physics_debug_stats_enabled) physics_debug_stats.collider_count += 1;
         (void)aabb_tree_insert(
             &physics_broadphase_tree,
             entity,
@@ -1621,6 +1657,11 @@ static void system_soft_body_node_rigid_collisions_apply(void) {
 }
 
 void system_physics_update(double dt) {
+    uint64_t total_started = physics_debug_stats_enabled ? SDL_GetPerformanceCounter() : 0;
+    uint64_t phase_started;
+    double collision_pass_ms;
+
+    physics_debug_stats = (PhysicsDebugStats){0};
     physics_interactions_step_begin();
     system_force_torque_accelerations_clear();
     system_joints_apply();
@@ -1639,8 +1680,24 @@ void system_physics_update(double dt) {
 
     system_generate_global_hitboxes();
     system_soft_body_node_rigid_collisions_apply();
+    if(physics_debug_stats_enabled) phase_started = SDL_GetPerformanceCounter();
     system_broadphase_build();
+    if(physics_debug_stats_enabled) {
+        physics_debug_stats.broadphase_build_ms = system_elapsed_ms(phase_started);
+        physics_debug_stats.tree_node_count = physics_broadphase_tree.count;
+        physics_debug_stats.tree_height = physics_broadphase_tree.root == AABB_TREE_NODE_INVALID
+            ? 0 : physics_broadphase_tree.nodes[physics_broadphase_tree.root].height;
+        phase_started = SDL_GetPerformanceCounter();
+    }
     system_broadphase_collisions_apply();
+    if(!physics_debug_stats_enabled) return;
+    collision_pass_ms = system_elapsed_ms(phase_started);
+    physics_debug_stats.broadphase_query_ms = collision_pass_ms -
+        physics_debug_stats.narrowphase_ms - physics_debug_stats.response_ms;
+    if(physics_debug_stats.broadphase_query_ms < 0.0) {
+        physics_debug_stats.broadphase_query_ms = 0.0;
+    }
+    physics_debug_stats.total_ms = system_elapsed_ms(total_started);
 }
 
 void print_entity_movement(Entity entity) {

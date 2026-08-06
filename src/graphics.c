@@ -1867,6 +1867,17 @@ TextAssetResult graphics_text_create(const FontAsset *font, const char *value, C
     return ERROR_RESULT_MAKE_VALUE(TextAssetResult, asset);
 }
 
+bool graphics_text_value_set(TextAsset *text, const char *value) {
+    int width;
+    int height;
+
+    if(text == NULL || text->text == NULL || value == NULL ||
+            !TTF_SetTextString(text->text, value, 0) ||
+            !TTF_GetTextSize(text->text, &width, &height)) return false;
+    text->size = (Scale){.x = (float)width, .y = (float)height};
+    return true;
+}
+
 void graphics_text_destroy(TextAsset *text) {
     if(text == NULL) {
         return;

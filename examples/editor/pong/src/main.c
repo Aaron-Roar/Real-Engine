@@ -185,6 +185,7 @@ static EngineResult pong_constrain_paddle(
 }
 
 int main(void) {
+    UIPhysicsDebugPanel debug_panel = {0};
     if(!example_use_executable_directory()) return 1;
     KeyboardState keyboard = {0};
     Controller left_controller = rohr_controller_wasd_default_get();
@@ -247,6 +248,8 @@ int main(void) {
             return 1;
         }
     }
+    if(rohr_error_check(rohr_ui_physics_debug_panel_init(&debug_panel,
+            (FontDescriptor){"assets/debug/JetBrainsMono-BoldItalic.ttf", 11.0f}))) goto fail;
     rohr_graphics_aabb_tree_debug_set(broadphase_debug);
     if(!game_components_init()) {
         goto fail;
@@ -527,6 +530,7 @@ int main(void) {
                 ? false
                 : fire_result.result.value;
         }
+        rohr_ui_physics_debug_panel_draw(&debug_panel);
         rohr_graphics_show();
     }
 
@@ -537,10 +541,12 @@ int main(void) {
     game_components_clear(ball);
     game_components_shutdown();
     rohr_graphics_end();
+    rohr_ui_physics_debug_panel_destroy(&debug_panel);
     rohr_engine_shutdown();
     return 0;
 
 fail:
+    rohr_ui_physics_debug_panel_destroy(&debug_panel);
     if(right_viewport != VIEWPORT_INVALID) (void)rohr_viewport_destroy(right_viewport);
     if(left_viewport != VIEWPORT_INVALID) (void)rohr_viewport_destroy(left_viewport);
     if(left_camera != CAMERA_INVALID) (void)rohr_camera_active_set(left_camera);
