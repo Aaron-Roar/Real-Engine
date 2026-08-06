@@ -126,6 +126,7 @@ int main(void) {
         EntityResult boundary_c;
         EntityResult boundary_triangle;
         EntityResult object = rohr_entity_add();
+        EntityIndexResult object_index;
         PositionResult object_position;
 
         if(rohr_error_check(boundary_body) || rohr_error_check(object)) goto fail;
@@ -137,6 +138,10 @@ int main(void) {
             boundary_body.result.value, (Position){0.0f, 10.0f}, 1.0f, 1.0f);
         if(rohr_error_check(boundary_a) || rohr_error_check(boundary_b) ||
                 rohr_error_check(boundary_c)) goto fail;
+        if(rohr_error_check(rohr_physics_friction_set(
+                    boundary_a.result.value, 1.0f)) ||
+                rohr_error_check(rohr_physics_friction_set(
+                    boundary_b.result.value, 1.0f))) goto fail;
         boundary_triangle = rohr_physics_soft_body_triangle_create(
             boundary_body.result.value, boundary_a.result.value,
             boundary_b.result.value, boundary_c.result.value);
@@ -147,14 +152,18 @@ int main(void) {
                     object.result.value, rohr_math_square_create(1.0f, 1.0f))) ||
                 rohr_error_check(rohr_physics_mass_set(object.result.value, 1.0f)) ||
                 rohr_error_check(rohr_physics_velocity_set(
-                    object.result.value, (Velocity){0.0f, 1.0f})) ||
+                    object.result.value, (Velocity){2.0f, 1.0f})) ||
                 rohr_error_check(rohr_physics_dynamic_set(object.result.value)) ||
                 rohr_error_check(rohr_physics_restitution_set(
-                    object.result.value, 0.0f))) goto fail;
+                    object.result.value, 0.0f)) ||
+                rohr_error_check(rohr_physics_friction_set(
+                    object.result.value, 1.0f))) goto fail;
         rohr_system_physics_update(0.0);
+        object_index = rohr_entity_index_get(object.result.value);
         object_position = rohr_physics_position_get(object.result.value);
-        if(rohr_error_check(object_position) ||
-                object_position.result.value.y >= -1.25f) goto fail;
+        if(rohr_error_check(object_index) || rohr_error_check(object_position) ||
+                object_position.result.value.y >= -1.25f ||
+                velocities[object_index.result.value].x >= 2.0f) goto fail;
     }
     rohr_engine_shutdown();
     return 0;

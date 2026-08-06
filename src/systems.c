@@ -1618,6 +1618,19 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
         .relative_velocity = relative_velocity
     };
     if(normal_velocity < 0.0f) {
+        Vec2D rigid_offset;
+        Vec2D rigid_angular_velocity = {0};
+        Vec2D edge_velocity;
+        Vec2D tangent;
+        float tangent_length;
+        float inverse_inertia_rigid = 0.0f;
+        float edge_friction;
+        float rigid_friction;
+        float friction;
+        float tangent_denominator;
+        float tangent_impulse_magnitude;
+        float maximum_friction;
+
         restitution = fminf(
             restitutions_pool.used[query->a] ? restitutions[query->a] : 0.0f,
             restitutions_pool.used[rigid] ? restitutions[rigid] : 0.0f);
@@ -1637,6 +1650,78 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
             weight_b * inverse_mass_b;
         velocities[rigid].x += contact.normal_impulse.x * inverse_mass_rigid;
         velocities[rigid].y += contact.normal_impulse.y * inverse_mass_rigid;
+
+        rigid_offset = math_vector_subtract(contact.point, positions[rigid]);
+        if(physics_entity_movable_get(rigid) &&
+                !entity_index_components_check(rigid, PARTICLE) &&
+                entity_index_components_check(rigid, MASS | HIT_BOX)) {
+            float inertia = physics_polygon_moment_of_inertia(
+                hit_boxes[rigid], mass[rigid]);
+            if(inertia > 0.0f) inverse_inertia_rigid = 1.0f / inertia;
+            rigid_angular_velocity = math_angular_velocity_cross_vec(
+                angular_velocities[rigid], rigid_offset);
+        }
+        edge_velocity = (Vec2D){
+            velocities[query->a].x * weight_a +
+                velocities[query->b].x * weight_b,
+            velocities[query->a].y * weight_a +
+                velocities[query->b].y * weight_b
+        };
+        relative_velocity = (Vec2D){
+            velocities[rigid].x + rigid_angular_velocity.x - edge_velocity.x,
+            velocities[rigid].y + rigid_angular_velocity.y - edge_velocity.y
+        };
+        {
+            float along_normal = math_dot_product(
+                relative_velocity, overlap.normal);
+            tangent = (Vec2D){
+                relative_velocity.x - overlap.normal.x * along_normal,
+                relative_velocity.y - overlap.normal.y * along_normal
+            };
+        }
+        tangent_length = math_vector_magnitude(tangent);
+        edge_friction =
+            (frictions_pool.used[query->a] ? frictions[query->a] : 0.0f) *
+                weight_a +
+            (frictions_pool.used[query->b] ? frictions[query->b] : 0.0f) *
+                weight_b;
+        rigid_friction = frictions_pool.used[rigid] ? frictions[rigid] : 0.0f;
+        friction = sqrtf(edge_friction * rigid_friction);
+        if(tangent_length > 0.0001f && friction > 0.0f) {
+            float rigid_lever;
+
+            tangent.x /= tangent_length;
+            tangent.y /= tangent_length;
+            rigid_lever = math_cross_2d(rigid_offset, tangent);
+            tangent_denominator = inverse_mass_edge + inverse_mass_rigid +
+                rigid_lever * rigid_lever * inverse_inertia_rigid;
+            if(tangent_denominator > 0.0f) {
+                tangent_impulse_magnitude = -math_dot_product(
+                    relative_velocity, tangent) / tangent_denominator;
+                maximum_friction = fabsf(impulse_magnitude) * friction;
+                tangent_impulse_magnitude = fmaxf(-maximum_friction,
+                    fminf(tangent_impulse_magnitude, maximum_friction));
+                contact.friction_impulse = (Vec2D){
+                    tangent.x * tangent_impulse_magnitude,
+                    tangent.y * tangent_impulse_magnitude
+                };
+                velocities[query->a].x -= contact.friction_impulse.x *
+                    weight_a * inverse_mass_a;
+                velocities[query->a].y -= contact.friction_impulse.y *
+                    weight_a * inverse_mass_a;
+                velocities[query->b].x -= contact.friction_impulse.x *
+                    weight_b * inverse_mass_b;
+                velocities[query->b].y -= contact.friction_impulse.y *
+                    weight_b * inverse_mass_b;
+                velocities[rigid].x += contact.friction_impulse.x *
+                    inverse_mass_rigid;
+                velocities[rigid].y += contact.friction_impulse.y *
+                    inverse_mass_rigid;
+                angular_velocities[rigid] += math_cross_2d(
+                    rigid_offset, contact.friction_impulse) *
+                    inverse_inertia_rigid;
+            }
+        }
     }
     system_interaction_by_index_record(query->a, rigid, overlap, contact,
         PHYSICS_INTERACTION_OVERLAP | PHYSICS_INTERACTION_CONTACT);
