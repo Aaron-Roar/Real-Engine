@@ -5,6 +5,7 @@
 #include "aabb_tree.h"
 #include "contact_constraint.h"
 #include "constraint_solver.h"
+#include "contact_manifold.h"
 #include "joint_constraint.h"
 #include "math2d.h"
 #include <math.h>
@@ -624,165 +625,141 @@ Vec2D system_friction_impulse_apply(
     return friction_impulse;
 }
 
+static void system_contact_point_solve(
+    Entity first,
+    Entity second,
+    OverlapInfo overlap,
+    Position point,
+    bool restitution_enabled,
+    float inverse_mass_first,
+    float inverse_mass_second,
+    float inverse_inertia_first,
+    float inverse_inertia_second,
+    Velocity *relative_velocity,
+    Vec2D *normal_impulse,
+    Vec2D *friction_impulse
+) {
+    Vec2D first_offset = math_vector_subtract(point, positions[first]);
+    Vec2D second_offset = math_vector_subtract(point, positions[second]);
+    Vec2D first_angular_velocity = inverse_mass_first <= 0.0f ||
+            entity_index_components_check(first, PARTICLE)
+        ? (Vec2D){0}
+        : math_angular_velocity_cross_vec(angular_velocities[first], first_offset);
+    Vec2D second_angular_velocity = inverse_mass_second <= 0.0f ||
+            entity_index_components_check(second, PARTICLE)
+        ? (Vec2D){0}
+        : math_angular_velocity_cross_vec(angular_velocities[second], second_offset);
+    Velocity current_relative_velocity = {
+        (inverse_mass_second > 0.0f ? velocities[second].x : 0.0f) +
+            second_angular_velocity.x -
+            (inverse_mass_first > 0.0f ? velocities[first].x : 0.0f) -
+            first_angular_velocity.x,
+        (inverse_mass_second > 0.0f ? velocities[second].y : 0.0f) +
+            second_angular_velocity.y -
+            (inverse_mass_first > 0.0f ? velocities[first].y : 0.0f) -
+            first_angular_velocity.y
+    };
+    float normal_velocity = math_dot_product(current_relative_velocity, overlap.normal);
+    float restitution;
+    float first_lever;
+    float second_lever;
+    float denominator;
+    float impulse_magnitude;
+    Vec2D impulse;
+
+    if(relative_velocity != NULL) *relative_velocity = current_relative_velocity;
+    if(normal_velocity > 0.0f) return;
+    restitution = restitution_enabled
+        ? fminf(restitutions[first], restitutions[second]) : 0.0f;
+    if(fabsf(normal_velocity) < 1.0f) restitution = 0.0f;
+    first_lever = math_cross_2d(first_offset, overlap.normal);
+    second_lever = math_cross_2d(second_offset, overlap.normal);
+    denominator = inverse_mass_first + inverse_mass_second +
+        first_lever * first_lever * inverse_inertia_first +
+        second_lever * second_lever * inverse_inertia_second;
+    if(denominator <= 0.0f) return;
+    impulse_magnitude = -(1.0f + restitution) * normal_velocity / denominator;
+    impulse = (Vec2D){
+        overlap.normal.x * impulse_magnitude,
+        overlap.normal.y * impulse_magnitude
+    };
+    velocities[first].x -= impulse.x * inverse_mass_first;
+    velocities[first].y -= impulse.y * inverse_mass_first;
+    velocities[second].x += impulse.x * inverse_mass_second;
+    velocities[second].y += impulse.y * inverse_mass_second;
+    angular_velocities[first] -= math_cross_2d(first_offset, impulse) *
+        inverse_inertia_first;
+    angular_velocities[second] += math_cross_2d(second_offset, impulse) *
+        inverse_inertia_second;
+    if(normal_impulse != NULL) *normal_impulse = impulse;
+    if(friction_impulse != NULL) {
+        *friction_impulse = system_friction_impulse_apply(
+            first, second, overlap, first_offset, second_offset,
+            impulse_magnitude, inverse_mass_first, inverse_mass_second,
+            inverse_inertia_first, inverse_inertia_second);
+    }
+}
+
 ContactInfo system_resolve_collision(
-    Entity entity_1,
-    Entity entity_2,
-    OverlapInfo collision,
+    Entity first,
+    Entity second,
+    OverlapInfo overlap,
     bool restitution_enabled
 ) {
-    //Assume collision.normal points from entity_1 -> entity_2
-    bool entity_1_movable = physics_entity_movable_get(entity_1);
-    bool entity_2_movable = physics_entity_movable_get(entity_2);
-
-    float inv_mass_1 = 0.0f;
-    float inv_mass_2 = 0.0f;
-    ContactInfo contact_info = {
+    bool first_particle = entity_index_components_check(first, PARTICLE);
+    bool second_particle = entity_index_components_check(second, PARTICLE);
+    float inverse_mass_first = physics_entity_movable_get(first) &&
+            entity_index_components_check(first, MASS) && mass[first] > 0.0f
+        ? 1.0f / mass[first] : 0.0f;
+    float inverse_mass_second = physics_entity_movable_get(second) &&
+            entity_index_components_check(second, MASS) && mass[second] > 0.0f
+        ? 1.0f / mass[second] : 0.0f;
+    float inverse_inertia_first = 0.0f;
+    float inverse_inertia_second = 0.0f;
+    ContactInfo result = {
         .detected = true,
-        .normal = collision.normal,
-        .depth = collision.depth,
-        .point = system_collision_contact_point(entity_1, entity_2, collision)
+        .normal = overlap.normal,
+        .depth = overlap.depth
     };
+    ContactManifold manifold = {0};
 
-    if (entity_1_movable && entity_index_components_check(entity_1, MASS) &&
-            mass[entity_1] > 0.0f) {
-        inv_mass_1 = 1.0f / mass[entity_1];
+    if(!first_particle && !second_particle) {
+        manifold = contact_manifold_polygon_get(
+            world_hit_boxes[first], world_hit_boxes[second], overlap.normal);
     }
-
-    if (entity_2_movable && entity_index_components_check(entity_2, MASS) &&
-            mass[entity_2] > 0.0f) {
-        inv_mass_2 = 1.0f / mass[entity_2];
+    if(manifold.count == 0) {
+        manifold.points[0] = system_collision_contact_point(first, second, overlap);
+        manifold.count = 1;
     }
-
-    //If neither body can move, no velocity response is needed
-    if (inv_mass_1 + inv_mass_2 <= 0.0f) {
-        return contact_info;
+    result.point_count = manifold.count;
+    for(uint8_t i = 0; i < manifold.count; i += 1) result.points[i] = manifold.points[i];
+    result.point = result.points[0];
+    if(inverse_mass_first + inverse_mass_second <= 0.0f) return result;
+    if(!first_particle && inverse_mass_first > 0.0f) {
+        float inertia = physics_polygon_moment_of_inertia(hit_boxes[first], mass[first]);
+        if(inertia > 0.0f) inverse_inertia_first = 1.0f / inertia;
     }
-
-    Position contact = contact_info.point;
-
-    Vec2D r1 = {
-        .x = contact.x - positions[entity_1].x,
-        .y = contact.y - positions[entity_1].y
-    };
-
-    Vec2D r2 = {
-        .x = contact.x - positions[entity_2].x,
-        .y = contact.y - positions[entity_2].y
-    };
-
-    Vec2D rotational_velocity_1 = {0};
-    Vec2D rotational_velocity_2 = {0};
-
-    if (entity_1_movable && !entity_index_components_check(entity_1, PARTICLE)) {
-        rotational_velocity_1 =
-            math_angular_velocity_cross_vec(angular_velocities[entity_1], r1);
+    if(!second_particle && inverse_mass_second > 0.0f) {
+        float inertia = physics_polygon_moment_of_inertia(hit_boxes[second], mass[second]);
+        if(inertia > 0.0f) inverse_inertia_second = 1.0f / inertia;
     }
+    for(uint8_t i = 0; i < result.point_count; i += 1) {
+        Velocity relative_velocity = {0};
+        Vec2D normal_impulse = {0};
+        Vec2D friction_impulse = {0};
 
-    if (entity_2_movable && !entity_index_components_check(entity_2, PARTICLE)) {
-        rotational_velocity_2 =
-            math_angular_velocity_cross_vec(angular_velocities[entity_2], r2);
+        system_contact_point_solve(
+            first, second, overlap, result.points[i], restitution_enabled,
+            inverse_mass_first, inverse_mass_second,
+            inverse_inertia_first, inverse_inertia_second,
+            &relative_velocity, &normal_impulse, &friction_impulse);
+        if(i == 0) result.relative_velocity = relative_velocity;
+        result.normal_impulse.x += normal_impulse.x;
+        result.normal_impulse.y += normal_impulse.y;
+        result.friction_impulse.x += friction_impulse.x;
+        result.friction_impulse.y += friction_impulse.y;
     }
-
-    Vec2D contact_velocity_1 = {0};
-    Vec2D contact_velocity_2 = {0};
-
-    if (entity_1_movable) {
-        contact_velocity_1.x = velocities[entity_1].x + rotational_velocity_1.x;
-        contact_velocity_1.y = velocities[entity_1].y + rotational_velocity_1.y;
-    }
-
-    if (entity_2_movable) {
-        contact_velocity_2.x = velocities[entity_2].x + rotational_velocity_2.x;
-        contact_velocity_2.y = velocities[entity_2].y + rotational_velocity_2.y;
-    }
-
-    Vec2D v_rel = {
-        .x = contact_velocity_2.x - contact_velocity_1.x,
-        .y = contact_velocity_2.y - contact_velocity_1.y
-    };
-    contact_info.relative_velocity = v_rel;
-
-    float v_normal = math_dot_product(v_rel, collision.normal);
-
-    if (v_normal > 0.0f) {
-        return contact_info;
-    }
-
-    float restitution = restitution_enabled
-        ? fminf(restitutions[entity_1], restitutions[entity_2])
-        : 0.0f;
-
-    if(fabsf(v_normal) < 1.0f) {
-      restitution = 0.0f;
-    }
-
-    float inv_inertia_1 = 0.0f;
-    float inv_inertia_2 = 0.0f;
-
-    if (entity_1_movable && !entity_index_components_check(entity_1, PARTICLE)) {
-        float inertia_1 = physics_polygon_moment_of_inertia(
-            hit_boxes[entity_1], mass[entity_1]);
-        if (inertia_1 > 0.0f) {
-            inv_inertia_1 = 1.0f / inertia_1;
-        }
-    }
-
-    if (entity_2_movable && !entity_index_components_check(entity_2, PARTICLE)) {
-        float inertia_2 = physics_polygon_moment_of_inertia(
-            hit_boxes[entity_2], mass[entity_2]);
-
-        if(inertia_2 > 0.0f) {
-            inv_inertia_2 = 1.0f / inertia_2;
-        }
-    }
-
-    float r1_cross_n = math_cross_2d(r1, collision.normal);
-    float r2_cross_n = math_cross_2d(r2, collision.normal);
-
-    float denominator =
-        inv_mass_1 +
-        inv_mass_2 +
-        (r1_cross_n * r1_cross_n) * inv_inertia_1 +
-        (r2_cross_n * r2_cross_n) * inv_inertia_2;
-
-    if (denominator <= 0.0f) {
-        return contact_info;
-    }
-
-    float impulse_magnitude =
-        (-(1.0f + restitution) * v_normal) / denominator;
-
-    Vec2D impulse = {
-        .x = collision.normal.x * impulse_magnitude,
-        .y = collision.normal.y * impulse_magnitude
-    };
-
-    velocities[entity_1].x -= impulse.x * inv_mass_1;
-    velocities[entity_1].y -= impulse.y * inv_mass_1;
-
-    velocities[entity_2].x += impulse.x * inv_mass_2;
-    velocities[entity_2].y += impulse.y * inv_mass_2;
-
-    angular_velocities[entity_1] -= math_cross_2d(r1, impulse) * inv_inertia_1;
-    angular_velocities[entity_2] += math_cross_2d(r2, impulse) * inv_inertia_2;
-
-    {
-        Vec2D friction_impulse = system_friction_impulse_apply(
-        entity_1,
-        entity_2,
-        collision,
-        r1,
-        r2,
-        impulse_magnitude,              // pass normal impulse magnitude
-        inv_mass_1,
-        inv_mass_2,
-        inv_inertia_1,
-        inv_inertia_2
-        );
-        contact_info.normal_impulse = impulse;
-        contact_info.friction_impulse = friction_impulse;
-    }
-    return contact_info;
+    return result;
 }
 
 typedef struct SystemBroadphaseQuery {
@@ -853,12 +830,7 @@ static void system_rigid_contact_constraint_solve(
         ? system_resolve_collision(first, second, overlap,
             first_solve)
         : (ContactInfo){0};
-    if(first_solve) {
-        constraint->value.rigid.contact = result;
-    } else {
-        constraint->value.rigid.contact.normal_impulse = result.normal_impulse;
-        constraint->value.rigid.contact.friction_impulse = result.friction_impulse;
-    }
+    constraint->value.rigid.contact = result;
     constraint->value.rigid.contact.normal_impulse.x += accumulated_normal.x;
     constraint->value.rigid.contact.normal_impulse.y += accumulated_normal.y;
     constraint->value.rigid.contact.friction_impulse.x += accumulated_friction.x;
@@ -1754,8 +1726,10 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
             query->start.x + edge.x * t,
             query->start.y + edge.y * t
         },
+        .point_count = 1,
         .relative_velocity = relative_velocity
     };
+    contact.points[0] = contact.point;
     if(normal_velocity < 0.0f) {
         Vec2D rigid_offset;
         Vec2D rigid_angular_velocity = {0};
@@ -1864,12 +1838,7 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
             }
         }
     }
-    if(!query->solved) {
-        query->contact = contact;
-    } else {
-        query->contact.normal_impulse = contact.normal_impulse;
-        query->contact.friction_impulse = contact.friction_impulse;
-    }
+    query->contact = contact;
     query->contact.normal_impulse.x += accumulated_normal.x;
     query->contact.normal_impulse.y += accumulated_normal.y;
     query->contact.friction_impulse.x += accumulated_friction.x;
@@ -2081,8 +2050,10 @@ static void system_soft_body_node_rigid_collisions_apply(void) {
                     positions[node].y +
                         collision.normal.y * soft_body_nodes[node].radius
                 },
+                .point_count = 1,
                 .relative_velocity = relative_velocity
             };
+            contact_info.points[0] = contact_info.point;
             system_interaction_by_index_record(
                 node,
                 rigid,

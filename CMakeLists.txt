@@ -50,6 +50,7 @@ set(ROHR_SDL3_TTF_TARGET SDL3_ttf::SDL3_ttf-static)
 set(ROHR_ENGINE_SOURCES
     src/aabb_tree.c
     src/console.c
+    src/contact_manifold.c
     src/contact_constraint.c
     src/constraint_solver.c
     src/joint_constraint.c
@@ -198,6 +199,12 @@ if(ROHR_BUILD_TESTS)
     set_target_properties(constraint_solver_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
     add_test(NAME constraint_solver COMMAND constraint_solver_test)
 
+    add_executable(contact_manifold_test tests/contact_manifold.c)
+    target_include_directories(contact_manifold_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(contact_manifold_test PRIVATE rohr_engine)
+    set_target_properties(contact_manifold_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+    add_test(NAME contact_manifold COMMAND contact_manifold_test)
+
     add_executable(editor_component_registry_test
         tests/editor_component_registry.c
     )
@@ -279,6 +286,7 @@ if(ROHR_BUILD_TESTS)
         aabb_tree
         physics_interaction_set
         constraint_solver
+        contact_manifold
         editor_component_registry
         generated_components
         PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy"
@@ -298,6 +306,7 @@ if(ROHR_BUILD_TESTS)
         aabb_tree_test
         physics_interaction_set_test
         constraint_solver_test
+        contact_manifold_test
         editor_component_registry_test
         generated_components_test
     )
