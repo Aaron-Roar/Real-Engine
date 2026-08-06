@@ -109,6 +109,10 @@ target_include_directories(rohr_tools
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+if(ROHR_BUILD_TESTS)
+    include(CTest)
+endif()
+
 if(ROHR_BUILD_EDITOR)
     add_subdirectory(tools/editor)
 endif()
@@ -132,8 +136,6 @@ if(ROHR_BUILD_EXAMPLES)
 endif()
 
 if(ROHR_BUILD_TESTS)
-    include(CTest)
-
     add_executable(engine_lifecycle_test tests/engine_lifecycle.c)
     target_include_directories(engine_lifecycle_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(engine_lifecycle_test PRIVATE rohr_engine)
