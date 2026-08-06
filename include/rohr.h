@@ -1115,6 +1115,30 @@ EngineResult rohr_physics_collision_report_set(Entity entity, Entity target, boo
 bool rohr_physics_contact_get(Entity entity, Entity target);
 
 /**
+ * @brief Checks whether contact between two entities began this physics step.
+ * @param entity First entity.
+ * @param target Second entity.
+ * @return true when the pair is current but was not previous.
+ */
+bool rohr_physics_contact_entered_get(Entity entity, Entity target);
+
+/**
+ * @brief Checks whether contact between two entities continued this physics step.
+ * @param entity First entity.
+ * @param target Second entity.
+ * @return true when the pair is both current and previous.
+ */
+bool rohr_physics_contact_stayed_get(Entity entity, Entity target);
+
+/**
+ * @brief Checks whether contact between two entities ended this physics step.
+ * @param entity First entity.
+ * @param target Second entity.
+ * @return true when the pair was previous but is not current.
+ */
+bool rohr_physics_contact_exited_get(Entity entity, Entity target);
+
+/**
  * @brief Creates an engine color from a hexadecimal RGB or RGBA value.
  * @param hex_color_code Hex color value.
  * @return Color created from hex_color_code.

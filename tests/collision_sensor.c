@@ -55,7 +55,10 @@ int main(void) {
             fabsf(velocities[body_index.result.value].y) > 0.0001f ||
             !physics_contact_current_get(body, sensor) ||
             physics_contact_previous_get(body, sensor) ||
-            !rohr_physics_contact_get(body, sensor)) {
+            !rohr_physics_contact_get(body, sensor) ||
+            !rohr_physics_contact_entered_get(body, sensor) ||
+            rohr_physics_contact_stayed_get(body, sensor) ||
+            rohr_physics_contact_exited_get(body, sensor)) {
         fprintf(stderr, "sensor overlap step: position=(%f,%f) velocity=(%f,%f) overlap=%d\n",
             body_position.result.value.x,
             body_position.result.value.y,
@@ -65,6 +68,12 @@ int main(void) {
         goto fail;
     }
 
+    rohr_system_physics_update(0.0);
+    if(!rohr_physics_contact_get(body, sensor) ||
+            rohr_physics_contact_entered_get(body, sensor) ||
+            !rohr_physics_contact_stayed_get(body, sensor) ||
+            rohr_physics_contact_exited_get(body, sensor)) goto fail;
+
     rohr_system_physics_update(1.0);
     body_position = rohr_physics_position_get(body);
     if(rohr_error_check(body_position) ||
@@ -72,7 +81,10 @@ int main(void) {
             fabsf(velocities[body_index.result.value].x - 12.0f) > 0.0001f ||
             physics_contact_current_get(body, sensor) ||
             !physics_contact_previous_get(body, sensor) ||
-            rohr_physics_contact_get(body, sensor)) {
+            rohr_physics_contact_get(body, sensor) ||
+            rohr_physics_contact_entered_get(body, sensor) ||
+            rohr_physics_contact_stayed_get(body, sensor) ||
+            !rohr_physics_contact_exited_get(body, sensor)) {
         fprintf(stderr, "sensor exit step: position=(%f,%f) velocity=(%f,%f) overlap=%d\n",
             body_position.result.value.x,
             body_position.result.value.y,
@@ -84,7 +96,10 @@ int main(void) {
 
     rohr_system_physics_update(0.0);
     if(physics_contact_current_get(body, sensor) ||
-            physics_contact_previous_get(body, sensor)) goto fail;
+            physics_contact_previous_get(body, sensor) ||
+            rohr_physics_contact_entered_get(body, sensor) ||
+            rohr_physics_contact_stayed_get(body, sensor) ||
+            rohr_physics_contact_exited_get(body, sensor)) goto fail;
 
     rohr_engine_shutdown();
     return 0;

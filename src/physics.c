@@ -1954,14 +1954,35 @@ EngineResult physics_collision_report_set(Entity entity, Entity target, bool sta
     if(error_check(result)) return result;
     return error_result_value(true);
 }
-bool physics_contact_get(Entity entity, Entity target) {
+static bool physics_contact_entities_valid(Entity entity, Entity target) {
     EntityIndex index;
     EntityIndex target_index;
 
-    if(!(entity_index_get(entity, &index) && entity_index_alive_check(index)) || !(entity_index_get(target, &target_index) && entity_index_alive_check(target_index))) {
-        return false;
-    }
+    return entity_index_get(entity, &index) && entity_index_alive_check(index) &&
+        entity_index_get(target, &target_index) && entity_index_alive_check(target_index);
+}
+
+bool physics_contact_get(Entity entity, Entity target) {
+    if(!physics_contact_entities_valid(entity, target)) return false;
     return physics_contact_current_get(entity, target);
+}
+
+bool physics_contact_entered_get(Entity entity, Entity target) {
+    if(!physics_contact_entities_valid(entity, target)) return false;
+    return physics_contact_current_get(entity, target) &&
+        !physics_contact_previous_get(entity, target);
+}
+
+bool physics_contact_stayed_get(Entity entity, Entity target) {
+    if(!physics_contact_entities_valid(entity, target)) return false;
+    return physics_contact_current_get(entity, target) &&
+        physics_contact_previous_get(entity, target);
+}
+
+bool physics_contact_exited_get(Entity entity, Entity target) {
+    if(!physics_contact_entities_valid(entity, target)) return false;
+    return !physics_contact_current_get(entity, target) &&
+        physics_contact_previous_get(entity, target);
 }
 
 EngineResult physics_dt_per_tick_set(Time dt) {

@@ -584,6 +584,12 @@ EngineResult physics_collision_report_set(Entity entity, Entity target, bool sta
  * Get collision state between an entity pair for the current physics step.
  */
 bool physics_contact_get(Entity entity, Entity target);
+/** Return whether a contact began during the current physics step. */
+bool physics_contact_entered_get(Entity entity, Entity target);
+/** Return whether a contact continued from the previous physics step. */
+bool physics_contact_stayed_get(Entity entity, Entity target);
+/** Return whether a contact ended during the current physics step. */
+bool physics_contact_exited_get(Entity entity, Entity target);
 
 /** Set an explicit simulation delta for each engine tick. */
 EngineResult physics_dt_per_tick_set(Time dt);

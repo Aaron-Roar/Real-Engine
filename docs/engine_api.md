@@ -2042,6 +2042,51 @@ Checks whether two entities collided during the current physics step.
 
 **Returns:** true when the pair is in the current contact set, false otherwise.
 
+### `rohr_physics_contact_entered_get`
+
+```c
+bool rohr_physics_contact_entered_get(Entity entity, Entity target);
+```
+
+Checks whether contact between two entities began this physics step.
+
+| Parameter | Description |
+| --- | --- |
+| `entity` | First entity. |
+| `target` | Second entity. |
+
+**Returns:** true when the pair is current but was not previous.
+
+### `rohr_physics_contact_stayed_get`
+
+```c
+bool rohr_physics_contact_stayed_get(Entity entity, Entity target);
+```
+
+Checks whether contact between two entities continued this physics step.
+
+| Parameter | Description |
+| --- | --- |
+| `entity` | First entity. |
+| `target` | Second entity. |
+
+**Returns:** true when the pair is both current and previous.
+
+### `rohr_physics_contact_exited_get`
+
+```c
+bool rohr_physics_contact_exited_get(Entity entity, Entity target);
+```
+
+Checks whether contact between two entities ended this physics step.
+
+| Parameter | Description |
+| --- | --- |
+| `entity` | First entity. |
+| `target` | Second entity. |
+
+**Returns:** true when the pair was previous but is not current.
+
 ## Graphics
 
 ### `rohr_graphics_color_hex_create`
