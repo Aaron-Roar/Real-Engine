@@ -151,8 +151,10 @@ EngineResult physics_interaction_set_record(
         contact.normal.y = -contact.normal.y;
         contact.relative_velocity.x = -contact.relative_velocity.x;
         contact.relative_velocity.y = -contact.relative_velocity.y;
-        contact.applied_impulse.x = -contact.applied_impulse.x;
-        contact.applied_impulse.y = -contact.applied_impulse.y;
+        contact.normal_impulse.x = -contact.normal_impulse.x;
+        contact.normal_impulse.y = -contact.normal_impulse.y;
+        contact.friction_impulse.x = -contact.friction_impulse.x;
+        contact.friction_impulse.y = -contact.friction_impulse.y;
     }
     slot = physics_interaction_slot_get(
         set->entries, set->occupied, set->capacity, pair, &found
@@ -270,10 +272,14 @@ bool physics_interaction_set_get(
             -interaction->contact.relative_velocity.x;
         interaction->contact.relative_velocity.y =
             -interaction->contact.relative_velocity.y;
-        interaction->contact.applied_impulse.x =
-            -interaction->contact.applied_impulse.x;
-        interaction->contact.applied_impulse.y =
-            -interaction->contact.applied_impulse.y;
+        interaction->contact.normal_impulse.x =
+            -interaction->contact.normal_impulse.x;
+        interaction->contact.normal_impulse.y =
+            -interaction->contact.normal_impulse.y;
+        interaction->contact.friction_impulse.x =
+            -interaction->contact.friction_impulse.x;
+        interaction->contact.friction_impulse.y =
+            -interaction->contact.friction_impulse.y;
     }
     return true;
 }
@@ -364,8 +370,10 @@ size_t physics_interaction_set_contacts_get(
             contact.normal.y = -contact.normal.y;
             contact.relative_velocity.x = -contact.relative_velocity.x;
             contact.relative_velocity.y = -contact.relative_velocity.y;
-            contact.applied_impulse.x = -contact.applied_impulse.x;
-            contact.applied_impulse.y = -contact.applied_impulse.y;
+            contact.normal_impulse.x = -contact.normal_impulse.x;
+            contact.normal_impulse.y = -contact.normal_impulse.y;
+            contact.friction_impulse.x = -contact.friction_impulse.x;
+            contact.friction_impulse.y = -contact.friction_impulse.y;
         } else {
             continue;
         }

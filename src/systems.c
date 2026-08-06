@@ -702,10 +702,8 @@ ContactInfo system_resolve_collision(Entity entity_1, Entity entity_2, OverlapIn
         inv_inertia_1,
         inv_inertia_2
         );
-        contact_info.applied_impulse = (Vec2D){
-            .x = impulse.x + friction_impulse.x,
-            .y = impulse.y + friction_impulse.y
-        };
+        contact_info.normal_impulse = impulse;
+        contact_info.friction_impulse = friction_impulse;
     }
     return contact_info;
 }
@@ -1529,7 +1527,7 @@ static void system_soft_body_node_rigid_collisions_apply(void) {
             velocities[node].y -= collision.normal.y * impulse_magnitude * inverse_mass_node;
             velocities[rigid].x += collision.normal.x * impulse_magnitude * inverse_mass_rigid;
             velocities[rigid].y += collision.normal.y * impulse_magnitude * inverse_mass_rigid;
-            contact_info.applied_impulse = (Vec2D){
+            contact_info.normal_impulse = (Vec2D){
                 collision.normal.x * impulse_magnitude,
                 collision.normal.y * impulse_magnitude
             };
@@ -1585,8 +1583,10 @@ static void system_soft_body_node_rigid_collisions_apply(void) {
                     rigid_offset,
                     (Vec2D){tangent.x * tangent_impulse, tangent.y * tangent_impulse}
                 ) * inverse_inertia_rigid;
-                contact_info.applied_impulse.x += tangent.x * tangent_impulse;
-                contact_info.applied_impulse.y += tangent.y * tangent_impulse;
+                contact_info.friction_impulse = (Vec2D){
+                    tangent.x * tangent_impulse,
+                    tangent.y * tangent_impulse
+                };
                 system_interaction_by_index_record(
                     node,
                     rigid,

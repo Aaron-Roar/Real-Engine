@@ -2125,6 +2125,13 @@ ContactInfo physics_contact_get(Entity entity, Entity target) {
     return interaction.contact;
 }
 
+Vec2D physics_contact_total_impulse_get(ContactInfo contact) {
+    return (Vec2D){
+        .x = contact.normal_impulse.x + contact.friction_impulse.x,
+        .y = contact.normal_impulse.y + contact.friction_impulse.y
+    };
+}
+
 bool physics_contact_entered_check(Entity entity, Entity target) {
     return physics_interaction_entered_check(entity, target, PHYSICS_INTERACTION_CONTACT);
 }

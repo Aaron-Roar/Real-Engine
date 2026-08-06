@@ -2041,6 +2041,7 @@ written. Result ordering is unspecified.
 ```c
 bool rohr_physics_contact_check(Entity entity, Entity target);
 ContactInfo rohr_physics_contact_get(Entity entity, Entity target);
+Vec2D rohr_physics_contact_total_impulse_get(ContactInfo contact);
 bool rohr_physics_contact_entered_check(Entity entity, Entity target);
 bool rohr_physics_contact_stayed_check(Entity entity, Entity target);
 bool rohr_physics_contact_exited_check(Entity entity, Entity target);
@@ -2054,9 +2055,10 @@ size_t rohr_physics_contacts_get(
 
 Contact queries include only entity pairs that entered physical collision
 response. `contact_get` returns its normal, depth, approximate world-space
-point, pre-resolution relative velocity, and total impulse applied to the
-second requested entity. It sets `detected` to false when no current contact
-exists. Sensors do not produce contacts.
+point, pre-resolution relative velocity, and separate normal and friction
+impulses applied to the second requested entity. `contact_total_impulse_get`
+returns the vector sum of those impulses. `contact_get` sets `detected` to
+false when no current contact exists. Sensors do not produce contacts.
 
 `contact_count_get` returns the required caller-owned buffer size.
 `contacts_get` writes up to `capacity` current results and returns the number

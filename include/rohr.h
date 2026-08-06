@@ -1120,6 +1120,8 @@ size_t rohr_physics_overlaps_get(
 bool rohr_physics_contact_check(Entity entity, Entity target);
 /** Return current contact geometry in the requested entity order. */
 ContactInfo rohr_physics_contact_get(Entity entity, Entity target);
+/** Return the sum of a contact's normal and friction impulses. */
+Vec2D rohr_physics_contact_total_impulse_get(ContactInfo contact);
 /** Return whether a physical contact began during the current physics step. */
 bool rohr_physics_contact_entered_check(Entity entity, Entity target);
 /** Return whether a physical contact continued from the previous physics step. */

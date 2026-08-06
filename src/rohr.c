@@ -234,6 +234,7 @@ size_t rohr_physics_overlap_count_get(Entity entity) { return physics_overlap_co
 size_t rohr_physics_overlaps_get(Entity entity, EntityInteraction *results, size_t capacity) { return physics_overlaps_get(entity, results, capacity); }
 bool rohr_physics_contact_check(Entity entity, Entity target) { return physics_contact_check(entity, target); }
 ContactInfo rohr_physics_contact_get(Entity entity, Entity target) { return physics_contact_get(entity, target); }
+Vec2D rohr_physics_contact_total_impulse_get(ContactInfo contact) { return physics_contact_total_impulse_get(contact); }
 bool rohr_physics_contact_entered_check(Entity entity, Entity target) { return physics_contact_entered_check(entity, target); }
 bool rohr_physics_contact_stayed_check(Entity entity, Entity target) { return physics_contact_stayed_check(entity, target); }
 bool rohr_physics_contact_exited_check(Entity entity, Entity target) { return physics_contact_exited_check(entity, target); }

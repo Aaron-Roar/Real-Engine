@@ -68,8 +68,10 @@ typedef struct ContactInfo {
     Position point;
     /** Pre-resolution velocity of the second entity relative to the first. */
     Velocity relative_velocity;
-    /** Total impulse applied to the second entity. */
-    Vec2D applied_impulse;
+    /** Normal impulse applied to the second entity. */
+    Vec2D normal_impulse;
+    /** Friction impulse applied to the second entity. */
+    Vec2D friction_impulse;
 } ContactInfo;
 
 /** One current physical contact involving a queried entity. */
@@ -629,6 +631,8 @@ size_t physics_overlaps_get(
 bool physics_contact_check(Entity entity, Entity target);
 /** Return current contact geometry in the requested entity order. */
 ContactInfo physics_contact_get(Entity entity, Entity target);
+/** Return the sum of a contact's normal and friction impulses. */
+Vec2D physics_contact_total_impulse_get(ContactInfo contact);
 /** Return whether a physical contact began during the current physics step. */
 bool physics_contact_entered_check(Entity entity, Entity target);
 /** Return whether a physical contact continued from the previous physics step. */
