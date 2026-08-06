@@ -10,6 +10,10 @@ int main(void) {
     second = editor_project_object_add(&project, (Position){30.0f, 40.0f});
     if(first == NULL || second == NULL || first->id == second->id ||
             project.selected != second->id || second->has_hitbox) return 1;
+    if(!editor_project_object_select(&project, first->id) ||
+            editor_project_selected_get(&project) != first ||
+            editor_project_object_select(&project, EDITOR_OBJECT_INVALID)) return 1;
+    if(!editor_project_object_select(&project, second->id)) return 1;
     editor_project_hitbox_add(second, 4);
     if(!second->has_hitbox || second->hitbox.vertex_count != 4) return 1;
     editor_project_hitbox_vertex_count_set(second, 7);

@@ -56,6 +56,16 @@ EditorObject *editor_project_selected_get(EditorProject *project) {
     return NULL;
 }
 
+bool editor_project_object_select(EditorProject *project, EditorObjectId id) {
+    if(project == NULL) return false;
+    for(size_t i = 0; i < project->object_count; i += 1) {
+        if(project->objects[i].id != id) continue;
+        project->selected = id;
+        return true;
+    }
+    return false;
+}
+
 void editor_project_hitbox_add(EditorObject *object, uint32_t vertex_count) {
     if(object == NULL) return;
     object->has_hitbox = true;

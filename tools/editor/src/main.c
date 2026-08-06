@@ -48,8 +48,12 @@ int main(void) {
     MouseState mouse = {0};
     FontAsset font = {0};
     TextAsset tools_title = {0};
+    TextAsset hierarchy_label = {0};
+    TextAsset hitbox_editor_label = {0};
     TextAsset add_entity_label = {0};
     TextAsset add_hitbox_label = {0};
+    TextAsset entity_label = {0};
+    TextAsset hitbox_label = {0};
     TextAsset vertices_label = {0};
     ViewportId viewport = 0;
     EditorProject project;
@@ -86,8 +90,12 @@ int main(void) {
         font = result.result.value;
     }
     if(!editor_text_create(&font, "Tools", &tools_title) ||
+            !editor_text_create(&font, "Hierarchy", &hierarchy_label) ||
+            !editor_text_create(&font, "Hitbox Editor", &hitbox_editor_label) ||
             !editor_text_create(&font, "Add Entity", &add_entity_label) ||
             !editor_text_create(&font, "Add Hitbox", &add_hitbox_label) ||
+            !editor_text_create(&font, "Entity", &entity_label) ||
+            !editor_text_create(&font, "Hitbox", &hitbox_label) ||
             !editor_text_create(&font, "Vertices", &vertices_label)) goto fail;
 
     while(running) {
@@ -104,7 +112,13 @@ int main(void) {
                 rohr_controller_mouse_event_capture(&event));
             if(event.type == SDL_EVENT_QUIT) running = false;
         }
-        if(rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) running = false;
+        if(rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
+            if(editor_viewport_hitbox_editor_active_get(&viewport_state)) {
+                editor_viewport_hitbox_editor_exit(&viewport_state);
+            } else {
+                running = false;
+            }
+        }
         if(!running) break;
 
         rohr_graphics_background_draw((Color){18, 21, 27, 255});
@@ -125,7 +139,30 @@ int main(void) {
         rohr_ui_label(&tools_title,
             (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 14.0f,
                 EDITOR_TOOLS_WIDTH - 16.0f, 24.0f});
-        {
+        if(editor_viewport_hitbox_editor_active_get(&viewport_state)) {
+            UISliderConfig slider = rohr_ui_slider_config_default_get();
+            UISliderResult result;
+            EditorObject *selected = editor_project_selected_get(&project);
+
+            rohr_ui_label(&hitbox_editor_label,
+                (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 48.0f,
+                    EDITOR_TOOLS_WIDTH - 16.0f, 24.0f});
+            rohr_ui_label(&vertices_label,
+                (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 92.0f,
+                    EDITOR_TOOLS_WIDTH - 20.0f, 24.0f});
+            slider.center = (Position){EDITOR_VIEWPORT_WIDTH +
+                EDITOR_TOOLS_WIDTH * 0.5f, 140.0f};
+            slider.length = EDITOR_TOOLS_WIDTH - 36.0f;
+            slider.min_value = EDITOR_HITBOX_VERTEX_MIN;
+            slider.max_value = EDITOR_HITBOX_VERTEX_MAX;
+            slider.step = 1.0f;
+            result = rohr_ui_slider("editor.hitbox.vertices", vertex_count, &slider);
+            vertex_count = result.value;
+            if(result.changed && selected != NULL && selected->has_hitbox) {
+                editor_project_hitbox_vertex_count_set(
+                    selected, (uint32_t)vertex_count);
+            }
+        } else {
             UIButtonResult add_entity = rohr_ui_button(
                 "editor.add_entity", &add_entity_label,
                 (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 58.0f,
@@ -147,6 +184,7 @@ int main(void) {
                         EDITOR_TOOLS_WIDTH - 20.0f, 38.0f}, NULL);
                 if(add_hitbox.clicked) {
                     editor_project_hitbox_add(selected, (uint32_t)vertex_count);
+                    editor_viewport_hitbox_editor_enter(&viewport_state);
                 }
             } else {
                 rohr_ui_button_disabled(
@@ -156,26 +194,36 @@ int main(void) {
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 106.0f,
                         EDITOR_TOOLS_WIDTH - 20.0f, 38.0f});
             }
-        }
-        rohr_ui_label(&vertices_label,
-            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 168.0f,
-                EDITOR_TOOLS_WIDTH - 20.0f, 24.0f});
-        {
-            UISliderConfig slider = rohr_ui_slider_config_default_get();
-            UISliderResult result;
-            EditorObject *selected = editor_project_selected_get(&project);
+            rohr_ui_label(&hierarchy_label,
+                (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 158.0f,
+                    EDITOR_TOOLS_WIDTH - 16.0f, 24.0f});
+            for(size_t i = 0; i < project.object_count; i += 1) {
+                EditorObject *object = &project.objects[i];
+                float y = 192.0f + (float)i * 66.0f;
+                char entity_button_id[64];
+                char hitbox_button_id[64];
+                UIButtonResult entity_result;
 
-            slider.center = (Position){EDITOR_VIEWPORT_WIDTH +
-                EDITOR_TOOLS_WIDTH * 0.5f, 215.0f};
-            slider.length = EDITOR_TOOLS_WIDTH - 36.0f;
-            slider.min_value = EDITOR_HITBOX_VERTEX_MIN;
-            slider.max_value = EDITOR_HITBOX_VERTEX_MAX;
-            slider.step = 1.0f;
-            result = rohr_ui_slider("editor.hitbox.vertices", vertex_count, &slider);
-            vertex_count = result.value;
-            if(result.changed && selected != NULL && selected->has_hitbox) {
-                editor_project_hitbox_vertex_count_set(
-                    selected, (uint32_t)vertex_count);
+                snprintf(entity_button_id, sizeof(entity_button_id),
+                    "editor.object.%u", object->id);
+                entity_result = rohr_ui_button(
+                    entity_button_id, &entity_label,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, y,
+                        EDITOR_TOOLS_WIDTH - 16.0f, 28.0f}, NULL);
+                if(entity_result.clicked) {
+                    (void)editor_project_object_select(&project, object->id);
+                }
+                if(!object->has_hitbox) continue;
+                snprintf(hitbox_button_id, sizeof(hitbox_button_id),
+                    "editor.object.%u.hitbox", object->id);
+                if(rohr_ui_button(
+                        hitbox_button_id, &hitbox_label,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 20.0f, y + 32.0f,
+                            EDITOR_TOOLS_WIDTH - 28.0f, 26.0f}, NULL).clicked) {
+                    (void)editor_project_object_select(&project, object->id);
+                    vertex_count = (float)object->hitbox.vertex_count;
+                    editor_viewport_hitbox_editor_enter(&viewport_state);
+                }
             }
         }
         editor_viewport_update(
@@ -184,14 +232,18 @@ int main(void) {
             rohr_graphics_mouse_screen_position_get(),
             mouse.button_states[MOUSE_BUTTON_LEFT],
             rohr_ui_pointer_consumed_get());
-        editor_viewport_draw(&project);
+        editor_viewport_draw(&project, &viewport_state);
         rohr_ui_frame_end();
         rohr_graphics_show();
     }
 
     rohr_graphics_text_destroy(&vertices_label);
+    rohr_graphics_text_destroy(&hitbox_label);
+    rohr_graphics_text_destroy(&entity_label);
     rohr_graphics_text_destroy(&add_hitbox_label);
     rohr_graphics_text_destroy(&add_entity_label);
+    rohr_graphics_text_destroy(&hitbox_editor_label);
+    rohr_graphics_text_destroy(&hierarchy_label);
     rohr_graphics_text_destroy(&tools_title);
     rohr_graphics_font_destroy(&font);
     if(viewport != 0) (void)rohr_viewport_destroy(viewport);
@@ -201,8 +253,12 @@ int main(void) {
 
 fail:
     rohr_graphics_text_destroy(&vertices_label);
+    rohr_graphics_text_destroy(&hitbox_label);
+    rohr_graphics_text_destroy(&entity_label);
     rohr_graphics_text_destroy(&add_hitbox_label);
     rohr_graphics_text_destroy(&add_entity_label);
+    rohr_graphics_text_destroy(&hitbox_editor_label);
+    rohr_graphics_text_destroy(&hierarchy_label);
     rohr_graphics_text_destroy(&tools_title);
     rohr_graphics_font_destroy(&font);
     if(viewport != 0) (void)rohr_viewport_destroy(viewport);

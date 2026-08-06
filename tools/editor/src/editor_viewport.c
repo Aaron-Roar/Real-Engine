@@ -33,6 +33,22 @@ void editor_viewport_state_init(EditorViewportState *state) {
     };
 }
 
+void editor_viewport_hitbox_editor_enter(EditorViewportState *state) {
+    if(state == NULL) return;
+    state->hitbox_editor_active = true;
+    state->dragged_vertex = -1;
+}
+
+void editor_viewport_hitbox_editor_exit(EditorViewportState *state) {
+    if(state == NULL) return;
+    state->hitbox_editor_active = false;
+    state->dragged_vertex = -1;
+}
+
+bool editor_viewport_hitbox_editor_active_get(const EditorViewportState *state) {
+    return state != NULL && state->hitbox_editor_active;
+}
+
 void editor_viewport_update(
     EditorViewportState *state,
     EditorProject *project,
@@ -42,7 +58,7 @@ void editor_viewport_update(
 ) {
     EditorObject *object;
 
-    if(state == NULL || project == NULL) return;
+    if(state == NULL || project == NULL || !state->hitbox_editor_active) return;
     object = editor_project_selected_get(project);
     if(object == NULL || !object->has_hitbox) {
         state->dragged_vertex = -1;
@@ -75,8 +91,11 @@ void editor_viewport_update(
     }
 }
 
-void editor_viewport_draw(const EditorProject *project) {
-    if(project == NULL) return;
+void editor_viewport_draw(
+    const EditorProject *project,
+    const EditorViewportState *state
+) {
+    if(project == NULL || state == NULL) return;
     for(size_t object_index = 0;
             object_index < project->object_count;
             object_index += 1) {
@@ -92,7 +111,7 @@ void editor_viewport_draw(const EditorProject *project) {
                 object, (i + 1) % object->hitbox.vertex_count);
 
             editor_line_draw(start, end, line_color);
-            if(object->id == project->selected) {
+            if(state->hitbox_editor_active && object->id == project->selected) {
                 (void)rohr_graphics_screen_quad_draw(
                     start, 10.0f, 10.0f, 0.0f,
                     (Color){235, 240, 248, 255});

@@ -33,6 +33,7 @@ typedef struct EditorProject {
 void editor_project_init(EditorProject *project);
 EditorObject *editor_project_object_add(EditorProject *project, Position position);
 EditorObject *editor_project_selected_get(EditorProject *project);
+bool editor_project_object_select(EditorProject *project, EditorObjectId id);
 void editor_project_hitbox_add(EditorObject *object, uint32_t vertex_count);
 void editor_project_hitbox_vertex_count_set(
     EditorObject *object,
