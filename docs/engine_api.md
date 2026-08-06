@@ -2011,81 +2011,35 @@ Gets overlap information for two particle shapes.
 
 **Returns:** Geometric overlap information.
 
-### `rohr_physics_collision_report_set`
+### Entity overlap queries
 
 ```c
-EngineResult rohr_physics_collision_report_set(Entity entity, Entity target, bool state);
+bool rohr_physics_overlap_check(Entity entity, Entity target);
+OverlapInfo rohr_physics_overlap_get(Entity entity, Entity target);
+bool rohr_physics_overlap_entered_check(Entity entity, Entity target);
+bool rohr_physics_overlap_stayed_check(Entity entity, Entity target);
+bool rohr_physics_overlap_exited_check(Entity entity, Entity target);
 ```
 
-Sets collision state between two entities for the current physics step.
+Overlap queries include sensors and physically resolved colliders. `overlap_get`
+returns geometry oriented from `entity` toward `target`; its `detected` field is
+false when no current overlap exists. Transition checks compare the current and
+previous physics steps.
 
-| Parameter | Description |
-| --- | --- |
-| `entity` | First entity. |
-| `target` | Second entity. |
-| `state` | true to store the pair, false to remove it. |
-
-**Returns:** EngineResult describing success or failure.
-
-### `rohr_physics_contact_get`
+### Entity contact queries
 
 ```c
-bool rohr_physics_contact_get(Entity entity, Entity target);
+bool rohr_physics_contact_check(Entity entity, Entity target);
+OverlapInfo rohr_physics_contact_get(Entity entity, Entity target);
+bool rohr_physics_contact_entered_check(Entity entity, Entity target);
+bool rohr_physics_contact_stayed_check(Entity entity, Entity target);
+bool rohr_physics_contact_exited_check(Entity entity, Entity target);
 ```
 
-Checks whether two entities collided during the current physics step.
-
-| Parameter | Description |
-| --- | --- |
-| `entity` | First entity. |
-| `target` | Second entity. |
-
-**Returns:** true when the pair is in the current contact set, false otherwise.
-
-### `rohr_physics_contact_entered_get`
-
-```c
-bool rohr_physics_contact_entered_get(Entity entity, Entity target);
-```
-
-Checks whether contact between two entities began this physics step.
-
-| Parameter | Description |
-| --- | --- |
-| `entity` | First entity. |
-| `target` | Second entity. |
-
-**Returns:** true when the pair is current but was not previous.
-
-### `rohr_physics_contact_stayed_get`
-
-```c
-bool rohr_physics_contact_stayed_get(Entity entity, Entity target);
-```
-
-Checks whether contact between two entities continued this physics step.
-
-| Parameter | Description |
-| --- | --- |
-| `entity` | First entity. |
-| `target` | Second entity. |
-
-**Returns:** true when the pair is both current and previous.
-
-### `rohr_physics_contact_exited_get`
-
-```c
-bool rohr_physics_contact_exited_get(Entity entity, Entity target);
-```
-
-Checks whether contact between two entities ended this physics step.
-
-| Parameter | Description |
-| --- | --- |
-| `entity` | First entity. |
-| `target` | Second entity. |
-
-**Returns:** true when the pair was previous but is not current.
+Contact queries include only entity pairs that entered physical collision
+response. `contact_get` returns the overlap geometry used for that response and
+sets `detected` to false when no current contact exists. Sensors do not produce
+contacts.
 
 ## Graphics
 

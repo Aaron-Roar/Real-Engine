@@ -811,7 +811,7 @@ EngineResult editor_select(EditorInput input) {
             {
                 EntityResult selected_result = entity_from_index_get(i);
                 if(selected_result.kind == ERROR_RESULT_VALUE &&
-                        physics_contact_get(
+                        physics_overlap_check(
                             selection, selected_result.result.value)) {
                     selected_entity = selected_result.result.value;
                     console_write(LOG_APP, "Selected Entity: %d\n", i);

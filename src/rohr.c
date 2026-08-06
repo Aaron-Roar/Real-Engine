@@ -225,11 +225,16 @@ EntityResult rohr_physics_joint_create(Entity a, Entity b, JointType type, Vec2D
     return physics_joint_create(a, b, type, local_anchor_a, local_anchor_b, stiffness, damping);
 }
 OverlapInfo rohr_physics_particle_overlap_get(Shape shape_1, Shape shape_2) { return physics_particle_overlap_get(shape_1, shape_2); }
-EngineResult rohr_physics_collision_report_set(Entity entity, Entity target, bool state) { return physics_collision_report_set(entity, target, state); }
-bool rohr_physics_contact_get(Entity entity, Entity target) { return physics_contact_get(entity, target); }
-bool rohr_physics_contact_entered_get(Entity entity, Entity target) { return physics_contact_entered_get(entity, target); }
-bool rohr_physics_contact_stayed_get(Entity entity, Entity target) { return physics_contact_stayed_get(entity, target); }
-bool rohr_physics_contact_exited_get(Entity entity, Entity target) { return physics_contact_exited_get(entity, target); }
+bool rohr_physics_overlap_check(Entity entity, Entity target) { return physics_overlap_check(entity, target); }
+OverlapInfo rohr_physics_overlap_get(Entity entity, Entity target) { return physics_overlap_get(entity, target); }
+bool rohr_physics_overlap_entered_check(Entity entity, Entity target) { return physics_overlap_entered_check(entity, target); }
+bool rohr_physics_overlap_stayed_check(Entity entity, Entity target) { return physics_overlap_stayed_check(entity, target); }
+bool rohr_physics_overlap_exited_check(Entity entity, Entity target) { return physics_overlap_exited_check(entity, target); }
+bool rohr_physics_contact_check(Entity entity, Entity target) { return physics_contact_check(entity, target); }
+OverlapInfo rohr_physics_contact_get(Entity entity, Entity target) { return physics_contact_get(entity, target); }
+bool rohr_physics_contact_entered_check(Entity entity, Entity target) { return physics_contact_entered_check(entity, target); }
+bool rohr_physics_contact_stayed_check(Entity entity, Entity target) { return physics_contact_stayed_check(entity, target); }
+bool rohr_physics_contact_exited_check(Entity entity, Entity target) { return physics_contact_exited_check(entity, target); }
 
 Color rohr_graphics_color_hex_create(uint32_t hex_color_code) { return graphics_color_hex_create(hex_color_code); }
 EngineResult rohr_graphics_start(void) { return graphics_start(); }

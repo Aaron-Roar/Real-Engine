@@ -1097,46 +1097,27 @@ EntityResult rohr_physics_joint_create(
  */
 OverlapInfo rohr_physics_particle_overlap_get(Shape shape_1, Shape shape_2);
 
-/**
- * @brief Sets collision state between two entities for the current physics step.
- * @param entity First entity.
- * @param target Second entity.
- * @param state true to store the pair, false to remove it.
- * @return EngineResult describing success or failure.
- */
-EngineResult rohr_physics_collision_report_set(Entity entity, Entity target, bool state);
+/** Return whether two entities overlap during the current physics step. */
+bool rohr_physics_overlap_check(Entity entity, Entity target);
+/** Return current overlap geometry in the requested entity order. */
+OverlapInfo rohr_physics_overlap_get(Entity entity, Entity target);
+/** Return whether an overlap began during the current physics step. */
+bool rohr_physics_overlap_entered_check(Entity entity, Entity target);
+/** Return whether an overlap continued from the previous physics step. */
+bool rohr_physics_overlap_stayed_check(Entity entity, Entity target);
+/** Return whether an overlap ended during the current physics step. */
+bool rohr_physics_overlap_exited_check(Entity entity, Entity target);
 
-/**
- * @brief Checks whether two entities collided during the current physics step.
- * @param entity First entity.
- * @param target Second entity.
- * @return true when the pair is in the current contact set, false otherwise.
- */
-bool rohr_physics_contact_get(Entity entity, Entity target);
-
-/**
- * @brief Checks whether contact between two entities began this physics step.
- * @param entity First entity.
- * @param target Second entity.
- * @return true when the pair is current but was not previous.
- */
-bool rohr_physics_contact_entered_get(Entity entity, Entity target);
-
-/**
- * @brief Checks whether contact between two entities continued this physics step.
- * @param entity First entity.
- * @param target Second entity.
- * @return true when the pair is both current and previous.
- */
-bool rohr_physics_contact_stayed_get(Entity entity, Entity target);
-
-/**
- * @brief Checks whether contact between two entities ended this physics step.
- * @param entity First entity.
- * @param target Second entity.
- * @return true when the pair was previous but is not current.
- */
-bool rohr_physics_contact_exited_get(Entity entity, Entity target);
+/** Return whether two entities physically contacted during the current physics step. */
+bool rohr_physics_contact_check(Entity entity, Entity target);
+/** Return current contact geometry in the requested entity order. */
+OverlapInfo rohr_physics_contact_get(Entity entity, Entity target);
+/** Return whether a physical contact began during the current physics step. */
+bool rohr_physics_contact_entered_check(Entity entity, Entity target);
+/** Return whether a physical contact continued from the previous physics step. */
+bool rohr_physics_contact_stayed_check(Entity entity, Entity target);
+/** Return whether a physical contact ended during the current physics step. */
+bool rohr_physics_contact_exited_check(Entity entity, Entity target);
 
 /**
  * @brief Creates an engine color from a hexadecimal RGB or RGBA value.

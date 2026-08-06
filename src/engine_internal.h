@@ -59,11 +59,6 @@ bool physics_interaction_previous_get(
     Entity target,
     PhysicsInteraction *interaction
 );
-/** Return whether a pair overlaps in the current physics step. */
-bool physics_contact_current_get(Entity entity, Entity target);
-/** Return whether a pair overlapped in the previous physics step. */
-bool physics_contact_previous_get(Entity entity, Entity target);
-
 /** Initialize graphics tables. */
 EngineResult graphics_tables_init(void);
 /** Ensure graphics tables can address capacity slots. */

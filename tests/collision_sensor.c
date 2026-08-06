@@ -54,57 +54,74 @@ int main(void) {
             fabsf(body_position.result.value.y) > 0.0001f ||
             fabsf(velocities[body_index.result.value].x - 12.0f) > 0.0001f ||
             fabsf(velocities[body_index.result.value].y) > 0.0001f ||
-            !physics_contact_current_get(body, sensor) ||
+            !physics_interaction_current_check(
+                body, sensor, PHYSICS_INTERACTION_OVERLAP) ||
             physics_interaction_current_check(
                 body, sensor, PHYSICS_INTERACTION_CONTACT) ||
             !physics_interaction_current_get(body, sensor, &interaction) ||
             !interaction.overlap.detected || interaction.overlap.depth <= 0.0f ||
-            physics_contact_previous_get(body, sensor) ||
-            !rohr_physics_contact_get(body, sensor) ||
-            !rohr_physics_contact_entered_get(body, sensor) ||
-            rohr_physics_contact_stayed_get(body, sensor) ||
-            rohr_physics_contact_exited_get(body, sensor)) {
+            physics_interaction_previous_check(
+                body, sensor, PHYSICS_INTERACTION_OVERLAP) ||
+            !rohr_physics_overlap_check(body, sensor) ||
+            !rohr_physics_overlap_get(body, sensor).detected ||
+            !rohr_physics_overlap_entered_check(body, sensor) ||
+            rohr_physics_overlap_stayed_check(body, sensor) ||
+            rohr_physics_overlap_exited_check(body, sensor) ||
+            rohr_physics_contact_check(body, sensor) ||
+            rohr_physics_contact_get(body, sensor).detected ||
+            rohr_physics_contact_entered_check(body, sensor) ||
+            rohr_physics_contact_stayed_check(body, sensor) ||
+            rohr_physics_contact_exited_check(body, sensor)) {
         fprintf(stderr, "sensor overlap step: position=(%f,%f) velocity=(%f,%f) overlap=%d\n",
             body_position.result.value.x,
             body_position.result.value.y,
             velocities[body_index.result.value].x,
             velocities[body_index.result.value].y,
-            rohr_physics_contact_get(body, sensor));
+            rohr_physics_overlap_check(body, sensor));
         goto fail;
     }
 
     rohr_system_physics_update(0.0);
-    if(!rohr_physics_contact_get(body, sensor) ||
-            rohr_physics_contact_entered_get(body, sensor) ||
-            !rohr_physics_contact_stayed_get(body, sensor) ||
-            rohr_physics_contact_exited_get(body, sensor)) goto fail;
+    if(!rohr_physics_overlap_check(body, sensor) ||
+            rohr_physics_overlap_entered_check(body, sensor) ||
+            !rohr_physics_overlap_stayed_check(body, sensor) ||
+            rohr_physics_overlap_exited_check(body, sensor) ||
+            rohr_physics_contact_check(body, sensor)) goto fail;
 
     rohr_system_physics_update(1.0);
     body_position = rohr_physics_position_get(body);
     if(rohr_error_check(body_position) ||
             fabsf(body_position.result.value.x - 9.0f) > 0.0001f ||
             fabsf(velocities[body_index.result.value].x - 12.0f) > 0.0001f ||
-            physics_contact_current_get(body, sensor) ||
-            !physics_contact_previous_get(body, sensor) ||
-            rohr_physics_contact_get(body, sensor) ||
-            rohr_physics_contact_entered_get(body, sensor) ||
-            rohr_physics_contact_stayed_get(body, sensor) ||
-            !rohr_physics_contact_exited_get(body, sensor)) {
+            physics_interaction_current_check(
+                body, sensor, PHYSICS_INTERACTION_OVERLAP) ||
+            !physics_interaction_previous_check(
+                body, sensor, PHYSICS_INTERACTION_OVERLAP) ||
+            rohr_physics_overlap_check(body, sensor) ||
+            rohr_physics_overlap_entered_check(body, sensor) ||
+            rohr_physics_overlap_stayed_check(body, sensor) ||
+            !rohr_physics_overlap_exited_check(body, sensor) ||
+            rohr_physics_contact_exited_check(body, sensor)) {
         fprintf(stderr, "sensor exit step: position=(%f,%f) velocity=(%f,%f) overlap=%d\n",
             body_position.result.value.x,
             body_position.result.value.y,
             velocities[body_index.result.value].x,
             velocities[body_index.result.value].y,
-            rohr_physics_contact_get(body, sensor));
+            rohr_physics_overlap_check(body, sensor));
         goto fail;
     }
 
     rohr_system_physics_update(0.0);
-    if(physics_contact_current_get(body, sensor) ||
-            physics_contact_previous_get(body, sensor) ||
-            rohr_physics_contact_entered_get(body, sensor) ||
-            rohr_physics_contact_stayed_get(body, sensor) ||
-            rohr_physics_contact_exited_get(body, sensor)) goto fail;
+    if(physics_interaction_current_check(
+                body, sensor, PHYSICS_INTERACTION_OVERLAP) ||
+            physics_interaction_previous_check(
+                body, sensor, PHYSICS_INTERACTION_OVERLAP) ||
+            rohr_physics_overlap_entered_check(body, sensor) ||
+            rohr_physics_overlap_stayed_check(body, sensor) ||
+            rohr_physics_overlap_exited_check(body, sensor) ||
+            rohr_physics_contact_entered_check(body, sensor) ||
+            rohr_physics_contact_stayed_check(body, sensor) ||
+            rohr_physics_contact_exited_check(body, sensor)) goto fail;
 
     rohr_engine_shutdown();
     return 0;

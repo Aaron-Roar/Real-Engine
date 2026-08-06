@@ -54,7 +54,16 @@ int main(void) {
         return 1;
     }
     rohr_system_physics_update(0.0);
-    if(!rohr_physics_contact_get(first.result.value, second.result.value) ||
+    if(!rohr_physics_overlap_check(first.result.value, second.result.value) ||
+            !rohr_physics_overlap_get(first.result.value, second.result.value).detected ||
+            !rohr_physics_overlap_entered_check(first.result.value, second.result.value) ||
+            rohr_physics_overlap_stayed_check(first.result.value, second.result.value) ||
+            rohr_physics_overlap_exited_check(first.result.value, second.result.value) ||
+            !rohr_physics_contact_check(first.result.value, second.result.value) ||
+            !rohr_physics_contact_get(first.result.value, second.result.value).detected ||
+            !rohr_physics_contact_entered_check(first.result.value, second.result.value) ||
+            rohr_physics_contact_stayed_check(first.result.value, second.result.value) ||
+            rohr_physics_contact_exited_check(first.result.value, second.result.value) ||
             !physics_interaction_current_check(
                 first.result.value,
                 second.result.value,
@@ -63,16 +72,6 @@ int main(void) {
         rohr_engine_shutdown();
         return 1;
     }
-    if(rohr_error_check(rohr_physics_collision_report_set(
-                first.result.value, second.result.value, false)) ||
-            rohr_physics_contact_get(first.result.value, second.result.value) ||
-            rohr_error_check(rohr_physics_collision_report_set(
-                first.result.value, second.result.value, true)) ||
-            !rohr_physics_contact_get(second.result.value, first.result.value)) {
-        rohr_engine_shutdown();
-        return 1;
-    }
-
     rohr_engine_shutdown();
     return 0;
 }

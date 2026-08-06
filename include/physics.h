@@ -575,21 +575,27 @@ EntityResult physics_joint_create(
  */
 OverlapInfo physics_particle_overlap_get(Shape shape_1, Shape shape_2);
 
-/**
- * Set collision state between an entity pair for the current physics step.
- */
-EngineResult physics_collision_report_set(Entity entity, Entity target, bool state);
+/** Return whether two entities overlap during the current physics step. */
+bool physics_overlap_check(Entity entity, Entity target);
+/** Return current overlap geometry in the requested entity order. */
+OverlapInfo physics_overlap_get(Entity entity, Entity target);
+/** Return whether an overlap began during the current physics step. */
+bool physics_overlap_entered_check(Entity entity, Entity target);
+/** Return whether an overlap continued from the previous physics step. */
+bool physics_overlap_stayed_check(Entity entity, Entity target);
+/** Return whether an overlap ended during the current physics step. */
+bool physics_overlap_exited_check(Entity entity, Entity target);
 
-/**
- * Get collision state between an entity pair for the current physics step.
- */
-bool physics_contact_get(Entity entity, Entity target);
-/** Return whether a contact began during the current physics step. */
-bool physics_contact_entered_get(Entity entity, Entity target);
-/** Return whether a contact continued from the previous physics step. */
-bool physics_contact_stayed_get(Entity entity, Entity target);
-/** Return whether a contact ended during the current physics step. */
-bool physics_contact_exited_get(Entity entity, Entity target);
+/** Return whether two entities physically contacted during the current physics step. */
+bool physics_contact_check(Entity entity, Entity target);
+/** Return current contact geometry in the requested entity order. */
+OverlapInfo physics_contact_get(Entity entity, Entity target);
+/** Return whether a physical contact began during the current physics step. */
+bool physics_contact_entered_check(Entity entity, Entity target);
+/** Return whether a physical contact continued from the previous physics step. */
+bool physics_contact_stayed_check(Entity entity, Entity target);
+/** Return whether a physical contact ended during the current physics step. */
+bool physics_contact_exited_check(Entity entity, Entity target);
 
 /** Set an explicit simulation delta for each engine tick. */
 EngineResult physics_dt_per_tick_set(Time dt);

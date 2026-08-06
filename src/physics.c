@@ -255,18 +255,6 @@ bool physics_interaction_previous_get(
     );
 }
 
-bool physics_contact_current_get(Entity entity, Entity target) {
-    return physics_interaction_current_check(
-        entity, target, PHYSICS_INTERACTION_OVERLAP
-    );
-}
-
-bool physics_contact_previous_get(Entity entity, Entity target) {
-    return physics_interaction_previous_check(
-        entity, target, PHYSICS_INTERACTION_OVERLAP
-    );
-}
-
 static void physics_soft_body_entity_list_remove(Entity *values, uint32_t *count, Entity entity) {
     if(values == NULL || count == NULL) return;
     for(uint32_t i = 0; i < *count; i += 1) {
@@ -1991,27 +1979,7 @@ SoftBodyTriangleResult physics_soft_body_triangle_get(Entity triangle) {
     return ERROR_RESULT_MAKE_VALUE(SoftBodyTriangleResult, soft_body_triangles[index]);
 }
 
-EngineResult physics_collision_report_set(Entity entity, Entity target, bool state) {
-    EntityIndex index;
-    EngineResult result;
-
-    result = physics_live_index_get(entity, &index);
-    if(error_check(result)) return result;
-    result = physics_live_index_get(target, &index);
-    if(error_check(result)) return result;
-    result = state
-        ? physics_interaction_set_record(
-            &current_interactions,
-            entity,
-            target,
-            (OverlapInfo){.detected = true},
-            PHYSICS_INTERACTION_OVERLAP
-        )
-        : physics_interaction_set_remove(&current_interactions, entity, target);
-    if(error_check(result)) return result;
-    return error_result_value(true);
-}
-static bool physics_contact_entities_valid(Entity entity, Entity target) {
+static bool physics_interaction_entities_valid(Entity entity, Entity target) {
     EntityIndex index;
     EntityIndex target_index;
 
@@ -2019,27 +1987,97 @@ static bool physics_contact_entities_valid(Entity entity, Entity target) {
         entity_index_get(target, &target_index) && entity_index_alive_check(target_index);
 }
 
-bool physics_contact_get(Entity entity, Entity target) {
-    if(!physics_contact_entities_valid(entity, target)) return false;
-    return physics_contact_current_get(entity, target);
+static bool physics_interaction_flag_check(
+    Entity entity,
+    Entity target,
+    PhysicsInteractionFlags flags
+) {
+    return physics_interaction_entities_valid(entity, target) &&
+        physics_interaction_current_check(entity, target, flags);
 }
 
-bool physics_contact_entered_get(Entity entity, Entity target) {
-    if(!physics_contact_entities_valid(entity, target)) return false;
-    return physics_contact_current_get(entity, target) &&
-        !physics_contact_previous_get(entity, target);
+static OverlapInfo physics_interaction_overlap_get(
+    Entity entity,
+    Entity target,
+    PhysicsInteractionFlags flags
+) {
+    PhysicsInteraction interaction;
+
+    if(!physics_interaction_flag_check(entity, target, flags) ||
+            !physics_interaction_current_get(entity, target, &interaction)) {
+        return (OverlapInfo){.detected = false};
+    }
+    return interaction.overlap;
 }
 
-bool physics_contact_stayed_get(Entity entity, Entity target) {
-    if(!physics_contact_entities_valid(entity, target)) return false;
-    return physics_contact_current_get(entity, target) &&
-        physics_contact_previous_get(entity, target);
+static bool physics_interaction_entered_check(
+    Entity entity,
+    Entity target,
+    PhysicsInteractionFlags flags
+) {
+    if(!physics_interaction_entities_valid(entity, target)) return false;
+    return physics_interaction_current_check(entity, target, flags) &&
+        !physics_interaction_previous_check(entity, target, flags);
 }
 
-bool physics_contact_exited_get(Entity entity, Entity target) {
-    if(!physics_contact_entities_valid(entity, target)) return false;
-    return !physics_contact_current_get(entity, target) &&
-        physics_contact_previous_get(entity, target);
+static bool physics_interaction_stayed_check(
+    Entity entity,
+    Entity target,
+    PhysicsInteractionFlags flags
+) {
+    if(!physics_interaction_entities_valid(entity, target)) return false;
+    return physics_interaction_current_check(entity, target, flags) &&
+        physics_interaction_previous_check(entity, target, flags);
+}
+
+static bool physics_interaction_exited_check(
+    Entity entity,
+    Entity target,
+    PhysicsInteractionFlags flags
+) {
+    if(!physics_interaction_entities_valid(entity, target)) return false;
+    return !physics_interaction_current_check(entity, target, flags) &&
+        physics_interaction_previous_check(entity, target, flags);
+}
+
+bool physics_overlap_check(Entity entity, Entity target) {
+    return physics_interaction_flag_check(entity, target, PHYSICS_INTERACTION_OVERLAP);
+}
+
+OverlapInfo physics_overlap_get(Entity entity, Entity target) {
+    return physics_interaction_overlap_get(entity, target, PHYSICS_INTERACTION_OVERLAP);
+}
+
+bool physics_overlap_entered_check(Entity entity, Entity target) {
+    return physics_interaction_entered_check(entity, target, PHYSICS_INTERACTION_OVERLAP);
+}
+
+bool physics_overlap_stayed_check(Entity entity, Entity target) {
+    return physics_interaction_stayed_check(entity, target, PHYSICS_INTERACTION_OVERLAP);
+}
+
+bool physics_overlap_exited_check(Entity entity, Entity target) {
+    return physics_interaction_exited_check(entity, target, PHYSICS_INTERACTION_OVERLAP);
+}
+
+bool physics_contact_check(Entity entity, Entity target) {
+    return physics_interaction_flag_check(entity, target, PHYSICS_INTERACTION_CONTACT);
+}
+
+OverlapInfo physics_contact_get(Entity entity, Entity target) {
+    return physics_interaction_overlap_get(entity, target, PHYSICS_INTERACTION_CONTACT);
+}
+
+bool physics_contact_entered_check(Entity entity, Entity target) {
+    return physics_interaction_entered_check(entity, target, PHYSICS_INTERACTION_CONTACT);
+}
+
+bool physics_contact_stayed_check(Entity entity, Entity target) {
+    return physics_interaction_stayed_check(entity, target, PHYSICS_INTERACTION_CONTACT);
+}
+
+bool physics_contact_exited_check(Entity entity, Entity target) {
+    return physics_interaction_exited_check(entity, target, PHYSICS_INTERACTION_CONTACT);
 }
 
 EngineResult physics_dt_per_tick_set(Time dt) {
