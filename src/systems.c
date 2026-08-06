@@ -30,6 +30,7 @@ typedef struct SystemSoftBoundaryQuery {
     float t;
     bool solving;
     bool solved;
+    float position_fraction;
     ContactInfo contact;
 } SystemSoftBoundaryQuery;
 
@@ -859,7 +860,8 @@ static bool system_broadphase_pair_apply(Entity target, void *context) {
 }
 
 static void system_rigid_contact_constraint_solve(
-    SystemContactConstraint *constraint
+    SystemContactConstraint *constraint,
+    float position_fraction
 ) {
     ContactInfo result;
     Vec2D accumulated_normal;
@@ -868,26 +870,36 @@ static void system_rigid_contact_constraint_solve(
     EntityIndex second;
     OverlapInfo overlap;
     bool responds;
+    bool first_solve;
 
     if(constraint == NULL) return;
     first = constraint->value.rigid.first_index;
     second = constraint->value.rigid.second_index;
     overlap = constraint->value.rigid.overlap;
     responds = constraint->value.rigid.responds;
+    first_solve = !constraint->value.rigid.solved;
     accumulated_normal = constraint->value.rigid.contact.normal_impulse;
     accumulated_friction = constraint->value.rigid.contact.friction_impulse;
     result = responds
         ? system_resolve_collision(first, second, overlap,
-            !constraint->value.rigid.solved)
+            first_solve)
         : (ContactInfo){0};
-    result.normal_impulse.x += accumulated_normal.x;
-    result.normal_impulse.y += accumulated_normal.y;
-    result.friction_impulse.x += accumulated_friction.x;
-    result.friction_impulse.y += accumulated_friction.y;
-    constraint->value.rigid.contact = result;
+    if(first_solve) {
+        constraint->value.rigid.contact = result;
+    } else {
+        constraint->value.rigid.contact.normal_impulse = result.normal_impulse;
+        constraint->value.rigid.contact.friction_impulse = result.friction_impulse;
+    }
+    constraint->value.rigid.contact.normal_impulse.x += accumulated_normal.x;
+    constraint->value.rigid.contact.normal_impulse.y += accumulated_normal.y;
+    constraint->value.rigid.contact.friction_impulse.x += accumulated_friction.x;
+    constraint->value.rigid.contact.friction_impulse.y += accumulated_friction.y;
     constraint->value.rigid.solved = true;
     if(responds) {
-        if(physics_debug_stats_enabled) physics_debug_stats.contact_count += 1;
+        if(physics_debug_stats_enabled && first_solve) {
+            physics_debug_stats.contact_count += 1;
+        }
+        overlap.depth *= position_fraction;
         system_separate_entities_tuned(first, second, overlap);
         system_generate_global_hitbox_by_index(first);
         system_generate_global_hitbox_by_index(second);
@@ -1700,16 +1712,22 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
     if(inverse_mass_sum <= 0.0f) return true;
 
     positions[query->a].x -= overlap.normal.x * overlap.depth *
+        query->position_fraction *
         weight_a * inverse_mass_a / inverse_mass_sum;
     positions[query->a].y -= overlap.normal.y * overlap.depth *
+        query->position_fraction *
         weight_a * inverse_mass_a / inverse_mass_sum;
     positions[query->b].x -= overlap.normal.x * overlap.depth *
+        query->position_fraction *
         weight_b * inverse_mass_b / inverse_mass_sum;
     positions[query->b].y -= overlap.normal.y * overlap.depth *
+        query->position_fraction *
         weight_b * inverse_mass_b / inverse_mass_sum;
     positions[rigid].x += overlap.normal.x * overlap.depth *
+        query->position_fraction *
         inverse_mass_rigid / inverse_mass_sum;
     positions[rigid].y += overlap.normal.y * overlap.depth *
+        query->position_fraction *
         inverse_mass_rigid / inverse_mass_sum;
 
     relative_velocity = (Vec2D){
@@ -1837,11 +1855,16 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
             }
         }
     }
-    contact.normal_impulse.x += accumulated_normal.x;
-    contact.normal_impulse.y += accumulated_normal.y;
-    contact.friction_impulse.x += accumulated_friction.x;
-    contact.friction_impulse.y += accumulated_friction.y;
-    query->contact = contact;
+    if(!query->solved) {
+        query->contact = contact;
+    } else {
+        query->contact.normal_impulse = contact.normal_impulse;
+        query->contact.friction_impulse = contact.friction_impulse;
+    }
+    query->contact.normal_impulse.x += accumulated_normal.x;
+    query->contact.normal_impulse.y += accumulated_normal.y;
+    query->contact.friction_impulse.x += accumulated_friction.x;
+    query->contact.friction_impulse.y += accumulated_friction.y;
     query->solved = true;
     system_generate_global_hitbox_by_index(query->a);
     system_generate_global_hitbox_by_index(query->b);
@@ -1930,13 +1953,14 @@ static void system_soft_body_boundary_collisions_apply(void) {
     }
 }
 
-static void system_contact_constraints_solve(void) {
+static void system_contact_constraints_solve(float position_fraction) {
     for(size_t i = 0; i < system_contact_constraint_count; i += 1) {
         SystemContactConstraint *constraint = &system_contact_constraints[i];
 
         if(constraint->type == SYSTEM_CONTACT_CONSTRAINT_RIGID_PAIR) {
-            system_rigid_contact_constraint_solve(constraint);
+            system_rigid_contact_constraint_solve(constraint, position_fraction);
         } else if(constraint->type == SYSTEM_CONTACT_CONSTRAINT_SOFT_BOUNDARY) {
+            constraint->value.soft.position_fraction = position_fraction;
             (void)system_soft_boundary_pair_apply(
                 constraint->value.soft.rigid_entity, &constraint->value.soft);
         }
@@ -2139,7 +2163,6 @@ void system_physics_update(double dt) {
     system_angular_velocity_maximums_apply();
     system_orientations_update(dt);
     system_positions_update(dt);
-    system_joint_constraints_apply();
     system_axis_locks_apply();
     system_angle_locks_apply();
     system_transform_locks_apply();
@@ -2164,7 +2187,15 @@ void system_physics_update(double dt) {
         }
         phase_started = SDL_GetPerformanceCounter();
     }
-    system_contact_constraints_solve();
+    {
+        uint32_t iterations = physics_solver_iterations_get();
+        float position_fraction = 1.0f / (float)iterations;
+
+        for(uint32_t iteration = 0; iteration < iterations; iteration += 1) {
+            system_contact_constraints_solve(position_fraction);
+            system_joint_constraints_apply();
+        }
+    }
     system_contact_constraints_finalize();
     if(physics_debug_stats_enabled) {
         physics_debug_stats.response_ms = system_elapsed_ms(phase_started);
