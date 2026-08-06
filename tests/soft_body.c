@@ -95,6 +95,7 @@ int main(void) {
         EntityResult collision_node;
         EntityResult wall = rohr_entity_add();
         EntityIndexResult collision_node_index;
+        PositionResult wall_position;
         if(rohr_error_check(collision_body) || rohr_error_check(wall)) goto fail;
         collision_node = rohr_physics_soft_body_node_create(
             collision_body.result.value, (Position){11.0f, 0.0f}, 1.0f, 3.0f);
@@ -106,11 +107,15 @@ int main(void) {
         if(rohr_error_check(rohr_physics_position_set(wall.result.value, (Position){0.0f, 0.0f}))) goto fail;
         if(rohr_error_check(rohr_physics_hitbox_set(
                     wall.result.value, rohr_math_square_create(20.0f, 20.0f)))) goto fail;
-        if(rohr_error_check(rohr_physics_static_set(wall.result.value))) goto fail;
+        if(rohr_error_check(rohr_physics_dynamic_set(wall.result.value))) goto fail;
         rohr_system_physics_update(0.0);
         collision_node_index = rohr_entity_index_get(collision_node.result.value);
+        wall_position = rohr_physics_position_get(wall.result.value);
         if(rohr_error_check(collision_node_index) ||
+                rohr_error_check(wall_position) ||
                 positions[collision_node_index.result.value].x <= 11.0f ||
+                wall_position.result.value.x != 0.0f ||
+                wall_position.result.value.y != 0.0f ||
                 frictions[collision_node_index.result.value] != 0.5f ||
                 restitutions[collision_node_index.result.value] != 0.3f) goto fail;
     }

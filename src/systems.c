@@ -327,12 +327,14 @@ void system_separate_entities_tuned(
     bool dynamic_2 = physics_entity_movable_get(entity_2);
 
     float inv_mass_1 =
-        dynamic_1 && mass[entity_1] > 0.0f
+        dynamic_1 && entity_index_components_check(entity_1, MASS) &&
+            mass[entity_1] > 0.0f
         ? 1.0f / mass[entity_1]
         : 0.0f;
 
     float inv_mass_2 =
-        dynamic_2 && mass[entity_2] > 0.0f
+        dynamic_2 && entity_index_components_check(entity_2, MASS) &&
+            mass[entity_2] > 0.0f
         ? 1.0f / mass[entity_2]
         : 0.0f;
 
@@ -596,11 +598,13 @@ ContactInfo system_resolve_collision(Entity entity_1, Entity entity_2, OverlapIn
         .point = system_collision_contact_point(entity_1, entity_2, collision)
     };
 
-    if (entity_1_movable && mass[entity_1] > 0.0f) {
+    if (entity_1_movable && entity_index_components_check(entity_1, MASS) &&
+            mass[entity_1] > 0.0f) {
         inv_mass_1 = 1.0f / mass[entity_1];
     }
 
-    if (entity_2_movable && mass[entity_2] > 0.0f) {
+    if (entity_2_movable && entity_index_components_check(entity_2, MASS) &&
+            mass[entity_2] > 0.0f) {
         inv_mass_2 = 1.0f / mass[entity_2];
     }
 
@@ -776,7 +780,8 @@ static bool system_broadphase_pair_apply(Entity target, void *context) {
     );
     if(responds) {
         if(physics_debug_stats_enabled) physics_debug_stats.contact_count += 1;
-        system_separate_entities(query->source_index, target_index, overlap);
+        system_separate_entities_tuned(
+            query->source_index, target_index, overlap);
         system_generate_global_hitbox_by_index(query->source_index);
         system_generate_global_hitbox_by_index(target_index);
     }

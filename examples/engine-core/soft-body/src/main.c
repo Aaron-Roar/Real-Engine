@@ -338,7 +338,7 @@ static const float hub_radius = 5.0f;
 static const Mass hub_mass = 1.0f;
 static const float disk_radius = 15.0f;
 static const Mass disk_mass = 3.0f;
-static const Torque control_torque = 60000.0f;
+static const Torque control_torque = 600000.0f;
 static const AngularVelocity maximum_wheel_angular_velocity = 5.0f;
 static const Vec2D chassis_dimensions = {170.0f, 40.0f};
 static const Mass chassis_mass = 5.0f;
@@ -373,7 +373,7 @@ static const Position ramp_weld_points[RAMP_TRIANGLE_COUNT - 1] = {
     {340.0f, -180.0f}
 };
 static const float particle_radius = 3.0f;
-static const Mass particle_mass = 2;
+static const Mass particle_mass = 0.3;
 static const float particle_spacing = 17.0f;
 static const Position particle_spawn_origin = {438.5f, -170.0f};
 static const float camera_default_zoom = 1.0f;
