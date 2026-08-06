@@ -3,11 +3,13 @@
 #include "systems.h"
 #include "console.h"
 #include "aabb_tree.h"
+#include "contact_constraint.h"
+#include "constraint_solver.h"
+#include "joint_constraint.h"
 #include "math2d.h"
 #include <math.h>
 #include <float.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <time.h>
 
 Shape system_generate_global_hitbox(Entity entity);
@@ -15,67 +17,11 @@ Shape system_generate_global_hitbox(Entity entity);
 AABBTree physics_broadphase_tree = {.root = AABB_TREE_NODE_INVALID};
 static PhysicsDebugStats physics_debug_stats;
 static bool physics_debug_stats_enabled;
-
-typedef struct SystemSoftBoundaryQuery {
-    Entity node_a;
-    Entity node_b;
-    EntityIndex a;
-    EntityIndex b;
-    Shape shape;
-    Position start;
-    Position end;
-    Entity rigid_entity;
-    EntityIndex rigid;
-    OverlapInfo overlap;
-    float t;
-    bool solving;
-    bool solved;
-    float position_fraction;
-    ContactInfo contact;
-} SystemSoftBoundaryQuery;
-
-typedef enum SystemContactConstraintType {
-    SYSTEM_CONTACT_CONSTRAINT_RIGID_PAIR,
-    SYSTEM_CONTACT_CONSTRAINT_SOFT_BOUNDARY
-} SystemContactConstraintType;
-
-typedef struct SystemContactConstraint {
-    SystemContactConstraintType type;
-    union {
-        struct {
-            Entity first;
-            Entity second;
-            EntityIndex first_index;
-            EntityIndex second_index;
-            OverlapInfo overlap;
-            bool responds;
-            bool solved;
-            ContactInfo contact;
-        } rigid;
-        SystemSoftBoundaryQuery soft;
-    } value;
-} SystemContactConstraint;
-
-static SystemContactConstraint *system_contact_constraints;
-static size_t system_contact_constraint_count;
-static size_t system_contact_constraint_capacity;
-
-static bool system_contact_constraint_append(SystemContactConstraint constraint) {
-    SystemContactConstraint *constraints;
-    size_t capacity;
-
-    if(system_contact_constraint_count == system_contact_constraint_capacity) {
-        capacity = system_contact_constraint_capacity == 0
-            ? 64 : system_contact_constraint_capacity * 2;
-        constraints = realloc(system_contact_constraints,
-            capacity * sizeof(*constraints));
-        if(constraints == NULL) return false;
-        system_contact_constraints = constraints;
-        system_contact_constraint_capacity = capacity;
-    }
-    system_contact_constraints[system_contact_constraint_count++] = constraint;
-    return true;
-}
+static ContactConstraintList system_contact_constraints;
+static JointConstraintList system_joint_constraints;
+static bool system_hitbox_dirty[MAX_ENTITIES];
+static EntityIndex system_hitbox_dirty_entities[MAX_ENTITIES];
+static size_t system_hitbox_dirty_count;
 
 static double system_elapsed_ms(uint64_t start) {
     return (double)(SDL_GetPerformanceCounter() - start) * 1000.0 /
@@ -103,20 +49,24 @@ EngineResult physics_broadphase_init(void) {
     EngineResult result = aabb_tree_init(&physics_broadphase_tree, 0);
 
     if(result.kind == ERROR_RESULT_ERROR) return result;
-    if(!system_contact_constraint_append((SystemContactConstraint){0})) {
+    result = contact_constraint_list_init(&system_contact_constraints, 64);
+    if(result.kind == ERROR_RESULT_ERROR) {
         aabb_tree_destroy(&physics_broadphase_tree);
-        return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
+        return result;
     }
-    system_contact_constraint_count = 0;
+    result = joint_constraint_list_init(&system_joint_constraints, 16);
+    if(result.kind == ERROR_RESULT_ERROR) {
+        contact_constraint_list_destroy(&system_contact_constraints);
+        aabb_tree_destroy(&physics_broadphase_tree);
+        return result;
+    }
     return result;
 }
 
 void physics_broadphase_destroy(void) {
     aabb_tree_destroy(&physics_broadphase_tree);
-    free(system_contact_constraints);
-    system_contact_constraints = NULL;
-    system_contact_constraint_count = 0;
-    system_contact_constraint_capacity = 0;
+    contact_constraint_list_destroy(&system_contact_constraints);
+    joint_constraint_list_destroy(&system_joint_constraints);
 }
 
 static bool system_entity_from_index_get(EntityIndex index, Entity *entity) {
@@ -166,6 +116,22 @@ static void system_generate_global_hitbox_by_index(EntityIndex index) {
         return;
     }
     system_generate_global_hitbox(entity);
+}
+
+static void system_hitbox_dirty_add(EntityIndex index) {
+    if(index >= MAX_ENTITIES || system_hitbox_dirty[index]) return;
+    system_hitbox_dirty[index] = true;
+    system_hitbox_dirty_entities[system_hitbox_dirty_count++] = index;
+}
+
+static void system_hitbox_dirty_flush(void) {
+    for(size_t i = 0; i < system_hitbox_dirty_count; i += 1) {
+        EntityIndex index = system_hitbox_dirty_entities[i];
+
+        system_generate_global_hitbox_by_index(index);
+        system_hitbox_dirty[index] = false;
+    }
+    system_hitbox_dirty_count = 0;
 }
 
 static void system_by_index_delete(EntityIndex index) {
@@ -846,7 +812,8 @@ static bool system_broadphase_pair_apply(Entity target, void *context) {
     if(physics_debug_stats_enabled) physics_debug_stats.overlap_count += 1;
     responds = entity_index_components_check(query->source_index, COLLISION) &&
         entity_index_components_check(target_index, COLLISION);
-    return system_contact_constraint_append((SystemContactConstraint){
+    return contact_constraint_list_append(&system_contact_constraints,
+        (SystemContactConstraint){
         .type = SYSTEM_CONTACT_CONSTRAINT_RIGID_PAIR,
         .value.rigid = {
             .first = query->source,
@@ -901,8 +868,8 @@ static void system_rigid_contact_constraint_solve(
         }
         overlap.depth *= position_fraction;
         system_separate_entities_tuned(first, second, overlap);
-        system_generate_global_hitbox_by_index(first);
-        system_generate_global_hitbox_by_index(second);
+        system_hitbox_dirty_add(first);
+        system_hitbox_dirty_add(second);
     }
 }
 
@@ -1565,8 +1532,27 @@ static void system_joint_spring_forces_apply(void) {
     }
 }
 
+static void system_joint_constraints_gather(void) {
+    joint_constraint_list_clear(&system_joint_constraints);
+    for(EntityIndex joint_entity = 0;
+            joint_entity < joints_pool.capacity;
+            joint_entity += 1) {
+        if(!joints_pool.used[joint_entity] ||
+                !entity_index_alive_check(joint_entity) ||
+                !entity_index_components_check(joint_entity, JOINT)) continue;
+        if(joints[joint_entity].type == JOINT_PIN ||
+                joints[joint_entity].type == JOINT_WELD) {
+            (void)joint_constraint_list_append(
+                &system_joint_constraints,
+                joint_entity);
+        }
+    }
+}
+
 static void system_joint_constraints_apply(void) {
-    for(Entity joint_entity = 0; joint_entity < MAX_ENTITIES; joint_entity += 1) {
+    for(size_t i = 0; i < system_joint_constraints.count; i += 1) {
+        EntityIndex joint_entity = system_joint_constraints.values[i];
+
         if(!entity_index_alive_check(joint_entity) ||
                 !entity_index_components_check(joint_entity, JOINT)) continue;
         if(joints[joint_entity].type == JOINT_PIN) {
@@ -1680,10 +1666,12 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
         query->t = fmaxf(0.0f, fminf(1.0f, t));
         query->solving = true;
         {
-            bool appended = system_contact_constraint_append((SystemContactConstraint){
-                .type = SYSTEM_CONTACT_CONSTRAINT_SOFT_BOUNDARY,
-                .value.soft = *query
-            });
+            bool appended = contact_constraint_list_append(
+                &system_contact_constraints,
+                (SystemContactConstraint){
+                    .type = SYSTEM_CONTACT_CONSTRAINT_SOFT_BOUNDARY,
+                    .value.soft = *query
+                });
             query->solving = false;
             return appended;
         }
@@ -1866,9 +1854,9 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
     query->contact.friction_impulse.x += accumulated_friction.x;
     query->contact.friction_impulse.y += accumulated_friction.y;
     query->solved = true;
-    system_generate_global_hitbox_by_index(query->a);
-    system_generate_global_hitbox_by_index(query->b);
-    system_generate_global_hitbox_by_index(rigid);
+    system_hitbox_dirty_add(query->a);
+    system_hitbox_dirty_add(query->b);
+    system_hitbox_dirty_add(rigid);
     return true;
 }
 
@@ -1953,9 +1941,14 @@ static void system_soft_body_boundary_collisions_apply(void) {
     }
 }
 
-static void system_contact_constraints_solve(float position_fraction) {
-    for(size_t i = 0; i < system_contact_constraint_count; i += 1) {
-        SystemContactConstraint *constraint = &system_contact_constraints[i];
+static void system_contact_constraints_solve_callback(
+    ContactConstraintList *constraints,
+    float position_fraction,
+    void *context
+) {
+    (void)context;
+    for(size_t i = 0; i < constraints->count; i += 1) {
+        SystemContactConstraint *constraint = &constraints->values[i];
 
         if(constraint->type == SYSTEM_CONTACT_CONSTRAINT_RIGID_PAIR) {
             system_rigid_contact_constraint_solve(constraint, position_fraction);
@@ -1965,11 +1958,16 @@ static void system_contact_constraints_solve(float position_fraction) {
                 constraint->value.soft.rigid_entity, &constraint->value.soft);
         }
     }
+    system_hitbox_dirty_flush();
 }
 
-static void system_contact_constraints_finalize(void) {
-    for(size_t i = 0; i < system_contact_constraint_count; i += 1) {
-        SystemContactConstraint *constraint = &system_contact_constraints[i];
+static void system_contact_constraints_finalize_callback(
+    ContactConstraintList *constraints,
+    void *context
+) {
+    (void)context;
+    for(size_t i = 0; i < constraints->count; i += 1) {
+        SystemContactConstraint *constraint = &constraints->values[i];
 
         if(constraint->type == SYSTEM_CONTACT_CONSTRAINT_RIGID_PAIR) {
             system_interaction_by_index_record(
@@ -1991,6 +1989,11 @@ static void system_contact_constraints_finalize(void) {
                 PHYSICS_INTERACTION_OVERLAP | PHYSICS_INTERACTION_CONTACT);
         }
     }
+}
+
+static void system_joint_constraints_solve_callback(void *context) {
+    (void)context;
+    system_joint_constraints_apply();
 }
 
 static bool system_soft_node_rigid_filter_allows(EntityIndex node, EntityIndex rigid) {
@@ -2150,7 +2153,8 @@ void system_physics_update(double dt) {
     uint64_t phase_started;
 
     physics_debug_stats = (PhysicsDebugStats){0};
-    system_contact_constraint_count = 0;
+    contact_constraint_list_clear(&system_contact_constraints);
+    joint_constraint_list_clear(&system_joint_constraints);
     physics_interactions_step_begin();
     system_force_torque_accelerations_clear();
     system_joint_spring_forces_apply();
@@ -2187,16 +2191,14 @@ void system_physics_update(double dt) {
         }
         phase_started = SDL_GetPerformanceCounter();
     }
-    {
-        uint32_t iterations = physics_solver_iterations_get();
-        float position_fraction = 1.0f / (float)iterations;
-
-        for(uint32_t iteration = 0; iteration < iterations; iteration += 1) {
-            system_contact_constraints_solve(position_fraction);
-            system_joint_constraints_apply();
-        }
-    }
-    system_contact_constraints_finalize();
+    system_joint_constraints_gather();
+    constraint_solver_run(
+        &system_contact_constraints,
+        physics_solver_iterations_get(),
+        system_contact_constraints_solve_callback,
+        system_joint_constraints_solve_callback,
+        system_contact_constraints_finalize_callback,
+        NULL);
     if(physics_debug_stats_enabled) {
         physics_debug_stats.response_ms = system_elapsed_ms(phase_started);
     }

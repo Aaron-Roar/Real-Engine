@@ -50,6 +50,9 @@ set(ROHR_SDL3_TTF_TARGET SDL3_ttf::SDL3_ttf-static)
 set(ROHR_ENGINE_SOURCES
     src/aabb_tree.c
     src/console.c
+    src/contact_constraint.c
+    src/constraint_solver.c
+    src/joint_constraint.c
     src/engine.c
     src/error.c
     src/entity_components.c
@@ -189,6 +192,12 @@ if(ROHR_BUILD_TESTS)
     set_target_properties(physics_interaction_set_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
     add_test(NAME physics_interaction_set COMMAND physics_interaction_set_test)
 
+    add_executable(constraint_solver_test tests/constraint_solver.c)
+    target_include_directories(constraint_solver_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(constraint_solver_test PRIVATE rohr_engine)
+    set_target_properties(constraint_solver_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+    add_test(NAME constraint_solver COMMAND constraint_solver_test)
+
     add_executable(editor_component_registry_test
         tests/editor_component_registry.c
     )
@@ -269,6 +278,7 @@ if(ROHR_BUILD_TESTS)
         entity_pair_set
         aabb_tree
         physics_interaction_set
+        constraint_solver
         editor_component_registry
         generated_components
         PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy"
@@ -287,6 +297,7 @@ if(ROHR_BUILD_TESTS)
         entity_pair_set_test
         aabb_tree_test
         physics_interaction_set_test
+        constraint_solver_test
         editor_component_registry_test
         generated_components_test
     )
