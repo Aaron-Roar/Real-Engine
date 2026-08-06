@@ -167,15 +167,28 @@ void editor_viewport_draw(
             Position start = editor_vertex_world_get(object, i);
             Position end = editor_vertex_world_get(
                 object, (i + 1) % object->hitbox.vertex_count);
+            Color edge_color = line_color;
 
-            editor_line_draw(start, end, line_color);
+            if(object->id == project->selected &&
+                    state->mode == EDITOR_VIEWPORT_LINE &&
+                    state->selected_line == i) {
+                edge_color = (Color){255, 215, 70, 255};
+            }
+
+            editor_line_draw(start, end, edge_color);
             if(state->mode > EDITOR_VIEWPORT_OBJECT &&
                     object->id == project->selected) {
+                Color vertex_color = object->hitbox.vertices[i].position_locked
+                    ? (Color){245, 165, 70, 255}
+                    : (Color){235, 240, 248, 255};
+
+                if(state->mode == EDITOR_VIEWPORT_VERTEX &&
+                        state->selected_vertex == i) {
+                    vertex_color = (Color){255, 215, 70, 255};
+                }
                 (void)rohr_graphics_screen_quad_draw(
                     start, 10.0f, 10.0f, 0.0f,
-                    object->hitbox.vertices[i].position_locked
-                        ? (Color){245, 165, 70, 255}
-                        : (Color){235, 240, 248, 255});
+                    vertex_color);
             }
         }
     }

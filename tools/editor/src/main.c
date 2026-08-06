@@ -78,8 +78,6 @@ int main(void) {
     TextAsset lines_label = {0};
     TextAsset vertex_labels[EDITOR_HITBOX_VERTEX_MAX] = {0};
     TextAsset line_labels[EDITOR_HITBOX_VERTEX_MAX] = {0};
-    TextAsset vertex_editor_label = {0};
-    TextAsset line_editor_label = {0};
     TextAsset lock_label = {0};
     TextAsset unlock_label = {0};
     TextAsset add_vertex_label = {0};
@@ -131,8 +129,6 @@ int main(void) {
             !editor_text_create(&font, "Hitbox", &hitbox_label) ||
             !editor_text_create(&font, "Vertices", &vertices_label) ||
             !editor_text_create(&font, "Lines", &lines_label) ||
-            !editor_text_create(&font, "Vertex Editor", &vertex_editor_label) ||
-            !editor_text_create(&font, "Line Editor", &line_editor_label) ||
             !editor_text_create(&font, "Lock Position", &lock_label) ||
             !editor_text_create(&font, "Unlock Position", &unlock_label) ||
             !editor_text_create(&font, "Add Vertex", &add_vertex_label) ||
@@ -243,7 +239,8 @@ int main(void) {
             if(selected != NULL && viewport_state.selected_vertex < selected->hitbox.vertex_count) {
                 EditorVertex *vertex = &selected->hitbox.vertices[viewport_state.selected_vertex];
                 UISliderConfig slider = rohr_ui_slider_config_default_get();
-                rohr_ui_label(&vertex_editor_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                rohr_ui_label(&vertex_labels[viewport_state.selected_vertex],
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     48.0f, EDITOR_TOOLS_WIDTH - 16.0f, 24.0f});
                 if(rohr_ui_button("editor.vertex.lock",
                         vertex->position_locked ? &unlock_label : &lock_label,
@@ -275,7 +272,7 @@ int main(void) {
                 bool constrained = a->position_locked && b->position_locked;
                 float length = editor_project_hitbox_line_length_get(selected, line);
                 UISliderConfig slider = rohr_ui_slider_config_default_get();
-                rohr_ui_label(&line_editor_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                rohr_ui_label(&line_labels[line], (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     48.0f, EDITOR_TOOLS_WIDTH - 16.0f, 24.0f});
                 if(rohr_ui_button("editor.line.add_vertex", &add_vertex_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 82.0f,
@@ -391,8 +388,6 @@ int main(void) {
     rohr_graphics_text_destroy(&add_vertex_label);
     rohr_graphics_text_destroy(&unlock_label);
     rohr_graphics_text_destroy(&lock_label);
-    rohr_graphics_text_destroy(&line_editor_label);
-    rohr_graphics_text_destroy(&vertex_editor_label);
     for(uint32_t i = 0; i < EDITOR_HITBOX_VERTEX_MAX; i += 1) {
         rohr_graphics_text_destroy(&line_labels[i]);
         rohr_graphics_text_destroy(&vertex_labels[i]);
@@ -422,8 +417,6 @@ fail:
     rohr_graphics_text_destroy(&add_vertex_label);
     rohr_graphics_text_destroy(&unlock_label);
     rohr_graphics_text_destroy(&lock_label);
-    rohr_graphics_text_destroy(&line_editor_label);
-    rohr_graphics_text_destroy(&vertex_editor_label);
     for(uint32_t i = 0; i < EDITOR_HITBOX_VERTEX_MAX; i += 1) {
         rohr_graphics_text_destroy(&line_labels[i]);
         rohr_graphics_text_destroy(&vertex_labels[i]);
