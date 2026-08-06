@@ -58,6 +58,50 @@ static void editor_numeric_field_disabled_draw(
     rohr_ui_label(display, bounds);
 }
 
+static UIButtonStyle editor_delete_button_style_get(void) {
+    UIButtonStyle style = rohr_ui_button_style_default_get();
+
+    style.idle = (Color){145, 42, 48, 255};
+    style.hovered = (Color){181, 53, 60, 255};
+    style.pressed = (Color){112, 31, 37, 255};
+    style.disabled = (Color){75, 35, 38, 210};
+    return style;
+}
+
+static bool editor_selected_delete(
+    EditorProject *project,
+    EditorViewportState *viewport_state
+) {
+    EditorObject *selected;
+
+    if(project == NULL || viewport_state == NULL) return false;
+    selected = editor_project_selected_get(project);
+    if(selected == NULL) return false;
+    if(viewport_state->mode == EDITOR_VIEWPORT_OBJECT) {
+        if(!editor_project_object_remove(project, selected->id)) return false;
+        editor_viewport_hitbox_editor_exit(viewport_state);
+        return true;
+    }
+    if(viewport_state->mode == EDITOR_VIEWPORT_HITBOX) {
+        if(!editor_project_hitbox_remove(selected)) return false;
+        editor_viewport_object_editor_enter(viewport_state);
+        return true;
+    }
+    if(viewport_state->mode == EDITOR_VIEWPORT_VERTEX) {
+        if(!editor_project_hitbox_vertex_remove(
+                selected, viewport_state->selected_vertex)) return false;
+        editor_viewport_hitbox_editor_enter(viewport_state);
+        return true;
+    }
+    if(viewport_state->mode == EDITOR_VIEWPORT_LINE) {
+        if(!editor_project_hitbox_line_remove(
+                selected, viewport_state->selected_line)) return false;
+        editor_viewport_hitbox_editor_enter(viewport_state);
+        return true;
+    }
+    return false;
+}
+
 static bool editor_object_name_key_apply(EditorObject *object, SDL_Keycode key) {
     size_t length;
 
@@ -95,6 +139,10 @@ int main(void) {
     TextAsset lock_label = {0};
     TextAsset unlock_label = {0};
     TextAsset add_vertex_label = {0};
+    TextAsset delete_hitbox_label = {0};
+    TextAsset delete_vertex_label = {0};
+    TextAsset delete_line_label = {0};
+    TextAsset delete_object_label = {0};
     TextAsset constrained_label = {0};
     TextAsset x_label = {0};
     TextAsset y_label = {0};
@@ -150,6 +198,10 @@ int main(void) {
             !editor_text_create(&font, "Lock Position", &lock_label) ||
             !editor_text_create(&font, "Unlock Position", &unlock_label) ||
             !editor_text_create(&font, "Add Vertex", &add_vertex_label) ||
+            !editor_text_create(&font, "Delete Hitbox", &delete_hitbox_label) ||
+            !editor_text_create(&font, "Delete Vertex", &delete_vertex_label) ||
+            !editor_text_create(&font, "Delete Line", &delete_line_label) ||
+            !editor_text_create(&font, "Delete Object", &delete_object_label) ||
             !editor_text_create(&font, "Line distance fully constrained", &constrained_label) ||
             !editor_text_create(&font, "X", &x_label) ||
             !editor_text_create(&font, "Y", &y_label) ||
@@ -199,6 +251,10 @@ int main(void) {
             } else {
                 running = false;
             }
+        }
+        if(viewport_state.mode != EDITOR_VIEWPORT_HIERARCHY &&
+                rohr_controller_key_pressed_get(&keyboard, SDLK_DELETE)) {
+            if(editor_selected_delete(&project, &viewport_state)) name_editing = false;
         }
         if(!running) break;
 
@@ -255,6 +311,18 @@ int main(void) {
                             editor_viewport_line_editor_enter(&viewport_state, i);
                         }
                     }
+                    {
+                        UIButtonStyle delete_style = editor_delete_button_style_get();
+                        float delete_y = base + 40.0f +
+                            (float)selected->hitbox.vertex_count * 27.0f;
+
+                        if(rohr_ui_button("editor.hitbox.delete", &delete_hitbox_label,
+                                (UIRect){EDITOR_VIEWPORT_WIDTH + 18.0f, delete_y,
+                                    EDITOR_TOOLS_WIDTH - 26.0f, 30.0f},
+                                &delete_style).clicked) {
+                            (void)editor_selected_delete(&project, &viewport_state);
+                        }
+                    }
                 }
             }
         } else if(viewport_state.mode == EDITOR_VIEWPORT_VERTEX) {
@@ -299,6 +367,18 @@ int main(void) {
                     vertex->position.x = rohr_ui_slider("editor.vertex.x", vertex->position.x, &slider).value;
                     slider.center.y = 227.0f;
                     vertex->position.y = rohr_ui_slider("editor.vertex.y", vertex->position.y, &slider).value;
+                }
+                {
+                    UIButtonStyle delete_style = editor_delete_button_style_get();
+                    UIRect delete_bounds = {EDITOR_VIEWPORT_WIDTH + 10.0f, 260.0f,
+                        EDITOR_TOOLS_WIDTH - 20.0f, 30.0f};
+                    if(selected->hitbox.vertex_count <= EDITOR_HITBOX_VERTEX_MIN) {
+                        rohr_ui_button_disabled(delete_bounds, &delete_style);
+                        rohr_ui_label(&delete_vertex_label, delete_bounds);
+                    } else if(rohr_ui_button("editor.vertex.delete", &delete_vertex_label,
+                            delete_bounds, &delete_style).clicked) {
+                        (void)editor_selected_delete(&project, &viewport_state);
+                    }
                 }
             }
         } else if(viewport_state.mode == EDITOR_VIEWPORT_LINE) {
@@ -345,6 +425,18 @@ int main(void) {
                     (void)editor_project_hitbox_line_length_set(selected, line,
                         rohr_ui_slider("editor.line.length", length, &slider).value);
                 }
+                {
+                    UIButtonStyle delete_style = editor_delete_button_style_get();
+                    UIRect delete_bounds = {EDITOR_VIEWPORT_WIDTH + 10.0f, 238.0f,
+                        EDITOR_TOOLS_WIDTH - 20.0f, 30.0f};
+                    if(selected->hitbox.vertex_count <= EDITOR_HITBOX_VERTEX_MIN) {
+                        rohr_ui_button_disabled(delete_bounds, &delete_style);
+                        rohr_ui_label(&delete_line_label, delete_bounds);
+                    } else if(rohr_ui_button("editor.line.delete", &delete_line_label,
+                            delete_bounds, &delete_style).clicked) {
+                        (void)editor_selected_delete(&project, &viewport_state);
+                    }
+                }
             }
         } else if(viewport_state.mode == EDITOR_VIEWPORT_OBJECT) {
             EditorObject *selected = editor_project_selected_get(&project);
@@ -375,6 +467,17 @@ int main(void) {
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 18.0f, 100.0f,
                             EDITOR_TOOLS_WIDTH - 26.0f, 30.0f}, NULL).clicked) {
                     editor_viewport_hitbox_editor_enter(&viewport_state);
+                }
+                {
+                    UIButtonStyle delete_style = editor_delete_button_style_get();
+                    if(rohr_ui_button("editor.object.delete", &delete_object_label,
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 146.0f,
+                                EDITOR_TOOLS_WIDTH - 20.0f, 34.0f},
+                            &delete_style).clicked) {
+                        if(editor_selected_delete(&project, &viewport_state)) {
+                            name_editing = false;
+                        }
+                    }
                 }
             }
         } else {
@@ -437,6 +540,10 @@ int main(void) {
     rohr_graphics_text_destroy(&y_label);
     rohr_graphics_text_destroy(&x_label);
     rohr_graphics_text_destroy(&constrained_label);
+    rohr_graphics_text_destroy(&delete_object_label);
+    rohr_graphics_text_destroy(&delete_line_label);
+    rohr_graphics_text_destroy(&delete_vertex_label);
+    rohr_graphics_text_destroy(&delete_hitbox_label);
     rohr_graphics_text_destroy(&add_vertex_label);
     rohr_graphics_text_destroy(&unlock_label);
     rohr_graphics_text_destroy(&lock_label);
@@ -469,6 +576,10 @@ fail:
     rohr_graphics_text_destroy(&y_label);
     rohr_graphics_text_destroy(&x_label);
     rohr_graphics_text_destroy(&constrained_label);
+    rohr_graphics_text_destroy(&delete_object_label);
+    rohr_graphics_text_destroy(&delete_line_label);
+    rohr_graphics_text_destroy(&delete_vertex_label);
+    rohr_graphics_text_destroy(&delete_hitbox_label);
     rohr_graphics_text_destroy(&add_vertex_label);
     rohr_graphics_text_destroy(&unlock_label);
     rohr_graphics_text_destroy(&lock_label);

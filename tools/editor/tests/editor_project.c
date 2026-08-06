@@ -19,9 +19,21 @@ int main(void) {
     if(!second->has_hitbox || second->hitbox.vertex_count != 3) return 1;
     if(!editor_project_hitbox_vertex_insert(&project, second, 0) ||
             second->hitbox.vertex_count != 4) return 1;
+    if(!editor_project_hitbox_line_remove(second, 0) ||
+            second->hitbox.vertex_count != 3 ||
+            editor_project_hitbox_vertex_remove(second, 0)) return 1;
+    if(!editor_project_hitbox_vertex_insert(&project, second, 0) ||
+            !editor_project_hitbox_vertex_remove(second, 1) ||
+            second->hitbox.vertex_count != 3) return 1;
     second->hitbox.vertices[0].position_locked = true;
     if(!editor_project_hitbox_line_length_set(second, 0, 100.0f)) return 1;
     second->hitbox.vertices[1].position_locked = true;
     if(editor_project_hitbox_line_length_set(second, 0, 50.0f)) return 1;
+    if(!editor_project_hitbox_remove(second) || second->has_hitbox ||
+            second->hitbox.vertex_count != 0 ||
+            editor_project_hitbox_remove(second)) return 1;
+    if(!editor_project_object_remove(&project, second->id) ||
+            project.object_count != 1 || project.selected != EDITOR_OBJECT_INVALID ||
+            editor_project_object_remove(&project, second->id)) return 1;
     return 0;
 }

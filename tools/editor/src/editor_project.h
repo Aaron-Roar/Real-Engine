@@ -42,9 +42,13 @@ typedef struct EditorProject {
 
 void editor_project_init(EditorProject *project);
 EditorObject *editor_project_object_add(EditorProject *project, Position position);
+bool editor_project_object_remove(EditorProject *project, EditorObjectId id);
 EditorObject *editor_project_selected_get(EditorProject *project);
 bool editor_project_object_select(EditorProject *project, EditorObjectId id);
 void editor_project_hitbox_add(EditorProject *project, EditorObject *object);
+bool editor_project_hitbox_remove(EditorObject *object);
+bool editor_project_hitbox_vertex_remove(EditorObject *object, uint32_t vertex_index);
+bool editor_project_hitbox_line_remove(EditorObject *object, uint32_t line_index);
 bool editor_project_hitbox_vertex_insert(EditorProject *project, EditorObject *object,
     uint32_t line_index);
 float editor_project_hitbox_line_length_get(const EditorObject *object,

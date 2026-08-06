@@ -55,6 +55,23 @@ EditorObject *editor_project_object_add(EditorProject *project, Position positio
     return object;
 }
 
+bool editor_project_object_remove(EditorProject *project, EditorObjectId id) {
+    size_t index;
+
+    if(project == NULL || id == EDITOR_OBJECT_INVALID) return false;
+    for(index = 0; index < project->object_count; index += 1) {
+        if(project->objects[index].id == id) break;
+    }
+    if(index == project->object_count) return false;
+    for(size_t i = index + 1; i < project->object_count; i += 1) {
+        project->objects[i - 1] = project->objects[i];
+    }
+    project->object_count -= 1;
+    project->objects[project->object_count] = (EditorObject){0};
+    if(project->selected == id) project->selected = EDITOR_OBJECT_INVALID;
+    return true;
+}
+
 EditorObject *editor_project_selected_get(EditorProject *project) {
     if(project == NULL || project->selected == EDITOR_OBJECT_INVALID) return NULL;
     for(size_t i = 0; i < project->object_count; i += 1) {
@@ -77,6 +94,35 @@ void editor_project_hitbox_add(EditorProject *project, EditorObject *object) {
     if(project == NULL || object == NULL) return;
     object->has_hitbox = true;
     editor_hitbox_regular_set(project, &object->hitbox, EDITOR_HITBOX_VERTEX_MIN);
+}
+
+bool editor_project_hitbox_remove(EditorObject *object) {
+    if(object == NULL || !object->has_hitbox) return false;
+    object->has_hitbox = false;
+    object->hitbox = (EditorHitbox){0};
+    return true;
+}
+
+bool editor_project_hitbox_vertex_remove(EditorObject *object, uint32_t vertex_index) {
+    EditorHitbox *hitbox;
+
+    if(object == NULL || !object->has_hitbox) return false;
+    hitbox = &object->hitbox;
+    if(hitbox->vertex_count <= EDITOR_HITBOX_VERTEX_MIN ||
+            vertex_index >= hitbox->vertex_count) return false;
+    for(uint32_t i = vertex_index + 1; i < hitbox->vertex_count; i += 1) {
+        hitbox->vertices[i - 1] = hitbox->vertices[i];
+    }
+    hitbox->vertex_count -= 1;
+    hitbox->vertices[hitbox->vertex_count] = (EditorVertex){0};
+    return true;
+}
+
+bool editor_project_hitbox_line_remove(EditorObject *object, uint32_t line_index) {
+    if(object == NULL || !object->has_hitbox ||
+            line_index >= object->hitbox.vertex_count) return false;
+    return editor_project_hitbox_vertex_remove(object,
+        (line_index + 1) % object->hitbox.vertex_count);
 }
 
 bool editor_project_hitbox_vertex_insert(EditorProject *project, EditorObject *object,
