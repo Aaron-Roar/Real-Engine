@@ -104,7 +104,7 @@ typedef enum {
     JOINT                       = 1 << 14,
     /** Entity has a lifetime expiry. */
     LIFETIME                    = 1 << 15,
-    /** Entity is treated as a particle by collision/render helpers. */
+    /** Translation-only circular body used by collision/render helpers. */
     PARTICLE                    = 1 << 16,
     /** Entity has an animated sprite. */
     ANIMATED_SPRITE             = 1 << 17,

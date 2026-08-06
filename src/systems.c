@@ -170,7 +170,8 @@ void system_orientations_update(double dt) {
         if(!system_alive_index_at(alive_position, &i)) {
             continue;
         }
-        if(physics_entity_movable_get(i)) {
+        if(physics_entity_movable_get(i) &&
+                !entity_index_components_check(i, PARTICLE)) {
             orientations[i] = orientations[i] + angular_velocities[i]*dt;
         }
     }
@@ -185,6 +186,10 @@ void system_angular_velocities_update(double dt) {
             continue;
         }
         if(physics_entity_movable_get(i)) {
+            if(entity_index_components_check(i, PARTICLE)) {
+                angular_velocities[i] = 0.0f;
+                continue;
+            }
             angular_velocities[i] += (angular_accelerations[i] + torque_angular_accelerations[i]) * dt;
         }
     }
@@ -497,8 +502,12 @@ Vec2D system_friction_impulse_apply(
     float inv_inertia_1,
     float inv_inertia_2
 ) {
-    Vec2D angular_v1 = math_angular_velocity_cross_vec(angular_velocities[entity_1], r1);
-    Vec2D angular_v2 = math_angular_velocity_cross_vec(angular_velocities[entity_2], r2);
+    Vec2D angular_v1 = entity_index_components_check(entity_1, PARTICLE)
+        ? (Vec2D){0}
+        : math_angular_velocity_cross_vec(angular_velocities[entity_1], r1);
+    Vec2D angular_v2 = entity_index_components_check(entity_2, PARTICLE)
+        ? (Vec2D){0}
+        : math_angular_velocity_cross_vec(angular_velocities[entity_2], r2);
 
     Vec2D contact_v1 = {
         .x = velocities[entity_1].x + angular_v1.x,
@@ -615,12 +624,12 @@ ContactInfo system_resolve_collision(Entity entity_1, Entity entity_2, OverlapIn
     Vec2D rotational_velocity_1 = {0};
     Vec2D rotational_velocity_2 = {0};
 
-    if (entity_1_movable) {
+    if (entity_1_movable && !entity_index_components_check(entity_1, PARTICLE)) {
         rotational_velocity_1 =
             math_angular_velocity_cross_vec(angular_velocities[entity_1], r1);
     }
 
-    if (entity_2_movable) {
+    if (entity_2_movable && !entity_index_components_check(entity_2, PARTICLE)) {
         rotational_velocity_2 =
             math_angular_velocity_cross_vec(angular_velocities[entity_2], r2);
     }
@@ -659,34 +668,17 @@ ContactInfo system_resolve_collision(Entity entity_1, Entity entity_2, OverlapIn
     float inv_inertia_1 = 0.0f;
     float inv_inertia_2 = 0.0f;
 
-    if (entity_1_movable) {
-        float inertia_1 = 0;
-        if(entity_index_components_check(entity_1, PARTICLE)) {
-            inertia_1 = physics_circle_moment_of_inertia(hit_boxes[entity_1], mass[entity_1]);
-        } else {
-            inertia_1 =
-            physics_polygon_moment_of_inertia(hit_boxes[entity_1], mass[entity_1]);
-
-        }
+    if (entity_1_movable && !entity_index_components_check(entity_1, PARTICLE)) {
+        float inertia_1 = physics_polygon_moment_of_inertia(
+            hit_boxes[entity_1], mass[entity_1]);
         if (inertia_1 > 0.0f) {
             inv_inertia_1 = 1.0f / inertia_1;
         }
     }
 
-    if (entity_2_movable) {
-        float inertia_2 = 0.0f;
-
-        if(entity_index_components_check(entity_2, PARTICLE)) {
-            inertia_2 = physics_circle_moment_of_inertia(
-                hit_boxes[entity_2],
-                mass[entity_2]
-            );
-        } else {
-            inertia_2 = physics_polygon_moment_of_inertia(
-                hit_boxes[entity_2],
-                mass[entity_2]
-            );
-        }
+    if (entity_2_movable && !entity_index_components_check(entity_2, PARTICLE)) {
+        float inertia_2 = physics_polygon_moment_of_inertia(
+            hit_boxes[entity_2], mass[entity_2]);
 
         if(inertia_2 > 0.0f) {
             inv_inertia_2 = 1.0f / inertia_2;
@@ -1679,7 +1671,6 @@ void system_physics_update(double dt) {
     system_transform_locks_apply();
 
     system_generate_global_hitboxes();
-    system_soft_body_node_rigid_collisions_apply();
     if(physics_debug_stats_enabled) phase_started = SDL_GetPerformanceCounter();
     system_broadphase_build();
     if(physics_debug_stats_enabled) {

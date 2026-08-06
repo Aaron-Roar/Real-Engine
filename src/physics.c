@@ -1735,16 +1735,26 @@ EntityResult physics_soft_body_node_create(Entity soft_body, Position position,
             physics_velocity_set(node.result.value, (Velocity){0}).kind == ERROR_RESULT_ERROR ||
             physics_acceleration_set(node.result.value, (Acceleration){0}).kind == ERROR_RESULT_ERROR ||
             physics_dynamic_set(node.result.value).kind == ERROR_RESULT_ERROR ||
+            physics_hitbox_set(node.result.value,
+                math_circle_create(radius, 8)).kind == ERROR_RESULT_ERROR ||
+            physics_restitution_set(node.result.value, 0.25f).kind == ERROR_RESULT_ERROR ||
+            physics_friction_set(node.result.value, 0.0f).kind == ERROR_RESULT_ERROR ||
+            physics_collision_filter_set(node.result.value, (CollisionFilterConfig){
+                .category = ROHR_COLLISION_CATEGORY_SOFT_BODY_NODE,
+                .collides_with = ROHR_COLLISION_CATEGORY_ALL &
+                    ~ROHR_COLLISION_CATEGORY_SOFT_BODY_NODE
+            }).kind == ERROR_RESULT_ERROR ||
             SoftBodyNodePool_store_at(&soft_body_nodes_pool, node_index, (SoftBodyNode){
                 .soft_body = soft_body,
                 .radius = radius,
-                .category = ROHR_COLLISION_CATEGORY_DEFAULT,
-                .collides_with = ROHR_COLLISION_CATEGORY_ALL
+                .category = ROHR_COLLISION_CATEGORY_SOFT_BODY_NODE,
+                .collides_with = ROHR_COLLISION_CATEGORY_ALL &
+                    ~ROHR_COLLISION_CATEGORY_SOFT_BODY_NODE
             }).kind == ERROR_RESULT_ERROR) {
         (void)entity_delete(node.result.value);
         return ERROR_RESULT_MAKE_ERROR(EntityResult, ERROR_MEMORY_POOL_ALLOCATION_FAILED);
     }
-    entity_mask[node_index] |= SOFT_BODY_NODE;
+    entity_mask[node_index] |= SOFT_BODY_NODE | PARTICLE;
     soft_bodies[body_index].nodes[soft_bodies[body_index].node_count++] = node.result.value;
     return node;
 }
@@ -1769,9 +1779,14 @@ EngineResult physics_soft_body_node_collision_filter_set(Entity node,
     if(!entity_index_components_check(index, SOFT_BODY_NODE) || !soft_body_nodes_pool.used[index]) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
     }
+    result = physics_collision_filter_set(node, (CollisionFilterConfig){
+        .category = category,
+        .collides_with = collides_with
+    });
+    if(result.kind == ERROR_RESULT_ERROR) return result;
     soft_body_nodes[index].category = category;
     soft_body_nodes[index].collides_with = collides_with;
-    return error_result_value(true);
+    return result;
 }
 
 EngineResult physics_soft_body_node_force_for_one_tick_apply(Entity node, Force force) {

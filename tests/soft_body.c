@@ -20,6 +20,17 @@ int main(void) {
     node_b = rohr_physics_soft_body_node_create(body.result.value, (Position){10.0f, 0.0f}, 1.0f, 2.0f);
     node_c = rohr_physics_soft_body_node_create(body.result.value, (Position){0.0f, 15.0f}, 1.0f, 2.0f);
     if(rohr_error_check(node_a) || rohr_error_check(node_b) || rohr_error_check(node_c)) goto fail;
+    {
+        CollisionFilterConfigResult filter =
+            rohr_physics_collision_filter_get(node_a.result.value);
+        if(rohr_error_check(filter) ||
+                !rohr_entity_components_check(node_a.result.value,
+                    SOFT_BODY_NODE | PARTICLE | HIT_BOX | COLLISION) ||
+                filter.result.value.category !=
+                    ROHR_COLLISION_CATEGORY_SOFT_BODY_NODE ||
+                (filter.result.value.collides_with &
+                    ROHR_COLLISION_CATEGORY_SOFT_BODY_NODE) != 0) goto fail;
+    }
     beam = rohr_physics_soft_body_beam_create(
         body.result.value, node_a.result.value, node_b.result.value, 10.0f, 1.0f);
     triangle = rohr_physics_soft_body_triangle_create(
@@ -30,12 +41,16 @@ int main(void) {
         if(rohr_error_check(topology) || topology.result.value.node_count != 3 ||
                 topology.result.value.beam_count != 1 || topology.result.value.triangle_count != 1) goto fail;
     }
-    if(rohr_error_check(rohr_physics_position_set(node_b.result.value, (Position){20.0f, 0.0f}))) goto fail;
+    if(rohr_error_check(rohr_physics_position_set(node_b.result.value, (Position){20.0f, 0.0f})) ||
+            rohr_error_check(rohr_physics_angular_velocity_set(
+                node_a.result.value, 10.0f))) goto fail;
     rohr_system_physics_update(0.1);
     index_a = rohr_entity_index_get(node_a.result.value);
     index_b = rohr_entity_index_get(node_b.result.value);
     if(rohr_error_check(index_a) || rohr_error_check(index_b) ||
-            velocities[index_a.result.value].x <= 0.0f || velocities[index_b.result.value].x >= 0.0f) goto fail;
+            velocities[index_a.result.value].x <= 0.0f ||
+            velocities[index_b.result.value].x >= 0.0f ||
+            angular_velocities[index_a.result.value] != 0.0f) goto fail;
     if(rohr_error_check(rohr_physics_soft_body_node_impulse_apply(
                 node_c.result.value, (Vec2D){0.0f, 2.0f})) ||
             rohr_error_check(rohr_physics_soft_body_node_force_for_one_tick_apply(

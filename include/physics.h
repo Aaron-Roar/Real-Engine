@@ -51,6 +51,8 @@ typedef uint64_t RohrCollisionCategoryMask;
 #define ROHR_COLLISION_CATEGORY_ALL UINT64_MAX
 /** Mask matching no collision categories. */
 #define ROHR_COLLISION_CATEGORY_NONE UINT64_C(0)
+/** Engine-reserved category assigned to soft-body nodes by default. */
+#define ROHR_COLLISION_CATEGORY_SOFT_BODY_NODE (UINT64_C(1) << 63)
 
 /** Collision filtering configuration owned by one collider entity. */
 typedef struct CollisionFilterConfig {
@@ -238,7 +240,9 @@ typedef struct SoftBody {
 typedef struct SoftBodyNode {
     Entity soft_body;
     float radius;
+    /** Mirrored for source compatibility; standard collision filters are authoritative. */
     RohrCollisionCategoryMask category;
+    /** Mirrored for source compatibility; standard collision filters are authoritative. */
     RohrCollisionCategoryMask collides_with;
 } SoftBodyNode;
 
