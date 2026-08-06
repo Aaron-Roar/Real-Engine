@@ -208,10 +208,11 @@ EngineResult physics_interaction_record(
     Entity entity,
     Entity target,
     OverlapInfo overlap,
+    ContactInfo contact,
     PhysicsInteractionFlags flags
 ) {
     return physics_interaction_set_record(
-        &current_interactions, entity, target, overlap, flags
+        &current_interactions, entity, target, overlap, contact, flags
     );
 }
 
@@ -272,6 +273,16 @@ size_t physics_interaction_current_entities_get(
 ) {
     return physics_interaction_set_entities_get(
         &current_interactions, entity, flags, results, capacity
+    );
+}
+
+size_t physics_interaction_current_contacts_get(
+    Entity entity,
+    EntityContact *results,
+    size_t capacity
+) {
+    return physics_interaction_set_contacts_get(
+        &current_interactions, entity, results, capacity
     );
 }
 
@@ -2103,8 +2114,15 @@ bool physics_contact_check(Entity entity, Entity target) {
     return physics_interaction_flag_check(entity, target, PHYSICS_INTERACTION_CONTACT);
 }
 
-OverlapInfo physics_contact_get(Entity entity, Entity target) {
-    return physics_interaction_overlap_get(entity, target, PHYSICS_INTERACTION_CONTACT);
+ContactInfo physics_contact_get(Entity entity, Entity target) {
+    PhysicsInteraction interaction;
+
+    if(!physics_interaction_flag_check(
+                entity, target, PHYSICS_INTERACTION_CONTACT) ||
+            !physics_interaction_current_get(entity, target, &interaction)) {
+        return (ContactInfo){.detected = false};
+    }
+    return interaction.contact;
 }
 
 bool physics_contact_entered_check(Entity entity, Entity target) {
@@ -2126,13 +2144,11 @@ size_t physics_contact_count_get(Entity entity) {
 
 size_t physics_contacts_get(
     Entity entity,
-    EntityInteraction *results,
+    EntityContact *results,
     size_t capacity
 ) {
     if(!physics_interaction_entity_valid(entity)) return 0;
-    return physics_interaction_current_entities_get(
-        entity, PHYSICS_INTERACTION_CONTACT, results, capacity
-    );
+    return physics_interaction_current_contacts_get(entity, results, capacity);
 }
 
 EngineResult physics_dt_per_tick_set(Time dt) {

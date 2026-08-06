@@ -9,6 +9,7 @@ int main(void) {
     EntityResult first;
     EntityResult second;
     CollisionFilterConfigResult filter;
+    ContactInfo contact;
     EngineResult result = rohr_engine_init();
     if(rohr_error_check(result)) {
         fprintf(stderr, "%s\n", rohr_error_default_message_get(result.result.error));
@@ -46,21 +47,30 @@ int main(void) {
         rohr_engine_shutdown();
         return 1;
     }
-    if(rohr_error_check(rohr_physics_position_set(first.result.value, (Position){0.0f, 0.0f})) ||
-            rohr_error_check(rohr_physics_position_set(second.result.value, (Position){0.0f, 0.0f})) ||
+    if(rohr_error_check(rohr_physics_position_set(first.result.value, (Position){-0.25f, 0.0f})) ||
+            rohr_error_check(rohr_physics_position_set(second.result.value, (Position){0.25f, 0.0f})) ||
+            rohr_error_check(rohr_physics_velocity_set(first.result.value, (Velocity){1.0f, 0.0f})) ||
+            rohr_error_check(rohr_physics_acceleration_set(first.result.value, (Acceleration){0})) ||
+            rohr_error_check(rohr_physics_mass_set(first.result.value, 1.0f)) ||
+            rohr_error_check(rohr_physics_dynamic_set(first.result.value)) ||
+            rohr_error_check(rohr_physics_static_set(second.result.value)) ||
+            rohr_error_check(rohr_physics_restitution_set(first.result.value, 0.0f)) ||
+            rohr_error_check(rohr_physics_restitution_set(second.result.value, 0.0f)) ||
             rohr_error_check(rohr_entity_components_add(first.result.value, COLLISION)) ||
             rohr_error_check(rohr_entity_components_add(second.result.value, COLLISION))) {
         rohr_engine_shutdown();
         return 1;
     }
     rohr_system_physics_update(0.0);
+    contact = rohr_physics_contact_get(first.result.value, second.result.value);
     if(!rohr_physics_overlap_check(first.result.value, second.result.value) ||
             !rohr_physics_overlap_get(first.result.value, second.result.value).detected ||
             !rohr_physics_overlap_entered_check(first.result.value, second.result.value) ||
             rohr_physics_overlap_stayed_check(first.result.value, second.result.value) ||
             rohr_physics_overlap_exited_check(first.result.value, second.result.value) ||
             !rohr_physics_contact_check(first.result.value, second.result.value) ||
-            !rohr_physics_contact_get(first.result.value, second.result.value).detected ||
+            !contact.detected || contact.relative_velocity.x >= 0.0f ||
+            contact.applied_impulse.x <= 0.0f ||
             !rohr_physics_contact_entered_check(first.result.value, second.result.value) ||
             rohr_physics_contact_stayed_check(first.result.value, second.result.value) ||
             rohr_physics_contact_exited_check(first.result.value, second.result.value) ||

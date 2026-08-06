@@ -19,6 +19,7 @@ enum {
 typedef struct PhysicsInteraction {
     EntityPair pair;
     OverlapInfo overlap;
+    ContactInfo contact;
     PhysicsInteractionFlags flags;
 } PhysicsInteraction;
 
@@ -35,6 +36,7 @@ EngineResult physics_interaction_set_record(
     Entity first,
     Entity second,
     OverlapInfo overlap,
+    ContactInfo contact,
     PhysicsInteractionFlags flags
 );
 EngineResult physics_interaction_set_remove(
@@ -64,6 +66,12 @@ size_t physics_interaction_set_entities_get(
     Entity entity,
     PhysicsInteractionFlags flags,
     EntityInteraction *results,
+    size_t capacity
+);
+size_t physics_interaction_set_contacts_get(
+    const PhysicsInteractionSet *set,
+    Entity entity,
+    EntityContact *results,
     size_t capacity
 );
 void physics_interaction_set_clear(PhysicsInteractionSet *set);

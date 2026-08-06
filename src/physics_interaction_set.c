@@ -112,6 +112,7 @@ EngineResult physics_interaction_set_record(
     Entity first,
     Entity second,
     OverlapInfo overlap,
+    ContactInfo contact,
     PhysicsInteractionFlags flags
 ) {
     EntityPair pair;
@@ -146,6 +147,12 @@ EngineResult physics_interaction_set_record(
     if(first != pair.first) {
         overlap.normal.x = -overlap.normal.x;
         overlap.normal.y = -overlap.normal.y;
+        contact.normal.x = -contact.normal.x;
+        contact.normal.y = -contact.normal.y;
+        contact.relative_velocity.x = -contact.relative_velocity.x;
+        contact.relative_velocity.y = -contact.relative_velocity.y;
+        contact.applied_impulse.x = -contact.applied_impulse.x;
+        contact.applied_impulse.y = -contact.applied_impulse.y;
     }
     slot = physics_interaction_slot_get(
         set->entries, set->occupied, set->capacity, pair, &found
@@ -153,11 +160,15 @@ EngineResult physics_interaction_set_record(
     if(found) {
         set->entries[slot].flags |= flags;
         set->entries[slot].overlap = overlap;
+        if((flags & PHYSICS_INTERACTION_CONTACT) != 0) {
+            set->entries[slot].contact = contact;
+        }
         return error_result_value(false);
     }
     set->entries[slot] = (PhysicsInteraction){
         .pair = pair,
         .overlap = overlap,
+        .contact = contact,
         .flags = flags
     };
     set->occupied[slot] = 1;
@@ -253,6 +264,16 @@ bool physics_interaction_set_get(
         interaction->pair = (EntityPair){first, second};
         interaction->overlap.normal.x = -interaction->overlap.normal.x;
         interaction->overlap.normal.y = -interaction->overlap.normal.y;
+        interaction->contact.normal.x = -interaction->contact.normal.x;
+        interaction->contact.normal.y = -interaction->contact.normal.y;
+        interaction->contact.relative_velocity.x =
+            -interaction->contact.relative_velocity.x;
+        interaction->contact.relative_velocity.y =
+            -interaction->contact.relative_velocity.y;
+        interaction->contact.applied_impulse.x =
+            -interaction->contact.applied_impulse.x;
+        interaction->contact.applied_impulse.y =
+            -interaction->contact.applied_impulse.y;
     }
     return true;
 }
@@ -311,6 +332,46 @@ size_t physics_interaction_set_entities_get(
         results[count++] = (EntityInteraction){
             .target = target,
             .overlap = overlap
+        };
+    }
+    return count;
+}
+
+size_t physics_interaction_set_contacts_get(
+    const PhysicsInteractionSet *set,
+    Entity entity,
+    EntityContact *results,
+    size_t capacity
+) {
+    size_t count = 0;
+
+    if(set == NULL || entity == ENTITY_INVALID || results == NULL || capacity == 0) {
+        return 0;
+    }
+    for(size_t index = 0; index < set->capacity && count < capacity; index += 1) {
+        const PhysicsInteraction *interaction = &set->entries[index];
+        Entity target;
+        ContactInfo contact;
+
+        if(set->occupied[index] == 0 ||
+                (interaction->flags & PHYSICS_INTERACTION_CONTACT) == 0) continue;
+        contact = interaction->contact;
+        if(interaction->pair.first == entity) {
+            target = interaction->pair.second;
+        } else if(interaction->pair.second == entity) {
+            target = interaction->pair.first;
+            contact.normal.x = -contact.normal.x;
+            contact.normal.y = -contact.normal.y;
+            contact.relative_velocity.x = -contact.relative_velocity.x;
+            contact.relative_velocity.y = -contact.relative_velocity.y;
+            contact.applied_impulse.x = -contact.applied_impulse.x;
+            contact.applied_impulse.y = -contact.applied_impulse.y;
+        } else {
+            continue;
+        }
+        results[count++] = (EntityContact){
+            .target = target,
+            .contact = contact
         };
     }
     return count;

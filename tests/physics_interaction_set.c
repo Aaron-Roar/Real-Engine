@@ -12,6 +12,7 @@ int main(void) {
     PhysicsInteractionSet set;
     PhysicsInteraction interaction;
     EntityInteraction interactions[200];
+    EntityContact contacts[1];
     Entity first = entity_handle(1, 1);
     Entity second = entity_handle(1, 2);
     OverlapInfo overlap = {
@@ -19,12 +20,21 @@ int main(void) {
         .normal = {0.5f, -0.75f},
         .depth = 3.0f
     };
+    ContactInfo contact = {
+        .detected = true,
+        .normal = {0.5f, -0.75f},
+        .depth = 3.0f,
+        .point = {4.0f, 5.0f},
+        .relative_velocity = {6.0f, 7.0f},
+        .applied_impulse = {8.0f, 9.0f}
+    };
     EngineResult result;
     size_t i;
 
     if(error_check(physics_interaction_set_init(&set, 2))) return 1;
     result = physics_interaction_set_record(
-        &set, second, first, overlap, PHYSICS_INTERACTION_OVERLAP
+        &set, second, first, overlap, (ContactInfo){0},
+        PHYSICS_INTERACTION_OVERLAP
     );
     if(error_check(result) || !result.result.value || set.count != 1 ||
             !physics_interaction_set_check(
@@ -33,7 +43,7 @@ int main(void) {
                 &set, first, second, PHYSICS_INTERACTION_CONTACT)) goto fail;
 
     result = physics_interaction_set_record(
-        &set, second, first, overlap, PHYSICS_INTERACTION_CONTACT
+        &set, second, first, overlap, contact, PHYSICS_INTERACTION_CONTACT
     );
     if(error_check(result) || result.result.value || set.count != 1 ||
             !physics_interaction_set_check(
@@ -46,7 +56,10 @@ int main(void) {
             interaction.pair.first != second || interaction.pair.second != first ||
             fabsf(interaction.overlap.normal.x - 0.5f) > 0.0001f ||
             fabsf(interaction.overlap.normal.y - -0.75f) > 0.0001f ||
-            interaction.overlap.depth != 3.0f) goto fail;
+            interaction.overlap.depth != 3.0f ||
+            !interaction.contact.detected ||
+            fabsf(interaction.contact.relative_velocity.x - 6.0f) > 0.0001f ||
+            fabsf(interaction.contact.applied_impulse.y - 9.0f) > 0.0001f) goto fail;
 
     for(i = 3; i < 200; i += 1) {
         result = physics_interaction_set_record(
@@ -54,6 +67,7 @@ int main(void) {
             first,
             entity_handle(1, (uint16_t)i),
             overlap,
+            (ContactInfo){0},
             PHYSICS_INTERACTION_OVERLAP
         );
         if(error_check(result)) goto fail;
@@ -100,6 +114,14 @@ int main(void) {
                 interactions,
                 4
             ) != 4) goto fail;
+    if(physics_interaction_set_contacts_get(
+                &set, first, contacts, 1) != 1 ||
+            contacts[0].target != second ||
+            !contacts[0].contact.detected ||
+            fabsf(contacts[0].contact.normal.x - -0.5f) > 0.0001f ||
+            fabsf(contacts[0].contact.relative_velocity.x - -6.0f) > 0.0001f ||
+            fabsf(contacts[0].contact.applied_impulse.y - -9.0f) > 0.0001f ||
+            contacts[0].contact.point.x != 4.0f) goto fail;
     if(!physics_interaction_set_get(&set, first, second, &interaction) ||
             !physics_interaction_set_check(
                 &set, first, second, PHYSICS_INTERACTION_CONTACT)) goto fail;

@@ -56,6 +56,29 @@ typedef Vec1D Orientation;
 typedef Vec2D Position;
 /** Entity linear velocity. */
 typedef Vec2D Velocity;
+/** Physical response information for one entity contact. */
+typedef struct ContactInfo {
+    /** true when physical collision response was entered. */
+    bool detected;
+    /** Normal pointing from the first entity toward the second. */
+    Axis normal;
+    /** Penetration depth along the contact normal. */
+    Vec1D depth;
+    /** Approximate world-space contact point. */
+    Position point;
+    /** Pre-resolution velocity of the second entity relative to the first. */
+    Velocity relative_velocity;
+    /** Total impulse applied to the second entity. */
+    Vec2D applied_impulse;
+} ContactInfo;
+
+/** One current physical contact involving a queried entity. */
+typedef struct EntityContact {
+    /** The other entity in the contact. */
+    Entity target;
+    /** Contact data oriented from the queried entity toward target. */
+    ContactInfo contact;
+} EntityContact;
 /** Entity angular velocity in radians per second. */
 typedef Orientation AngularVelocity;
 /** Entity angular acceleration. */
@@ -605,7 +628,7 @@ size_t physics_overlaps_get(
 /** Return whether two entities physically contacted during the current physics step. */
 bool physics_contact_check(Entity entity, Entity target);
 /** Return current contact geometry in the requested entity order. */
-OverlapInfo physics_contact_get(Entity entity, Entity target);
+ContactInfo physics_contact_get(Entity entity, Entity target);
 /** Return whether a physical contact began during the current physics step. */
 bool physics_contact_entered_check(Entity entity, Entity target);
 /** Return whether a physical contact continued from the previous physics step. */
@@ -617,7 +640,7 @@ size_t physics_contact_count_get(Entity entity);
 /** Write up to capacity current contacts and return the number written. */
 size_t physics_contacts_get(
     Entity entity,
-    EntityInteraction *results,
+    EntityContact *results,
     size_t capacity
 );
 

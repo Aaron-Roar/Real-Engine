@@ -33,6 +33,7 @@ EngineResult physics_interaction_record(
     Entity entity,
     Entity target,
     OverlapInfo overlap,
+    ContactInfo contact,
     PhysicsInteractionFlags flags
 );
 /** Check a current interaction flag. */
@@ -69,6 +70,12 @@ size_t physics_interaction_current_entities_get(
     Entity entity,
     PhysicsInteractionFlags flags,
     EntityInteraction *results,
+    size_t capacity
+);
+/** Write current physical contacts involving an entity. */
+size_t physics_interaction_current_contacts_get(
+    Entity entity,
+    EntityContact *results,
     size_t capacity
 );
 /** Initialize graphics tables. */

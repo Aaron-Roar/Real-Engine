@@ -1119,7 +1119,7 @@ size_t rohr_physics_overlaps_get(
 /** Return whether two entities physically contacted during the current physics step. */
 bool rohr_physics_contact_check(Entity entity, Entity target);
 /** Return current contact geometry in the requested entity order. */
-OverlapInfo rohr_physics_contact_get(Entity entity, Entity target);
+ContactInfo rohr_physics_contact_get(Entity entity, Entity target);
 /** Return whether a physical contact began during the current physics step. */
 bool rohr_physics_contact_entered_check(Entity entity, Entity target);
 /** Return whether a physical contact continued from the previous physics step. */
@@ -1131,7 +1131,7 @@ size_t rohr_physics_contact_count_get(Entity entity);
 /** Write up to capacity current contacts and return the number written. */
 size_t rohr_physics_contacts_get(
     Entity entity,
-    EntityInteraction *results,
+    EntityContact *results,
     size_t capacity
 );
 

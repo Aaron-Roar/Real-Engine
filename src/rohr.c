@@ -233,12 +233,12 @@ bool rohr_physics_overlap_exited_check(Entity entity, Entity target) { return ph
 size_t rohr_physics_overlap_count_get(Entity entity) { return physics_overlap_count_get(entity); }
 size_t rohr_physics_overlaps_get(Entity entity, EntityInteraction *results, size_t capacity) { return physics_overlaps_get(entity, results, capacity); }
 bool rohr_physics_contact_check(Entity entity, Entity target) { return physics_contact_check(entity, target); }
-OverlapInfo rohr_physics_contact_get(Entity entity, Entity target) { return physics_contact_get(entity, target); }
+ContactInfo rohr_physics_contact_get(Entity entity, Entity target) { return physics_contact_get(entity, target); }
 bool rohr_physics_contact_entered_check(Entity entity, Entity target) { return physics_contact_entered_check(entity, target); }
 bool rohr_physics_contact_stayed_check(Entity entity, Entity target) { return physics_contact_stayed_check(entity, target); }
 bool rohr_physics_contact_exited_check(Entity entity, Entity target) { return physics_contact_exited_check(entity, target); }
 size_t rohr_physics_contact_count_get(Entity entity) { return physics_contact_count_get(entity); }
-size_t rohr_physics_contacts_get(Entity entity, EntityInteraction *results, size_t capacity) { return physics_contacts_get(entity, results, capacity); }
+size_t rohr_physics_contacts_get(Entity entity, EntityContact *results, size_t capacity) { return physics_contacts_get(entity, results, capacity); }
 
 Color rohr_graphics_color_hex_create(uint32_t hex_color_code) { return graphics_color_hex_create(hex_color_code); }
 EngineResult rohr_graphics_start(void) { return graphics_start(); }
