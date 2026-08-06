@@ -167,6 +167,17 @@ Provide an optional, explicit loop helper that accumulates frame time and runs
 physics at a fixed interval. Include a catch-up limit, separate rendering
 timing, pause and single-step support, and optional render interpolation.
 
+Add adaptive physics substeps that select a bounded substep count from
+predicted entity movement and collision-feature size. Keep all interacting
+entities on one global substep count, expose the selected count through debug
+statistics, and retain explicit minimum and maximum limits so simulation cost
+cannot grow without bound.
+
+Add swept collision detection for fast-moving rigid bodies, particles, and
+soft-body boundary edges where bounded substeps cannot reliably prevent
+tunneling. Integrate swept contacts with the existing contact constraint and
+interaction-event pipeline instead of creating a separate response path.
+
 Any change to physics stepping must document how it affects existing
 simulation behavior before it is implemented.
 
