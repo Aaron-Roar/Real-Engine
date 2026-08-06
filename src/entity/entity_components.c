@@ -1,5 +1,5 @@
 #include "entity_components.h"
-#include "engine_internal.h"
+#include "core/engine_internal.h"
 #include <stdbool.h>
 #include <string.h>
 

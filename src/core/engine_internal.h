@@ -4,8 +4,8 @@
 #include <stddef.h>
 #include "error.h"
 #include "entity_components.h"
-#include "physics_interaction_set.h"
-#include "aabb_tree.h"
+#include "physics/collision/interaction_set.h"
+#include "physics/broadphase/aabb_tree.h"
 
 /**
  * Ensure all entity-indexed subsystem tables can address capacity slots.

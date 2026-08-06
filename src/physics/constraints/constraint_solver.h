@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include "contact_constraint.h"
+#include "physics/collision/contact_constraint.h"
 
 typedef void (*ConstraintContactsSolveFn)(
     ContactConstraintList *contacts,

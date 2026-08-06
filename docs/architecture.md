@@ -1,8 +1,9 @@
 # Architecture {#architecture}
 
 Rohr Engine keeps systems separate and explicit. Public engine APIs live in
-`include/`, implementation files live in `src/`, and private engine contracts
-that should not be application-facing live in `src/engine_internal.h`.
+`include/`, implementation files are grouped by domain under `src/`, and
+private engine contracts that should not be application-facing live in
+`src/core/engine_internal.h`.
 
 The engine initializes entity, physics, graphics, and grid tables during
 `engine_init()`. Entity-indexed tables start with zero capacity and grow as

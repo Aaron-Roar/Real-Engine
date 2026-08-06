@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <SDL3/SDL.h>
 #include "engine.h"
-#include "engine_internal.h"
+#include "core/engine_internal.h"
 #include "entity_components.h"
 #include "physics.h"
 #include "graphics.h"

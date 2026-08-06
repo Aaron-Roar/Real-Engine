@@ -1,7 +1,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "entity_pair_set.h"
+#include "entity/entity_pair_set.h"
 
 static Entity entity_handle(uint16_t generation, uint16_t slot) {
     return ((Entity)generation << 16) | slot;

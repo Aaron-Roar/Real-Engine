@@ -1,12 +1,13 @@
 #include "entity_components.h"
-#include "engine_internal.h"
+#include "core/engine_internal.h"
 #include "systems.h"
 #include "console.h"
-#include "aabb_tree.h"
-#include "contact_constraint.h"
-#include "constraint_solver.h"
-#include "contact_manifold.h"
-#include "joint_constraint.h"
+#include "physics/broadphase/aabb_tree.h"
+#include "physics/collision/contact_constraint.h"
+#include "physics/constraints/constraint_solver.h"
+#include "physics/collision/contact_manifold.h"
+#include "physics/joints/joint_constraint.h"
+#include "physics/soft_body/soft_body.h"
 #include "math2d.h"
 #include <math.h>
 #include <float.h>
@@ -1147,30 +1148,6 @@ void system_transform_locks_apply(void) {
     }
 }
 
-void system_entities_past_lifetime_clean(void) {
-    for(int i = 0; i < MAX_ENTITIES; i += 1) {
-        if(!entity_index_alive_check(i)) {
-            continue;
-        }
-        if( entity_index_components_check(i, LIFETIME) ) {
-
-            if( (life_times[i].expirey_time != 0 && life_times[i].expirey_time <= engine_time_get()) ) {
-                system_by_index_delete(i);
-            }
-            else if( (life_times[i].expirey_tick != 0 && life_times[i].expirey_tick <= engine_tick_get()) ) {
-                system_by_index_delete(i);
-            }
-        }
-    }
-}
-
-Tick system_tick_update(void) {
-    Tick ticks = engine_tick_update();
-
-    system_entities_past_lifetime_clean();
-    return ticks;
-}
-
 static Velocity system_point_velocity(Entity entity, Vec2D world_offset) {
     EntityIndex index;
 
@@ -1604,28 +1581,6 @@ static void system_soft_body_beams_apply(void) {
     }
 }
 
-static Shape system_soft_boundary_shape_create(
-    Position start,
-    Position end,
-    float radius
-) {
-    Vec2D delta = math_vector_subtract(end, start);
-    float length = math_vector_magnitude(delta);
-    Vec2D normal;
-
-    if(length <= 0.0001f) return (Shape){0};
-    normal = (Vec2D){-delta.y * radius / length, delta.x * radius / length};
-    return (Shape){
-        .amount_of_vertices = 4,
-        .vertices = {
-            {start.x + normal.x, start.y + normal.y},
-            {end.x + normal.x, end.y + normal.y},
-            {end.x - normal.x, end.y - normal.y},
-            {start.x - normal.x, start.y - normal.y}
-        }
-    };
-}
-
 static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) {
     SystemSoftBoundaryQuery *query = context;
     EntityIndex rigid;
@@ -1690,7 +1645,7 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
             !entity_index_components_check(rigid, HIT_BOX | COLLISION)) return true;
     query->start = positions[query->a];
     query->end = positions[query->b];
-    query->shape = system_soft_boundary_shape_create(
+    query->shape = soft_body_boundary_shape_create(
         query->start,
         query->end,
         fminf(soft_body_nodes[query->a].radius, soft_body_nodes[query->b].radius));
@@ -1952,7 +1907,7 @@ static void system_soft_body_boundary_collisions_apply(void) {
                     .start = positions[a],
                     .end = positions[b]
                 };
-                query.shape = system_soft_boundary_shape_create(
+                query.shape = soft_body_boundary_shape_create(
                     query.start, query.end, radius);
                 if(query.shape.amount_of_vertices == 0) continue;
                 (void)aabb_tree_query(&physics_broadphase_tree,

@@ -80,7 +80,22 @@ Internal modules still exist under `include/` and `src/`, but examples are inten
 ```text
 engine/
 ├── include/               # Runtime and build-time tooling APIs
-├── src/                   # Engine and tooling implementations
+├── src/
+│   ├── core/              # Lifecycle, facade, errors, and timing systems
+│   ├── entity/            # Entity storage and entity-pair utilities
+│   ├── physics/           # Pipeline and physics API implementation
+│   │   ├── broadphase/
+│   │   ├── collision/
+│   │   ├── constraints/
+│   │   ├── joints/
+│   │   ├── particles/
+│   │   ├── rigid_body/
+│   │   └── soft_body/
+│   ├── graphics/
+│   ├── input/
+│   ├── math/
+│   ├── state/
+│   └── tools/
 ├── docs/                  # Doxygen config and documentation source
 ├── docs/assets/           # README and documentation media
 ├── examples/

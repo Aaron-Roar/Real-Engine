@@ -1,10 +1,10 @@
 #include "graphics.h"
-#include "engine_internal.h"
+#include "core/engine_internal.h"
 #include "console.h"
 #include "engine.h"
 #include "systems.h"
 #include "physics.h"
-#include "platform_process.h"
+#include "core/platform_process.h"
 #include <stdio.h>
 #include <string.h>
 

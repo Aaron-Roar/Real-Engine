@@ -1,4 +1,4 @@
-#include "physics_interaction_set.h"
+#include "interaction_set.h"
 
 #include <stdint.h>
 #include <stdlib.h>

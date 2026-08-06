@@ -1,6 +1,6 @@
 #include "physics.h"
-#include "physics_interaction_set.h"
-#include "engine_internal.h"
+#include "physics/collision/interaction_set.h"
+#include "core/engine_internal.h"
 #include "float.h"
 #include <math.h>
 #include "console.h"
@@ -377,65 +377,6 @@ void physics_entity_clear(Entity entity, EntityIndex index) {
     }
 }
 
-Shape physics_shape_world_translate(Shape shape, Position position, Orientation angle) {
-    Shape world_shape = {0};
-    world_shape.amount_of_vertices = shape.amount_of_vertices;
-
-    Position center = math_polygon_centroid(shape);
-
-    float cos_a = cosf(angle);
-    float sin_a = sinf(angle);
-
-    for (int i = 0; i < shape.amount_of_vertices; i++) {
-        float x = shape.vertices[i].x - center.x;
-        float y = shape.vertices[i].y - center.y;
-
-        float rotated_x = x*cos_a - y*sin_a;
-        float rotated_y = x*sin_a + y*cos_a;
-
-        world_shape.vertices[i].x = position.x + rotated_x;
-        world_shape.vertices[i].y = position.y + rotated_y;
-    }
-
-    return world_shape;
-}
-float physics_polygon_moment_of_inertia(Shape shape, Mass mass_value) {
-    Position c = math_polygon_centroid(shape);
-
-    float area_sum = 0.0f;
-    float inertia_sum = 0.0f;
-
-    for (int i = 0; i < shape.amount_of_vertices; i++) {
-        int j = (i + 1) % shape.amount_of_vertices;
-
-        float xi = shape.vertices[i].x - c.x;
-        float yi = shape.vertices[i].y - c.y;
-
-        float xj = shape.vertices[j].x - c.x;
-        float yj = shape.vertices[j].y - c.y;
-
-        float cross = xi * yj - xj * yi;
-
-        float q =
-            xi*xi + xi*xj + xj*xj +
-            yi*yi + yi*yj + yj*yj;
-
-        area_sum += cross;
-        inertia_sum += cross * q;
-    }
-
-    float area = 0.5f * area_sum;
-    float area_moment = inertia_sum / 12.0f;
-
-    if (fabsf(area) < 1e-8f) { //Very small area no inertia calc needed
-        return 0;
-    }
-
-    float density = mass_value / fabsf(area);
-    float inertia = density * fabsf(area_moment);
-
-    return inertia;
-}
 OverlapInfo physics_sat_overlap_on_axes_get(Shape shape_1, Shape shape_2, Vec2DList axes, OverlapInfo overlap_info) {
     for (int i = 0; i < axes.amount_of_vectors; i += 1) {
         Axis axis = axes.vectors[i];
@@ -457,53 +398,6 @@ OverlapInfo physics_sat_overlap_on_axes_get(Shape shape_1, Shape shape_2, Vec2DL
 
     return overlap_info;
 }
-OverlapInfo physics_particle_overlap_get(Shape shape_1, Shape shape_2)
-{
-    Position center_1 = math_polygon_centroid(shape_1);
-    Position center_2 = math_polygon_centroid(shape_2);
-
-    float radius_1 = math_circle_radius(shape_1, center_1);
-    float radius_2 = math_circle_radius(shape_2, center_2);
-
-    Vec2D delta = {
-        .x = center_2.x - center_1.x,
-        .y = center_2.y - center_1.y
-    };
-
-    float distance_squared =
-        delta.x * delta.x +
-        delta.y * delta.y;
-
-    float radius_sum = radius_1 + radius_2;
-    float radius_sum_squared = radius_sum * radius_sum;
-
-    if(distance_squared >= radius_sum_squared) {
-        return (OverlapInfo){
-            .detected = false
-        };
-    }
-
-    float distance = sqrtf(distance_squared);
-
-    Vec2D normal;
-
-    if(distance > 0.00001f) {
-        normal = (Vec2D){
-            .x = delta.x / distance,
-            .y = delta.y / distance
-        };
-    } else {
-        normal = (Vec2D){1.0f, 0.0f};
-        distance = 0.0f;
-    }
-
-    return (OverlapInfo){
-        .detected = true,
-        .normal = normal,
-        .depth = radius_sum - distance
-    };
-}
-
 OverlapInfo physics_sat_overlap_get(Shape shape_1, Shape shape_2)
 {
     OverlapInfo collision = {
@@ -549,14 +443,6 @@ Position physics_approximate_contact_point(Position p1, Position p2)
         .y = (p1.y + p2.y) * 0.5f
     };
 }
-Vec1D physics_circle_moment_of_inertia(Shape circle, Mass mass_value) {
-  Vec1D radius = math_circle_radius(circle, math_polygon_centroid(circle));
-  Vec1D area = PI_F*radius*radius;
-  Vec1D density = mass_value/fabsf(area);
-  Vec1D area_moment = 0.5f * area * radius * radius;
-  return density * area_moment;
-}
-
 static EngineResult physics_live_index_get(Entity entity, EntityIndex *index) {
     if(index == NULL) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);

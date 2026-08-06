@@ -1,5 +1,5 @@
-#include "constraint_solver.h"
-#include "joint_constraint.h"
+#include "physics/constraints/constraint_solver.h"
+#include "physics/joints/joint_constraint.h"
 
 typedef struct SolverTestContext {
     size_t contact_solves;

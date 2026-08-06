@@ -2,7 +2,7 @@ PROJECT_NAME           = "Rohr Engine"
 PROJECT_BRIEF          = "A lightweight C and SDL3 game engine"
 OUTPUT_DIRECTORY       = build/docs
 
-INPUT                  = README.md include src/engine_internal.h docs
+INPUT                  = README.md include src/core/engine_internal.h docs
 USE_MDFILE_AS_MAINPAGE = docs/README.md
 FILE_PATTERNS          = *.h *.md
 RECURSIVE              = YES

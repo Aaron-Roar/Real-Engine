@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "entity_pair_set.h"
+#include "entity/entity_pair_set.h"
 #include "physics.h"
 
 typedef uint8_t PhysicsInteractionFlags;

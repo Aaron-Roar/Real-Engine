@@ -48,27 +48,31 @@ set(ROHR_SDL3_IMAGE_TARGET SDL3_image::SDL3_image-static)
 set(ROHR_SDL3_TTF_TARGET SDL3_ttf::SDL3_ttf-static)
 
 set(ROHR_ENGINE_SOURCES
-    src/aabb_tree.c
-    src/console.c
-    src/contact_manifold.c
-    src/contact_constraint.c
-    src/constraint_solver.c
-    src/joint_constraint.c
-    src/engine.c
-    src/error.c
-    src/entity_components.c
-    src/entity_pair_set.c
-    src/graphics.c
-    src/math2d.c
-    src/physics.c
-    src/physics_interaction_set.c
-    src/platform_process.c
-    src/rohr.c
-    src/systems.c
-    src/tools.c
-    src/ui.c
-    src/controller.c
-    src/game_state.c
+    src/core/console.c
+    src/core/engine.c
+    src/core/error.c
+    src/core/platform_process.c
+    src/core/rohr.c
+    src/core/systems.c
+    src/entity/entity_components.c
+    src/entity/entity_pair_set.c
+    src/graphics/graphics.c
+    src/graphics/ui.c
+    src/input/controller.c
+    src/math/math2d.c
+    src/physics/broadphase/aabb_tree.c
+    src/physics/collision/contact_constraint.c
+    src/physics/collision/contact_manifold.c
+    src/physics/collision/interaction_set.c
+    src/physics/constraints/constraint_solver.c
+    src/physics/joints/joint_constraint.c
+    src/physics/particles/particle.c
+    src/physics/physics.c
+    src/physics/physics_step.c
+    src/physics/rigid_body/rigid_body.c
+    src/physics/soft_body/soft_body.c
+    src/state/game_state.c
+    src/tools/tools.c
     lib/yyjson.c
 )
 

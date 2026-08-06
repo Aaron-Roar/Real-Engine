@@ -2,7 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "physics_interaction_set.h"
+#include "physics/collision/interaction_set.h"
 
 static Entity entity_handle(uint16_t generation, uint16_t slot) {
     return ((Entity)generation << 16) | slot;
