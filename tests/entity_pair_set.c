@@ -40,6 +40,13 @@ int main(void) {
             goto fail;
         }
     }
+    result = entity_pair_set_remove(&set, first, entity_handle(1, 100));
+    if(error_check(result) || !result.result.value ||
+            entity_pair_set_contains(&set, first, entity_handle(1, 100)) ||
+            !entity_pair_set_contains(&set, first, entity_handle(1, 99)) ||
+            !entity_pair_set_contains(&set, first, entity_handle(1, 101))) goto fail;
+    result = entity_pair_set_remove(&set, first, entity_handle(1, 100));
+    if(error_check(result) || result.result.value) goto fail;
 
     original_capacity = set.capacity;
     result = entity_pair_set_reserve(&set, SIZE_MAX);

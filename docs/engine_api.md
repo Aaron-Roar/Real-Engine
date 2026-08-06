@@ -2017,30 +2017,30 @@ Tests two particle shapes for collision.
 EngineResult rohr_physics_collision_report_set(Entity entity, Entity target, bool state);
 ```
 
-Enables or disables collision reporting between two entities.
+Sets collision state between two entities for the current physics step.
 
 | Parameter | Description |
 | --- | --- |
-| `entity` | Reporting entity. |
-| `target` | Target entity. |
-| `state` | true to enable reporting, false to disable it. |
+| `entity` | First entity. |
+| `target` | Second entity. |
+| `state` | true to store the pair, false to remove it. |
 
 **Returns:** EngineResult describing success or failure.
 
-### `rohr_physics_collision_report_get`
+### `rohr_physics_contact_get`
 
 ```c
-bool rohr_physics_collision_report_get(Entity entity, Entity target);
+bool rohr_physics_contact_get(Entity entity, Entity target);
 ```
 
-Checks whether a collision report exists between two entities.
+Checks whether two entities collided during the current physics step.
 
 | Parameter | Description |
 | --- | --- |
-| `entity` | Reporting entity. |
-| `target` | Target entity. |
+| `entity` | First entity. |
+| `target` | Second entity. |
 
-**Returns:** true when reporting is enabled, false otherwise.
+**Returns:** true when the pair is in the current contact set, false otherwise.
 
 ## Graphics
 

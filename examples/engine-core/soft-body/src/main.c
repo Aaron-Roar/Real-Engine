@@ -504,7 +504,7 @@ int main(void) {
             rohr_physics_update(ticks);
             if(!collision_zoom_started) {
                 for(uint32_t i = 0; i < PIT_PARTICLE_COUNT; i += 1) {
-                    if(!rohr_physics_collision_report_get(chassis, particles[i])) continue;
+                    if(!rohr_physics_contact_get(chassis, particles[i])) continue;
                     if(!result_ok(rohr_camera_zoom_set(
                                 rohr_camera_active_get(), camera_collision_zoom,
                                 camera_collision_zoom_duration)) ||

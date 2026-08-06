@@ -808,9 +808,11 @@ EngineResult editor_select(EditorInput input) {
             if(i == selection_index) {
                 continue;
             }
-            if(collision_reports[selection_index].collisions[i]) {
+            {
                 EntityResult selected_result = entity_from_index_get(i);
-                if(selected_result.kind == ERROR_RESULT_VALUE) {
+                if(selected_result.kind == ERROR_RESULT_VALUE &&
+                        physics_contact_get(
+                            selection, selected_result.result.value)) {
                     selected_entity = selected_result.result.value;
                     console_write(LOG_APP, "Selected Entity: %d\n", i);
                 }

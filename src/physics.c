@@ -15,7 +15,6 @@ MEMORY_DEFINE_OBJECT_POOL(AccelerationPool, Acceleration)
 MEMORY_DEFINE_OBJECT_POOL(MassPool, float)
 MEMORY_DEFINE_OBJECT_POOL(ForcePool, Force)
 MEMORY_DEFINE_OBJECT_POOL(ShapePool, Shape)
-MEMORY_DEFINE_OBJECT_POOL(CollisionReportPool, CollisionReport)
 MEMORY_DEFINE_OBJECT_POOL(CollisionFilterConfigPool, CollisionFilterConfig)
 MEMORY_DEFINE_OBJECT_POOL(OrientationPool, Orientation)
 MEMORY_DEFINE_OBJECT_POOL(AngularVelocityPool, AngularVelocity)
@@ -41,7 +40,6 @@ MassPool mass_pool = {0};
 ForcePool forces_pool = {0};
 ShapePool hit_boxes_pool = {0};
 ShapePool world_hit_boxes_pool = {0};
-CollisionReportPool collision_reports_pool = {0};
 static EntityPairSet current_contacts = {0};
 static EntityPairSet previous_contacts = {0};
 CollisionFilterConfigPool collision_filters_pool = {0};
@@ -101,7 +99,6 @@ EngineResult physics_tables_init(void) {
     if(ForcePool_init(&forces_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(ShapePool_init(&hit_boxes_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(ShapePool_init(&world_hit_boxes_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
-    if(CollisionReportPool_init(&collision_reports_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(CollisionFilterConfigPool_init(&collision_filters_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(AngularVelocityPool_init(&angular_velocities_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(AngularVelocityPool_init(&angular_velocity_maximums_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
@@ -150,7 +147,6 @@ EngineResult physics_tables_ensure_capacity(size_t capacity) {
     if(new_capacity > forces_pool.capacity && ForcePool_expand(&forces_pool, new_capacity - forces_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
     if(new_capacity > hit_boxes_pool.capacity && ShapePool_expand(&hit_boxes_pool, new_capacity - hit_boxes_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
     if(new_capacity > world_hit_boxes_pool.capacity && ShapePool_expand(&world_hit_boxes_pool, new_capacity - world_hit_boxes_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
-    if(new_capacity > collision_reports_pool.capacity && CollisionReportPool_expand(&collision_reports_pool, new_capacity - collision_reports_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
     if(new_capacity > collision_filters_pool.capacity && CollisionFilterConfigPool_expand(&collision_filters_pool, new_capacity - collision_filters_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
     if(new_capacity > angular_velocities_pool.capacity && AngularVelocityPool_expand(&angular_velocities_pool, new_capacity - angular_velocities_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
     if(new_capacity > angular_velocity_maximums_pool.capacity && AngularVelocityPool_expand(&angular_velocity_maximums_pool, new_capacity - angular_velocity_maximums_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
@@ -182,7 +178,6 @@ void physics_tables_destroy(void) {
     (void)ForcePool_destroy(&forces_pool);
     (void)ShapePool_destroy(&hit_boxes_pool);
     (void)ShapePool_destroy(&world_hit_boxes_pool);
-    (void)CollisionReportPool_destroy(&collision_reports_pool);
     (void)CollisionFilterConfigPool_destroy(&collision_filters_pool);
     (void)AngularVelocityPool_destroy(&angular_velocities_pool);
     (void)AngularVelocityPool_destroy(&angular_velocity_maximums_pool);
@@ -1947,37 +1942,26 @@ SoftBodyTriangleResult physics_soft_body_triangle_get(Entity triangle) {
 
 EngineResult physics_collision_report_set(Entity entity, Entity target, bool state) {
     EntityIndex index;
-    EntityIndex target_index;
     EngineResult result;
 
     result = physics_live_index_get(entity, &index);
-    if(result.kind == ERROR_RESULT_ERROR) {
-        return result;
-    }
-    result = physics_live_index_get(target, &target_index);
-    if(result.kind == ERROR_RESULT_ERROR) {
-        return result;
-    }
-    if(index >= collision_reports_pool.capacity) {
-        return error_result_error(ERROR_ENGINE_ENTITY_NOT_FOUND);
-    }
-    if(collision_reports_pool.used[index] == 0) {
-        (void)CollisionReportPool_store_at(&collision_reports_pool, index, (CollisionReport){0});
-    }
-    collision_reports[index].collisions[target_index] = state;
+    if(error_check(result)) return result;
+    result = physics_live_index_get(target, &index);
+    if(error_check(result)) return result;
+    result = state
+        ? entity_pair_set_insert(&current_contacts, entity, target)
+        : entity_pair_set_remove(&current_contacts, entity, target);
+    if(error_check(result)) return result;
     return error_result_value(true);
 }
-bool physics_collision_report_get(Entity entity, Entity target) {
+bool physics_contact_get(Entity entity, Entity target) {
     EntityIndex index;
     EntityIndex target_index;
 
     if(!(entity_index_get(entity, &index) && entity_index_alive_check(index)) || !(entity_index_get(target, &target_index) && entity_index_alive_check(target_index))) {
         return false;
     }
-    if(collision_reports[index].collisions[target_index] && collision_reports[target_index].collisions[index]) {
-        return true;
-    }
-    return false;
+    return physics_contact_current_get(entity, target);
 }
 
 EngineResult physics_dt_per_tick_set(Time dt) {

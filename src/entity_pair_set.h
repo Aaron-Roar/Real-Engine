@@ -23,6 +23,7 @@ typedef struct EntityPairSet {
 EngineResult entity_pair_set_init(EntityPairSet *set, size_t capacity);
 EngineResult entity_pair_set_reserve(EntityPairSet *set, size_t capacity);
 EngineResult entity_pair_set_insert(EntityPairSet *set, Entity first, Entity second);
+EngineResult entity_pair_set_remove(EntityPairSet *set, Entity first, Entity second);
 bool entity_pair_set_contains(const EntityPairSet *set, Entity first, Entity second);
 void entity_pair_set_clear(EntityPairSet *set);
 void entity_pair_set_destroy(EntityPairSet *set);

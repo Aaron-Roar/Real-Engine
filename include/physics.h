@@ -36,12 +36,6 @@ typedef struct CollisionFilterConfig {
 /** Result type for functions returning collision filter configuration. */
 ERROR_DECLARE_RESULT_TYPE(CollisionFilterConfigResult, CollisionFilterConfig);
 
-/** Per-target collision state table for one entity. */
-typedef struct {
-    /** Collision flags indexed by target EntityIndex. */
-    bool collisions[MAX_ENTITIES];
-} CollisionReport;
-
 /** Surface friction coefficient. */
 typedef Vec1D Friction;
 
@@ -238,8 +232,6 @@ MEMORY_DECLARE_OBJECT_POOL(MassPool, float);
 MEMORY_DECLARE_OBJECT_POOL(ForcePool, Force);
 /** Pool storing shapes by EntityIndex. */
 MEMORY_DECLARE_OBJECT_POOL(ShapePool, Shape);
-/** Pool storing collision reports by EntityIndex. */
-MEMORY_DECLARE_OBJECT_POOL(CollisionReportPool, CollisionReport);
 /** Pool storing collision filters by EntityIndex. */
 MEMORY_DECLARE_OBJECT_POOL(CollisionFilterConfigPool, CollisionFilterConfig);
 /** Pool storing orientations by EntityIndex. */
@@ -275,7 +267,6 @@ extern ForcePool forces_pool;
 extern AccelerationPool force_accelerations_pool;
 extern ShapePool hit_boxes_pool;
 extern ShapePool world_hit_boxes_pool;
-extern CollisionReportPool collision_reports_pool;
 extern CollisionFilterConfigPool collision_filters_pool;
 extern OrientationPool orientations_pool;
 extern AngularVelocityPool angular_velocities_pool;
@@ -301,7 +292,6 @@ extern SoftBodyTrianglePool soft_body_triangles_pool;
 #define force_accelerations force_accelerations_pool.objects
 #define hit_boxes hit_boxes_pool.objects
 #define world_hit_boxes world_hit_boxes_pool.objects
-#define collision_reports collision_reports_pool.objects
 #define collision_filters collision_filters_pool.objects
 #define orientations orientations_pool.objects
 #define angular_velocities angular_velocities_pool.objects
@@ -586,14 +576,14 @@ EntityResult physics_joint_create(
 Collision physics_particle_collision(Shape shape_1, Shape shape_2);
 
 /**
- * Set collision state between an entity and target entity.
+ * Set collision state between an entity pair for the current physics step.
  */
 EngineResult physics_collision_report_set(Entity entity, Entity target, bool state);
 
 /**
- * Get collision state between an entity and target entity.
+ * Get collision state between an entity pair for the current physics step.
  */
-bool physics_collision_report_get(Entity entity, Entity target);
+bool physics_contact_get(Entity entity, Entity target);
 
 /** Set an explicit simulation delta for each engine tick. */
 EngineResult physics_dt_per_tick_set(Time dt);

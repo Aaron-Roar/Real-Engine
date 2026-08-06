@@ -34,16 +34,6 @@ static bool system_alive_index_at(uint32_t alive_position, EntityIndex *index) {
     return entity_index_get(result.result.value, index) && entity_index_alive_check(*index);
 }
 
-static void system_collision_report_by_index_set(EntityIndex entity_1, EntityIndex entity_2, bool state) {
-    Entity entity_1_id;
-    Entity entity_2_id;
-
-    if(!system_entity_from_index_get(entity_1, &entity_1_id) || !system_entity_from_index_get(entity_2, &entity_2_id)) {
-        return;
-    }
-    physics_collision_report_set(entity_1_id, entity_2_id, state);
-}
-
 static void system_contact_by_index_record(EntityIndex entity_1, EntityIndex entity_2) {
     Entity entity_1_id;
     Entity entity_2_id;
@@ -731,14 +721,10 @@ void system_collisions_tuned_apply(void) {
                                 continue;
                             }
                             if(!physics_collision_between_check(entity_1_id, entity_2_id)) {
-                                system_collision_report_by_index_set(entity_1, entity_2, false);
-                                system_collision_report_by_index_set(entity_2, entity_1, false);
                                 continue;
                             }
                             Collision collision = system_entity_collision_get(entity_1, entity_2);
                             if(collision.overlap == true) {
-                                system_collision_report_by_index_set(entity_1, entity_2, true);
-                                system_collision_report_by_index_set(entity_2, entity_1, true);
                                 system_contact_by_index_record(entity_1, entity_2);
                                 if(entity_index_components_check(entity_1, COLLISION) && entity_index_components_check(entity_2, COLLISION)) {
                                     system_resolve_collision(entity_1, entity_2, collision);
@@ -749,10 +735,6 @@ void system_collisions_tuned_apply(void) {
                                     grid_aabb_update(entity_1);
                                     grid_aabb_update(entity_2);
                                 }
-
-                            } else {
-                                system_collision_report_by_index_set(entity_1, entity_2, false);
-                                system_collision_report_by_index_set(entity_2, entity_1, false);
 
                             }
                     }
@@ -785,25 +767,16 @@ void system_collisions_apply(void) {
                 continue;
             }
             if(!physics_collision_between_check(entity_1, entity_2)) {
-                system_collision_report_by_index_set(i, j, false);
-                system_collision_report_by_index_set(j, i, false);
                 continue;
             }
             Collision collision = system_entity_collision_get(i, j);
 
 
             if(collision.overlap == true) {
-                system_collision_report_by_index_set(i, j, true);
-                system_collision_report_by_index_set(j, i, true);
                 system_contact_by_index_record(i, j);
                 if(entity_index_components_check(i, COLLISION) && entity_index_components_check(j, COLLISION)) {
                     system_resolve_collision(i, j, collision);
                 }
-
-            }
-            else {
-                system_collision_report_by_index_set(i, j, false);
-                system_collision_report_by_index_set(j, i, false);
 
             }
         }

@@ -1098,21 +1098,21 @@ EntityResult rohr_physics_joint_create(
 Collision rohr_physics_particle_collision(Shape shape_1, Shape shape_2);
 
 /**
- * @brief Enables or disables collision reporting between two entities.
- * @param entity Reporting entity.
- * @param target Target entity.
- * @param state true to enable reporting, false to disable it.
+ * @brief Sets collision state between two entities for the current physics step.
+ * @param entity First entity.
+ * @param target Second entity.
+ * @param state true to store the pair, false to remove it.
  * @return EngineResult describing success or failure.
  */
 EngineResult rohr_physics_collision_report_set(Entity entity, Entity target, bool state);
 
 /**
- * @brief Checks whether a collision report exists between two entities.
- * @param entity Reporting entity.
- * @param target Target entity.
- * @return true when reporting is enabled, false otherwise.
+ * @brief Checks whether two entities collided during the current physics step.
+ * @param entity First entity.
+ * @param target Second entity.
+ * @return true when the pair is in the current contact set, false otherwise.
  */
-bool rohr_physics_collision_report_get(Entity entity, Entity target);
+bool rohr_physics_contact_get(Entity entity, Entity target);
 
 /**
  * @brief Creates an engine color from a hexadecimal RGB or RGBA value.

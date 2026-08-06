@@ -419,8 +419,8 @@ int main(void) {
 
         ticks_advanced = rohr_engine_tick_update();
         rohr_physics_update(ticks_advanced);
-        if(rohr_physics_collision_report_get(ball, paddle_left) ||
-                rohr_physics_collision_report_get(ball, paddle_right)) {
+        if(rohr_physics_contact_get(ball, paddle_left) ||
+                rohr_physics_contact_get(ball, paddle_right)) {
             if(!game_ball_on_fire_set(ball, true)) {
                 goto fail;
             }

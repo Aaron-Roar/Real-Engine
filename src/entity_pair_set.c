@@ -145,6 +145,47 @@ EngineResult entity_pair_set_insert(EntityPairSet *set, Entity first, Entity sec
     return error_result_value(true);
 }
 
+EngineResult entity_pair_set_remove(EntityPairSet *set, Entity first, Entity second) {
+    EntityPair pair;
+    bool found;
+    size_t slot;
+    size_t next;
+
+    if(set == NULL) {
+        return error_result_error(ERROR_MEMORY_POOL_NULL_POINTER);
+    }
+    if(first == ENTITY_INVALID || second == ENTITY_INVALID || first == second) {
+        return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
+    }
+    if(set->capacity == 0) return error_result_value(false);
+
+    pair = entity_pair_make(first, second);
+    slot = entity_pair_set_slot_get(
+        set->entries, set->occupied, set->capacity, pair, &found
+    );
+    if(!found) return error_result_value(false);
+
+    set->entries[slot] = (EntityPair){0};
+    set->occupied[slot] = 0;
+    set->count -= 1;
+
+    next = (slot + 1) & (set->capacity - 1);
+    while(set->occupied[next] != 0) {
+        EntityPair moved = set->entries[next];
+        size_t moved_slot;
+
+        set->entries[next] = (EntityPair){0};
+        set->occupied[next] = 0;
+        moved_slot = entity_pair_set_slot_get(
+            set->entries, set->occupied, set->capacity, moved, &found
+        );
+        set->entries[moved_slot] = moved;
+        set->occupied[moved_slot] = 1;
+        next = (next + 1) & (set->capacity - 1);
+    }
+    return error_result_value(true);
+}
+
 bool entity_pair_set_contains(const EntityPairSet *set, Entity first, Entity second) {
     bool found;
 
