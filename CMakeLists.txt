@@ -164,6 +164,11 @@ if(ROHR_BUILD_TESTS)
     set_target_properties(timing_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
     add_test(NAME timing COMMAND timing_test)
 
+    add_executable(ui_field_test tests/ui_field.c)
+    target_link_libraries(ui_field_test PRIVATE rohr_engine)
+    set_target_properties(ui_field_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+    add_test(NAME ui_field COMMAND ui_field_test)
+
     add_executable(joints_test tests/joints.c)
     target_link_libraries(joints_test PRIVATE rohr_engine)
     set_target_properties(joints_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)

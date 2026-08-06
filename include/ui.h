@@ -8,6 +8,8 @@
 #define UI_DEFINITION_NAME_MAX 64
 #define UI_LABEL_MAX 128
 #define UI_FONT_PATH_MAX 512
+#define UI_FIELD_EDIT_MAX 256
+#define UI_FIELD_KEY_EVENT_MAX 64
 
 /** Axis-aligned rectangle in logical screen coordinates. */
 typedef struct UIRect {
@@ -37,6 +39,25 @@ typedef struct UIButtonResult {
     bool pressed;
     bool clicked;
 } UIButtonResult;
+
+typedef enum UIFieldKind {
+    UI_FIELD_STRING,
+    UI_FIELD_FLOAT
+} UIFieldKind;
+
+typedef struct UIFieldBinding {
+    UIFieldKind kind;
+    char *string;
+    size_t string_capacity;
+    float *number;
+} UIFieldBinding;
+
+typedef struct UIFieldResult {
+    bool hovered;
+    bool active;
+    bool changed;
+    bool submitted;
+} UIFieldResult;
 
 /** Authored button data that can be loaded independently of runtime state. */
 typedef struct UIButtonDefinition {
@@ -138,6 +159,9 @@ ERROR_DECLARE_RESULT_TYPE(UISliderDefinitionResult, UISliderDefinition);
 
 /** Start a UI frame with pointer coordinates in logical screen space. */
 void ui_frame_begin(UIInput input);
+void ui_field_event_add(const SDL_Event *event);
+UIFieldResult ui_field(const char *id, UIFieldBinding binding,
+    TextAsset *display, UIRect bounds, const UIButtonStyle *style);
 
 /**
  * Draw and update a button identified by a stable, non-empty string.

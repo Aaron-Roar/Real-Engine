@@ -3,6 +3,8 @@
 #include "ui.h"
 #include "physics.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 typedef struct UIContext {
     UIInput input;
@@ -11,6 +13,11 @@ typedef struct UIContext {
     bool pointer_claimed;
     bool pointer_consumed;
     bool frame_active;
+    uint64_t field_id;
+    char field_edit[UI_FIELD_EDIT_MAX];
+    SDL_Keycode field_keys[UI_FIELD_KEY_EVENT_MAX];
+    size_t field_key_count;
+    bool field_replace_pending;
 } UIContext;
 
 static UIContext ui_context = {0};
@@ -133,6 +140,135 @@ void ui_frame_begin(UIInput input) {
     ui_context.pointer_claimed = false;
     ui_context.pointer_consumed = false;
     ui_context.frame_active = true;
+}
+
+void ui_field_event_add(const SDL_Event *event) {
+    if(event == NULL || event->type != SDL_EVENT_KEY_DOWN || event->key.repeat ||
+            ui_context.field_key_count >= UI_FIELD_KEY_EVENT_MAX) return;
+    ui_context.field_keys[ui_context.field_key_count++] = event->key.key;
+}
+
+static void ui_field_binding_display_set(UIFieldBinding binding, TextAsset *display) {
+    char value[UI_FIELD_EDIT_MAX] = {0};
+
+    if(binding.kind == UI_FIELD_FLOAT && binding.number != NULL) {
+        snprintf(value, sizeof(value), "%.1f", *binding.number);
+    } else if(binding.kind == UI_FIELD_STRING && binding.string != NULL) {
+        snprintf(value, sizeof(value), "%s", binding.string);
+    }
+    snprintf(ui_context.field_edit, sizeof(ui_context.field_edit), "%s", value);
+    if(display != NULL) (void)graphics_text_value_set(display, value);
+}
+
+static bool ui_field_character_add(UIFieldBinding binding, char character) {
+    size_t length = strlen(ui_context.field_edit);
+
+    if(binding.kind == UI_FIELD_FLOAT) {
+        char *decimal;
+
+        if(character == ',') return false;
+        if(character != '-' && character != '.' &&
+                (character < '0' || character > '9')) return false;
+        if(ui_context.field_replace_pending) {
+            ui_context.field_edit[0] = '\0';
+            length = 0;
+        }
+        decimal = strchr(ui_context.field_edit, '.');
+        if(character == '-' && length != 0) return false;
+        if(character == '.' && decimal != NULL) return false;
+        if(decimal != NULL && character >= '0' && character <= '9' &&
+                strlen(decimal + 1) >= 1) return false;
+    } else if(character < 32 || character > 126) {
+        return false;
+    }
+    ui_context.field_replace_pending = false;
+    if(length + 1 >= sizeof(ui_context.field_edit)) return false;
+    ui_context.field_edit[length] = character;
+    ui_context.field_edit[length + 1] = '\0';
+    return true;
+}
+
+static bool ui_field_binding_store(UIFieldBinding binding) {
+    if(binding.kind == UI_FIELD_STRING) {
+        if(binding.string == NULL || binding.string_capacity == 0) return false;
+        snprintf(binding.string, binding.string_capacity, "%s", ui_context.field_edit);
+        return true;
+    }
+    if(binding.kind == UI_FIELD_FLOAT && binding.number != NULL &&
+            ui_context.field_edit[0] != '\0' &&
+            strcmp(ui_context.field_edit, "-") != 0 &&
+            strcmp(ui_context.field_edit, ".") != 0) {
+        *binding.number = strtof(ui_context.field_edit, NULL);
+        return true;
+    }
+    return false;
+}
+
+UIFieldResult ui_field(const char *id, UIFieldBinding binding,
+    TextAsset *display, UIRect bounds, const UIButtonStyle *style) {
+    UIFieldResult result = {0};
+    UIButtonStyle resolved = style == NULL ? ui_button_style_default_get() : *style;
+    uint64_t field_id = ui_hash_id(id);
+
+    if(!ui_context.frame_active || field_id == 0 || bounds.width <= 0.0f ||
+            bounds.height <= 0.0f) return result;
+    result.hovered = ui_point_in_rect(ui_context.input.pointer, bounds) &&
+        !ui_context.pointer_claimed;
+    if(result.hovered) {
+        ui_context.pointer_claimed = true;
+        ui_context.pointer_consumed = true;
+    }
+    if(result.hovered && ui_context.input.primary_button == MOUSE_BUTTON_STATE_PRESSED) {
+        ui_context.field_id = field_id;
+        ui_context.field_replace_pending = binding.kind == UI_FIELD_FLOAT;
+        ui_field_binding_display_set(binding, display);
+    } else if(ui_context.input.primary_button == MOUSE_BUTTON_STATE_PRESSED &&
+            ui_context.field_id == field_id && !result.hovered) {
+        ui_context.field_id = 0;
+    }
+    result.active = ui_context.field_id == field_id;
+    if(result.active) {
+        for(size_t i = 0; i < ui_context.field_key_count; i += 1) {
+            SDL_Keycode key = ui_context.field_keys[i];
+            bool edited = false;
+
+            if(key == SDLK_RETURN || key == SDLK_KP_ENTER) {
+                result.submitted = true;
+                ui_context.field_id = 0;
+            } else if(key == SDLK_ESCAPE) {
+                ui_field_binding_display_set(binding, display);
+                ui_context.field_id = 0;
+            } else if(key == SDLK_BACKSPACE) {
+                size_t length = strlen(ui_context.field_edit);
+                if(ui_context.field_replace_pending) {
+                    ui_context.field_edit[0] = '\0';
+                    ui_context.field_replace_pending = false;
+                    edited = true;
+                } else if(length > 0) {
+                    ui_context.field_edit[length - 1] = '\0';
+                    edited = true;
+                }
+            } else if(key >= 0 && key <= 127) {
+                edited = ui_field_character_add(binding, (char)key);
+            }
+            if(edited && ui_field_binding_store(binding)) result.changed = true;
+            if(display != NULL) {
+                (void)graphics_text_value_set(display, ui_context.field_edit);
+            }
+        }
+    } else if(display != NULL) {
+        char value[UI_FIELD_EDIT_MAX];
+        if(binding.kind == UI_FIELD_FLOAT && binding.number != NULL) {
+            snprintf(value, sizeof(value), "%.1f", *binding.number);
+            (void)graphics_text_value_set(display, value);
+        } else if(binding.kind == UI_FIELD_STRING && binding.string != NULL) {
+            (void)graphics_text_value_set(display, binding.string);
+        }
+    }
+    (void)graphics_screen_rect_draw(bounds.x, bounds.y, bounds.width, bounds.height,
+        result.active ? resolved.pressed : (result.hovered ? resolved.hovered : resolved.idle));
+    ui_label(display, bounds);
+    return result;
 }
 
 UIButtonResult ui_button(
@@ -505,5 +641,6 @@ void ui_frame_end(void) {
             (ui_context.active_id != 0 && !ui_context.active_seen)) {
         ui_context.active_id = 0;
     }
+    ui_context.field_key_count = 0;
     ui_context.frame_active = false;
 }

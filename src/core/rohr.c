@@ -446,6 +446,8 @@ int rohr_tools_random_range(int min, int max) { return tools_random_range(min, m
 float rohr_tools_random_range_float(float min, float max) { return tools_random_range_float(min, max); }
 
 void rohr_ui_frame_begin(UIInput input) { ui_frame_begin(input); }
+void rohr_ui_field_event_add(const SDL_Event *event) { ui_field_event_add(event); }
+UIFieldResult rohr_ui_field(const char *id, UIFieldBinding binding, TextAsset *display, UIRect bounds, const UIButtonStyle *style) { return ui_field(id, binding, display, bounds, style); }
 UIButtonResult rohr_ui_button(const char *id, const TextAsset *label, UIRect bounds, const UIButtonStyle *style) { return ui_button(id, label, bounds, style); }
 void rohr_ui_label(const TextAsset *text, UIRect bounds) { ui_label(text, bounds); }
 EngineResult rohr_ui_physics_debug_panel_init(UIPhysicsDebugPanel *panel, FontDescriptor font) { return ui_physics_debug_panel_init(panel, font); }

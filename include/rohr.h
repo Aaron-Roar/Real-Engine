@@ -1901,6 +1901,11 @@ float rohr_tools_random_range_float(float min, float max);
 
 /** @brief Starts a UI frame with logical screen-space pointer input. */
 void rohr_ui_frame_begin(UIInput input);
+/** Queues a keyboard event for focused UI fields. */
+void rohr_ui_field_event_add(const SDL_Event *event);
+/** Draws and edits a caller-owned string or float field. */
+UIFieldResult rohr_ui_field(const char *id, UIFieldBinding binding,
+    TextAsset *display, UIRect bounds, const UIButtonStyle *style);
 
 /**
  * @brief Draws and updates one button identified by a stable string.
