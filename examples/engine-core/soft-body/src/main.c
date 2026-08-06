@@ -6,7 +6,7 @@
 
 #define WHEEL_COUNT 2
 #define ANCHOR_NODE_COUNT 10
-#define OUTER_NODE_COUNT 20
+#define OUTER_NODE_COUNT 40
 #define OUTER_NODE_START ANCHOR_NODE_COUNT
 #define WHEEL_NODE_COUNT (ANCHOR_NODE_COUNT + OUTER_NODE_COUNT)
 #define RAMP_TRIANGLE_COUNT 4
@@ -317,8 +317,8 @@ static const RohrCollisionCategoryMask disk_category = UINT64_C(1) << 3;
 static const RohrCollisionCategoryMask chassis_category = UINT64_C(1) << 4;
 static const RohrCollisionCategoryMask particle_category = UINT64_C(1) << 5;
 static const float inner_beam_stiffness = 1280.0f;
-static const float outer_beam_stiffness = 1377.5f;
-static const float support_beam_stiffness = 618.75f;
+static const float outer_beam_stiffness = 1277.5f;
+static const float support_beam_stiffness = 818.75f;
 static const float physics_tick_time = 1.0f / 240.0f;
 static const Acceleration gravity = {0.0f, -175.0f};
 static const float rigid_friction = 2.0f;
@@ -329,7 +329,7 @@ static const float cabin_height = 51.961524f;
 static const float wheel_inner_radius = 17.5f;
 static const float wheel_outer_radius = 31.0f;
 static const float inner_node_radius = 2.0f;
-static const float outer_node_radius = 2.8f;
+static const float outer_node_radius = 1.0f;
 static const Mass node_mass = 0.50f;
 static const float inner_beam_damping = 10.0f;
 static const float outer_beam_damping = 8.0f;
@@ -337,9 +337,9 @@ static const float support_beam_damping = 7.0f;
 static const float hub_radius = 5.0f;
 static const Mass hub_mass = 1.0f;
 static const float disk_radius = 15.0f;
-static const Mass disk_mass = 5.0f;
-static const Torque control_torque = 900000.0f;
-static const AngularVelocity maximum_wheel_angular_velocity = 5.0f;
+static const Mass disk_mass = 15.0f;
+static const Torque control_torque = 11111900000.0f;
+static const AngularVelocity maximum_wheel_angular_velocity = 7.0f;
 static const Vec2D chassis_dimensions = {170.0f, 40.0f};
 static const Mass chassis_mass = 3.0f;
 static const Mass cabin_mass = 0.10f;

@@ -7,6 +7,8 @@ typedef struct SolverTestContext {
     size_t finalizes;
     bool finalized_early;
     size_t expected_contact_solves;
+    float position_fractions[4];
+    size_t solve_batches;
 } SolverTestContext;
 
 static void contacts_solve(
@@ -16,7 +18,8 @@ static void contacts_solve(
 ) {
     SolverTestContext *test = context;
 
-    if(contacts == NULL || position_fraction != 0.25f) return;
+    if(contacts == NULL || test->solve_batches >= 4) return;
+    test->position_fractions[test->solve_batches++] = position_fraction;
     for(size_t i = 0; i < contacts->count; i += 1) {
         test->contact_solves += 1;
     }
@@ -89,7 +92,11 @@ int main(void) {
     constraint_solver_run(&contacts, 4, contacts_solve, joints_solve,
         contacts_finalize, &context);
     if(context.contact_solves != 520 || context.joint_solves != 4 ||
-            context.finalizes != 130 || context.finalized_early) {
+            context.finalizes != 130 || context.finalized_early ||
+            context.position_fractions[0] != 0.25f ||
+            context.position_fractions[1] != 1.0f / 3.0f ||
+            context.position_fractions[2] != 0.5f ||
+            context.position_fractions[3] != 1.0f) {
         joint_constraint_list_destroy(&joint_constraints);
         contact_constraint_list_destroy(&contacts);
         return 1;

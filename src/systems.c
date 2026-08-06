@@ -842,7 +842,9 @@ static void system_rigid_contact_constraint_solve(
     if(constraint == NULL) return;
     first = constraint->value.rigid.first_index;
     second = constraint->value.rigid.second_index;
-    overlap = constraint->value.rigid.overlap;
+    overlap = system_entity_overlap_get(first, second);
+    if(!overlap.detected) return;
+    constraint->value.rigid.overlap = overlap;
     responds = constraint->value.rigid.responds;
     first_solve = !constraint->value.rigid.solved;
     accumulated_normal = constraint->value.rigid.contact.normal_impulse;
@@ -1678,9 +1680,28 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
     }
     rigid_entity = query->rigid_entity;
     rigid = query->rigid;
-    overlap = query->overlap;
-    t = query->t;
+    if(!entity_index_alive_check(query->a) ||
+            !entity_index_alive_check(query->b) ||
+            !entity_index_alive_check(rigid) ||
+            !entity_index_components_check(rigid, HIT_BOX | COLLISION)) return true;
+    query->start = positions[query->a];
+    query->end = positions[query->b];
+    query->shape = system_soft_boundary_shape_create(
+        query->start,
+        query->end,
+        fminf(soft_body_nodes[query->a].radius, soft_body_nodes[query->b].radius));
+    if(query->shape.amount_of_vertices == 0) return true;
+    overlap = physics_sat_overlap_get(query->shape, world_hit_boxes[rigid]);
+    if(!overlap.detected) return true;
     edge = math_vector_subtract(query->end, query->start);
+    edge_length_squared = math_dot_product(edge, edge);
+    if(edge_length_squared <= 0.0001f) return true;
+    t = math_dot_product(
+        math_vector_subtract(math_polygon_centroid(world_hit_boxes[rigid]), query->start),
+        edge) / edge_length_squared;
+    query->overlap = overlap;
+    query->t = fmaxf(0.0f, fminf(1.0f, t));
+    t = query->t;
     accumulated_normal = query->contact.normal_impulse;
     accumulated_friction = query->contact.friction_impulse;
     weight_a = 1.0f - t;
@@ -1958,7 +1979,6 @@ static void system_contact_constraints_solve_callback(
                 constraint->value.soft.rigid_entity, &constraint->value.soft);
         }
     }
-    system_hitbox_dirty_flush();
 }
 
 static void system_contact_constraints_finalize_callback(
@@ -1994,6 +2014,19 @@ static void system_contact_constraints_finalize_callback(
 static void system_joint_constraints_solve_callback(void *context) {
     (void)context;
     system_joint_constraints_apply();
+    for(size_t i = 0; i < system_joint_constraints.count; i += 1) {
+        EntityIndex joint_entity = system_joint_constraints.values[i];
+        EntityIndex index;
+
+        if(!entity_index_alive_check(joint_entity)) continue;
+        if(entity_index_get(joints[joint_entity].a, &index)) {
+            system_hitbox_dirty_add(index);
+        }
+        if(entity_index_get(joints[joint_entity].b, &index)) {
+            system_hitbox_dirty_add(index);
+        }
+    }
+    system_hitbox_dirty_flush();
 }
 
 static bool system_soft_node_rigid_filter_allows(EntityIndex node, EntityIndex rigid) {

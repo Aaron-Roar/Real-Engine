@@ -11,8 +11,8 @@ void constraint_solver_run(
     float position_fraction;
 
     if(contacts == NULL || iterations == 0 || contacts_solve == NULL) return;
-    position_fraction = 1.0f / (float)iterations;
     for(uint32_t iteration = 0; iteration < iterations; iteration += 1) {
+        position_fraction = 1.0f / (float)(iterations - iteration);
         contacts_solve(contacts, position_fraction, context);
         if(joints_solve != NULL) joints_solve(context);
     }
