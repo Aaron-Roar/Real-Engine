@@ -1439,31 +1439,24 @@ static void system_spring_joint_apply(Entity joint_entity) {
         system_joint_torque_for_one_tick_add(b, torque_on_b);
 
 }
-void system_joints_apply(void)
-{
+static void system_joint_spring_forces_apply(void) {
     for(Entity joint_entity = 0; joint_entity < MAX_ENTITIES; joint_entity += 1) {
-        if(!entity_index_alive_check(joint_entity)) {
-            continue;
-        }
-        if(!entity_index_components_check(joint_entity, JOINT)) {
-            continue;
-        }
-        Joint joint = joints[joint_entity];
-        switch(joint.type) {
-            case JOINT_PIN:
-                system_pin_joint_apply(joint_entity);
-                break;
-            case JOINT_SPRING:
-                system_spring_joint_apply(joint_entity);
-                break;
-            case JOINT_WELD:
-                system_weld_joint_apply(joint_entity);
-                break;
-            default:
-                //Not implemented
-                break;
-        }
+        if(!entity_index_alive_check(joint_entity) ||
+                !entity_index_components_check(joint_entity, JOINT) ||
+                joints[joint_entity].type != JOINT_SPRING) continue;
+        system_spring_joint_apply(joint_entity);
+    }
+}
 
+static void system_joint_constraints_apply(void) {
+    for(Entity joint_entity = 0; joint_entity < MAX_ENTITIES; joint_entity += 1) {
+        if(!entity_index_alive_check(joint_entity) ||
+                !entity_index_components_check(joint_entity, JOINT)) continue;
+        if(joints[joint_entity].type == JOINT_PIN) {
+            system_pin_joint_apply(joint_entity);
+        } else if(joints[joint_entity].type == JOINT_WELD) {
+            system_weld_joint_apply(joint_entity);
+        }
     }
 }
 
@@ -1974,7 +1967,7 @@ void system_physics_update(double dt) {
     physics_debug_stats = (PhysicsDebugStats){0};
     physics_interactions_step_begin();
     system_force_torque_accelerations_clear();
-    system_joints_apply();
+    system_joint_spring_forces_apply();
     system_soft_body_beams_apply();
 
     system_forces_apply();
@@ -1984,6 +1977,7 @@ void system_physics_update(double dt) {
     system_angular_velocity_maximums_apply();
     system_orientations_update(dt);
     system_positions_update(dt);
+    system_joint_constraints_apply();
     system_axis_locks_apply();
     system_angle_locks_apply();
     system_transform_locks_apply();

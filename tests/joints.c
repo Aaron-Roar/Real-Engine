@@ -41,6 +41,13 @@ int main(void) {
     index_b = rohr_entity_index_get(body_b.result.value);
     if(rohr_error_check(index_a) || rohr_error_check(index_b) ||
             fabsf(positions[index_a.result.value].x - positions[index_b.result.value].x) > 0.0001f) goto fail;
+    if(rohr_error_check(rohr_physics_acceleration_set(
+                body_a.result.value, (Acceleration){-10.0f, 0.0f})) ||
+            rohr_error_check(rohr_physics_acceleration_set(
+                body_b.result.value, (Acceleration){10.0f, 0.0f}))) goto fail;
+    rohr_system_physics_update(0.1);
+    if(fabsf(positions[index_a.result.value].x -
+            positions[index_b.result.value].x) > 0.0001f) goto fail;
 
     if(rohr_error_check(rohr_physics_joint_anchor_remove(anchor_a.result.value)) ||
             rohr_entity_alive_check(joint.result.value)) goto fail;

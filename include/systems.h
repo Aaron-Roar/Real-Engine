@@ -9,8 +9,9 @@ Tick system_tick_update(void);
 /**
  * Run the physics pipeline for one frame.
  *
- * The current pipeline applies forces and joints, integrates movement,
- * applies locks, updates hitboxes/AABBs, then resolves collisions.
+ * The current pipeline applies spring forces, integrates movement, solves
+ * rigid joint constraints, applies locks, updates hitboxes/AABBs, then
+ * resolves collisions.
  *
  * @param dt Delta time in seconds.
  */
