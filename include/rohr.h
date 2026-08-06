@@ -426,6 +426,10 @@ EngineResult rohr_physics_dt_per_tick_set(Time dt);
 Time rohr_physics_dt_per_tick_get(void);
 /** Restores the engine time-per-tick default. */
 void rohr_physics_engine_time_per_tick_use(void);
+/** Sets constraint-solver iterations. Must be greater than zero. */
+EngineResult rohr_physics_solver_iterations_set(uint32_t iterations);
+/** Returns constraint-solver iterations. Defaults to 8. */
+uint32_t rohr_physics_solver_iterations_get(void);
 /** Advances physics using the supplied number of elapsed engine ticks. */
 void rohr_physics_update(Tick ticks);
 /** Advances physics once with an explicit exceptional delta. */

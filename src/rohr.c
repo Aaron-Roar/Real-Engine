@@ -95,6 +95,8 @@ EngineResult rohr_entity_life_time_remove(Entity entity) { return entity_life_ti
 EngineResult rohr_physics_dt_per_tick_set(Time dt) { return physics_dt_per_tick_set(dt); }
 Time rohr_physics_dt_per_tick_get(void) { return physics_dt_per_tick_get(); }
 void rohr_physics_engine_time_per_tick_use(void) { physics_engine_time_per_tick_use(); }
+EngineResult rohr_physics_solver_iterations_set(uint32_t iterations) { return physics_solver_iterations_set(iterations); }
+uint32_t rohr_physics_solver_iterations_get(void) { return physics_solver_iterations_get(); }
 void rohr_physics_update(Tick ticks) { physics_update(ticks); }
 void rohr_physics_dt_update(Time dt) { physics_dt_update(dt); }
 Shape rohr_physics_shape_world_translate(Shape shape, Position position, Orientation angle) { return physics_shape_world_translate(shape, position, angle); }

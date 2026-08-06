@@ -15,6 +15,13 @@ int main(void) {
         fprintf(stderr, "%s\n", rohr_error_default_message_get(result.result.error));
         return 1;
     }
+    if(rohr_physics_solver_iterations_get() != PHYSICS_SOLVER_ITERATIONS_DEFAULT ||
+            !rohr_error_check(rohr_physics_solver_iterations_set(0)) ||
+            rohr_error_check(rohr_physics_solver_iterations_set(12)) ||
+            rohr_physics_solver_iterations_get() != 12) {
+        rohr_engine_shutdown();
+        return 1;
+    }
 
     first = rohr_entity_add();
     second = rohr_entity_add();

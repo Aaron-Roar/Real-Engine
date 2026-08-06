@@ -450,11 +450,13 @@ int main(void) {
     }
     chassis = rigid_body_create((Position){0.0f, chassis_center_y},
         rohr_math_square_create(chassis_dimensions.x, chassis_dimensions.y), chassis_mass,
-        chassis_category, room_category | particle_category);
+        chassis_category,
+        room_category | particle_category | chassis_category);
     cabin = rigid_body_create(
         (Position){cabin_offset.x, chassis_center_y + cabin_offset.y},
         truck_cabin_shape_create(), cabin_mass,
-        chassis_category, room_category | particle_category);
+        chassis_category,
+        room_category | particle_category | chassis_category);
     for(uint32_t i = 0; i < PIT_PARTICLE_COUNT; i += 1) {
         uint32_t column = i % PIT_PARTICLE_COLUMNS;
         uint32_t row = i / PIT_PARTICLE_COLUMNS;
