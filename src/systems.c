@@ -732,7 +732,9 @@ ContactInfo system_resolve_collision(
         manifold.count = 1;
     }
     result.point_count = manifold.count;
-    for(uint8_t i = 0; i < manifold.count; i += 1) result.points[i] = manifold.points[i];
+    for(uint8_t i = 0; i < manifold.count; i += 1) {
+        result.points[i].position = manifold.points[i];
+    }
     if(inverse_mass_first + inverse_mass_second <= 0.0f) return result;
     if(!first_particle && inverse_mass_first > 0.0f) {
         float inertia = physics_polygon_moment_of_inertia(hit_boxes[first], mass[first]);
@@ -743,20 +745,13 @@ ContactInfo system_resolve_collision(
         if(inertia > 0.0f) inverse_inertia_second = 1.0f / inertia;
     }
     for(uint8_t i = 0; i < result.point_count; i += 1) {
-        Velocity relative_velocity = {0};
-        Vec2D normal_impulse = {0};
-        Vec2D friction_impulse = {0};
-
         system_contact_point_solve(
-            first, second, overlap, result.points[i], restitution_enabled,
+            first, second, overlap, result.points[i].position, restitution_enabled,
             inverse_mass_first, inverse_mass_second,
             inverse_inertia_first, inverse_inertia_second,
-            &relative_velocity, &normal_impulse, &friction_impulse);
-        if(i == 0) result.relative_velocity = relative_velocity;
-        result.normal_impulse.x += normal_impulse.x;
-        result.normal_impulse.y += normal_impulse.y;
-        result.friction_impulse.x += friction_impulse.x;
-        result.friction_impulse.y += friction_impulse.y;
+            &result.points[i].relative_velocity,
+            &result.points[i].normal_impulse,
+            &result.points[i].friction_impulse);
     }
     return result;
 }
@@ -802,13 +797,54 @@ static bool system_broadphase_pair_apply(Entity target, void *context) {
     });
 }
 
+static void system_contact_point_impulses_accumulate(
+    ContactInfo *current,
+    const ContactInfo *previous
+) {
+    bool matched[PHYSICS_CONTACT_POINT_MAX] = {0};
+
+    if(current == NULL || previous == NULL) return;
+    for(uint8_t previous_index = 0;
+            previous_index < previous->point_count;
+            previous_index += 1) {
+        uint8_t nearest = PHYSICS_CONTACT_POINT_MAX;
+        float nearest_distance = FLT_MAX;
+
+        for(uint8_t current_index = 0;
+                current_index < current->point_count;
+                current_index += 1) {
+            Vec2D delta;
+            float distance;
+
+            if(matched[current_index]) continue;
+            delta = math_vector_subtract(
+                current->points[current_index].position,
+                previous->points[previous_index].position);
+            distance = math_dot_product(delta, delta);
+            if(distance < nearest_distance) {
+                nearest = current_index;
+                nearest_distance = distance;
+            }
+        }
+        if(nearest >= current->point_count) continue;
+        matched[nearest] = true;
+        current->points[nearest].normal_impulse.x +=
+            previous->points[previous_index].normal_impulse.x;
+        current->points[nearest].normal_impulse.y +=
+            previous->points[previous_index].normal_impulse.y;
+        current->points[nearest].friction_impulse.x +=
+            previous->points[previous_index].friction_impulse.x;
+        current->points[nearest].friction_impulse.y +=
+            previous->points[previous_index].friction_impulse.y;
+    }
+}
+
 static void system_rigid_contact_constraint_solve(
     SystemContactConstraint *constraint,
     float position_fraction
 ) {
     ContactInfo result;
-    Vec2D accumulated_normal;
-    Vec2D accumulated_friction;
+    ContactInfo previous_contact;
     EntityIndex first;
     EntityIndex second;
     OverlapInfo overlap;
@@ -823,17 +859,15 @@ static void system_rigid_contact_constraint_solve(
     constraint->value.rigid.overlap = overlap;
     responds = constraint->value.rigid.responds;
     first_solve = !constraint->value.rigid.solved;
-    accumulated_normal = constraint->value.rigid.contact.normal_impulse;
-    accumulated_friction = constraint->value.rigid.contact.friction_impulse;
+    previous_contact = constraint->value.rigid.contact;
     result = responds
         ? system_resolve_collision(first, second, overlap,
             first_solve)
         : (ContactInfo){0};
     constraint->value.rigid.contact = result;
-    constraint->value.rigid.contact.normal_impulse.x += accumulated_normal.x;
-    constraint->value.rigid.contact.normal_impulse.y += accumulated_normal.y;
-    constraint->value.rigid.contact.friction_impulse.x += accumulated_friction.x;
-    constraint->value.rigid.contact.friction_impulse.y += accumulated_friction.y;
+    system_contact_point_impulses_accumulate(
+        &constraint->value.rigid.contact,
+        &previous_contact);
     constraint->value.rigid.solved = true;
     if(responds) {
         if(physics_debug_stats_enabled && first_solve) {
@@ -1611,8 +1645,7 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
     float restitution;
     float impulse_magnitude;
     ContactInfo contact;
-    Vec2D accumulated_normal;
-    Vec2D accumulated_friction;
+    ContactInfo previous_contact;
 
     if(query == NULL) return true;
     if(!query->solving) {
@@ -1673,8 +1706,7 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
     query->overlap = overlap;
     query->t = fmaxf(0.0f, fminf(1.0f, t));
     t = query->t;
-    accumulated_normal = query->contact.normal_impulse;
-    accumulated_friction = query->contact.friction_impulse;
+    previous_contact = query->contact;
     weight_a = 1.0f - t;
     weight_b = t;
     inverse_mass_a = physics_entity_movable_get(query->a) &&
@@ -1722,11 +1754,13 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
         .normal = overlap.normal,
         .depth = overlap.depth,
         .points = {{
-            query->start.x + edge.x * t,
-            query->start.y + edge.y * t
+            .position = {
+                query->start.x + edge.x * t,
+                query->start.y + edge.y * t
+            },
+            .relative_velocity = relative_velocity
         }},
-        .point_count = 1,
-        .relative_velocity = relative_velocity
+        .point_count = 1
     };
     if(normal_velocity < 0.0f) {
         Vec2D rigid_offset;
@@ -1749,22 +1783,23 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
                 restitutions_pool.used[rigid] ? restitutions[rigid] : 0.0f);
         impulse_magnitude = -(1.0f + restitution) * normal_velocity /
             inverse_mass_sum;
-        contact.normal_impulse = (Vec2D){
+        contact.points[0].normal_impulse = (Vec2D){
             overlap.normal.x * impulse_magnitude,
             overlap.normal.y * impulse_magnitude
         };
-        velocities[query->a].x -= contact.normal_impulse.x *
+        velocities[query->a].x -= contact.points[0].normal_impulse.x *
             weight_a * inverse_mass_a;
-        velocities[query->a].y -= contact.normal_impulse.y *
+        velocities[query->a].y -= contact.points[0].normal_impulse.y *
             weight_a * inverse_mass_a;
-        velocities[query->b].x -= contact.normal_impulse.x *
+        velocities[query->b].x -= contact.points[0].normal_impulse.x *
             weight_b * inverse_mass_b;
-        velocities[query->b].y -= contact.normal_impulse.y *
+        velocities[query->b].y -= contact.points[0].normal_impulse.y *
             weight_b * inverse_mass_b;
-        velocities[rigid].x += contact.normal_impulse.x * inverse_mass_rigid;
-        velocities[rigid].y += contact.normal_impulse.y * inverse_mass_rigid;
+        velocities[rigid].x += contact.points[0].normal_impulse.x * inverse_mass_rigid;
+        velocities[rigid].y += contact.points[0].normal_impulse.y * inverse_mass_rigid;
 
-        rigid_offset = math_vector_subtract(contact.points[0], positions[rigid]);
+        rigid_offset = math_vector_subtract(
+            contact.points[0].position, positions[rigid]);
         if(physics_entity_movable_get(rigid) &&
                 !entity_index_components_check(rigid, PARTICLE) &&
                 entity_index_components_check(rigid, MASS | HIT_BOX)) {
@@ -1814,33 +1849,32 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
                 maximum_friction = fabsf(impulse_magnitude) * friction;
                 tangent_impulse_magnitude = fmaxf(-maximum_friction,
                     fminf(tangent_impulse_magnitude, maximum_friction));
-                contact.friction_impulse = (Vec2D){
+                contact.points[0].friction_impulse = (Vec2D){
                     tangent.x * tangent_impulse_magnitude,
                     tangent.y * tangent_impulse_magnitude
                 };
-                velocities[query->a].x -= contact.friction_impulse.x *
+                velocities[query->a].x -= contact.points[0].friction_impulse.x *
                     weight_a * inverse_mass_a;
-                velocities[query->a].y -= contact.friction_impulse.y *
+                velocities[query->a].y -= contact.points[0].friction_impulse.y *
                     weight_a * inverse_mass_a;
-                velocities[query->b].x -= contact.friction_impulse.x *
+                velocities[query->b].x -= contact.points[0].friction_impulse.x *
                     weight_b * inverse_mass_b;
-                velocities[query->b].y -= contact.friction_impulse.y *
+                velocities[query->b].y -= contact.points[0].friction_impulse.y *
                     weight_b * inverse_mass_b;
-                velocities[rigid].x += contact.friction_impulse.x *
+                velocities[rigid].x += contact.points[0].friction_impulse.x *
                     inverse_mass_rigid;
-                velocities[rigid].y += contact.friction_impulse.y *
+                velocities[rigid].y += contact.points[0].friction_impulse.y *
                     inverse_mass_rigid;
                 angular_velocities[rigid] += math_cross_2d(
-                    rigid_offset, contact.friction_impulse) *
+                    rigid_offset, contact.points[0].friction_impulse) *
                     inverse_inertia_rigid;
             }
         }
     }
     query->contact = contact;
-    query->contact.normal_impulse.x += accumulated_normal.x;
-    query->contact.normal_impulse.y += accumulated_normal.y;
-    query->contact.friction_impulse.x += accumulated_friction.x;
-    query->contact.friction_impulse.y += accumulated_friction.y;
+    system_contact_point_impulses_accumulate(
+        &query->contact,
+        &previous_contact);
     query->solved = true;
     system_hitbox_dirty_add(query->a);
     system_hitbox_dirty_add(query->b);
@@ -2043,13 +2077,15 @@ static void system_soft_body_node_rigid_collisions_apply(void) {
                 .normal = collision.normal,
                 .depth = collision.depth,
                 .points = {{
-                    positions[node].x +
-                        collision.normal.x * soft_body_nodes[node].radius,
-                    positions[node].y +
-                        collision.normal.y * soft_body_nodes[node].radius
+                    .position = {
+                        positions[node].x +
+                            collision.normal.x * soft_body_nodes[node].radius,
+                        positions[node].y +
+                            collision.normal.y * soft_body_nodes[node].radius
+                    },
+                    .relative_velocity = relative_velocity
                 }},
-                .point_count = 1,
-                .relative_velocity = relative_velocity
+                .point_count = 1
             };
             system_interaction_by_index_record(
                 node,
@@ -2077,7 +2113,7 @@ static void system_soft_body_node_rigid_collisions_apply(void) {
             velocities[node].y -= collision.normal.y * impulse_magnitude * inverse_mass_node;
             velocities[rigid].x += collision.normal.x * impulse_magnitude * inverse_mass_rigid;
             velocities[rigid].y += collision.normal.y * impulse_magnitude * inverse_mass_rigid;
-            contact_info.normal_impulse = (Vec2D){
+            contact_info.points[0].normal_impulse = (Vec2D){
                 collision.normal.x * impulse_magnitude,
                 collision.normal.y * impulse_magnitude
             };
@@ -2133,7 +2169,7 @@ static void system_soft_body_node_rigid_collisions_apply(void) {
                     rigid_offset,
                     (Vec2D){tangent.x * tangent_impulse, tangent.y * tangent_impulse}
                 ) * inverse_inertia_rigid;
-                contact_info.friction_impulse = (Vec2D){
+                contact_info.points[0].friction_impulse = (Vec2D){
                     tangent.x * tangent_impulse,
                     tangent.y * tangent_impulse
                 };

@@ -6,6 +6,26 @@
 
 #define PHYSICS_INTERACTION_SET_MIN_CAPACITY 8
 
+static void physics_contact_orientation_reverse(ContactInfo *contact) {
+    if(contact == NULL) return;
+    contact->normal.x = -contact->normal.x;
+    contact->normal.y = -contact->normal.y;
+    for(uint8_t i = 0; i < contact->point_count; i += 1) {
+        contact->points[i].relative_velocity.x =
+            -contact->points[i].relative_velocity.x;
+        contact->points[i].relative_velocity.y =
+            -contact->points[i].relative_velocity.y;
+        contact->points[i].normal_impulse.x =
+            -contact->points[i].normal_impulse.x;
+        contact->points[i].normal_impulse.y =
+            -contact->points[i].normal_impulse.y;
+        contact->points[i].friction_impulse.x =
+            -contact->points[i].friction_impulse.x;
+        contact->points[i].friction_impulse.y =
+            -contact->points[i].friction_impulse.y;
+    }
+}
+
 static EntityPair physics_interaction_pair_make(Entity first, Entity second) {
     if(first < second) return (EntityPair){first, second};
     return (EntityPair){second, first};
@@ -147,14 +167,7 @@ EngineResult physics_interaction_set_record(
     if(first != pair.first) {
         overlap.normal.x = -overlap.normal.x;
         overlap.normal.y = -overlap.normal.y;
-        contact.normal.x = -contact.normal.x;
-        contact.normal.y = -contact.normal.y;
-        contact.relative_velocity.x = -contact.relative_velocity.x;
-        contact.relative_velocity.y = -contact.relative_velocity.y;
-        contact.normal_impulse.x = -contact.normal_impulse.x;
-        contact.normal_impulse.y = -contact.normal_impulse.y;
-        contact.friction_impulse.x = -contact.friction_impulse.x;
-        contact.friction_impulse.y = -contact.friction_impulse.y;
+        physics_contact_orientation_reverse(&contact);
     }
     slot = physics_interaction_slot_get(
         set->entries, set->occupied, set->capacity, pair, &found
@@ -266,20 +279,7 @@ bool physics_interaction_set_get(
         interaction->pair = (EntityPair){first, second};
         interaction->overlap.normal.x = -interaction->overlap.normal.x;
         interaction->overlap.normal.y = -interaction->overlap.normal.y;
-        interaction->contact.normal.x = -interaction->contact.normal.x;
-        interaction->contact.normal.y = -interaction->contact.normal.y;
-        interaction->contact.relative_velocity.x =
-            -interaction->contact.relative_velocity.x;
-        interaction->contact.relative_velocity.y =
-            -interaction->contact.relative_velocity.y;
-        interaction->contact.normal_impulse.x =
-            -interaction->contact.normal_impulse.x;
-        interaction->contact.normal_impulse.y =
-            -interaction->contact.normal_impulse.y;
-        interaction->contact.friction_impulse.x =
-            -interaction->contact.friction_impulse.x;
-        interaction->contact.friction_impulse.y =
-            -interaction->contact.friction_impulse.y;
+        physics_contact_orientation_reverse(&interaction->contact);
     }
     return true;
 }
@@ -366,14 +366,7 @@ size_t physics_interaction_set_contacts_get(
             target = interaction->pair.second;
         } else if(interaction->pair.second == entity) {
             target = interaction->pair.first;
-            contact.normal.x = -contact.normal.x;
-            contact.normal.y = -contact.normal.y;
-            contact.relative_velocity.x = -contact.relative_velocity.x;
-            contact.relative_velocity.y = -contact.relative_velocity.y;
-            contact.normal_impulse.x = -contact.normal_impulse.x;
-            contact.normal_impulse.y = -contact.normal_impulse.y;
-            contact.friction_impulse.x = -contact.friction_impulse.x;
-            contact.friction_impulse.y = -contact.friction_impulse.y;
+            physics_contact_orientation_reverse(&contact);
         } else {
             continue;
         }

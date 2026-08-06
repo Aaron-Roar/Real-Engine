@@ -24,11 +24,13 @@ int main(void) {
         .detected = true,
         .normal = {0.5f, -0.75f},
         .depth = 3.0f,
-        .points = {{4.0f, 5.0f}},
+        .points = {{
+            .position = {4.0f, 5.0f},
+            .relative_velocity = {6.0f, 7.0f},
+            .normal_impulse = {8.0f, 9.0f},
+            .friction_impulse = {10.0f, 11.0f}
+        }},
         .point_count = 1,
-        .relative_velocity = {6.0f, 7.0f},
-        .normal_impulse = {8.0f, 9.0f},
-        .friction_impulse = {10.0f, 11.0f}
     };
     EngineResult result;
     Vec2D total_impulse;
@@ -65,9 +67,9 @@ int main(void) {
             fabsf(interaction.overlap.normal.y - -0.75f) > 0.0001f ||
             interaction.overlap.depth != 3.0f ||
             !interaction.contact.detected ||
-            fabsf(interaction.contact.relative_velocity.x - 6.0f) > 0.0001f ||
-            fabsf(interaction.contact.normal_impulse.y - 9.0f) > 0.0001f ||
-            fabsf(interaction.contact.friction_impulse.x - 10.0f) > 0.0001f) goto fail;
+            fabsf(interaction.contact.points[0].relative_velocity.x - 6.0f) > 0.0001f ||
+            fabsf(interaction.contact.points[0].normal_impulse.y - 9.0f) > 0.0001f ||
+            fabsf(interaction.contact.points[0].friction_impulse.x - 10.0f) > 0.0001f) goto fail;
 
     for(i = 3; i < 200; i += 1) {
         result = physics_interaction_set_record(
@@ -127,11 +129,11 @@ int main(void) {
             contacts[0].target != second ||
             !contacts[0].contact.detected ||
             fabsf(contacts[0].contact.normal.x - -0.5f) > 0.0001f ||
-            fabsf(contacts[0].contact.relative_velocity.x - -6.0f) > 0.0001f ||
-            fabsf(contacts[0].contact.normal_impulse.y - -9.0f) > 0.0001f ||
-            fabsf(contacts[0].contact.friction_impulse.x - -10.0f) > 0.0001f ||
+            fabsf(contacts[0].contact.points[0].relative_velocity.x - -6.0f) > 0.0001f ||
+            fabsf(contacts[0].contact.points[0].normal_impulse.y - -9.0f) > 0.0001f ||
+            fabsf(contacts[0].contact.points[0].friction_impulse.x - -10.0f) > 0.0001f ||
             contacts[0].contact.point_count != 1 ||
-            contacts[0].contact.points[0].x != 4.0f) goto fail;
+            contacts[0].contact.points[0].position.x != 4.0f) goto fail;
     if(!physics_interaction_set_get(&set, first, second, &interaction) ||
             !physics_interaction_set_check(
                 &set, first, second, PHYSICS_INTERACTION_CONTACT)) goto fail;

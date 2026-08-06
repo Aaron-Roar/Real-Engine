@@ -83,6 +83,18 @@ typedef Vec2D Position;
 /** Entity linear velocity. */
 typedef Vec2D Velocity;
 #define PHYSICS_CONTACT_POINT_MAX 2
+/** Solver information for one world-space point in a contact manifold. */
+typedef struct ContactPointInfo {
+    /** World-space contact position. */
+    Position position;
+    /** Pre-resolution velocity of the second entity relative to the first. */
+    Velocity relative_velocity;
+    /** Normal impulse applied to the second entity at this point. */
+    Vec2D normal_impulse;
+    /** Friction impulse applied to the second entity at this point. */
+    Vec2D friction_impulse;
+} ContactPointInfo;
+
 /** Physical response information for one entity contact. */
 typedef struct ContactInfo {
     /** true when physical collision response was entered. */
@@ -91,16 +103,10 @@ typedef struct ContactInfo {
     Axis normal;
     /** Penetration depth along the contact normal. */
     Vec1D depth;
-    /** World-space points in the collision manifold. */
-    Position points[PHYSICS_CONTACT_POINT_MAX];
+    /** World-space points and solver results in the collision manifold. */
+    ContactPointInfo points[PHYSICS_CONTACT_POINT_MAX];
     /** Number of valid manifold points. */
     uint8_t point_count;
-    /** Pre-resolution velocity of the second entity relative to the first. */
-    Velocity relative_velocity;
-    /** Normal impulse applied to the second entity. */
-    Vec2D normal_impulse;
-    /** Friction impulse applied to the second entity. */
-    Vec2D friction_impulse;
 } ContactInfo;
 
 /** One current physical contact involving a queried entity. */

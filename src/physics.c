@@ -2143,10 +2143,15 @@ ContactInfo physics_contact_get(Entity entity, Entity target) {
 }
 
 Vec2D physics_contact_total_impulse_get(ContactInfo contact) {
-    return (Vec2D){
-        .x = contact.normal_impulse.x + contact.friction_impulse.x,
-        .y = contact.normal_impulse.y + contact.friction_impulse.y
-    };
+    Vec2D total = {0};
+
+    for(uint8_t i = 0; i < contact.point_count; i += 1) {
+        total.x += contact.points[i].normal_impulse.x +
+            contact.points[i].friction_impulse.x;
+        total.y += contact.points[i].normal_impulse.y +
+            contact.points[i].friction_impulse.y;
+    }
+    return total;
 }
 
 bool physics_contact_entered_check(Entity entity, Entity target) {
