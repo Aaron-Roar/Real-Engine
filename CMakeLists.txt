@@ -4,6 +4,7 @@ project(rohr_engine LANGUAGES C)
 
 option(ROHR_BUILD_EXAMPLES "Build Rohr example programs" ON)
 option(ROHR_BUILD_TESTS "Build Rohr tests" ON)
+option(ROHR_BUILD_EDITOR "Build Rohr Editor" ON)
 option(ROHR_ENABLE_DOCUMENTATION "Enable documentation build targets" ON)
 
 set(CMAKE_C_STANDARD 99)
@@ -107,6 +108,10 @@ target_include_directories(rohr_tools
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+
+if(ROHR_BUILD_EDITOR)
+    add_subdirectory(tools/editor)
+endif()
 
 if(ROHR_BUILD_EXAMPLES)
     add_subdirectory(examples)
