@@ -363,11 +363,11 @@ int main(void) {
             ShapeResult player_shape_result = rohr_physics_global_hit_box_get(player);
             ShapeResult finish_shape_result = rohr_physics_global_hit_box_get(finish_line);
             if(player_shape_result.kind == ERROR_RESULT_VALUE && finish_shape_result.kind == ERROR_RESULT_VALUE) {
-                Collision finish_collision = rohr_physics_sat_collision(
+                OverlapInfo finish_overlap = rohr_physics_sat_overlap_get(
                     player_shape_result.result.value,
                     finish_shape_result.result.value
                 );
-                reached_finish = finish_collision.overlap;
+                reached_finish = finish_overlap.detected;
             }
         }
 

@@ -456,12 +456,12 @@ Shape rohr_physics_shape_world_translate(Shape shape, Position position, Orienta
 float rohr_physics_polygon_moment_of_inertia(Shape shape, Mass mass_value);
 
 /**
- * @brief Tests two shapes with separating axis theorem collision detection.
+ * @brief Gets overlap information using the separating axis theorem.
  * @param shape_1 First shape.
  * @param shape_2 Second shape.
- * @return Collision information.
+ * @return Geometric overlap information.
  */
-Collision rohr_physics_sat_collision(Shape shape_1, Shape shape_2);
+OverlapInfo rohr_physics_sat_overlap_get(Shape shape_1, Shape shape_2);
 
 /**
  * @brief Calculates circle moment of inertia.
@@ -1090,12 +1090,12 @@ EntityResult rohr_physics_joint_create(
 );
 
 /**
- * @brief Tests two particle shapes for collision.
+ * @brief Gets overlap information for two particle shapes.
  * @param shape_1 First shape.
  * @param shape_2 Second shape.
- * @return Collision information.
+ * @return Geometric overlap information.
  */
-Collision rohr_physics_particle_collision(Shape shape_1, Shape shape_2);
+OverlapInfo rohr_physics_particle_overlap_get(Shape shape_1, Shape shape_2);
 
 /**
  * @brief Sets collision state between two entities for the current physics step.

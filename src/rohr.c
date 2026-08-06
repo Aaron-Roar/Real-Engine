@@ -100,7 +100,7 @@ void rohr_physics_update(Tick ticks) { physics_update(ticks); }
 void rohr_physics_dt_update(Time dt) { physics_dt_update(dt); }
 Shape rohr_physics_shape_world_translate(Shape shape, Position position, Orientation angle) { return physics_shape_world_translate(shape, position, angle); }
 float rohr_physics_polygon_moment_of_inertia(Shape shape, Mass mass_value) { return physics_polygon_moment_of_inertia(shape, mass_value); }
-Collision rohr_physics_sat_collision(Shape shape_1, Shape shape_2) { return physics_sat_collision(shape_1, shape_2); }
+OverlapInfo rohr_physics_sat_overlap_get(Shape shape_1, Shape shape_2) { return physics_sat_overlap_get(shape_1, shape_2); }
 Vec1D rohr_physics_circle_moment_of_inertia(Shape circle, Mass mass_value) { return physics_circle_moment_of_inertia(circle, mass_value); }
 bool rohr_physics_entity_held_get(EntityIndex index) { return physics_entity_held_get(index); }
 EngineResult rohr_physics_acceleration_set(Entity entity, Acceleration a) { return physics_acceleration_set(entity, a); }
@@ -224,7 +224,7 @@ SoftBodyTriangleResult rohr_physics_soft_body_triangle_get(Entity triangle) { re
 EntityResult rohr_physics_joint_create(Entity a, Entity b, JointType type, Vec2D local_anchor_a, Vec2D local_anchor_b, float stiffness, float damping) {
     return physics_joint_create(a, b, type, local_anchor_a, local_anchor_b, stiffness, damping);
 }
-Collision rohr_physics_particle_collision(Shape shape_1, Shape shape_2) { return physics_particle_collision(shape_1, shape_2); }
+OverlapInfo rohr_physics_particle_overlap_get(Shape shape_1, Shape shape_2) { return physics_particle_overlap_get(shape_1, shape_2); }
 EngineResult rohr_physics_collision_report_set(Entity entity, Entity target, bool state) { return physics_collision_report_set(entity, target, state); }
 bool rohr_physics_contact_get(Entity entity, Entity target) { return physics_contact_get(entity, target); }
 bool rohr_physics_contact_entered_get(Entity entity, Entity target) { return physics_contact_entered_get(entity, target); }

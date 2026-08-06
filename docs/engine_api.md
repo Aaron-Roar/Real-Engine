@@ -823,20 +823,20 @@ Calculates polygon moment of inertia.
 
 **Returns:** Moment of inertia value.
 
-### `rohr_physics_sat_collision`
+### `rohr_physics_sat_overlap_get`
 
 ```c
-Collision rohr_physics_sat_collision(Shape shape_1, Shape shape_2);
+OverlapInfo rohr_physics_sat_overlap_get(Shape shape_1, Shape shape_2);
 ```
 
-Tests two shapes with separating axis theorem collision detection.
+Gets overlap information using the separating axis theorem.
 
 | Parameter | Description |
 | --- | --- |
 | `shape_1` | First shape. |
 | `shape_2` | Second shape. |
 
-**Returns:** Collision information.
+**Returns:** Geometric overlap information.
 
 ### `rohr_physics_circle_moment_of_inertia`
 
@@ -1996,20 +1996,20 @@ Creates a joint between two entities.
 
 **Returns:** EntityResult containing the joint entity, or an error.
 
-### `rohr_physics_particle_collision`
+### `rohr_physics_particle_overlap_get`
 
 ```c
-Collision rohr_physics_particle_collision(Shape shape_1, Shape shape_2);
+OverlapInfo rohr_physics_particle_overlap_get(Shape shape_1, Shape shape_2);
 ```
 
-Tests two particle shapes for collision.
+Gets overlap information for two particle shapes.
 
 | Parameter | Description |
 | --- | --- |
 | `shape_1` | First shape. |
 | `shape_2` | Second shape. |
 
-**Returns:** Collision information.
+**Returns:** Geometric overlap information.
 
 ### `rohr_physics_collision_report_set`
 

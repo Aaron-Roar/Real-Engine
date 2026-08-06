@@ -5,15 +5,15 @@
 /** Result type for functions that return a Shape. */
 ERROR_DECLARE_RESULT_TYPE(ShapeResult, Shape);
 
-/** Collision result from narrow-phase collision tests. */
-typedef struct Collision {
+/** Geometric overlap information from narrow-phase shape tests. */
+typedef struct OverlapInfo {
     /** true when shapes overlap. */
-    bool overlap;
-    /** Collision normal pointing from the first shape toward the second. */
+    bool detected;
+    /** Normal pointing from the first shape toward the second. */
     Axis normal;
-    /** Penetration depth along the collision normal. */
+    /** Penetration depth along the overlap normal. */
     Vec1D depth;
-} Collision;
+} OverlapInfo;
 
 /** Bit mask describing one or more collision categories. */
 typedef uint64_t RohrCollisionCategoryMask;
@@ -334,9 +334,9 @@ float physics_polygon_moment_of_inertia(Shape shape, Mass mass_value);
  *
  * @param shape_1 First world-space shape.
  * @param shape_2 Second world-space shape.
- * @return Collision data.
+ * @return Geometric overlap information.
  */
-Collision physics_sat_collision(Shape shape_1, Shape shape_2);
+OverlapInfo physics_sat_overlap_get(Shape shape_1, Shape shape_2);
 
 /**
  * Compute circle moment of inertia from a circle-like shape.
@@ -573,7 +573,7 @@ EntityResult physics_joint_create(
 /**
  * Run particle collision detection between two circle-like shapes.
  */
-Collision physics_particle_collision(Shape shape_1, Shape shape_2);
+OverlapInfo physics_particle_overlap_get(Shape shape_1, Shape shape_2);
 
 /**
  * Set collision state between an entity pair for the current physics step.

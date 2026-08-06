@@ -262,19 +262,19 @@ void system_force_torque_accelerations_clear(void) {
     }
 }
 
-Collision system_entity_collision_get(Entity entity_1, Entity entity_2) {
+OverlapInfo system_entity_overlap_get(Entity entity_1, Entity entity_2) {
     Shape shape1 = world_hit_boxes[entity_1];
     Shape shape2 = world_hit_boxes[entity_2];
     if(entity_index_components_check(entity_1, PARTICLE) && entity_index_components_check(entity_2, PARTICLE)) {
-        return physics_particle_collision(shape1, shape2);
+        return physics_particle_overlap_get(shape1, shape2);
     }
-    return physics_sat_collision(shape1, shape2);
+    return physics_sat_overlap_get(shape1, shape2);
 }
 
 void system_separate_entities_tuned(
     Entity entity_1,
     Entity entity_2,
-    Collision collision
+    OverlapInfo collision
 ) {
     bool dynamic_1 = physics_entity_movable_get(entity_1);
     bool dynamic_2 = physics_entity_movable_get(entity_2);
@@ -310,7 +310,7 @@ void system_separate_entities_tuned(
     positions[entity_2].y += correction.y * share_2;
 }
 
-void system_separate_entities(Entity entity_1, Entity entity_2, Collision collision)
+void system_separate_entities(Entity entity_1, Entity entity_2, OverlapInfo collision)
 {
     bool entity_1_dynamic = physics_entity_movable_get(entity_1);
     bool entity_2_dynamic = physics_entity_movable_get(entity_2);
@@ -380,7 +380,7 @@ Position system_particle_edge_get(Entity entity, Vec2D normal, Vec1D radius) {
     };
 }
 
-Position system_collision_contact_point(Entity entity_1, Entity entity_2, Collision collision)
+Position system_collision_contact_point(Entity entity_1, Entity entity_2, OverlapInfo collision)
 {
     Shape shape_1 = world_hit_boxes[entity_1];
     Shape shape_2 = world_hit_boxes[entity_2];
@@ -446,7 +446,7 @@ Position system_collision_contact_point(Entity entity_1, Entity entity_2, Collis
 void system_friction_impulse_apply(
     Entity entity_1,
     Entity entity_2,
-    Collision collision,
+    OverlapInfo collision,
     Vec2D r1,
     Vec2D r2,
     float normal_impulse_magnitude,
@@ -530,7 +530,7 @@ void system_friction_impulse_apply(
     angular_velocities[entity_2] += math_cross_2d(r2, friction_impulse) * inv_inertia_2;
 }
 
-void system_resolve_collision(Entity entity_1, Entity entity_2, Collision collision) {
+void system_resolve_collision(Entity entity_1, Entity entity_2, OverlapInfo collision) {
     //Assume collision.normal points from entity_1 -> entity_2
     bool entity_1_movable = physics_entity_movable_get(entity_1);
     bool entity_2_movable = physics_entity_movable_get(entity_2);
@@ -723,8 +723,8 @@ void system_collisions_tuned_apply(void) {
                             if(!physics_collision_between_check(entity_1_id, entity_2_id)) {
                                 continue;
                             }
-                            Collision collision = system_entity_collision_get(entity_1, entity_2);
-                            if(collision.overlap == true) {
+                            OverlapInfo collision = system_entity_overlap_get(entity_1, entity_2);
+                            if(collision.detected == true) {
                                 system_contact_by_index_record(entity_1, entity_2);
                                 if(entity_index_components_check(entity_1, COLLISION) && entity_index_components_check(entity_2, COLLISION)) {
                                     system_resolve_collision(entity_1, entity_2, collision);
@@ -769,10 +769,10 @@ void system_collisions_apply(void) {
             if(!physics_collision_between_check(entity_1, entity_2)) {
                 continue;
             }
-            Collision collision = system_entity_collision_get(i, j);
+            OverlapInfo collision = system_entity_overlap_get(i, j);
 
 
-            if(collision.overlap == true) {
+            if(collision.detected == true) {
                 system_contact_by_index_record(i, j);
                 if(entity_index_components_check(i, COLLISION) && entity_index_components_check(j, COLLISION)) {
                     system_resolve_collision(i, j, collision);
@@ -1432,7 +1432,7 @@ static void system_soft_body_node_rigid_collisions_apply(void) {
             0.0f
         );
         for(EntityIndex rigid = 0; rigid < world_hit_boxes_pool.capacity; rigid += 1) {
-            Collision collision;
+            OverlapInfo collision;
             float inverse_mass_node;
             float inverse_mass_rigid;
             float inverse_mass_sum;
@@ -1445,8 +1445,8 @@ static void system_soft_body_node_rigid_collisions_apply(void) {
                     !entity_index_components_check(rigid, HIT_BOX | COLLISION) ||
                     entity_index_components_check(rigid, SOFT_BODY_NODE) ||
                     !system_soft_node_rigid_filter_allows(node, rigid)) continue;
-            collision = physics_sat_collision(node_shape, world_hit_boxes[rigid]);
-            if(!collision.overlap) continue;
+            collision = physics_sat_overlap_get(node_shape, world_hit_boxes[rigid]);
+            if(!collision.detected) continue;
             inverse_mass_node = physics_entity_movable_get(node) && mass[node] > 0.0f ? 1.0f / mass[node] : 0.0f;
             inverse_mass_rigid = physics_entity_movable_get(rigid) && mass[rigid] > 0.0f ? 1.0f / mass[rigid] : 0.0f;
             inverse_mass_sum = inverse_mass_node + inverse_mass_rigid;

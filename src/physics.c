@@ -364,7 +364,7 @@ float physics_polygon_moment_of_inertia(Shape shape, Mass mass_value) {
 
     return inertia;
 }
-Collision physics_sat_collision_on_axes(Shape shape_1, Shape shape_2, Vec2DList axes, Collision collision) {
+OverlapInfo physics_sat_overlap_on_axes_get(Shape shape_1, Shape shape_2, Vec2DList axes, OverlapInfo overlap_info) {
     for (int i = 0; i < axes.amount_of_vectors; i += 1) {
         Axis axis = axes.vectors[i];
 
@@ -374,18 +374,18 @@ Collision physics_sat_collision_on_axes(Shape shape_1, Shape shape_2, Vec2DList 
         float overlap = math_projection_overlap(p1, p2);
 
         if (overlap <= 0.0f) {
-            return (Collision){ .overlap = false };
+            return (OverlapInfo){ .detected = false };
         }
 
-        if (overlap < collision.depth) {
-            collision.depth = overlap;
-            collision.normal = axis;
+        if (overlap < overlap_info.depth) {
+            overlap_info.depth = overlap;
+            overlap_info.normal = axis;
         }
     }
 
-    return collision;
+    return overlap_info;
 }
-Collision physics_particle_collision(Shape shape_1, Shape shape_2)
+OverlapInfo physics_particle_overlap_get(Shape shape_1, Shape shape_2)
 {
     Position center_1 = math_polygon_centroid(shape_1);
     Position center_2 = math_polygon_centroid(shape_2);
@@ -406,8 +406,8 @@ Collision physics_particle_collision(Shape shape_1, Shape shape_2)
     float radius_sum_squared = radius_sum * radius_sum;
 
     if(distance_squared >= radius_sum_squared) {
-        return (Collision){
-            .overlap = false
+        return (OverlapInfo){
+            .detected = false
         };
     }
 
@@ -425,17 +425,17 @@ Collision physics_particle_collision(Shape shape_1, Shape shape_2)
         distance = 0.0f;
     }
 
-    return (Collision){
-        .overlap = true,
+    return (OverlapInfo){
+        .detected = true,
         .normal = normal,
         .depth = radius_sum - distance
     };
 }
 
-Collision physics_sat_collision(Shape shape_1, Shape shape_2)
+OverlapInfo physics_sat_overlap_get(Shape shape_1, Shape shape_2)
 {
-    Collision collision = {
-        .overlap = true,
+    OverlapInfo collision = {
+        .detected = true,
         .normal = {0},
         .depth = FLT_MAX
     };
@@ -443,15 +443,15 @@ Collision physics_sat_collision(Shape shape_1, Shape shape_2)
     Vec2DList shape1_axes = math_vectors_normalize(math_normals_create(shape_1));
     Vec2DList shape2_axes = math_vectors_normalize(math_normals_create(shape_2));
 
-    collision = physics_sat_collision_on_axes(shape_1, shape_2, shape1_axes, collision);
+    collision = physics_sat_overlap_on_axes_get(shape_1, shape_2, shape1_axes, collision);
 
-    if (!collision.overlap) {
+    if (!collision.detected) {
         return collision;
     }
 
-    collision = physics_sat_collision_on_axes(shape_1, shape_2, shape2_axes, collision);
+    collision = physics_sat_overlap_on_axes_get(shape_1, shape_2, shape2_axes, collision);
 
-    if (!collision.overlap) {
+    if (!collision.detected) {
         return collision;
     }
 
