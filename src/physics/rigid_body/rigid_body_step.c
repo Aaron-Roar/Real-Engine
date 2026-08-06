@@ -1029,7 +1029,7 @@ void physics_rigid_constraints_gather(void) {
     if(physics_step_debug_stats_enabled) started = SDL_GetPerformanceCounter();
     system_broadphase_build();
     if(physics_step_debug_stats_enabled) {
-        physics_step_debug_stats.broadphase_build_ms =
+        physics_step_debug_stats.broadphase_build_ms +=
             physics_rigid_elapsed_ms(started);
         physics_step_debug_stats.tree_node_count = physics_broadphase_tree.count;
         physics_step_debug_stats.tree_height =

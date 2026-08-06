@@ -193,14 +193,13 @@ static void system_joint_constraints_solve_callback(void *context) {
     physics_joint_constraints_solve();
 }
 
-void system_physics_update(double dt) {
-    uint64_t total_started = physics_step_debug_stats_enabled ? SDL_GetPerformanceCounter() : 0;
+static void system_physics_substep_update(double dt) {
     uint64_t phase_started;
+    double broadphase_build_before = physics_step_debug_stats.broadphase_build_ms;
+    double narrowphase_before = physics_step_debug_stats.narrowphase_ms;
 
-    physics_step_debug_stats = (PhysicsDebugStats){0};
     contact_constraint_list_clear(&physics_step_contact_constraints);
     joint_constraint_list_clear(&physics_step_joint_constraints);
-    physics_interactions_step_begin();
     physics_rigid_accelerations_clear();
     physics_joint_spring_forces_apply();
     physics_soft_body_beams_apply();
@@ -210,13 +209,13 @@ void system_physics_update(double dt) {
     physics_rigid_constraints_gather();
     physics_soft_body_constraints_gather();
     if(physics_step_debug_stats_enabled) {
-        physics_step_debug_stats.broadphase_query_ms =
+        double broadphase_query_ms =
             system_elapsed_ms(phase_started) -
-            physics_step_debug_stats.broadphase_build_ms -
-            physics_step_debug_stats.narrowphase_ms;
-        if(physics_step_debug_stats.broadphase_query_ms < 0.0) {
-            physics_step_debug_stats.broadphase_query_ms = 0.0;
-        }
+            (physics_step_debug_stats.broadphase_build_ms -
+                broadphase_build_before) -
+            (physics_step_debug_stats.narrowphase_ms - narrowphase_before);
+        if(broadphase_query_ms < 0.0) broadphase_query_ms = 0.0;
+        physics_step_debug_stats.broadphase_query_ms += broadphase_query_ms;
         phase_started = SDL_GetPerformanceCounter();
     }
     physics_joint_constraints_gather();
@@ -228,7 +227,19 @@ void system_physics_update(double dt) {
         system_contact_constraints_finalize_callback,
         NULL);
     if(physics_step_debug_stats_enabled) {
-        physics_step_debug_stats.response_ms = system_elapsed_ms(phase_started);
+        physics_step_debug_stats.response_ms += system_elapsed_ms(phase_started);
+    }
+}
+
+void system_physics_update(double dt) {
+    uint64_t total_started = physics_step_debug_stats_enabled ? SDL_GetPerformanceCounter() : 0;
+    uint32_t substeps = physics_substeps_get();
+    double substep_dt = dt / (double)substeps;
+
+    physics_step_debug_stats = (PhysicsDebugStats){0};
+    physics_interactions_step_begin();
+    for(uint32_t substep = 0; substep < substeps; substep += 1) {
+        system_physics_substep_update(substep_dt);
     }
     if(!physics_step_debug_stats_enabled) return;
     physics_step_debug_stats.total_ms = system_elapsed_ms(total_started);

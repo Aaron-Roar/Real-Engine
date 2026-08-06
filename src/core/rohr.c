@@ -97,6 +97,8 @@ Time rohr_physics_dt_per_tick_get(void) { return physics_dt_per_tick_get(); }
 void rohr_physics_engine_time_per_tick_use(void) { physics_engine_time_per_tick_use(); }
 EngineResult rohr_physics_solver_iterations_set(uint32_t iterations) { return physics_solver_iterations_set(iterations); }
 uint32_t rohr_physics_solver_iterations_get(void) { return physics_solver_iterations_get(); }
+EngineResult rohr_physics_substeps_set(uint32_t substeps) { return physics_substeps_set(substeps); }
+uint32_t rohr_physics_substeps_get(void) { return physics_substeps_get(); }
 void rohr_physics_update(Tick ticks) { physics_update(ticks); }
 void rohr_physics_dt_update(Time dt) { physics_dt_update(dt); }
 Shape rohr_physics_shape_world_translate(Shape shape, Position position, Orientation angle) { return physics_shape_world_translate(shape, position, angle); }

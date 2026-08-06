@@ -330,7 +330,7 @@ static const float wheel_inner_radius = 17.5f;
 static const float wheel_outer_radius = 31.0f;
 static const float inner_node_radius = 2.0f;
 static const float outer_node_radius = 1.0f;
-static const Mass node_mass = 0.50f;
+static const Mass node_mass = 0.40f;
 static const float inner_beam_damping = 10.0f;
 static const float outer_beam_damping = 8.0f;
 static const float support_beam_damping = 7.0f;
@@ -408,6 +408,7 @@ int main(void) {
 
     if(!example_use_executable_directory() || !result_ok(rohr_engine_init())) return 1;
     if(!result_ok(rohr_engine_time_per_tick_set(physics_tick_time)) ||
+            !result_ok(rohr_physics_substeps_set(4)) ||
             !result_ok(rohr_graphics_start())) goto fail;
     if(!result_ok(rohr_ui_physics_debug_panel_init(&debug_panel,
             (FontDescriptor){"assets/debug/JetBrainsMono-BoldItalic.ttf", 11.0f}))) goto fail;

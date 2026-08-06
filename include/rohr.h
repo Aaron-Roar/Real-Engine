@@ -430,6 +430,10 @@ void rohr_physics_engine_time_per_tick_use(void);
 EngineResult rohr_physics_solver_iterations_set(uint32_t iterations);
 /** Returns constraint-solver iterations. Defaults to 8. */
 uint32_t rohr_physics_solver_iterations_get(void);
+/** Sets integration and collision-detection substeps. Must be greater than zero. */
+EngineResult rohr_physics_substeps_set(uint32_t substeps);
+/** Returns physics substeps. Defaults to 1. */
+uint32_t rohr_physics_substeps_get(void);
 /** Advances physics using the supplied number of elapsed engine ticks. */
 void rohr_physics_update(Tick ticks);
 /** Advances physics once with an explicit exceptional delta. */

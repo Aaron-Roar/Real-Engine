@@ -23,9 +23,12 @@ PhysicsDebugStats physics_debug_stats_get(void);
 void physics_debug_stats_enabled_set(bool enabled);
 
 #define PHYSICS_SOLVER_ITERATIONS_DEFAULT 8u
+#define PHYSICS_SUBSTEPS_DEFAULT 1u
 
 EngineResult physics_solver_iterations_set(uint32_t iterations);
 uint32_t physics_solver_iterations_get(void);
+EngineResult physics_substeps_set(uint32_t substeps);
+uint32_t physics_substeps_get(void);
 /** Result type for functions that return a Shape. */
 ERROR_DECLARE_RESULT_TYPE(ShapeResult, Shape);
 

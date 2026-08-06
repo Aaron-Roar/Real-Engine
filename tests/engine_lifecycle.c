@@ -18,7 +18,11 @@ int main(void) {
     if(rohr_physics_solver_iterations_get() != PHYSICS_SOLVER_ITERATIONS_DEFAULT ||
             !rohr_error_check(rohr_physics_solver_iterations_set(0)) ||
             rohr_error_check(rohr_physics_solver_iterations_set(12)) ||
-            rohr_physics_solver_iterations_get() != 12) {
+            rohr_physics_solver_iterations_get() != 12 ||
+            rohr_physics_substeps_get() != PHYSICS_SUBSTEPS_DEFAULT ||
+            !rohr_error_check(rohr_physics_substeps_set(0)) ||
+            rohr_error_check(rohr_physics_substeps_set(4)) ||
+            rohr_physics_substeps_get() != 4) {
         rohr_engine_shutdown();
         return 1;
     }

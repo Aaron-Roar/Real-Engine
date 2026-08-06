@@ -9,6 +9,7 @@
 static Time physics_dt_per_tick = 0.0;
 static bool physics_dt_overwritten = false;
 static uint32_t physics_solver_iterations = PHYSICS_SOLVER_ITERATIONS_DEFAULT;
+static uint32_t physics_substeps = PHYSICS_SUBSTEPS_DEFAULT;
 
 MEMORY_DEFINE_OBJECT_POOL(PositionPool, Position)
 MEMORY_DEFINE_OBJECT_POOL(VelocityPool, Velocity)
@@ -87,6 +88,7 @@ EngineResult physics_tables_init(void) {
     physics_dt_per_tick = 0.0;
     physics_dt_overwritten = false;
     physics_solver_iterations = PHYSICS_SOLVER_ITERATIONS_DEFAULT;
+    physics_substeps = PHYSICS_SUBSTEPS_DEFAULT;
     memset(joint_anchors, 0, sizeof(joint_anchors));
     memset(joint_anchor_used, 0, sizeof(joint_anchor_used));
     for(uint32_t i = 0; i < MAX_JOINT_ANCHORS; i += 1) joint_anchor_generations[i] = 1;
@@ -2090,6 +2092,16 @@ EngineResult physics_solver_iterations_set(uint32_t iterations) {
 
 uint32_t physics_solver_iterations_get(void) {
     return physics_solver_iterations;
+}
+
+EngineResult physics_substeps_set(uint32_t substeps) {
+    if(substeps == 0) return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    physics_substeps = substeps;
+    return error_result_value(true);
+}
+
+uint32_t physics_substeps_get(void) {
+    return physics_substeps;
 }
 
 void physics_update(Tick ticks) {
