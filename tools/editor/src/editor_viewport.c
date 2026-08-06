@@ -39,6 +39,12 @@ void editor_viewport_hitbox_editor_enter(EditorViewportState *state) {
     state->dragged_vertex = -1;
 }
 
+void editor_viewport_object_editor_enter(EditorViewportState *state) {
+    if(state == NULL) return;
+    state->mode = EDITOR_VIEWPORT_OBJECT;
+    state->dragged_vertex = -1;
+}
+
 void editor_viewport_hitbox_editor_exit(EditorViewportState *state) {
     if(state == NULL) return;
     state->mode = EDITOR_VIEWPORT_HIERARCHY;
@@ -68,6 +74,8 @@ void editor_viewport_back(EditorViewportState *state) {
     if(state->mode == EDITOR_VIEWPORT_LINE || state->mode == EDITOR_VIEWPORT_VERTEX) {
         state->mode = EDITOR_VIEWPORT_HITBOX;
     } else if(state->mode == EDITOR_VIEWPORT_HITBOX) {
+        state->mode = EDITOR_VIEWPORT_OBJECT;
+    } else if(state->mode == EDITOR_VIEWPORT_OBJECT) {
         state->mode = EDITOR_VIEWPORT_HIERARCHY;
     }
     state->dragged_vertex = -1;
@@ -82,7 +90,7 @@ void editor_viewport_update(
 ) {
     EditorObject *object;
 
-    if(state == NULL || project == NULL || state->mode == EDITOR_VIEWPORT_HIERARCHY) return;
+    if(state == NULL || project == NULL || state->mode <= EDITOR_VIEWPORT_OBJECT) return;
     object = editor_project_selected_get(project);
     if(object == NULL || !object->has_hitbox) {
         state->dragged_vertex = -1;
@@ -161,7 +169,7 @@ void editor_viewport_draw(
                 object, (i + 1) % object->hitbox.vertex_count);
 
             editor_line_draw(start, end, line_color);
-            if(state->mode != EDITOR_VIEWPORT_HIERARCHY &&
+            if(state->mode > EDITOR_VIEWPORT_OBJECT &&
                     object->id == project->selected) {
                 (void)rohr_graphics_screen_quad_draw(
                     start, 10.0f, 10.0f, 0.0f,

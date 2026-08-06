@@ -4,6 +4,7 @@
 #include "editor_layout.h"
 
 #include <stdio.h>
+#include <string.h>
 
 #if defined(_WIN32)
 #include <direct.h>
@@ -43,6 +44,26 @@ static bool editor_text_create(
     return true;
 }
 
+static bool editor_object_name_key_apply(EditorObject *object, SDL_Keycode key) {
+    size_t length;
+
+    if(object == NULL) return false;
+    length = strlen(object->name);
+    if(key == SDLK_BACKSPACE) {
+        if(length > 0) object->name[length - 1] = '\0';
+        return true;
+    }
+    if((key >= 'a' && key <= 'z') || (key >= '0' && key <= '9') ||
+            key == '_' || key == '-' || key == ' ') {
+        if(length + 1 < sizeof(object->name)) {
+            object->name[length] = (char)key;
+            object->name[length + 1] = '\0';
+        }
+        return true;
+    }
+    return false;
+}
+
 int main(void) {
     KeyboardState keyboard = {0};
     MouseState mouse = {0};
@@ -52,7 +73,6 @@ int main(void) {
     TextAsset hitbox_editor_label = {0};
     TextAsset add_object_label = {0};
     TextAsset add_hitbox_label = {0};
-    TextAsset object_label = {0};
     TextAsset hitbox_label = {0};
     TextAsset vertices_label = {0};
     TextAsset lines_label = {0};
@@ -67,10 +87,13 @@ int main(void) {
     TextAsset x_label = {0};
     TextAsset y_label = {0};
     TextAsset length_label = {0};
+    TextAsset object_name_labels[EDITOR_OBJECT_MAX] = {0};
+    char object_name_cache[EDITOR_OBJECT_MAX][EDITOR_OBJECT_NAME_MAX] = {{0}};
     ViewportId viewport = 0;
     EditorProject project;
     EditorViewportState viewport_state;
     bool running = true;
+    bool name_editing = false;
 
     editor_project_init(&project);
     editor_viewport_state_init(&viewport_state);
@@ -105,7 +128,6 @@ int main(void) {
             !editor_text_create(&font, "Hitbox Editor", &hitbox_editor_label) ||
             !editor_text_create(&font, "Add Object", &add_object_label) ||
             !editor_text_create(&font, "Add Hitbox", &add_hitbox_label) ||
-            !editor_text_create(&font, "Object", &object_label) ||
             !editor_text_create(&font, "Hitbox", &hitbox_label) ||
             !editor_text_create(&font, "Vertices", &vertices_label) ||
             !editor_text_create(&font, "Lines", &lines_label) ||
@@ -128,10 +150,22 @@ int main(void) {
 
     while(running) {
         SDL_Event event;
+        bool escape_name_edit_consumed = false;
 
         rohr_controller_key_states_update(&keyboard);
         rohr_controller_mouse_states_update(&mouse);
         while((event = rohr_engine_event_poll()).type != 0) {
+            if(name_editing && event.type == SDL_EVENT_KEY_DOWN) {
+                EditorObject *selected = editor_project_selected_get(&project);
+                if(event.key.key == SDLK_RETURN || event.key.key == SDLK_KP_ENTER) {
+                    name_editing = false;
+                } else if(event.key.key == SDLK_ESCAPE) {
+                    name_editing = false;
+                    escape_name_edit_consumed = true;
+                } else {
+                    (void)editor_object_name_key_apply(selected, event.key.key);
+                }
+            }
             rohr_controller_key_event_add(
                 &keyboard,
                 rohr_controller_keyboard_event_capture(&event));
@@ -140,7 +174,8 @@ int main(void) {
                 rohr_controller_mouse_event_capture(&event));
             if(event.type == SDL_EVENT_QUIT) running = false;
         }
-        if(rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
+        if(!escape_name_edit_consumed &&
+                rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             if(editor_viewport_hitbox_editor_active_get(&viewport_state)) {
                 editor_viewport_back(&viewport_state);
             } else {
@@ -265,65 +300,75 @@ int main(void) {
                         rohr_ui_slider("editor.line.length", length, &slider).value);
                 }
             }
+        } else if(viewport_state.mode == EDITOR_VIEWPORT_OBJECT) {
+            EditorObject *selected = editor_project_selected_get(&project);
+            size_t selected_index = 0;
+            if(selected != NULL) {
+                selected_index = (size_t)(selected - project.objects);
+                if(strcmp(object_name_cache[selected_index], selected->name) != 0) {
+                    rohr_graphics_text_destroy(&object_name_labels[selected_index]);
+                    if(!editor_text_create(&font, selected->name,
+                            &object_name_labels[selected_index])) goto fail;
+                    snprintf(object_name_cache[selected_index], EDITOR_OBJECT_NAME_MAX,
+                        "%s", selected->name);
+                }
+                if(rohr_ui_button("editor.object.name",
+                        &object_name_labels[selected_index],
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 52.0f,
+                            EDITOR_TOOLS_WIDTH - 20.0f, 34.0f}, NULL).clicked) {
+                    name_editing = true;
+                }
+                if(!selected->has_hitbox) {
+                    if(rohr_ui_button("editor.add_hitbox", &add_hitbox_label,
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 98.0f,
+                                EDITOR_TOOLS_WIDTH - 20.0f, 36.0f}, NULL).clicked) {
+                        editor_project_hitbox_add(&project, selected);
+                        editor_viewport_hitbox_editor_enter(&viewport_state);
+                    }
+                } else if(rohr_ui_button("editor.object.hitbox", &hitbox_label,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 18.0f, 100.0f,
+                            EDITOR_TOOLS_WIDTH - 26.0f, 30.0f}, NULL).clicked) {
+                    editor_viewport_hitbox_editor_enter(&viewport_state);
+                }
+            }
         } else {
             UIButtonResult add_object = rohr_ui_button(
                 "editor.add_object", &add_object_label,
                 (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 58.0f,
                     EDITOR_TOOLS_WIDTH - 20.0f, 38.0f}, NULL);
-            EditorObject *selected = editor_project_selected_get(&project);
-            UIButtonResult add_hitbox;
-
             if(add_object.clicked) {
-                selected = editor_project_object_add(
+                EditorObject *added = editor_project_object_add(
                     &project,
                     (Position){EDITOR_VIEWPORT_WIDTH * 0.5f,
                         WINDOW_HEIGHT * 0.5f});
-            }
-            if(selected != NULL && !selected->has_hitbox) {
-                add_hitbox = rohr_ui_button(
-                    "editor.add_hitbox", &add_hitbox_label,
-                    (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 106.0f,
-                        EDITOR_TOOLS_WIDTH - 20.0f, 38.0f}, NULL);
-                if(add_hitbox.clicked) {
-                    editor_project_hitbox_add(&project, selected);
-                    editor_viewport_hitbox_editor_enter(&viewport_state);
-                }
-            } else {
-                rohr_ui_button_disabled(
-                    (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 106.0f,
-                        EDITOR_TOOLS_WIDTH - 20.0f, 38.0f}, NULL);
-                rohr_ui_label(&add_hitbox_label,
-                    (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 106.0f,
-                        EDITOR_TOOLS_WIDTH - 20.0f, 38.0f});
+                if(added != NULL) editor_viewport_object_editor_enter(&viewport_state);
             }
             rohr_ui_label(&hierarchy_label,
-                (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 158.0f,
+                (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 108.0f,
                     EDITOR_TOOLS_WIDTH - 16.0f, 24.0f});
             for(size_t i = 0; i < project.object_count; i += 1) {
                 EditorObject *object = &project.objects[i];
-                float y = 192.0f + (float)i * 66.0f;
+                float y = 142.0f + (float)i * 34.0f;
                 char object_button_id[64];
-                char hitbox_button_id[64];
                 UIButtonResult object_result;
+
+                if(strcmp(object_name_cache[i], object->name) != 0) {
+                    rohr_graphics_text_destroy(&object_name_labels[i]);
+                    if(!editor_text_create(&font, object->name,
+                            &object_name_labels[i])) goto fail;
+                    snprintf(object_name_cache[i], EDITOR_OBJECT_NAME_MAX,
+                        "%s", object->name);
+                }
 
                 snprintf(object_button_id, sizeof(object_button_id),
                     "editor.object.%u", object->id);
                 object_result = rohr_ui_button(
-                    object_button_id, &object_label,
+                    object_button_id, &object_name_labels[i],
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, y,
                         EDITOR_TOOLS_WIDTH - 16.0f, 28.0f}, NULL);
                 if(object_result.clicked) {
                     (void)editor_project_object_select(&project, object->id);
-                }
-                if(!object->has_hitbox) continue;
-                snprintf(hitbox_button_id, sizeof(hitbox_button_id),
-                    "editor.object.%u.hitbox", object->id);
-                if(rohr_ui_button(
-                        hitbox_button_id, &hitbox_label,
-                        (UIRect){EDITOR_VIEWPORT_WIDTH + 20.0f, y + 32.0f,
-                            EDITOR_TOOLS_WIDTH - 28.0f, 26.0f}, NULL).clicked) {
-                    (void)editor_project_object_select(&project, object->id);
-                    editor_viewport_hitbox_editor_enter(&viewport_state);
+                    editor_viewport_object_editor_enter(&viewport_state);
                 }
             }
         }
@@ -354,7 +399,9 @@ int main(void) {
     }
     rohr_graphics_text_destroy(&lines_label);
     rohr_graphics_text_destroy(&hitbox_label);
-    rohr_graphics_text_destroy(&object_label);
+    for(size_t i = 0; i < EDITOR_OBJECT_MAX; i += 1) {
+        rohr_graphics_text_destroy(&object_name_labels[i]);
+    }
     rohr_graphics_text_destroy(&add_hitbox_label);
     rohr_graphics_text_destroy(&add_object_label);
     rohr_graphics_text_destroy(&hitbox_editor_label);
@@ -383,7 +430,9 @@ fail:
     }
     rohr_graphics_text_destroy(&lines_label);
     rohr_graphics_text_destroy(&hitbox_label);
-    rohr_graphics_text_destroy(&object_label);
+    for(size_t i = 0; i < EDITOR_OBJECT_MAX; i += 1) {
+        rohr_graphics_text_destroy(&object_name_labels[i]);
+    }
     rohr_graphics_text_destroy(&add_hitbox_label);
     rohr_graphics_text_destroy(&add_object_label);
     rohr_graphics_text_destroy(&hitbox_editor_label);

@@ -1,6 +1,7 @@
 #include "editor_project.h"
 
 #include <math.h>
+#include <stdio.h>
 
 static uint32_t editor_vertex_count_clamp(uint32_t vertex_count) {
     if(vertex_count < EDITOR_HITBOX_VERTEX_MIN) {
@@ -49,6 +50,7 @@ EditorObject *editor_project_object_add(EditorProject *project, Position positio
         .id = project->next_id++,
         .position = position
     };
+    snprintf(object->name, sizeof(object->name), "object_%u", object->id);
     project->selected = object->id;
     return object;
 }

@@ -9,6 +9,7 @@ int main(void) {
     first = editor_project_object_add(&project, (Position){10.0f, 20.0f});
     second = editor_project_object_add(&project, (Position){30.0f, 40.0f});
     if(first == NULL || second == NULL || first->id == second->id ||
+            first->name[0] == '\0' || second->name[0] == '\0' ||
             project.selected != second->id || second->has_hitbox) return 1;
     if(!editor_project_object_select(&project, first->id) ||
             editor_project_selected_get(&project) != first ||

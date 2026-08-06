@@ -6,6 +6,7 @@
 #define EDITOR_OBJECT_MAX 64
 #define EDITOR_HITBOX_VERTEX_MIN 3
 #define EDITOR_HITBOX_VERTEX_MAX 8
+#define EDITOR_OBJECT_NAME_MAX 64
 
 typedef uint32_t EditorObjectId;
 typedef uint32_t EditorVertexId;
@@ -25,6 +26,7 @@ typedef struct EditorHitbox {
 
 typedef struct EditorObject {
     EditorObjectId id;
+    char name[EDITOR_OBJECT_NAME_MAX];
     Position position;
     bool has_hitbox;
     EditorHitbox hitbox;

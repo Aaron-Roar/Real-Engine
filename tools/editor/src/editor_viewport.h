@@ -5,6 +5,7 @@
 
 typedef enum EditorViewportMode {
     EDITOR_VIEWPORT_HIERARCHY,
+    EDITOR_VIEWPORT_OBJECT,
     EDITOR_VIEWPORT_HITBOX,
     EDITOR_VIEWPORT_LINE,
     EDITOR_VIEWPORT_VERTEX
@@ -19,6 +20,7 @@ typedef struct EditorViewportState {
 
 void editor_viewport_state_init(EditorViewportState *state);
 void editor_viewport_hitbox_editor_enter(EditorViewportState *state);
+void editor_viewport_object_editor_enter(EditorViewportState *state);
 void editor_viewport_hitbox_editor_exit(EditorViewportState *state);
 bool editor_viewport_hitbox_editor_active_get(const EditorViewportState *state);
 void editor_viewport_line_editor_enter(EditorViewportState *state, uint32_t line);
