@@ -733,7 +733,6 @@ ContactInfo system_resolve_collision(
     }
     result.point_count = manifold.count;
     for(uint8_t i = 0; i < manifold.count; i += 1) result.points[i] = manifold.points[i];
-    result.point = result.points[0];
     if(inverse_mass_first + inverse_mass_second <= 0.0f) return result;
     if(!first_particle && inverse_mass_first > 0.0f) {
         float inertia = physics_polygon_moment_of_inertia(hit_boxes[first], mass[first]);
@@ -1722,14 +1721,13 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
         .detected = true,
         .normal = overlap.normal,
         .depth = overlap.depth,
-        .point = {
+        .points = {{
             query->start.x + edge.x * t,
             query->start.y + edge.y * t
-        },
+        }},
         .point_count = 1,
         .relative_velocity = relative_velocity
     };
-    contact.points[0] = contact.point;
     if(normal_velocity < 0.0f) {
         Vec2D rigid_offset;
         Vec2D rigid_angular_velocity = {0};
@@ -1766,7 +1764,7 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
         velocities[rigid].x += contact.normal_impulse.x * inverse_mass_rigid;
         velocities[rigid].y += contact.normal_impulse.y * inverse_mass_rigid;
 
-        rigid_offset = math_vector_subtract(contact.point, positions[rigid]);
+        rigid_offset = math_vector_subtract(contact.points[0], positions[rigid]);
         if(physics_entity_movable_get(rigid) &&
                 !entity_index_components_check(rigid, PARTICLE) &&
                 entity_index_components_check(rigid, MASS | HIT_BOX)) {
@@ -2044,16 +2042,15 @@ static void system_soft_body_node_rigid_collisions_apply(void) {
                 .detected = true,
                 .normal = collision.normal,
                 .depth = collision.depth,
-                .point = {
+                .points = {{
                     positions[node].x +
                         collision.normal.x * soft_body_nodes[node].radius,
                     positions[node].y +
                         collision.normal.y * soft_body_nodes[node].radius
-                },
+                }},
                 .point_count = 1,
                 .relative_velocity = relative_velocity
             };
-            contact_info.points[0] = contact_info.point;
             system_interaction_by_index_record(
                 node,
                 rigid,

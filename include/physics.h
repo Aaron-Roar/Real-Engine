@@ -91,8 +91,6 @@ typedef struct ContactInfo {
     Axis normal;
     /** Penetration depth along the contact normal. */
     Vec1D depth;
-    /** Primary world-space contact point; equal to points[0] when available. */
-    Position point;
     /** World-space points in the collision manifold. */
     Position points[PHYSICS_CONTACT_POINT_MAX];
     /** Number of valid manifold points. */

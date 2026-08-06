@@ -24,7 +24,8 @@ int main(void) {
         .detected = true,
         .normal = {0.5f, -0.75f},
         .depth = 3.0f,
-        .point = {4.0f, 5.0f},
+        .points = {{4.0f, 5.0f}},
+        .point_count = 1,
         .relative_velocity = {6.0f, 7.0f},
         .normal_impulse = {8.0f, 9.0f},
         .friction_impulse = {10.0f, 11.0f}
@@ -129,7 +130,8 @@ int main(void) {
             fabsf(contacts[0].contact.relative_velocity.x - -6.0f) > 0.0001f ||
             fabsf(contacts[0].contact.normal_impulse.y - -9.0f) > 0.0001f ||
             fabsf(contacts[0].contact.friction_impulse.x - -10.0f) > 0.0001f ||
-            contacts[0].contact.point.x != 4.0f) goto fail;
+            contacts[0].contact.point_count != 1 ||
+            contacts[0].contact.points[0].x != 4.0f) goto fail;
     if(!physics_interaction_set_get(&set, first, second, &interaction) ||
             !physics_interaction_set_check(
                 &set, first, second, PHYSICS_INTERACTION_CONTACT)) goto fail;
