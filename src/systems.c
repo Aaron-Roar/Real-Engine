@@ -1,4 +1,5 @@
 #include "entity_components.h"
+#include "engine_internal.h"
 #include "systems.h"
 #include "console.h"
 #include "grid.h"
@@ -41,6 +42,15 @@ static void system_collision_report_by_index_set(EntityIndex entity_1, EntityInd
         return;
     }
     physics_collision_report_set(entity_1_id, entity_2_id, state);
+}
+
+static void system_contact_by_index_record(EntityIndex entity_1, EntityIndex entity_2) {
+    Entity entity_1_id;
+    Entity entity_2_id;
+
+    if(!system_entity_from_index_get(entity_1, &entity_1_id) ||
+            !system_entity_from_index_get(entity_2, &entity_2_id)) return;
+    (void)physics_contact_record(entity_1_id, entity_2_id);
 }
 
 static void system_generate_global_hitbox_by_index(EntityIndex index) {
@@ -729,6 +739,7 @@ void system_collisions_tuned_apply(void) {
                             if(collision.overlap == true) {
                                 system_collision_report_by_index_set(entity_1, entity_2, true);
                                 system_collision_report_by_index_set(entity_2, entity_1, true);
+                                system_contact_by_index_record(entity_1, entity_2);
                                 if(entity_index_components_check(entity_1, COLLISION) && entity_index_components_check(entity_2, COLLISION)) {
                                     system_resolve_collision(entity_1, entity_2, collision);
                                     system_separate_entities(entity_1,entity_2, collision);
@@ -784,6 +795,7 @@ void system_collisions_apply(void) {
             if(collision.overlap == true) {
                 system_collision_report_by_index_set(i, j, true);
                 system_collision_report_by_index_set(j, i, true);
+                system_contact_by_index_record(i, j);
                 if(entity_index_components_check(i, COLLISION) && entity_index_components_check(j, COLLISION)) {
                     system_resolve_collision(i, j, collision);
                 }
@@ -1533,6 +1545,7 @@ static void system_soft_body_node_rigid_collisions_apply(void) {
 }
 
 void system_physics_update(double dt) {
+    physics_contacts_step_begin();
     system_force_torque_accelerations_clear();
     system_joints_apply();
     system_soft_body_beams_apply();

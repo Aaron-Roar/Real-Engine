@@ -25,6 +25,14 @@ EngineResult physics_tables_ensure_capacity(size_t capacity);
 void physics_tables_destroy(void);
 /** Clear joints and anchors owned by or connected to a deleted entity. */
 void physics_entity_clear(Entity entity, EntityIndex index);
+/** Advance current contacts to the previous step and clear current contacts. */
+void physics_contacts_step_begin(void);
+/** Record one overlapping pair in the current physics step. */
+EngineResult physics_contact_record(Entity entity, Entity target);
+/** Return whether a pair overlaps in the current physics step. */
+bool physics_contact_current_get(Entity entity, Entity target);
+/** Return whether a pair overlapped in the previous physics step. */
+bool physics_contact_previous_get(Entity entity, Entity target);
 
 /** Initialize graphics tables. */
 EngineResult graphics_tables_init(void);

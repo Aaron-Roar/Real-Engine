@@ -1,4 +1,5 @@
 #include "physics.h"
+#include "entity_pair_set.h"
 #include "engine_internal.h"
 #include "float.h"
 #include <math.h>
@@ -41,6 +42,8 @@ ForcePool forces_pool = {0};
 ShapePool hit_boxes_pool = {0};
 ShapePool world_hit_boxes_pool = {0};
 CollisionReportPool collision_reports_pool = {0};
+static EntityPairSet current_contacts = {0};
+static EntityPairSet previous_contacts = {0};
 CollisionFilterConfigPool collision_filters_pool = {0};
 AngularVelocityPool angular_velocities_pool = {0};
 AngularVelocityPool angular_velocity_maximums_pool = {0};
@@ -87,6 +90,8 @@ EngineResult physics_tables_init(void) {
     memset(joint_anchors, 0, sizeof(joint_anchors));
     memset(joint_anchor_used, 0, sizeof(joint_anchor_used));
     for(uint32_t i = 0; i < MAX_JOINT_ANCHORS; i += 1) joint_anchor_generations[i] = 1;
+    if(error_check(entity_pair_set_init(&current_contacts, 64))) { goto fail; }
+    if(error_check(entity_pair_set_init(&previous_contacts, 64))) { goto fail; }
     if(PositionPool_init(&positions_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(OrientationPool_init(&orientations_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(VelocityPool_init(&velocities_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
@@ -166,6 +171,8 @@ EngineResult physics_tables_ensure_capacity(size_t capacity) {
 }
 
 void physics_tables_destroy(void) {
+    entity_pair_set_destroy(&current_contacts);
+    entity_pair_set_destroy(&previous_contacts);
     (void)PositionPool_destroy(&positions_pool);
     (void)OrientationPool_destroy(&orientations_pool);
     (void)VelocityPool_destroy(&velocities_pool);
@@ -192,6 +199,26 @@ void physics_tables_destroy(void) {
     (void)SoftBodyNodePool_destroy(&soft_body_nodes_pool);
     (void)SoftBodyBeamPool_destroy(&soft_body_beams_pool);
     (void)SoftBodyTrianglePool_destroy(&soft_body_triangles_pool);
+}
+
+void physics_contacts_step_begin(void) {
+    EntityPairSet contacts = previous_contacts;
+
+    previous_contacts = current_contacts;
+    current_contacts = contacts;
+    entity_pair_set_clear(&current_contacts);
+}
+
+EngineResult physics_contact_record(Entity entity, Entity target) {
+    return entity_pair_set_insert(&current_contacts, entity, target);
+}
+
+bool physics_contact_current_get(Entity entity, Entity target) {
+    return entity_pair_set_contains(&current_contacts, entity, target);
+}
+
+bool physics_contact_previous_get(Entity entity, Entity target) {
+    return entity_pair_set_contains(&previous_contacts, entity, target);
 }
 
 static void physics_soft_body_entity_list_remove(Entity *values, uint32_t *count, Entity entity) {

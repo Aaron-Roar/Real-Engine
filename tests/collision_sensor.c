@@ -1,4 +1,5 @@
 #include "rohr.h"
+#include "engine_internal.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -52,6 +53,8 @@ int main(void) {
             fabsf(body_position.result.value.y) > 0.0001f ||
             fabsf(velocities[body_index.result.value].x - 12.0f) > 0.0001f ||
             fabsf(velocities[body_index.result.value].y) > 0.0001f ||
+            !physics_contact_current_get(body, sensor) ||
+            physics_contact_previous_get(body, sensor) ||
             !rohr_physics_collision_report_get(body, sensor)) {
         fprintf(stderr, "sensor overlap step: position=(%f,%f) velocity=(%f,%f) overlap=%d\n",
             body_position.result.value.x,
@@ -67,6 +70,8 @@ int main(void) {
     if(rohr_error_check(body_position) ||
             fabsf(body_position.result.value.x - 9.0f) > 0.0001f ||
             fabsf(velocities[body_index.result.value].x - 12.0f) > 0.0001f ||
+            physics_contact_current_get(body, sensor) ||
+            !physics_contact_previous_get(body, sensor) ||
             rohr_physics_collision_report_get(body, sensor)) {
         fprintf(stderr, "sensor exit step: position=(%f,%f) velocity=(%f,%f) overlap=%d\n",
             body_position.result.value.x,
@@ -76,6 +81,10 @@ int main(void) {
             rohr_physics_collision_report_get(body, sensor));
         goto fail;
     }
+
+    rohr_system_physics_update(0.0);
+    if(physics_contact_current_get(body, sensor) ||
+            physics_contact_previous_get(body, sensor)) goto fail;
 
     rohr_engine_shutdown();
     return 0;
