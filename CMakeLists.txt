@@ -66,11 +66,14 @@ set(ROHR_ENGINE_SOURCES
     src/physics/collision/interaction_set.c
     src/physics/constraints/constraint_solver.c
     src/physics/joints/joint_constraint.c
+    src/physics/joints/joint_solver.c
     src/physics/particles/particle.c
     src/physics/physics.c
     src/physics/physics_step.c
     src/physics/rigid_body/rigid_body.c
+    src/physics/rigid_body/rigid_body_step.c
     src/physics/soft_body/soft_body.c
+    src/physics/soft_body/soft_body_solver.c
     src/state/game_state.c
     src/tools/tools.c
     lib/yyjson.c
