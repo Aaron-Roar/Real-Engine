@@ -99,7 +99,8 @@ engine/
 ├── docs/                  # Doxygen config and documentation source
 ├── docs/assets/           # README and documentation media
 ├── examples/
-│   └── engine-core/       # Games using librohr_engine
+│   ├── view-port/         # Example games and demonstrations
+│   └── ...
 ├── lib/                   # Vendored third-party source dependencies
 └── build/                 # Generated objects, binaries, and docs
 ```

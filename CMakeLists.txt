@@ -111,8 +111,8 @@ target_include_directories(rohr_tools
 if(ROHR_BUILD_EXAMPLES)
     add_subdirectory(examples)
 
-    add_custom_target(core_examples)
-    add_dependencies(core_examples
+    add_custom_target(examples)
+    add_dependencies(examples
         view_port
         flies_in_pit
         flies_around_ball
@@ -124,8 +124,6 @@ if(ROHR_BUILD_EXAMPLES)
         pong
     )
 
-    add_custom_target(examples)
-    add_dependencies(examples core_examples)
 endif()
 
 if(ROHR_BUILD_TESTS)

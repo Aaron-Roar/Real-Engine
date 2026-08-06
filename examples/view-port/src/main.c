@@ -71,7 +71,7 @@ int main(void) {
 
     rohr_engine_clock_reset();
     //Game Loop
-    //rohr_graphics_recording_start("examples/engine-core/view-port/recording.mp4",60);
+    //rohr_graphics_recording_start("examples/view-port/recording.mp4",60);
     while(true) {
 
         //physics
