@@ -77,6 +77,7 @@ static void pong_render_camera(CameraId camera, void *context_value) {
         context->ball,
         context->ball_on_fire
     );
+    rohr_graphics_aabb_tree_draw();
 }
 
 static EngineResult pong_update_camera(
@@ -199,6 +200,7 @@ int main(void) {
     ViewportId left_viewport = VIEWPORT_INVALID;
     ViewportId right_viewport = VIEWPORT_INVALID;
     PongRenderContext render_context = {0};
+    bool broadphase_debug = true;
     bool ball_behind_left = false;
     bool ball_behind_right = false;
     PongCameraState left_camera_state = PONG_CAMERA_HOME;
@@ -245,6 +247,7 @@ int main(void) {
             return 1;
         }
     }
+    rohr_graphics_aabb_tree_debug_set(broadphase_debug);
     if(!game_components_init()) {
         goto fail;
     }
@@ -386,10 +389,16 @@ int main(void) {
         Tick ticks_advanced;
 
         rohr_controller_key_states_update(&keyboard);
-        rohr_controller_key_event_add(
-            &keyboard,
-            rohr_controller_keyboard_event_capture(&event)
-        );
+        {
+            KeyboardEvent key_event =
+                rohr_controller_keyboard_event_capture(&event);
+            rohr_controller_key_event_add(&keyboard, key_event);
+            if(key_event.keycode == SDLK_B &&
+                    key_event.state == KEY_STATE_PRESSED) {
+                broadphase_debug = !broadphase_debug;
+                rohr_graphics_aabb_tree_debug_set(broadphase_debug);
+            }
+        }
         if(event.type == SDL_EVENT_QUIT ||
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) break;
         left_axis = rohr_controller_axis_get(&keyboard, &left_controller, "movement");
