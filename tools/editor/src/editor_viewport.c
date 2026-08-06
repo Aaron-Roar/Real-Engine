@@ -8,8 +8,8 @@ static Position editor_vertex_world_get(
     uint32_t vertex
 ) {
     return (Position){
-        object->position.x + object->hitbox.vertices[vertex].x,
-        object->position.y + object->hitbox.vertices[vertex].y
+        object->position.x + object->hitbox.vertices[vertex].position.x,
+        object->position.y + object->hitbox.vertices[vertex].position.y
     };
 }
 
@@ -35,18 +35,42 @@ void editor_viewport_state_init(EditorViewportState *state) {
 
 void editor_viewport_hitbox_editor_enter(EditorViewportState *state) {
     if(state == NULL) return;
-    state->hitbox_editor_active = true;
+    state->mode = EDITOR_VIEWPORT_HITBOX;
     state->dragged_vertex = -1;
 }
 
 void editor_viewport_hitbox_editor_exit(EditorViewportState *state) {
     if(state == NULL) return;
-    state->hitbox_editor_active = false;
+    state->mode = EDITOR_VIEWPORT_HIERARCHY;
     state->dragged_vertex = -1;
 }
 
 bool editor_viewport_hitbox_editor_active_get(const EditorViewportState *state) {
-    return state != NULL && state->hitbox_editor_active;
+    return state != NULL && state->mode != EDITOR_VIEWPORT_HIERARCHY;
+}
+
+void editor_viewport_line_editor_enter(EditorViewportState *state, uint32_t line) {
+    if(state == NULL) return;
+    state->mode = EDITOR_VIEWPORT_LINE;
+    state->selected_line = line;
+    state->dragged_vertex = -1;
+}
+
+void editor_viewport_vertex_editor_enter(EditorViewportState *state, uint32_t vertex) {
+    if(state == NULL) return;
+    state->mode = EDITOR_VIEWPORT_VERTEX;
+    state->selected_vertex = vertex;
+    state->dragged_vertex = -1;
+}
+
+void editor_viewport_back(EditorViewportState *state) {
+    if(state == NULL) return;
+    if(state->mode == EDITOR_VIEWPORT_LINE || state->mode == EDITOR_VIEWPORT_VERTEX) {
+        state->mode = EDITOR_VIEWPORT_HITBOX;
+    } else if(state->mode == EDITOR_VIEWPORT_HITBOX) {
+        state->mode = EDITOR_VIEWPORT_HIERARCHY;
+    }
+    state->dragged_vertex = -1;
 }
 
 void editor_viewport_update(
@@ -58,7 +82,7 @@ void editor_viewport_update(
 ) {
     EditorObject *object;
 
-    if(state == NULL || project == NULL || !state->hitbox_editor_active) return;
+    if(state == NULL || project == NULL || state->mode == EDITOR_VIEWPORT_HIERARCHY) return;
     object = editor_project_selected_get(project);
     if(object == NULL || !object->has_hitbox) {
         state->dragged_vertex = -1;
@@ -71,7 +95,8 @@ void editor_viewport_update(
     if(state->dragged_vertex >= 0 &&
             (primary_button == MOUSE_BUTTON_STATE_DOWN ||
                 primary_button == MOUSE_BUTTON_STATE_PRESSED)) {
-        object->hitbox.vertices[state->dragged_vertex] = (Position){
+        if(object->hitbox.vertices[state->dragged_vertex].position_locked) return;
+        object->hitbox.vertices[state->dragged_vertex].position = (Position){
             pointer.x - object->position.x,
             pointer.y - object->position.y
         };
@@ -85,7 +110,32 @@ void editor_viewport_update(
         Vec2D delta = {pointer.x - vertex.x, pointer.y - vertex.y};
 
         if(delta.x * delta.x + delta.y * delta.y <= 100.0f) {
-            state->dragged_vertex = (int)i;
+            editor_viewport_vertex_editor_enter(state, i);
+            if(!object->hitbox.vertices[i].position_locked) {
+                state->dragged_vertex = (int)i;
+            }
+            return;
+        }
+    }
+    for(uint32_t i = 0; i < object->hitbox.vertex_count; i += 1) {
+        Position start = editor_vertex_world_get(object, i);
+        Position end = editor_vertex_world_get(object,
+            (i + 1) % object->hitbox.vertex_count);
+        Vec2D edge = {end.x - start.x, end.y - start.y};
+        float length_squared = edge.x * edge.x + edge.y * edge.y;
+        float amount;
+        Position nearest;
+        Vec2D distance;
+
+        if(length_squared <= 0.001f) continue;
+        amount = ((pointer.x - start.x) * edge.x +
+            (pointer.y - start.y) * edge.y) / length_squared;
+        if(amount < 0.0f) amount = 0.0f;
+        if(amount > 1.0f) amount = 1.0f;
+        nearest = (Position){start.x + edge.x * amount, start.y + edge.y * amount};
+        distance = (Vec2D){pointer.x - nearest.x, pointer.y - nearest.y};
+        if(distance.x * distance.x + distance.y * distance.y <= 36.0f) {
+            editor_viewport_line_editor_enter(state, i);
             return;
         }
     }
@@ -111,10 +161,13 @@ void editor_viewport_draw(
                 object, (i + 1) % object->hitbox.vertex_count);
 
             editor_line_draw(start, end, line_color);
-            if(state->hitbox_editor_active && object->id == project->selected) {
+            if(state->mode != EDITOR_VIEWPORT_HIERARCHY &&
+                    object->id == project->selected) {
                 (void)rohr_graphics_screen_quad_draw(
                     start, 10.0f, 10.0f, 0.0f,
-                    (Color){235, 240, 248, 255});
+                    object->hitbox.vertices[i].position_locked
+                        ? (Color){245, 165, 70, 255}
+                        : (Color){235, 240, 248, 255});
             }
         }
     }

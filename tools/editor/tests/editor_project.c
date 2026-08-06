@@ -14,11 +14,13 @@ int main(void) {
             editor_project_selected_get(&project) != first ||
             editor_project_object_select(&project, EDITOR_OBJECT_INVALID)) return 1;
     if(!editor_project_object_select(&project, second->id)) return 1;
-    editor_project_hitbox_add(second, 4);
-    if(!second->has_hitbox || second->hitbox.vertex_count != 4) return 1;
-    editor_project_hitbox_vertex_count_set(second, 7);
-    if(second->hitbox.vertex_count != 7) return 1;
-    editor_project_hitbox_vertex_count_set(second, 100);
-    if(second->hitbox.vertex_count != EDITOR_HITBOX_VERTEX_MAX) return 1;
+    editor_project_hitbox_add(&project, second);
+    if(!second->has_hitbox || second->hitbox.vertex_count != 3) return 1;
+    if(!editor_project_hitbox_vertex_insert(&project, second, 0) ||
+            second->hitbox.vertex_count != 4) return 1;
+    second->hitbox.vertices[0].position_locked = true;
+    if(!editor_project_hitbox_line_length_set(second, 0, 100.0f)) return 1;
+    second->hitbox.vertices[1].position_locked = true;
+    if(editor_project_hitbox_line_length_set(second, 0, 50.0f)) return 1;
     return 0;
 }
