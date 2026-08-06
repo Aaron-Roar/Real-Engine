@@ -29,6 +29,8 @@ typedef struct SystemSoftBoundaryQuery {
     OverlapInfo overlap;
     float t;
     bool solving;
+    bool solved;
+    ContactInfo contact;
 } SystemSoftBoundaryQuery;
 
 typedef enum SystemContactConstraintType {
@@ -46,6 +48,8 @@ typedef struct SystemContactConstraint {
             EntityIndex second_index;
             OverlapInfo overlap;
             bool responds;
+            bool solved;
+            ContactInfo contact;
         } rigid;
         SystemSoftBoundaryQuery soft;
     } value;
@@ -653,7 +657,12 @@ Vec2D system_friction_impulse_apply(
     return friction_impulse;
 }
 
-ContactInfo system_resolve_collision(Entity entity_1, Entity entity_2, OverlapInfo collision) {
+ContactInfo system_resolve_collision(
+    Entity entity_1,
+    Entity entity_2,
+    OverlapInfo collision,
+    bool restitution_enabled
+) {
     //Assume collision.normal points from entity_1 -> entity_2
     bool entity_1_movable = physics_entity_movable_get(entity_1);
     bool entity_2_movable = physics_entity_movable_get(entity_2);
@@ -732,7 +741,9 @@ ContactInfo system_resolve_collision(Entity entity_1, Entity entity_2, OverlapIn
         return contact_info;
     }
 
-    float restitution = fminf(restitutions[entity_1], restitutions[entity_2]);
+    float restitution = restitution_enabled
+        ? fminf(restitutions[entity_1], restitutions[entity_2])
+        : 0.0f;
 
     if(fabsf(v_normal) < 1.0f) {
       restitution = 0.0f;
@@ -848,9 +859,11 @@ static bool system_broadphase_pair_apply(Entity target, void *context) {
 }
 
 static void system_rigid_contact_constraint_solve(
-    const SystemContactConstraint *constraint
+    SystemContactConstraint *constraint
 ) {
-    ContactInfo contact;
+    ContactInfo result;
+    Vec2D accumulated_normal;
+    Vec2D accumulated_friction;
     EntityIndex first;
     EntityIndex second;
     OverlapInfo overlap;
@@ -861,17 +874,18 @@ static void system_rigid_contact_constraint_solve(
     second = constraint->value.rigid.second_index;
     overlap = constraint->value.rigid.overlap;
     responds = constraint->value.rigid.responds;
-    contact = responds
-        ? system_resolve_collision(first, second, overlap)
+    accumulated_normal = constraint->value.rigid.contact.normal_impulse;
+    accumulated_friction = constraint->value.rigid.contact.friction_impulse;
+    result = responds
+        ? system_resolve_collision(first, second, overlap,
+            !constraint->value.rigid.solved)
         : (ContactInfo){0};
-    system_interaction_by_index_record(
-        first,
-        second,
-        overlap,
-        contact,
-        PHYSICS_INTERACTION_OVERLAP |
-            (responds ? PHYSICS_INTERACTION_CONTACT : 0)
-    );
+    result.normal_impulse.x += accumulated_normal.x;
+    result.normal_impulse.y += accumulated_normal.y;
+    result.friction_impulse.x += accumulated_friction.x;
+    result.friction_impulse.y += accumulated_friction.y;
+    constraint->value.rigid.contact = result;
+    constraint->value.rigid.solved = true;
     if(responds) {
         if(physics_debug_stats_enabled) physics_debug_stats.contact_count += 1;
         system_separate_entities_tuned(first, second, overlap);
@@ -956,7 +970,7 @@ void system_collisions_apply(void) {
             if(collision.detected == true) {
                 bool responds = entity_index_components_check(i, COLLISION) && entity_index_components_check(j, COLLISION);
                 ContactInfo contact = responds
-                    ? system_resolve_collision(i, j, collision)
+                    ? system_resolve_collision(i, j, collision, true)
                     : (ContactInfo){0};
                 system_interaction_by_index_record(
                     i,
@@ -1626,6 +1640,8 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
     float restitution;
     float impulse_magnitude;
     ContactInfo contact;
+    Vec2D accumulated_normal;
+    Vec2D accumulated_friction;
 
     if(query == NULL) return true;
     if(!query->solving) {
@@ -1665,6 +1681,8 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
     overlap = query->overlap;
     t = query->t;
     edge = math_vector_subtract(query->end, query->start);
+    accumulated_normal = query->contact.normal_impulse;
+    accumulated_friction = query->contact.friction_impulse;
     weight_a = 1.0f - t;
     weight_b = t;
     inverse_mass_a = physics_entity_movable_get(query->a) &&
@@ -1725,9 +1743,11 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
         float tangent_impulse_magnitude;
         float maximum_friction;
 
-        restitution = fminf(
-            restitutions_pool.used[query->a] ? restitutions[query->a] : 0.0f,
-            restitutions_pool.used[rigid] ? restitutions[rigid] : 0.0f);
+        restitution = query->solved
+            ? 0.0f
+            : fminf(
+                restitutions_pool.used[query->a] ? restitutions[query->a] : 0.0f,
+                restitutions_pool.used[rigid] ? restitutions[rigid] : 0.0f);
         impulse_magnitude = -(1.0f + restitution) * normal_velocity /
             inverse_mass_sum;
         contact.normal_impulse = (Vec2D){
@@ -1817,10 +1837,12 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
             }
         }
     }
-    system_interaction_by_index_record(query->a, rigid, overlap, contact,
-        PHYSICS_INTERACTION_OVERLAP | PHYSICS_INTERACTION_CONTACT);
-    system_interaction_by_index_record(query->b, rigid, overlap, contact,
-        PHYSICS_INTERACTION_OVERLAP | PHYSICS_INTERACTION_CONTACT);
+    contact.normal_impulse.x += accumulated_normal.x;
+    contact.normal_impulse.y += accumulated_normal.y;
+    contact.friction_impulse.x += accumulated_friction.x;
+    contact.friction_impulse.y += accumulated_friction.y;
+    query->contact = contact;
+    query->solved = true;
     system_generate_global_hitbox_by_index(query->a);
     system_generate_global_hitbox_by_index(query->b);
     system_generate_global_hitbox_by_index(rigid);
@@ -1915,8 +1937,34 @@ static void system_contact_constraints_solve(void) {
         if(constraint->type == SYSTEM_CONTACT_CONSTRAINT_RIGID_PAIR) {
             system_rigid_contact_constraint_solve(constraint);
         } else if(constraint->type == SYSTEM_CONTACT_CONSTRAINT_SOFT_BOUNDARY) {
-            SystemSoftBoundaryQuery query = constraint->value.soft;
-            (void)system_soft_boundary_pair_apply(query.rigid_entity, &query);
+            (void)system_soft_boundary_pair_apply(
+                constraint->value.soft.rigid_entity, &constraint->value.soft);
+        }
+    }
+}
+
+static void system_contact_constraints_finalize(void) {
+    for(size_t i = 0; i < system_contact_constraint_count; i += 1) {
+        SystemContactConstraint *constraint = &system_contact_constraints[i];
+
+        if(constraint->type == SYSTEM_CONTACT_CONSTRAINT_RIGID_PAIR) {
+            system_interaction_by_index_record(
+                constraint->value.rigid.first_index,
+                constraint->value.rigid.second_index,
+                constraint->value.rigid.overlap,
+                constraint->value.rigid.contact,
+                PHYSICS_INTERACTION_OVERLAP |
+                    (constraint->value.rigid.responds
+                        ? PHYSICS_INTERACTION_CONTACT : 0));
+        } else if(constraint->type == SYSTEM_CONTACT_CONSTRAINT_SOFT_BOUNDARY) {
+            SystemSoftBoundaryQuery *soft = &constraint->value.soft;
+
+            system_interaction_by_index_record(
+                soft->a, soft->rigid, soft->overlap, soft->contact,
+                PHYSICS_INTERACTION_OVERLAP | PHYSICS_INTERACTION_CONTACT);
+            system_interaction_by_index_record(
+                soft->b, soft->rigid, soft->overlap, soft->contact,
+                PHYSICS_INTERACTION_OVERLAP | PHYSICS_INTERACTION_CONTACT);
         }
     }
 }
@@ -2117,6 +2165,7 @@ void system_physics_update(double dt) {
         phase_started = SDL_GetPerformanceCounter();
     }
     system_contact_constraints_solve();
+    system_contact_constraints_finalize();
     if(physics_debug_stats_enabled) {
         physics_debug_stats.response_ms = system_elapsed_ms(phase_started);
     }
