@@ -15,6 +15,14 @@ typedef struct OverlapInfo {
     Vec1D depth;
 } OverlapInfo;
 
+/** One current interaction between a queried entity and another entity. */
+typedef struct EntityInteraction {
+    /** The other entity in the interaction. */
+    Entity target;
+    /** Geometry oriented from the queried entity toward target. */
+    OverlapInfo overlap;
+} EntityInteraction;
+
 /** Bit mask describing one or more collision categories. */
 typedef uint64_t RohrCollisionCategoryMask;
 
@@ -585,6 +593,14 @@ bool physics_overlap_entered_check(Entity entity, Entity target);
 bool physics_overlap_stayed_check(Entity entity, Entity target);
 /** Return whether an overlap ended during the current physics step. */
 bool physics_overlap_exited_check(Entity entity, Entity target);
+/** Return the number of current overlaps involving an entity. */
+size_t physics_overlap_count_get(Entity entity);
+/** Write up to capacity current overlaps and return the number written. */
+size_t physics_overlaps_get(
+    Entity entity,
+    EntityInteraction *results,
+    size_t capacity
+);
 
 /** Return whether two entities physically contacted during the current physics step. */
 bool physics_contact_check(Entity entity, Entity target);
@@ -596,6 +612,14 @@ bool physics_contact_entered_check(Entity entity, Entity target);
 bool physics_contact_stayed_check(Entity entity, Entity target);
 /** Return whether a physical contact ended during the current physics step. */
 bool physics_contact_exited_check(Entity entity, Entity target);
+/** Return the number of current physical contacts involving an entity. */
+size_t physics_contact_count_get(Entity entity);
+/** Write up to capacity current contacts and return the number written. */
+size_t physics_contacts_get(
+    Entity entity,
+    EntityInteraction *results,
+    size_t capacity
+);
 
 /** Set an explicit simulation delta for each engine tick. */
 EngineResult physics_dt_per_tick_set(Time dt);

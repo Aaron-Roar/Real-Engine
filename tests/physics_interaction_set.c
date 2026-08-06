@@ -11,6 +11,7 @@ static Entity entity_handle(uint16_t generation, uint16_t slot) {
 int main(void) {
     PhysicsInteractionSet set;
     PhysicsInteraction interaction;
+    EntityInteraction interactions[200];
     Entity first = entity_handle(1, 1);
     Entity second = entity_handle(1, 2);
     OverlapInfo overlap = {
@@ -57,6 +58,48 @@ int main(void) {
         );
         if(error_check(result)) goto fail;
     }
+    if(physics_interaction_set_entity_count_get(
+                &set, first, PHYSICS_INTERACTION_OVERLAP) != 198 ||
+            physics_interaction_set_entity_count_get(
+                &set, first, PHYSICS_INTERACTION_CONTACT) != 1 ||
+            physics_interaction_set_entities_get(
+                &set,
+                first,
+                PHYSICS_INTERACTION_OVERLAP,
+                interactions,
+                200
+            ) != 198) goto fail;
+    {
+        bool found = false;
+
+        for(i = 0; i < 198; i += 1) {
+            if(interactions[i].target != second) continue;
+            if(fabsf(interactions[i].overlap.normal.x - -0.5f) > 0.0001f ||
+                    fabsf(interactions[i].overlap.normal.y - 0.75f) > 0.0001f) {
+                goto fail;
+            }
+            found = true;
+            break;
+        }
+        if(!found) goto fail;
+    }
+    if(physics_interaction_set_entities_get(
+                &set,
+                second,
+                PHYSICS_INTERACTION_CONTACT,
+                interactions,
+                1
+            ) != 1 ||
+            interactions[0].target != first ||
+            fabsf(interactions[0].overlap.normal.x - 0.5f) > 0.0001f ||
+            fabsf(interactions[0].overlap.normal.y - -0.75f) > 0.0001f ||
+            physics_interaction_set_entities_get(
+                &set,
+                first,
+                PHYSICS_INTERACTION_OVERLAP,
+                interactions,
+                4
+            ) != 4) goto fail;
     if(!physics_interaction_set_get(&set, first, second, &interaction) ||
             !physics_interaction_set_check(
                 &set, first, second, PHYSICS_INTERACTION_CONTACT)) goto fail;

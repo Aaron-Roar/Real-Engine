@@ -54,6 +54,18 @@ bool physics_interaction_set_get(
     Entity second,
     PhysicsInteraction *interaction
 );
+size_t physics_interaction_set_entity_count_get(
+    const PhysicsInteractionSet *set,
+    Entity entity,
+    PhysicsInteractionFlags flags
+);
+size_t physics_interaction_set_entities_get(
+    const PhysicsInteractionSet *set,
+    Entity entity,
+    PhysicsInteractionFlags flags,
+    EntityInteraction *results,
+    size_t capacity
+);
 void physics_interaction_set_clear(PhysicsInteractionSet *set);
 void physics_interaction_set_destroy(PhysicsInteractionSet *set);
 

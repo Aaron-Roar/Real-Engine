@@ -2019,12 +2019,22 @@ OverlapInfo rohr_physics_overlap_get(Entity entity, Entity target);
 bool rohr_physics_overlap_entered_check(Entity entity, Entity target);
 bool rohr_physics_overlap_stayed_check(Entity entity, Entity target);
 bool rohr_physics_overlap_exited_check(Entity entity, Entity target);
+size_t rohr_physics_overlap_count_get(Entity entity);
+size_t rohr_physics_overlaps_get(
+    Entity entity,
+    EntityInteraction *results,
+    size_t capacity
+);
 ```
 
 Overlap queries include sensors and physically resolved colliders. `overlap_get`
 returns geometry oriented from `entity` toward `target`; its `detected` field is
 false when no current overlap exists. Transition checks compare the current and
 previous physics steps.
+
+`overlap_count_get` returns the required caller-owned buffer size.
+`overlaps_get` writes up to `capacity` current results and returns the number
+written. Result ordering is unspecified.
 
 ### Entity contact queries
 
@@ -2034,12 +2044,22 @@ OverlapInfo rohr_physics_contact_get(Entity entity, Entity target);
 bool rohr_physics_contact_entered_check(Entity entity, Entity target);
 bool rohr_physics_contact_stayed_check(Entity entity, Entity target);
 bool rohr_physics_contact_exited_check(Entity entity, Entity target);
+size_t rohr_physics_contact_count_get(Entity entity);
+size_t rohr_physics_contacts_get(
+    Entity entity,
+    EntityInteraction *results,
+    size_t capacity
+);
 ```
 
 Contact queries include only entity pairs that entered physical collision
 response. `contact_get` returns the overlap geometry used for that response and
 sets `detected` to false when no current contact exists. Sensors do not produce
 contacts.
+
+`contact_count_get` returns the required caller-owned buffer size.
+`contacts_get` writes up to `capacity` current results and returns the number
+written. Result ordering is unspecified.
 
 ## Graphics
 

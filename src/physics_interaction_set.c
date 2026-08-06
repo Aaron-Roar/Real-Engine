@@ -257,6 +257,65 @@ bool physics_interaction_set_get(
     return true;
 }
 
+size_t physics_interaction_set_entity_count_get(
+    const PhysicsInteractionSet *set,
+    Entity entity,
+    PhysicsInteractionFlags flags
+) {
+    size_t count = 0;
+
+    if(set == NULL || entity == ENTITY_INVALID || flags == PHYSICS_INTERACTION_NONE) {
+        return 0;
+    }
+    for(size_t index = 0; index < set->capacity; index += 1) {
+        const PhysicsInteraction *interaction = &set->entries[index];
+
+        if(set->occupied[index] == 0 ||
+                (interaction->flags & flags) != flags) continue;
+        if(interaction->pair.first == entity || interaction->pair.second == entity) {
+            count += 1;
+        }
+    }
+    return count;
+}
+
+size_t physics_interaction_set_entities_get(
+    const PhysicsInteractionSet *set,
+    Entity entity,
+    PhysicsInteractionFlags flags,
+    EntityInteraction *results,
+    size_t capacity
+) {
+    size_t count = 0;
+
+    if(set == NULL || entity == ENTITY_INVALID || flags == PHYSICS_INTERACTION_NONE ||
+            results == NULL || capacity == 0) return 0;
+    for(size_t index = 0; index < set->capacity && count < capacity; index += 1) {
+        const PhysicsInteraction *interaction = &set->entries[index];
+        Entity target;
+        OverlapInfo overlap;
+
+        if(set->occupied[index] == 0 ||
+                (interaction->flags & flags) != flags) continue;
+        if(interaction->pair.first == entity) {
+            target = interaction->pair.second;
+            overlap = interaction->overlap;
+        } else if(interaction->pair.second == entity) {
+            target = interaction->pair.first;
+            overlap = interaction->overlap;
+            overlap.normal.x = -overlap.normal.x;
+            overlap.normal.y = -overlap.normal.y;
+        } else {
+            continue;
+        }
+        results[count++] = (EntityInteraction){
+            .target = target,
+            .overlap = overlap
+        };
+    }
+    return count;
+}
+
 void physics_interaction_set_clear(PhysicsInteractionSet *set) {
     if(set == NULL) return;
     if(set->capacity > 0) {

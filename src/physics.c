@@ -255,6 +255,26 @@ bool physics_interaction_previous_get(
     );
 }
 
+size_t physics_interaction_current_count_get(
+    Entity entity,
+    PhysicsInteractionFlags flags
+) {
+    return physics_interaction_set_entity_count_get(
+        &current_interactions, entity, flags
+    );
+}
+
+size_t physics_interaction_current_entities_get(
+    Entity entity,
+    PhysicsInteractionFlags flags,
+    EntityInteraction *results,
+    size_t capacity
+) {
+    return physics_interaction_set_entities_get(
+        &current_interactions, entity, flags, results, capacity
+    );
+}
+
 static void physics_soft_body_entity_list_remove(Entity *values, uint32_t *count, Entity entity) {
     if(values == NULL || count == NULL) return;
     for(uint32_t i = 0; i < *count; i += 1) {
@@ -1979,12 +1999,15 @@ SoftBodyTriangleResult physics_soft_body_triangle_get(Entity triangle) {
     return ERROR_RESULT_MAKE_VALUE(SoftBodyTriangleResult, soft_body_triangles[index]);
 }
 
-static bool physics_interaction_entities_valid(Entity entity, Entity target) {
+static bool physics_interaction_entity_valid(Entity entity) {
     EntityIndex index;
-    EntityIndex target_index;
 
-    return entity_index_get(entity, &index) && entity_index_alive_check(index) &&
-        entity_index_get(target, &target_index) && entity_index_alive_check(target_index);
+    return entity_index_get(entity, &index) && entity_index_alive_check(index);
+}
+
+static bool physics_interaction_entities_valid(Entity entity, Entity target) {
+    return physics_interaction_entity_valid(entity) &&
+        physics_interaction_entity_valid(target);
 }
 
 static bool physics_interaction_flag_check(
@@ -2060,6 +2083,22 @@ bool physics_overlap_exited_check(Entity entity, Entity target) {
     return physics_interaction_exited_check(entity, target, PHYSICS_INTERACTION_OVERLAP);
 }
 
+size_t physics_overlap_count_get(Entity entity) {
+    if(!physics_interaction_entity_valid(entity)) return 0;
+    return physics_interaction_current_count_get(entity, PHYSICS_INTERACTION_OVERLAP);
+}
+
+size_t physics_overlaps_get(
+    Entity entity,
+    EntityInteraction *results,
+    size_t capacity
+) {
+    if(!physics_interaction_entity_valid(entity)) return 0;
+    return physics_interaction_current_entities_get(
+        entity, PHYSICS_INTERACTION_OVERLAP, results, capacity
+    );
+}
+
 bool physics_contact_check(Entity entity, Entity target) {
     return physics_interaction_flag_check(entity, target, PHYSICS_INTERACTION_CONTACT);
 }
@@ -2078,6 +2117,22 @@ bool physics_contact_stayed_check(Entity entity, Entity target) {
 
 bool physics_contact_exited_check(Entity entity, Entity target) {
     return physics_interaction_exited_check(entity, target, PHYSICS_INTERACTION_CONTACT);
+}
+
+size_t physics_contact_count_get(Entity entity) {
+    if(!physics_interaction_entity_valid(entity)) return 0;
+    return physics_interaction_current_count_get(entity, PHYSICS_INTERACTION_CONTACT);
+}
+
+size_t physics_contacts_get(
+    Entity entity,
+    EntityInteraction *results,
+    size_t capacity
+) {
+    if(!physics_interaction_entity_valid(entity)) return 0;
+    return physics_interaction_current_entities_get(
+        entity, PHYSICS_INTERACTION_CONTACT, results, capacity
+    );
 }
 
 EngineResult physics_dt_per_tick_set(Time dt) {

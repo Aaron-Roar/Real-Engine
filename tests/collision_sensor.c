@@ -15,6 +15,7 @@ int main(void) {
     Entity body;
     Entity sensor;
     PhysicsInteraction interaction;
+    EntityInteraction public_interaction;
 
     if(rohr_error_check(rohr_engine_init())) return 1;
     body_result = rohr_entity_add();
@@ -71,7 +72,13 @@ int main(void) {
             rohr_physics_contact_get(body, sensor).detected ||
             rohr_physics_contact_entered_check(body, sensor) ||
             rohr_physics_contact_stayed_check(body, sensor) ||
-            rohr_physics_contact_exited_check(body, sensor)) {
+            rohr_physics_contact_exited_check(body, sensor) ||
+            rohr_physics_overlap_count_get(body) != 1 ||
+            rohr_physics_overlaps_get(body, &public_interaction, 1) != 1 ||
+            public_interaction.target != sensor ||
+            !public_interaction.overlap.detected ||
+            rohr_physics_contact_count_get(body) != 0 ||
+            rohr_physics_contacts_get(body, &public_interaction, 1) != 0) {
         fprintf(stderr, "sensor overlap step: position=(%f,%f) velocity=(%f,%f) overlap=%d\n",
             body_position.result.value.x,
             body_position.result.value.y,

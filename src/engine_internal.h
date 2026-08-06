@@ -59,6 +59,18 @@ bool physics_interaction_previous_get(
     Entity target,
     PhysicsInteraction *interaction
 );
+/** Count current interactions involving an entity with all requested flags. */
+size_t physics_interaction_current_count_get(
+    Entity entity,
+    PhysicsInteractionFlags flags
+);
+/** Write current interactions involving an entity with all requested flags. */
+size_t physics_interaction_current_entities_get(
+    Entity entity,
+    PhysicsInteractionFlags flags,
+    EntityInteraction *results,
+    size_t capacity
+);
 /** Initialize graphics tables. */
 EngineResult graphics_tables_init(void);
 /** Ensure graphics tables can address capacity slots. */

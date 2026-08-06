@@ -1107,6 +1107,14 @@ bool rohr_physics_overlap_entered_check(Entity entity, Entity target);
 bool rohr_physics_overlap_stayed_check(Entity entity, Entity target);
 /** Return whether an overlap ended during the current physics step. */
 bool rohr_physics_overlap_exited_check(Entity entity, Entity target);
+/** Return the number of current overlaps involving an entity. */
+size_t rohr_physics_overlap_count_get(Entity entity);
+/** Write up to capacity current overlaps and return the number written. */
+size_t rohr_physics_overlaps_get(
+    Entity entity,
+    EntityInteraction *results,
+    size_t capacity
+);
 
 /** Return whether two entities physically contacted during the current physics step. */
 bool rohr_physics_contact_check(Entity entity, Entity target);
@@ -1118,6 +1126,14 @@ bool rohr_physics_contact_entered_check(Entity entity, Entity target);
 bool rohr_physics_contact_stayed_check(Entity entity, Entity target);
 /** Return whether a physical contact ended during the current physics step. */
 bool rohr_physics_contact_exited_check(Entity entity, Entity target);
+/** Return the number of current physical contacts involving an entity. */
+size_t rohr_physics_contact_count_get(Entity entity);
+/** Write up to capacity current contacts and return the number written. */
+size_t rohr_physics_contacts_get(
+    Entity entity,
+    EntityInteraction *results,
+    size_t capacity
+);
 
 /**
  * @brief Creates an engine color from a hexadecimal RGB or RGBA value.
