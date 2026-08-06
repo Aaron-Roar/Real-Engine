@@ -152,7 +152,9 @@ int main(void) {
                     object.result.value, rohr_math_square_create(1.0f, 1.0f))) ||
                 rohr_error_check(rohr_physics_mass_set(object.result.value, 1.0f)) ||
                 rohr_error_check(rohr_physics_velocity_set(
-                    object.result.value, (Velocity){2.0f, 1.0f})) ||
+                    object.result.value, (Velocity){0.0f, 1.0f})) ||
+                rohr_error_check(rohr_physics_angular_velocity_set(
+                    object.result.value, 4.0f)) ||
                 rohr_error_check(rohr_physics_dynamic_set(object.result.value)) ||
                 rohr_error_check(rohr_physics_restitution_set(
                     object.result.value, 0.0f)) ||
@@ -163,7 +165,8 @@ int main(void) {
         object_position = rohr_physics_position_get(object.result.value);
         if(rohr_error_check(object_index) || rohr_error_check(object_position) ||
                 object_position.result.value.y >= -1.25f ||
-                velocities[object_index.result.value].x >= 2.0f) goto fail;
+                velocities[object_index.result.value].x <= 0.0f ||
+                angular_velocities[object_index.result.value] >= 4.0f) goto fail;
     }
     rohr_engine_shutdown();
     return 0;
