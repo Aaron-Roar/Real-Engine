@@ -1501,6 +1501,234 @@ static void system_soft_body_beams_apply(void) {
     }
 }
 
+typedef struct SystemSoftBoundaryQuery {
+    Entity node_a;
+    Entity node_b;
+    EntityIndex a;
+    EntityIndex b;
+    Shape shape;
+    Position start;
+    Position end;
+} SystemSoftBoundaryQuery;
+
+static Shape system_soft_boundary_shape_create(
+    Position start,
+    Position end,
+    float radius
+) {
+    Vec2D delta = math_vector_subtract(end, start);
+    float length = math_vector_magnitude(delta);
+    Vec2D normal;
+
+    if(length <= 0.0001f) return (Shape){0};
+    normal = (Vec2D){-delta.y * radius / length, delta.x * radius / length};
+    return (Shape){
+        .amount_of_vertices = 4,
+        .vertices = {
+            {start.x + normal.x, start.y + normal.y},
+            {end.x + normal.x, end.y + normal.y},
+            {end.x - normal.x, end.y - normal.y},
+            {start.x - normal.x, start.y - normal.y}
+        }
+    };
+}
+
+static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) {
+    SystemSoftBoundaryQuery *query = context;
+    EntityIndex rigid;
+    OverlapInfo overlap;
+    Vec2D edge;
+    float edge_length_squared;
+    float t;
+    float weight_a;
+    float weight_b;
+    float inverse_mass_a;
+    float inverse_mass_b;
+    float inverse_mass_rigid;
+    float inverse_mass_edge;
+    float inverse_mass_sum;
+    Vec2D relative_velocity;
+    float normal_velocity;
+    float restitution;
+    float impulse_magnitude;
+    ContactInfo contact;
+
+    if(query == NULL || rigid_entity == query->node_a || rigid_entity == query->node_b ||
+            !entity_index_get(rigid_entity, &rigid) || !entity_index_alive_check(rigid) ||
+            !entity_index_components_check(rigid, HIT_BOX | COLLISION) ||
+            entity_index_components_check(rigid, SOFT_BODY_NODE | SOFT_BODY_BEAM |
+                SOFT_BODY_TRIANGLE) ||
+            (!physics_collision_between_check(query->node_a, rigid_entity) &&
+                !physics_collision_between_check(query->node_b, rigid_entity))) return true;
+    overlap = physics_sat_overlap_get(query->shape, world_hit_boxes[rigid]);
+    if(!overlap.detected) return true;
+    edge = math_vector_subtract(query->end, query->start);
+    edge_length_squared = math_dot_product(edge, edge);
+    if(edge_length_squared <= 0.0001f) return true;
+    {
+        Position center = math_polygon_centroid(world_hit_boxes[rigid]);
+        t = math_dot_product(math_vector_subtract(center, query->start), edge) /
+            edge_length_squared;
+    }
+    t = fmaxf(0.0f, fminf(1.0f, t));
+    weight_a = 1.0f - t;
+    weight_b = t;
+    inverse_mass_a = physics_entity_movable_get(query->a) &&
+            entity_index_components_check(query->a, MASS) && mass[query->a] > 0.0f
+        ? 1.0f / mass[query->a] : 0.0f;
+    inverse_mass_b = physics_entity_movable_get(query->b) &&
+            entity_index_components_check(query->b, MASS) && mass[query->b] > 0.0f
+        ? 1.0f / mass[query->b] : 0.0f;
+    inverse_mass_rigid = physics_entity_movable_get(rigid) &&
+            entity_index_components_check(rigid, MASS) && mass[rigid] > 0.0f
+        ? 1.0f / mass[rigid] : 0.0f;
+    inverse_mass_edge = weight_a * weight_a * inverse_mass_a +
+        weight_b * weight_b * inverse_mass_b;
+    inverse_mass_sum = inverse_mass_edge + inverse_mass_rigid;
+    if(inverse_mass_sum <= 0.0f) return true;
+
+    positions[query->a].x -= overlap.normal.x * overlap.depth *
+        weight_a * inverse_mass_a / inverse_mass_sum;
+    positions[query->a].y -= overlap.normal.y * overlap.depth *
+        weight_a * inverse_mass_a / inverse_mass_sum;
+    positions[query->b].x -= overlap.normal.x * overlap.depth *
+        weight_b * inverse_mass_b / inverse_mass_sum;
+    positions[query->b].y -= overlap.normal.y * overlap.depth *
+        weight_b * inverse_mass_b / inverse_mass_sum;
+    positions[rigid].x += overlap.normal.x * overlap.depth *
+        inverse_mass_rigid / inverse_mass_sum;
+    positions[rigid].y += overlap.normal.y * overlap.depth *
+        inverse_mass_rigid / inverse_mass_sum;
+
+    relative_velocity = (Vec2D){
+        velocities[rigid].x -
+            (velocities[query->a].x * weight_a + velocities[query->b].x * weight_b),
+        velocities[rigid].y -
+            (velocities[query->a].y * weight_a + velocities[query->b].y * weight_b)
+    };
+    normal_velocity = math_dot_product(relative_velocity, overlap.normal);
+    contact = (ContactInfo){
+        .detected = true,
+        .normal = overlap.normal,
+        .depth = overlap.depth,
+        .point = {
+            query->start.x + edge.x * t,
+            query->start.y + edge.y * t
+        },
+        .relative_velocity = relative_velocity
+    };
+    if(normal_velocity < 0.0f) {
+        restitution = fminf(
+            restitutions_pool.used[query->a] ? restitutions[query->a] : 0.0f,
+            restitutions_pool.used[rigid] ? restitutions[rigid] : 0.0f);
+        impulse_magnitude = -(1.0f + restitution) * normal_velocity /
+            inverse_mass_sum;
+        contact.normal_impulse = (Vec2D){
+            overlap.normal.x * impulse_magnitude,
+            overlap.normal.y * impulse_magnitude
+        };
+        velocities[query->a].x -= contact.normal_impulse.x *
+            weight_a * inverse_mass_a;
+        velocities[query->a].y -= contact.normal_impulse.y *
+            weight_a * inverse_mass_a;
+        velocities[query->b].x -= contact.normal_impulse.x *
+            weight_b * inverse_mass_b;
+        velocities[query->b].y -= contact.normal_impulse.y *
+            weight_b * inverse_mass_b;
+        velocities[rigid].x += contact.normal_impulse.x * inverse_mass_rigid;
+        velocities[rigid].y += contact.normal_impulse.y * inverse_mass_rigid;
+    }
+    system_interaction_by_index_record(query->a, rigid, overlap, contact,
+        PHYSICS_INTERACTION_OVERLAP | PHYSICS_INTERACTION_CONTACT);
+    system_interaction_by_index_record(query->b, rigid, overlap, contact,
+        PHYSICS_INTERACTION_OVERLAP | PHYSICS_INTERACTION_CONTACT);
+    system_generate_global_hitbox_by_index(query->a);
+    system_generate_global_hitbox_by_index(query->b);
+    system_generate_global_hitbox_by_index(rigid);
+    return true;
+}
+
+static uint32_t system_soft_boundary_edge_use_count(
+    SoftBody body,
+    Entity first,
+    Entity second
+) {
+    uint32_t count = 0;
+
+    for(uint32_t i = 0; i < body.triangle_count; i += 1) {
+        EntityIndex triangle_index;
+        SoftBodyTriangle triangle;
+        Entity nodes[3];
+
+        if(!entity_index_get(body.triangles[i], &triangle_index) ||
+                triangle_index >= soft_body_triangles_pool.capacity ||
+                !soft_body_triangles_pool.used[triangle_index]) continue;
+        triangle = soft_body_triangles[triangle_index];
+        nodes[0] = triangle.node_a;
+        nodes[1] = triangle.node_b;
+        nodes[2] = triangle.node_c;
+        for(uint32_t edge = 0; edge < 3; edge += 1) {
+            Entity a = nodes[edge];
+            Entity b = nodes[(edge + 1) % 3];
+            if((a == first && b == second) || (a == second && b == first)) {
+                count += 1;
+            }
+        }
+    }
+    return count;
+}
+
+static void system_soft_body_boundary_collisions_apply(void) {
+    for(EntityIndex body_index = 0; body_index < soft_bodies_pool.capacity;
+            body_index += 1) {
+        SoftBody body;
+
+        if(!soft_bodies_pool.used[body_index] || !entity_index_alive_check(body_index)) continue;
+        body = soft_bodies[body_index];
+        for(uint32_t i = 0; i < body.triangle_count; i += 1) {
+            EntityIndex triangle_index;
+            SoftBodyTriangle triangle;
+            Entity nodes[3];
+
+            if(!entity_index_get(body.triangles[i], &triangle_index) ||
+                    triangle_index >= soft_body_triangles_pool.capacity ||
+                    !soft_body_triangles_pool.used[triangle_index]) continue;
+            triangle = soft_body_triangles[triangle_index];
+            nodes[0] = triangle.node_a;
+            nodes[1] = triangle.node_b;
+            nodes[2] = triangle.node_c;
+            for(uint32_t edge_index = 0; edge_index < 3; edge_index += 1) {
+                EntityIndex a;
+                EntityIndex b;
+                Entity first = nodes[edge_index];
+                Entity second = nodes[(edge_index + 1) % 3];
+                SystemSoftBoundaryQuery query;
+                float radius;
+
+                if(system_soft_boundary_edge_use_count(body, first, second) != 1 ||
+                        !entity_index_get(first, &a) || !entity_index_alive_check(a) ||
+                        !entity_index_get(second, &b) || !entity_index_alive_check(b) ||
+                        !soft_body_nodes_pool.used[a] || !soft_body_nodes_pool.used[b]) continue;
+                radius = fminf(soft_body_nodes[a].radius, soft_body_nodes[b].radius);
+                query = (SystemSoftBoundaryQuery){
+                    .node_a = first,
+                    .node_b = second,
+                    .a = a,
+                    .b = b,
+                    .start = positions[a],
+                    .end = positions[b]
+                };
+                query.shape = system_soft_boundary_shape_create(
+                    query.start, query.end, radius);
+                if(query.shape.amount_of_vertices == 0) continue;
+                (void)aabb_tree_query(&physics_broadphase_tree,
+                    math_aabb_create(query.shape),
+                    system_soft_boundary_pair_apply, &query);
+            }
+        }
+    }
+}
+
 static bool system_soft_node_rigid_filter_allows(EntityIndex node, EntityIndex rigid) {
     CollisionFilterConfig rigid_filter = physics_collision_filter_config_default_get();
 
@@ -1686,6 +1914,7 @@ void system_physics_update(double dt) {
         phase_started = SDL_GetPerformanceCounter();
     }
     system_broadphase_collisions_apply();
+    system_soft_body_boundary_collisions_apply();
     if(!physics_debug_stats_enabled) return;
     collision_pass_ms = system_elapsed_ms(phase_started);
     physics_debug_stats.broadphase_query_ms = collision_pass_ms -
