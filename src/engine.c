@@ -6,7 +6,6 @@
 #include "entity_components.h"
 #include "physics.h"
 #include "graphics.h"
-#include "grid.h"
 
 SDL_Event sdl_event;
 
@@ -31,9 +30,6 @@ EngineResult engine_tables_ensure_capacity(size_t capacity) {
     }
     if(result.kind != ERROR_RESULT_ERROR) {
         result = graphics_tables_ensure_capacity(capacity);
-    }
-    if(result.kind != ERROR_RESULT_ERROR) {
-        result = grid_tables_ensure_capacity(capacity);
     }
     return result;
 }
@@ -67,7 +63,7 @@ EngineResult engine_init(void) {
         SDL_Quit();
         return result;
     }
-    result = grid_tables_init();
+    result = physics_broadphase_init();
     if(result.kind == ERROR_RESULT_ERROR) {
         graphics_tables_destroy();
         physics_tables_destroy();
@@ -157,7 +153,7 @@ Time engine_time_per_tick_get(void) { return engine_time_per_tick; }
 
 void engine_shutdown(void) {
     game_state_runtime_reset();
-    grid_tables_destroy();
+    physics_broadphase_destroy();
     graphics_tables_destroy();
     physics_tables_destroy();
     entity_tables_destroy();

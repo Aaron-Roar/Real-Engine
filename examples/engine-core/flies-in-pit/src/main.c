@@ -133,9 +133,8 @@ int main(void) {
         if(phase_2) {
             rohr_graphics_particles_draw();
         }
-        if(phase_3) {
-            rohr_graphics_grid_draw();
-        }
+        rohr_graphics_aabb_tree_debug_set(true);
+        rohr_graphics_aabb_tree_draw();
         rohr_graphics_local_origins_draw();
         rohr_graphics_show();
 

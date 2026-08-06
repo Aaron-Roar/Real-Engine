@@ -159,6 +159,8 @@ int main(void) {
         rohr_graphics_hit_box_colored_draw(bodies[4], GRAPHICS_FILLED, spring_color);
         rohr_graphics_hit_box_colored_draw(bodies[5], GRAPHICS_FILLED, spring_color);
         rohr_graphics_joints_draw(joint_color);
+        rohr_graphics_aabb_tree_debug_set(true);
+        rohr_graphics_aabb_tree_draw();
         rohr_graphics_show();
     }
 

@@ -114,4 +114,6 @@ Shape math_vertex_add(Shape shape);
 Shape math_vertex_delete(Shape shape);
 /** Create an axis-aligned bounding box around a world-space shape. */
 AABB math_aabb_create(Shape world_shape);
+/** Return whether two axis-aligned bounding boxes overlap. */
+bool math_aabb_overlap(AABB a, AABB b);
 #endif

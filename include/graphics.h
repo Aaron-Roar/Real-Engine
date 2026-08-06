@@ -438,8 +438,12 @@ Position graphics_window_to_screen_get(Position window);
 /** Get the mouse position in logical screen coordinates. */
 Position graphics_mouse_screen_position_get(void);
 
-/** Draw the editor/debug grid. */
-void graphics_grid_draw(void);
+/** Enable or disable AABB-tree debug drawing. */
+void graphics_aabb_tree_debug_set(bool enabled);
+/** Return whether AABB-tree debug drawing is enabled. */
+bool graphics_aabb_tree_debug_check(void);
+/** Draw the current physics AABB-tree bounds when enabled. */
+void graphics_aabb_tree_draw(void);
 
 /** Start recording frames to an output file through ffmpeg. */
 bool graphics_recording_start(

@@ -2,7 +2,7 @@
 #include "engine_internal.h"
 #include "systems.h"
 #include "console.h"
-#include "grid.h"
+#include "aabb_tree.h"
 #include "math2d.h"
 #include <math.h>
 #include <float.h>
@@ -10,6 +10,16 @@
 #include <time.h>
 
 Shape system_generate_global_hitbox(Entity entity);
+
+AABBTree physics_broadphase_tree = {.root = AABB_TREE_NODE_INVALID};
+
+EngineResult physics_broadphase_init(void) {
+    return aabb_tree_init(&physics_broadphase_tree, 0);
+}
+
+void physics_broadphase_destroy(void) {
+    aabb_tree_destroy(&physics_broadphase_tree);
+}
 
 static bool system_entity_from_index_get(EntityIndex index, Entity *entity) {
     EntityResult result = entity_from_index_get(index);
@@ -708,68 +718,85 @@ ContactInfo system_resolve_collision(Entity entity_1, Entity entity_2, OverlapIn
     return contact_info;
 }
 
-void system_entities_to_grid_add(void) {
-    for(uint32_t alive_position = 0; alive_position < entity_alive_count_get(); alive_position += 1) {
-        EntityIndex i;
+typedef struct SystemBroadphaseQuery {
+    Entity source;
+    EntityIndex source_index;
+} SystemBroadphaseQuery;
 
-        if(!system_alive_index_at(alive_position, &i)) {
-            continue;
-        }
-        if( entity_index_components_check(i, HIT_BOX)) {
-            grid_entity_add(i);
-        }
+static bool system_broadphase_pair_apply(Entity target, void *context) {
+    SystemBroadphaseQuery *query = context;
+    EntityIndex target_index;
+    OverlapInfo overlap;
+    bool responds;
+    ContactInfo contact;
+
+    if(query == NULL || target <= query->source ||
+            !entity_index_get(target, &target_index) ||
+            !entity_index_alive_check(target_index) ||
+            !physics_collision_between_check(query->source, target)) return true;
+    overlap = system_entity_overlap_get(query->source_index, target_index);
+    if(!overlap.detected) return true;
+    responds = entity_index_components_check(query->source_index, COLLISION) &&
+        entity_index_components_check(target_index, COLLISION);
+    contact = responds
+        ? system_resolve_collision(query->source_index, target_index, overlap)
+        : (ContactInfo){0};
+    system_interaction_by_index_record(
+        query->source_index,
+        target_index,
+        overlap,
+        contact,
+        PHYSICS_INTERACTION_OVERLAP |
+            (responds ? PHYSICS_INTERACTION_CONTACT : 0)
+    );
+    if(responds) {
+        system_separate_entities(query->source_index, target_index, overlap);
+        system_generate_global_hitbox_by_index(query->source_index);
+        system_generate_global_hitbox_by_index(target_index);
+    }
+    return true;
+}
+
+static void system_broadphase_build(void) {
+    aabb_tree_clear(&physics_broadphase_tree);
+    for(uint32_t alive_position = 0;
+            alive_position < entity_alive_count_get();
+            alive_position += 1) {
+        EntityIndex index;
+        Entity entity;
+
+        if(!system_alive_index_at(alive_position, &index) ||
+                !entity_index_components_check(index, HIT_BOX) ||
+                !system_entity_from_index_get(index, &entity)) continue;
+        (void)aabb_tree_insert(
+            &physics_broadphase_tree,
+            entity,
+            math_aabb_create(world_hit_boxes[index])
+        );
     }
 }
 
-void system_collisions_tuned_apply(void) {
-    for(int row = 0; row < GRID_ROWS; row += 1) {
-        for(int col = 0; col < GRID_COLS; col += 1) {
-            Cell *cell = &grid.cells[row][col];
+static void system_broadphase_collisions_apply(void) {
+    for(uint32_t alive_position = 0;
+            alive_position < entity_alive_count_get();
+            alive_position += 1) {
+        EntityIndex index;
+        Entity entity;
+        SystemBroadphaseQuery query;
 
-            for(uint16_t i = 0; i < cell->entity_count; i += 1) {
-                    for(uint16_t j = i + 1; j < cell->entity_count; j += 1) {
-                            EntityIndex entity_1 = grid.cells[row][col].entities[i];
-                            EntityIndex entity_2 = grid.cells[row][col].entities[j];
-                            Entity entity_1_id;
-                            Entity entity_2_id;
-                            if(grid_pair_checked_get(entity_1,entity_2)) {
-                                continue;
-                            }
-                            grid_pair_add(entity_1,entity_2);
-                            if(!system_entity_from_index_get(entity_1, &entity_1_id) ||
-                                    !system_entity_from_index_get(entity_2, &entity_2_id)) {
-                                continue;
-                            }
-                            if(!physics_collision_between_check(entity_1_id, entity_2_id)) {
-                                continue;
-                            }
-                            OverlapInfo collision = system_entity_overlap_get(entity_1, entity_2);
-                            if(collision.detected == true) {
-                                bool responds = entity_index_components_check(entity_1, COLLISION) && entity_index_components_check(entity_2, COLLISION);
-                                ContactInfo contact = responds
-                                    ? system_resolve_collision(entity_1, entity_2, collision)
-                                    : (ContactInfo){0};
-                                system_interaction_by_index_record(
-                                    entity_1,
-                                    entity_2,
-                                    collision,
-                                    contact,
-                                    PHYSICS_INTERACTION_OVERLAP |
-                                        (responds ? PHYSICS_INTERACTION_CONTACT : 0)
-                                );
-                                if(responds) {
-                                    system_separate_entities(entity_1,entity_2, collision);
-
-                                    system_generate_global_hitbox_by_index(entity_1);
-                                    system_generate_global_hitbox_by_index(entity_2);
-                                    grid_aabb_update(entity_1);
-                                    grid_aabb_update(entity_2);
-                                }
-
-                            }
-                    }
-            }
-        }
+        if(!system_alive_index_at(alive_position, &index) ||
+                !entity_index_components_check(index, HIT_BOX) ||
+                !system_entity_from_index_get(index, &entity)) continue;
+        query = (SystemBroadphaseQuery){
+            .source = entity,
+            .source_index = index
+        };
+        (void)aabb_tree_query(
+            &physics_broadphase_tree,
+            math_aabb_create(world_hit_boxes[index]),
+            system_broadphase_pair_apply,
+            &query
+        );
     }
 }
 
@@ -1407,19 +1434,6 @@ void system_joints_apply(void)
     }
 }
 
-void system_aabbs_update(void) {
-    for(uint32_t alive_position = 0; alive_position < entity_alive_count_get(); alive_position += 1) {
-        EntityIndex i;
-
-        if(!system_alive_index_at(alive_position, &i)) {
-            continue;
-        }
-        if( entity_index_components_check(i, HIT_BOX)) {
-            grid_aabb_update(i);
-        }
-    }
-}
-
 static void system_soft_body_beams_apply(void) {
     for(EntityIndex beam_index = 0; beam_index < soft_body_beams_pool.capacity; beam_index += 1) {
         SoftBodyBeam beam;
@@ -1625,10 +1639,8 @@ void system_physics_update(double dt) {
 
     system_generate_global_hitboxes();
     system_soft_body_node_rigid_collisions_apply();
-    system_aabbs_update();
-    system_entities_to_grid_add();
-    system_collisions_tuned_apply();
-    grid_clear();
+    system_broadphase_build();
+    system_broadphase_collisions_apply();
 }
 
 void print_entity_movement(Entity entity) {

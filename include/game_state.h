@@ -43,7 +43,7 @@ UISliderDefinitionResult ui_slider_by_name_get(const char *name);
  * Save all named live entities to one JSON state file.
  *
  * Unnamed entities are omitted because stable cross-session references require
- * names. Runtime-derived collision reports and grid state are omitted.
+ * names. Runtime-derived interaction and broad-phase state are omitted.
  */
 EngineResult game_state_file_save(const char *path);
 

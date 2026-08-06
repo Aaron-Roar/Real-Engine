@@ -22,7 +22,6 @@ Entity values are stable ids, not component table indexes. Use the public entity
 - <a href="#math">Math</a>
 - <a href="#systems">Systems</a>
 - <a href="#controller-input">Controller Input</a>
-- <a href="#spatial-grid">Spatial Grid</a>
 - <a href="#tools">Tools</a>
 - <a href="#other">Other</a>
 
@@ -2487,13 +2486,16 @@ Returns the current mouse position in screen coordinates.
 
 **Returns:** Mouse screen position.
 
-### `rohr_graphics_grid_draw`
+### AABB-tree debug drawing
 
 ```c
-void rohr_graphics_grid_draw(void);
+void rohr_graphics_aabb_tree_debug_set(bool enabled);
+bool rohr_graphics_aabb_tree_debug_check(void);
+void rohr_graphics_aabb_tree_draw(void);
 ```
 
-Draws the spatial grid overlay.
+Enables, inspects, and draws the current physics broad-phase hierarchy. Leaf
+bounds are green and internal hierarchy bounds are orange.
 
 ### `rohr_graphics_recording_start`
 
@@ -3220,68 +3222,6 @@ Converts the current logical screen-space mouse position to world space.
 | `mouse` | Mouse state to convert. |
 
 **Returns:** World position under the mouse, or zero when mouse is NULL.
-
-## Spatial Grid
-
-### `rohr_grid_entity_add`
-
-```c
-void rohr_grid_entity_add(Entity entity);
-```
-
-Adds an entity to the spatial grid tables.
-
-| Parameter | Description |
-| --- | --- |
-| `entity` | Entity to add. |
-
-### `rohr_grid_pair_checked_get`
-
-```c
-bool rohr_grid_pair_checked_get(Entity entity_1, Entity entity_2);
-```
-
-Checks whether a pair of entities has already been processed.
-
-| Parameter | Description |
-| --- | --- |
-| `entity_1` | First entity. |
-| `entity_2` | Second entity. |
-
-**Returns:** true when the pair was already checked, false otherwise.
-
-### `rohr_grid_pair_add`
-
-```c
-void rohr_grid_pair_add(Entity entity_1, Entity entity_2);
-```
-
-Stores a processed entity pair.
-
-| Parameter | Description |
-| --- | --- |
-| `entity_1` | First entity. |
-| `entity_2` | Second entity. |
-
-### `rohr_grid_clear`
-
-```c
-void rohr_grid_clear(void);
-```
-
-Clears spatial grid state.
-
-### `rohr_grid_aabb_update`
-
-```c
-void rohr_grid_aabb_update(Entity entity);
-```
-
-Updates an entity axis-aligned bounding box in the grid.
-
-| Parameter | Description |
-| --- | --- |
-| `entity` | Entity to update. |
 
 ## Tools
 

@@ -43,8 +43,6 @@ const char *error_default_message_get(EngineError error) {
             return "physics tables initialization failed";
         case ERROR_ENGINE_GRAPHICS_TABLES_INIT_FAILED:
             return "graphics tables initialization failed";
-        case ERROR_ENGINE_GRID_TABLES_INIT_FAILED:
-            return "grid tables initialization failed";
         case ERROR_ENGINE_GRAPHICS_INIT_FAILED:
             return "graphics initialization failed";
         case ERROR_ENGINE_MAX_ENTITIES_EXCEEDED:

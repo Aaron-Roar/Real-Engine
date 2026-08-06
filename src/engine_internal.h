@@ -5,6 +5,7 @@
 #include "error.h"
 #include "entity_components.h"
 #include "physics_interaction_set.h"
+#include "aabb_tree.h"
 
 /**
  * Ensure all entity-indexed subsystem tables can address capacity slots.
@@ -85,12 +86,12 @@ EngineResult graphics_tables_ensure_capacity(size_t capacity);
 /** Destroy graphics tables. */
 void graphics_tables_destroy(void);
 
-/** Initialize grid tables. */
-EngineResult grid_tables_init(void);
-/** Ensure grid tables can address capacity slots. */
-EngineResult grid_tables_ensure_capacity(size_t capacity);
-/** Destroy grid tables. */
-void grid_tables_destroy(void);
+/** Current physics broad-phase hierarchy retained for debug drawing. */
+extern AABBTree physics_broadphase_tree;
+/** Initialize physics broad-phase storage. */
+EngineResult physics_broadphase_init(void);
+/** Destroy physics broad-phase storage. */
+void physics_broadphase_destroy(void);
 
 /** Reset engine-owned serializable asset and sprite-reference state. */
 void game_state_runtime_reset(void);

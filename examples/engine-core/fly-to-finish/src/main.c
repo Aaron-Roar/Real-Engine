@@ -386,6 +386,8 @@ int main(void) {
         }
         rohr_graphics_sprite_frames_update(rohr_engine_tick_get(), rohr_engine_time_get());
         rohr_graphics_animated_sprites_draw();
+        rohr_graphics_aabb_tree_debug_set(true);
+        rohr_graphics_aabb_tree_draw();
         rohr_graphics_show();
     }
 

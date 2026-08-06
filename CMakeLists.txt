@@ -48,13 +48,13 @@ set(ROHR_SDL3_IMAGE_TARGET SDL3_image::SDL3_image-static)
 set(ROHR_SDL3_TTF_TARGET SDL3_ttf::SDL3_ttf-static)
 
 set(ROHR_ENGINE_SOURCES
+    src/aabb_tree.c
     src/console.c
     src/engine.c
     src/error.c
     src/entity_components.c
     src/entity_pair_set.c
     src/graphics.c
-    src/grid.c
     src/math2d.c
     src/physics.c
     src/physics_interaction_set.c
@@ -177,6 +177,12 @@ if(ROHR_BUILD_TESTS)
     set_target_properties(entity_pair_set_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
     add_test(NAME entity_pair_set COMMAND entity_pair_set_test)
 
+    add_executable(aabb_tree_test tests/aabb_tree.c)
+    target_include_directories(aabb_tree_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(aabb_tree_test PRIVATE rohr_engine)
+    set_target_properties(aabb_tree_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+    add_test(NAME aabb_tree COMMAND aabb_tree_test)
+
     add_executable(physics_interaction_set_test tests/physics_interaction_set.c)
     target_include_directories(physics_interaction_set_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(physics_interaction_set_test PRIVATE rohr_engine)
@@ -261,6 +267,7 @@ if(ROHR_BUILD_TESTS)
         soft_body
         collision_sensor
         entity_pair_set
+        aabb_tree
         physics_interaction_set
         editor_component_registry
         generated_components
@@ -278,6 +285,7 @@ if(ROHR_BUILD_TESTS)
         soft_body_test
         collision_sensor_test
         entity_pair_set_test
+        aabb_tree_test
         physics_interaction_set_test
         editor_component_registry_test
         generated_components_test

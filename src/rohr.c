@@ -326,7 +326,9 @@ EngineResult rohr_viewport_disable_set(ViewportId viewport) { return graphics_vi
 Position rohr_graphics_world_to_screen_get(Position pos) { return graphics_world_to_screen_get(pos); }
 Position rohr_graphics_screen_to_world_get(Position screen) { return graphics_screen_to_world_get(screen); }
 Position rohr_graphics_mouse_screen_position_get(void) { return graphics_mouse_screen_position_get(); }
-void rohr_graphics_grid_draw(void) { graphics_grid_draw(); }
+void rohr_graphics_aabb_tree_debug_set(bool enabled) { graphics_aabb_tree_debug_set(enabled); }
+bool rohr_graphics_aabb_tree_debug_check(void) { return graphics_aabb_tree_debug_check(); }
+void rohr_graphics_aabb_tree_draw(void) { graphics_aabb_tree_draw(); }
 bool rohr_graphics_recording_start(const char *output_path, int fps) { return graphics_recording_start(output_path, fps); }
 void rohr_graphics_particles_draw(void) { graphics_particles_draw(); }
 void rohr_graphics_local_origins_draw(void) { graphics_local_origins_draw(); }
@@ -430,12 +432,6 @@ Position rohr_controller_mouse_world_position_get(const MouseState *mouse) {
     }
     return graphics_screen_to_world_get(mouse->position);
 }
-
-void rohr_grid_entity_add(Entity entity) { grid_entity_add(entity); }
-bool rohr_grid_pair_checked_get(Entity entity_1, Entity entity_2) { return grid_pair_checked_get(entity_1, entity_2); }
-void rohr_grid_pair_add(Entity entity_1, Entity entity_2) { grid_pair_add(entity_1, entity_2); }
-void rohr_grid_clear(void) { grid_clear(); }
-void rohr_grid_aabb_update(Entity entity) { grid_aabb_update(entity); }
 
 void rohr_tools_delay(int seconds) { delay(seconds); }
 void rohr_tools_binary_to_string(uint32_t value, char *buffer, size_t size) { binary_to_string(value, buffer, size); }

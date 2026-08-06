@@ -7,12 +7,12 @@
 #include "platform_process.h"
 #include <stdio.h>
 #include <string.h>
-#include "grid.h"
 
 static SDL_Renderer *sdl_renderer = NULL;
 static SDL_Window *sdl_window = NULL;
 static TTF_TextEngine *ttf_text_engine = NULL;
 static bool ttf_initialized = false;
+static bool graphics_aabb_tree_debug_enabled = false;
 static Camera camera = {0};
 
 typedef struct ActiveCameraAttachment {
@@ -226,6 +226,7 @@ EngineResult graphics_tables_init(void) {
     memset(viewports_used, 0, sizeof(viewports_used));
     drawing_screen = SCREEN_INVALID;
     camera_before_screen = CAMERA_INVALID;
+    graphics_aabb_tree_debug_enabled = false;
     if(AnimatedSpritePool_init(&animated_sprites_pool, 0).kind == ERROR_RESULT_ERROR) {
         graphics_tables_destroy();
         return error_result_error(ERROR_ENGINE_GRAPHICS_TABLES_INIT_FAILED);
@@ -473,78 +474,43 @@ void graphics_recording_stop(void) {
     );
 }
 
-void graphics_grid_draw(void) {
-    Color grid_color = {100, 100, 100, 255};
+void graphics_aabb_tree_debug_set(bool enabled) {
+    graphics_aabb_tree_debug_enabled = enabled;
+}
 
-    SDL_SetRenderDrawColor(
-        sdl_renderer,
-        grid_color.red,
-        grid_color.green,
-        grid_color.blue,
-        grid_color.alpha
-    );
+bool graphics_aabb_tree_debug_check(void) {
+    return graphics_aabb_tree_debug_enabled;
+}
 
-    float grid_min_x =
-        -(GRID_COLS * CELL_SIZE) * 0.5f;
-
-    float grid_max_x =
-        (GRID_COLS * CELL_SIZE) * 0.5f;
-
-    float grid_min_y =
-        -(GRID_ROWS * CELL_SIZE) * 0.5f;
-
-    float grid_max_y =
-        (GRID_ROWS * CELL_SIZE) * 0.5f;
-
-    for(int col = 0; col <= GRID_COLS; col++) {
-        float world_x =
-            grid_min_x + col * CELL_SIZE;
-
-        Position top = graphics_world_to_screen_get(
-            (Position){
-                .x = world_x,
-                .y = grid_max_y
-            }
-        );
-
-        Position bottom = graphics_world_to_screen_get(
-            (Position){
-                .x = world_x,
-                .y = grid_min_y
-            }
-        );
-
-        SDL_FPoint points[2] = {
-            {top.x, top.y},
-            {bottom.x, bottom.y}
+void graphics_aabb_tree_draw(void) {
+    if(!graphics_aabb_tree_debug_enabled || sdl_renderer == NULL) return;
+    for(size_t index = 0; index < physics_broadphase_tree.count; index += 1) {
+        const AABBTreeNode *node = &physics_broadphase_tree.nodes[index];
+        bool leaf = aabb_tree_node_leaf_check(node);
+        Position top_left = graphics_world_to_screen_get(
+            (Position){node->bounds.min_x, node->bounds.max_y});
+        Position top_right = graphics_world_to_screen_get(
+            (Position){node->bounds.max_x, node->bounds.max_y});
+        Position bottom_right = graphics_world_to_screen_get(
+            (Position){node->bounds.max_x, node->bounds.min_y});
+        Position bottom_left = graphics_world_to_screen_get(
+            (Position){node->bounds.min_x, node->bounds.min_y});
+        SDL_FPoint points[5] = {
+            {top_left.x, top_left.y},
+            {top_right.x, top_right.y},
+            {bottom_right.x, bottom_right.y},
+            {bottom_left.x, bottom_left.y},
+            {top_left.x, top_left.y}
         };
 
-        SDL_RenderLines(sdl_renderer, points, 2);
-    }
-    for(int row = 0; row <= GRID_ROWS; row++) {
-        float world_y =
-            grid_min_y + row * CELL_SIZE;
-
-        Position left = graphics_world_to_screen_get(
-            (Position){
-                .x = grid_min_x,
-                .y = world_y
-            }
+        (void)SDL_SetRenderDrawColor(
+            sdl_renderer,
+            leaf ? 80 : 255,
+            leaf ? 220 : 170,
+            leaf ? 120 : 40,
+            255
         );
-
-        Position right = graphics_world_to_screen_get(
-            (Position){
-                .x = grid_max_x,
-                .y = world_y
-            }
-        );
-
-        SDL_FPoint points[2] = {
-            {left.x, left.y},
-            {right.x, right.y}
-        };
-
-        SDL_RenderLines(sdl_renderer, points, 2);
+        (void)SDL_RenderLines(sdl_renderer, points, 5);
     }
 }
 

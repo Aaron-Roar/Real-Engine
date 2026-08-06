@@ -8,7 +8,6 @@
 #include "error.h"
 #include "graphics.h"
 #include "game_state.h"
-#include "grid.h"
 #include "math2d.h"
 #include "physics.h"
 #include "systems.h"
@@ -1424,10 +1423,12 @@ Position rohr_graphics_screen_to_world_get(Position screen);
  */
 Position rohr_graphics_mouse_screen_position_get(void);
 
-/**
- * @brief Draws the spatial grid overlay.
- */
-void rohr_graphics_grid_draw(void);
+/** Enable or disable physics AABB-tree debug drawing. */
+void rohr_graphics_aabb_tree_debug_set(bool enabled);
+/** Return whether physics AABB-tree debug drawing is enabled. */
+bool rohr_graphics_aabb_tree_debug_check(void);
+/** Draw the current physics AABB-tree bounds when debug drawing is enabled. */
+void rohr_graphics_aabb_tree_draw(void);
 
 /**
  * @brief Starts recording rendered frames to a video file.
@@ -1841,38 +1842,6 @@ MouseEvent rohr_controller_mouse_event_capture(const SDL_Event *sdl_event);
  * @return World position under the mouse, or zero when mouse is NULL.
  */
 Position rohr_controller_mouse_world_position_get(const MouseState *mouse);
-
-/**
- * @brief Adds an entity to the spatial grid tables.
- * @param entity Entity to add.
- */
-void rohr_grid_entity_add(Entity entity);
-
-/**
- * @brief Checks whether a pair of entities has already been processed.
- * @param entity_1 First entity.
- * @param entity_2 Second entity.
- * @return true when the pair was already checked, false otherwise.
- */
-bool rohr_grid_pair_checked_get(Entity entity_1, Entity entity_2);
-
-/**
- * @brief Stores a processed entity pair.
- * @param entity_1 First entity.
- * @param entity_2 Second entity.
- */
-void rohr_grid_pair_add(Entity entity_1, Entity entity_2);
-
-/**
- * @brief Clears spatial grid state.
- */
-void rohr_grid_clear(void);
-
-/**
- * @brief Updates an entity axis-aligned bounding box in the grid.
- * @param entity Entity to update.
- */
-void rohr_grid_aabb_update(Entity entity);
 
 /**
  * @brief Delays execution for a number of seconds.

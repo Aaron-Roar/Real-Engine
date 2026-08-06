@@ -274,6 +274,8 @@ int main(void) {
         if(quit.clicked) running = false;
 
         rohr_ui_frame_end();
+        rohr_graphics_aabb_tree_debug_set(true);
+        rohr_graphics_aabb_tree_draw();
         rohr_graphics_show();
     }
 

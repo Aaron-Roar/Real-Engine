@@ -403,6 +403,7 @@ int main(void) {
     Tick zoom_end_tick = 0;
     bool collision_zoom_started = false;
     bool collision_slow_motion_active = false;
+    bool broadphase_debug = true;
 
     if(!example_use_executable_directory() || !result_ok(rohr_engine_init())) return 1;
     if(!result_ok(rohr_engine_time_per_tick_set(physics_tick_time)) ||
@@ -413,6 +414,7 @@ int main(void) {
                 .positive_y = SDLK_UNKNOWN,
                 .negative_y = SDLK_UNKNOWN
             })) goto fail;
+    rohr_graphics_aabb_tree_debug_set(broadphase_debug);
     for(uint32_t i = 0; i < LEVEL_WALL_COUNT; i += 1) {
         walls[i] = wall_create(level_wall_positions[i], level_wall_dimensions[i]);
         if(walls[i] == ENTITY_INVALID) goto fail;
@@ -487,6 +489,11 @@ int main(void) {
             KeyboardEvent key_event =
                 rohr_controller_keyboard_event_capture(&event);
             rohr_controller_key_event_add(&keyboard, key_event);
+            if(key_event.keycode == SDLK_B &&
+                    key_event.state == KEY_STATE_PRESSED) {
+                broadphase_debug = !broadphase_debug;
+                rohr_graphics_aabb_tree_debug_set(broadphase_debug);
+            }
             if(event.type == SDL_EVENT_QUIT ||
                     rohr_controller_key_pressed_get(
                         &keyboard, SDLK_ESCAPE)) exit_requested = true;
@@ -526,7 +533,7 @@ int main(void) {
             }
         }
         rohr_graphics_background_draw(background_color);
-        rohr_graphics_grid_draw();
+        rohr_graphics_aabb_tree_draw();
         for(uint32_t i = 0; i < LEVEL_WALL_COUNT; i += 1) {
             rohr_graphics_hit_box_colored_draw(walls[i], GRAPHICS_FILLED, wall_color);
         }

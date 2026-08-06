@@ -41,8 +41,6 @@ typedef enum EngineError {
     ERROR_ENGINE_PHYSICS_TABLES_INIT_FAILED,
     /** Graphics tables failed to initialize. */
     ERROR_ENGINE_GRAPHICS_TABLES_INIT_FAILED,
-    /** Grid tables failed to initialize. */
-    ERROR_ENGINE_GRID_TABLES_INIT_FAILED,
     /** Graphics window or renderer initialization failed. */
     ERROR_ENGINE_GRAPHICS_INIT_FAILED,
     /** An operation would exceed MAX_ENTITIES. */
