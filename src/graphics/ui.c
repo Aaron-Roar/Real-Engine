@@ -14,6 +14,7 @@ typedef struct UIContext {
     bool pointer_consumed;
     bool frame_active;
     uint64_t field_id;
+    bool field_seen;
     char field_edit[UI_FIELD_EDIT_MAX];
     SDL_Keycode field_keys[UI_FIELD_KEY_EVENT_MAX];
     size_t field_key_count;
@@ -137,6 +138,7 @@ static bool ui_point_in_oriented_square(
 void ui_frame_begin(UIInput input) {
     ui_context.input = input;
     ui_context.active_seen = false;
+    ui_context.field_seen = false;
     ui_context.pointer_claimed = false;
     ui_context.pointer_consumed = false;
     ui_context.frame_active = true;
@@ -227,6 +229,7 @@ UIFieldResult ui_field(const char *id, UIFieldBinding binding,
         ui_context.field_id = 0;
     }
     result.active = ui_context.field_id == field_id;
+    if(result.active) ui_context.field_seen = true;
     if(result.active) {
         for(size_t i = 0; i < ui_context.field_key_count; i += 1) {
             SDL_Keycode key = ui_context.field_keys[i];
@@ -640,6 +643,9 @@ void ui_frame_end(void) {
     if(ui_context.input.primary_button == MOUSE_BUTTON_STATE_RELEASED ||
             (ui_context.active_id != 0 && !ui_context.active_seen)) {
         ui_context.active_id = 0;
+    }
+    if(ui_context.field_id != 0 && !ui_context.field_seen) {
+        ui_context.field_id = 0;
     }
     ui_context.field_key_count = 0;
     ui_context.frame_active = false;

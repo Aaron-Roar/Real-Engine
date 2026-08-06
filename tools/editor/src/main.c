@@ -44,6 +44,20 @@ static bool editor_text_create(
     return true;
 }
 
+static void editor_numeric_field_disabled_draw(
+    TextAsset *display,
+    float value,
+    UIRect bounds
+) {
+    char text[32];
+
+    if(display == NULL) return;
+    snprintf(text, sizeof(text), "%.1f", value);
+    (void)rohr_graphics_text_value_set(display, text);
+    rohr_ui_button_disabled(bounds, NULL);
+    rohr_ui_label(display, bounds);
+}
+
 static bool editor_object_name_key_apply(EditorObject *object, SDL_Keycode key) {
     size_t length;
 
@@ -85,6 +99,9 @@ int main(void) {
     TextAsset x_label = {0};
     TextAsset y_label = {0};
     TextAsset length_label = {0};
+    TextAsset x_field = {0};
+    TextAsset y_field = {0};
+    TextAsset length_field = {0};
     TextAsset object_name_labels[EDITOR_OBJECT_MAX] = {0};
     char object_name_cache[EDITOR_OBJECT_MAX][EDITOR_OBJECT_NAME_MAX] = {{0}};
     ViewportId viewport = 0;
@@ -92,6 +109,7 @@ int main(void) {
     EditorViewportState viewport_state;
     bool running = true;
     bool name_editing = false;
+    bool field_editing = false;
 
     editor_project_init(&project);
     editor_viewport_state_init(&viewport_state);
@@ -135,7 +153,10 @@ int main(void) {
             !editor_text_create(&font, "Line distance fully constrained", &constrained_label) ||
             !editor_text_create(&font, "X", &x_label) ||
             !editor_text_create(&font, "Y", &y_label) ||
-            !editor_text_create(&font, "Length", &length_label)) goto fail;
+            !editor_text_create(&font, "Length", &length_label) ||
+            !editor_text_create(&font, "", &x_field) ||
+            !editor_text_create(&font, "", &y_field) ||
+            !editor_text_create(&font, "", &length_field)) goto fail;
     for(uint32_t i = 0; i < EDITOR_HITBOX_VERTEX_MAX; i += 1) {
         char name[32];
         snprintf(name, sizeof(name), "vertex_%u", i + 1);
@@ -151,6 +172,7 @@ int main(void) {
         rohr_controller_key_states_update(&keyboard);
         rohr_controller_mouse_states_update(&mouse);
         while((event = rohr_engine_event_poll()).type != 0) {
+            rohr_ui_field_event_add(&event);
             if(name_editing && event.type == SDL_EVENT_KEY_DOWN) {
                 EditorObject *selected = editor_project_selected_get(&project);
                 if(event.key.key == SDLK_RETURN || event.key.key == SDLK_KP_ENTER) {
@@ -170,7 +192,7 @@ int main(void) {
                 rohr_controller_mouse_event_capture(&event));
             if(event.type == SDL_EVENT_QUIT) running = false;
         }
-        if(!escape_name_edit_consumed &&
+        if(!escape_name_edit_consumed && !field_editing &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             if(editor_viewport_hitbox_editor_active_get(&viewport_state)) {
                 editor_viewport_back(&viewport_state);
@@ -195,6 +217,7 @@ int main(void) {
             .pointer = rohr_graphics_mouse_screen_position_get(),
             .primary_button = mouse.button_states[MOUSE_BUTTON_LEFT]
         });
+        field_editing = false;
         rohr_ui_label(&tools_title,
             (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 14.0f,
                 EDITOR_TOOLS_WIDTH - 16.0f, 24.0f});
@@ -255,9 +278,24 @@ int main(void) {
                 slider.max_value = EDITOR_VIEWPORT_WIDTH * 0.5f;
                 slider.center = (Position){EDITOR_VIEWPORT_WIDTH + 72.0f, 157.0f};
                 if(vertex->position_locked) {
-                    rohr_ui_button_disabled((UIRect){EDITOR_VIEWPORT_WIDTH + 28.0f, 145.0f, 88.0f, 24.0f}, NULL);
-                    rohr_ui_button_disabled((UIRect){EDITOR_VIEWPORT_WIDTH + 28.0f, 215.0f, 88.0f, 24.0f}, NULL);
+                    editor_numeric_field_disabled_draw(&x_field, vertex->position.x,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 28.0f, 122.0f,
+                            EDITOR_TOOLS_WIDTH - 38.0f, 24.0f});
+                    editor_numeric_field_disabled_draw(&y_field, vertex->position.y,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 28.0f, 192.0f,
+                            EDITOR_TOOLS_WIDTH - 38.0f, 24.0f});
                 } else {
+                    UIFieldResult x_result = rohr_ui_field("editor.vertex.x.field",
+                        (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                            .number = &vertex->position.x}, &x_field,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 28.0f, 122.0f,
+                            EDITOR_TOOLS_WIDTH - 38.0f, 24.0f}, NULL);
+                    UIFieldResult y_result = rohr_ui_field("editor.vertex.y.field",
+                        (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                            .number = &vertex->position.y}, &y_field,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 28.0f, 192.0f,
+                            EDITOR_TOOLS_WIDTH - 38.0f, 24.0f}, NULL);
+                    field_editing = x_result.active || y_result.active;
                     vertex->position.x = rohr_ui_slider("editor.vertex.x", vertex->position.x, &slider).value;
                     slider.center.y = 227.0f;
                     vertex->position.y = rohr_ui_slider("editor.vertex.y", vertex->position.y, &slider).value;
@@ -283,13 +321,24 @@ int main(void) {
                 rohr_ui_label(&length_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     126.0f, EDITOR_TOOLS_WIDTH - 16.0f, 22.0f});
                 if(constrained) {
-                    rohr_ui_button_disabled((UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
-                        154.0f, EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, NULL);
+                    editor_numeric_field_disabled_draw(&length_field, length,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
+                            150.0f, EDITOR_TOOLS_WIDTH - 20.0f, 26.0f});
                     rohr_ui_label(&constrained_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 5.0f,
                         190.0f, EDITOR_TOOLS_WIDTH - 10.0f, 38.0f});
                 } else {
+                    UIFieldResult length_result = rohr_ui_field(
+                        "editor.line.length.field",
+                        (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &length},
+                        &length_field,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 150.0f,
+                            EDITOR_TOOLS_WIDTH - 20.0f, 26.0f}, NULL);
+                    field_editing = length_result.active;
+                    if(length_result.changed) {
+                        (void)editor_project_hitbox_line_length_set(selected, line, length);
+                    }
                     slider.center = (Position){EDITOR_VIEWPORT_WIDTH +
-                        EDITOR_TOOLS_WIDTH * 0.5f, 170.0f};
+                        EDITOR_TOOLS_WIDTH * 0.5f, 202.0f};
                     slider.length = EDITOR_TOOLS_WIDTH - 36.0f;
                     slider.min_value = 5.0f;
                     slider.max_value = EDITOR_VIEWPORT_WIDTH;
@@ -381,6 +430,9 @@ int main(void) {
     }
 
     rohr_graphics_text_destroy(&vertices_label);
+    rohr_graphics_text_destroy(&length_field);
+    rohr_graphics_text_destroy(&y_field);
+    rohr_graphics_text_destroy(&x_field);
     rohr_graphics_text_destroy(&length_label);
     rohr_graphics_text_destroy(&y_label);
     rohr_graphics_text_destroy(&x_label);
@@ -410,6 +462,9 @@ int main(void) {
 
 fail:
     rohr_graphics_text_destroy(&vertices_label);
+    rohr_graphics_text_destroy(&length_field);
+    rohr_graphics_text_destroy(&y_field);
+    rohr_graphics_text_destroy(&x_field);
     rohr_graphics_text_destroy(&length_label);
     rohr_graphics_text_destroy(&y_label);
     rohr_graphics_text_destroy(&x_label);

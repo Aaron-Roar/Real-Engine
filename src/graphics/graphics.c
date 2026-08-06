@@ -1845,9 +1845,6 @@ TextAssetResult graphics_text_create(const FontAsset *font, const char *value, C
     if(font == NULL || font->font == NULL || value == NULL || ttf_text_engine == NULL) {
         return ERROR_RESULT_MAKE_ERROR(TextAssetResult, ERROR_ENGINE_TEXT_CREATE_FAILED);
     }
-    if(value[0] == '\0') {
-        return ERROR_RESULT_MAKE_VALUE(TextAssetResult, asset);
-    }
     asset.text = TTF_CreateText(ttf_text_engine, font->font, value, 0);
     if(asset.text == NULL || !TTF_SetTextColor(
             asset.text,
