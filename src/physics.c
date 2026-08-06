@@ -1,5 +1,5 @@
 #include "physics.h"
-#include "entity_pair_set.h"
+#include "physics_interaction_set.h"
 #include "engine_internal.h"
 #include "float.h"
 #include <math.h>
@@ -40,8 +40,8 @@ MassPool mass_pool = {0};
 ForcePool forces_pool = {0};
 ShapePool hit_boxes_pool = {0};
 ShapePool world_hit_boxes_pool = {0};
-static EntityPairSet current_contacts = {0};
-static EntityPairSet previous_contacts = {0};
+static PhysicsInteractionSet current_interactions = {0};
+static PhysicsInteractionSet previous_interactions = {0};
 CollisionFilterConfigPool collision_filters_pool = {0};
 AngularVelocityPool angular_velocities_pool = {0};
 AngularVelocityPool angular_velocity_maximums_pool = {0};
@@ -88,8 +88,8 @@ EngineResult physics_tables_init(void) {
     memset(joint_anchors, 0, sizeof(joint_anchors));
     memset(joint_anchor_used, 0, sizeof(joint_anchor_used));
     for(uint32_t i = 0; i < MAX_JOINT_ANCHORS; i += 1) joint_anchor_generations[i] = 1;
-    if(error_check(entity_pair_set_init(&current_contacts, 64))) { goto fail; }
-    if(error_check(entity_pair_set_init(&previous_contacts, 64))) { goto fail; }
+    if(error_check(physics_interaction_set_init(&current_interactions, 64))) { goto fail; }
+    if(error_check(physics_interaction_set_init(&previous_interactions, 64))) { goto fail; }
     if(PositionPool_init(&positions_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(OrientationPool_init(&orientations_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(VelocityPool_init(&velocities_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
@@ -167,8 +167,8 @@ EngineResult physics_tables_ensure_capacity(size_t capacity) {
 }
 
 void physics_tables_destroy(void) {
-    entity_pair_set_destroy(&current_contacts);
-    entity_pair_set_destroy(&previous_contacts);
+    physics_interaction_set_destroy(&current_interactions);
+    physics_interaction_set_destroy(&previous_interactions);
     (void)PositionPool_destroy(&positions_pool);
     (void)OrientationPool_destroy(&orientations_pool);
     (void)VelocityPool_destroy(&velocities_pool);
@@ -196,24 +196,75 @@ void physics_tables_destroy(void) {
     (void)SoftBodyTrianglePool_destroy(&soft_body_triangles_pool);
 }
 
-void physics_contacts_step_begin(void) {
-    EntityPairSet contacts = previous_contacts;
+void physics_interactions_step_begin(void) {
+    PhysicsInteractionSet interactions = previous_interactions;
 
-    previous_contacts = current_contacts;
-    current_contacts = contacts;
-    entity_pair_set_clear(&current_contacts);
+    previous_interactions = current_interactions;
+    current_interactions = interactions;
+    physics_interaction_set_clear(&current_interactions);
 }
 
-EngineResult physics_contact_record(Entity entity, Entity target) {
-    return entity_pair_set_insert(&current_contacts, entity, target);
+EngineResult physics_interaction_record(
+    Entity entity,
+    Entity target,
+    OverlapInfo overlap,
+    PhysicsInteractionFlags flags
+) {
+    return physics_interaction_set_record(
+        &current_interactions, entity, target, overlap, flags
+    );
+}
+
+bool physics_interaction_current_check(
+    Entity entity,
+    Entity target,
+    PhysicsInteractionFlags flags
+) {
+    return physics_interaction_set_check(
+        &current_interactions, entity, target, flags
+    );
+}
+
+bool physics_interaction_previous_check(
+    Entity entity,
+    Entity target,
+    PhysicsInteractionFlags flags
+) {
+    return physics_interaction_set_check(
+        &previous_interactions, entity, target, flags
+    );
+}
+
+bool physics_interaction_current_get(
+    Entity entity,
+    Entity target,
+    PhysicsInteraction *interaction
+) {
+    return physics_interaction_set_get(
+        &current_interactions, entity, target, interaction
+    );
+}
+
+bool physics_interaction_previous_get(
+    Entity entity,
+    Entity target,
+    PhysicsInteraction *interaction
+) {
+    return physics_interaction_set_get(
+        &previous_interactions, entity, target, interaction
+    );
 }
 
 bool physics_contact_current_get(Entity entity, Entity target) {
-    return entity_pair_set_contains(&current_contacts, entity, target);
+    return physics_interaction_current_check(
+        entity, target, PHYSICS_INTERACTION_OVERLAP
+    );
 }
 
 bool physics_contact_previous_get(Entity entity, Entity target) {
-    return entity_pair_set_contains(&previous_contacts, entity, target);
+    return physics_interaction_previous_check(
+        entity, target, PHYSICS_INTERACTION_OVERLAP
+    );
 }
 
 static void physics_soft_body_entity_list_remove(Entity *values, uint32_t *count, Entity entity) {
@@ -1949,8 +2000,14 @@ EngineResult physics_collision_report_set(Entity entity, Entity target, bool sta
     result = physics_live_index_get(target, &index);
     if(error_check(result)) return result;
     result = state
-        ? entity_pair_set_insert(&current_contacts, entity, target)
-        : entity_pair_set_remove(&current_contacts, entity, target);
+        ? physics_interaction_set_record(
+            &current_interactions,
+            entity,
+            target,
+            (OverlapInfo){.detected = true},
+            PHYSICS_INTERACTION_OVERLAP
+        )
+        : physics_interaction_set_remove(&current_interactions, entity, target);
     if(error_check(result)) return result;
     return error_result_value(true);
 }

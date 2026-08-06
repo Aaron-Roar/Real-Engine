@@ -57,6 +57,7 @@ set(ROHR_ENGINE_SOURCES
     src/grid.c
     src/math2d.c
     src/physics.c
+    src/physics_interaction_set.c
     src/platform_process.c
     src/rohr.c
     src/systems.c
@@ -127,6 +128,7 @@ if(ROHR_BUILD_TESTS)
     include(CTest)
 
     add_executable(engine_lifecycle_test tests/engine_lifecycle.c)
+    target_include_directories(engine_lifecycle_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(engine_lifecycle_test PRIVATE rohr_engine)
     set_target_properties(engine_lifecycle_test
         PROPERTIES
@@ -174,6 +176,12 @@ if(ROHR_BUILD_TESTS)
     target_link_libraries(entity_pair_set_test PRIVATE rohr_engine)
     set_target_properties(entity_pair_set_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
     add_test(NAME entity_pair_set COMMAND entity_pair_set_test)
+
+    add_executable(physics_interaction_set_test tests/physics_interaction_set.c)
+    target_include_directories(physics_interaction_set_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(physics_interaction_set_test PRIVATE rohr_engine)
+    set_target_properties(physics_interaction_set_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+    add_test(NAME physics_interaction_set COMMAND physics_interaction_set_test)
 
     add_executable(editor_component_registry_test
         tests/editor_component_registry.c
@@ -253,6 +261,7 @@ if(ROHR_BUILD_TESTS)
         soft_body
         collision_sensor
         entity_pair_set
+        physics_interaction_set
         editor_component_registry
         generated_components
         PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy"
@@ -269,6 +278,7 @@ if(ROHR_BUILD_TESTS)
         soft_body_test
         collision_sensor_test
         entity_pair_set_test
+        physics_interaction_set_test
         editor_component_registry_test
         generated_components_test
     )

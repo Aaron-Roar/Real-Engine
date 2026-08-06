@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include "error.h"
 #include "entity_components.h"
+#include "physics_interaction_set.h"
 
 /**
  * Ensure all entity-indexed subsystem tables can address capacity slots.
@@ -25,10 +26,39 @@ EngineResult physics_tables_ensure_capacity(size_t capacity);
 void physics_tables_destroy(void);
 /** Clear joints and anchors owned by or connected to a deleted entity. */
 void physics_entity_clear(Entity entity, EntityIndex index);
-/** Advance current contacts to the previous step and clear current contacts. */
-void physics_contacts_step_begin(void);
-/** Record one overlapping pair in the current physics step. */
-EngineResult physics_contact_record(Entity entity, Entity target);
+/** Advance current interactions to the previous step and clear current interactions. */
+void physics_interactions_step_begin(void);
+/** Record one pair interaction in the current physics step. */
+EngineResult physics_interaction_record(
+    Entity entity,
+    Entity target,
+    OverlapInfo overlap,
+    PhysicsInteractionFlags flags
+);
+/** Check a current interaction flag. */
+bool physics_interaction_current_check(
+    Entity entity,
+    Entity target,
+    PhysicsInteractionFlags flags
+);
+/** Check a previous interaction flag. */
+bool physics_interaction_previous_check(
+    Entity entity,
+    Entity target,
+    PhysicsInteractionFlags flags
+);
+/** Get current interaction data in the requested entity order. */
+bool physics_interaction_current_get(
+    Entity entity,
+    Entity target,
+    PhysicsInteraction *interaction
+);
+/** Get previous interaction data in the requested entity order. */
+bool physics_interaction_previous_get(
+    Entity entity,
+    Entity target,
+    PhysicsInteraction *interaction
+);
 /** Return whether a pair overlaps in the current physics step. */
 bool physics_contact_current_get(Entity entity, Entity target);
 /** Return whether a pair overlapped in the previous physics step. */

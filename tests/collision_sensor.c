@@ -14,6 +14,7 @@ int main(void) {
     PositionResult body_position;
     Entity body;
     Entity sensor;
+    PhysicsInteraction interaction;
 
     if(rohr_error_check(rohr_engine_init())) return 1;
     body_result = rohr_entity_add();
@@ -54,6 +55,10 @@ int main(void) {
             fabsf(velocities[body_index.result.value].x - 12.0f) > 0.0001f ||
             fabsf(velocities[body_index.result.value].y) > 0.0001f ||
             !physics_contact_current_get(body, sensor) ||
+            physics_interaction_current_check(
+                body, sensor, PHYSICS_INTERACTION_CONTACT) ||
+            !physics_interaction_current_get(body, sensor, &interaction) ||
+            !interaction.overlap.detected || interaction.overlap.depth <= 0.0f ||
             physics_contact_previous_get(body, sensor) ||
             !rohr_physics_contact_get(body, sensor) ||
             !rohr_physics_contact_entered_get(body, sensor) ||

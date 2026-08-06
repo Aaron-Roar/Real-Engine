@@ -1,4 +1,5 @@
 #include "rohr.h"
+#include "engine_internal.h"
 
 #include <stdio.h>
 
@@ -46,12 +47,19 @@ int main(void) {
         return 1;
     }
     if(rohr_error_check(rohr_physics_position_set(first.result.value, (Position){0.0f, 0.0f})) ||
-            rohr_error_check(rohr_physics_position_set(second.result.value, (Position){0.0f, 0.0f}))) {
+            rohr_error_check(rohr_physics_position_set(second.result.value, (Position){0.0f, 0.0f})) ||
+            rohr_error_check(rohr_entity_components_add(first.result.value, COLLISION)) ||
+            rohr_error_check(rohr_entity_components_add(second.result.value, COLLISION))) {
         rohr_engine_shutdown();
         return 1;
     }
     rohr_system_physics_update(0.0);
-    if(!rohr_physics_contact_get(first.result.value, second.result.value)) {
+    if(!rohr_physics_contact_get(first.result.value, second.result.value) ||
+            !physics_interaction_current_check(
+                first.result.value,
+                second.result.value,
+                PHYSICS_INTERACTION_CONTACT
+            )) {
         rohr_engine_shutdown();
         return 1;
     }

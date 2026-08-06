@@ -34,13 +34,18 @@ static bool system_alive_index_at(uint32_t alive_position, EntityIndex *index) {
     return entity_index_get(result.result.value, index) && entity_index_alive_check(*index);
 }
 
-static void system_contact_by_index_record(EntityIndex entity_1, EntityIndex entity_2) {
+static void system_interaction_by_index_record(
+    EntityIndex entity_1,
+    EntityIndex entity_2,
+    OverlapInfo overlap,
+    PhysicsInteractionFlags flags
+) {
     Entity entity_1_id;
     Entity entity_2_id;
 
     if(!system_entity_from_index_get(entity_1, &entity_1_id) ||
             !system_entity_from_index_get(entity_2, &entity_2_id)) return;
-    (void)physics_contact_record(entity_1_id, entity_2_id);
+    (void)physics_interaction_record(entity_1_id, entity_2_id, overlap, flags);
 }
 
 static void system_generate_global_hitbox_by_index(EntityIndex index) {
@@ -725,8 +730,15 @@ void system_collisions_tuned_apply(void) {
                             }
                             OverlapInfo collision = system_entity_overlap_get(entity_1, entity_2);
                             if(collision.detected == true) {
-                                system_contact_by_index_record(entity_1, entity_2);
-                                if(entity_index_components_check(entity_1, COLLISION) && entity_index_components_check(entity_2, COLLISION)) {
+                                bool responds = entity_index_components_check(entity_1, COLLISION) && entity_index_components_check(entity_2, COLLISION);
+                                system_interaction_by_index_record(
+                                    entity_1,
+                                    entity_2,
+                                    collision,
+                                    PHYSICS_INTERACTION_OVERLAP |
+                                        (responds ? PHYSICS_INTERACTION_CONTACT : 0)
+                                );
+                                if(responds) {
                                     system_resolve_collision(entity_1, entity_2, collision);
                                     system_separate_entities(entity_1,entity_2, collision);
 
@@ -773,8 +785,15 @@ void system_collisions_apply(void) {
 
 
             if(collision.detected == true) {
-                system_contact_by_index_record(i, j);
-                if(entity_index_components_check(i, COLLISION) && entity_index_components_check(j, COLLISION)) {
+                bool responds = entity_index_components_check(i, COLLISION) && entity_index_components_check(j, COLLISION);
+                system_interaction_by_index_record(
+                    i,
+                    j,
+                    collision,
+                    PHYSICS_INTERACTION_OVERLAP |
+                        (responds ? PHYSICS_INTERACTION_CONTACT : 0)
+                );
+                if(responds) {
                     system_resolve_collision(i, j, collision);
                 }
 
@@ -1447,6 +1466,12 @@ static void system_soft_body_node_rigid_collisions_apply(void) {
                     !system_soft_node_rigid_filter_allows(node, rigid)) continue;
             collision = physics_sat_overlap_get(node_shape, world_hit_boxes[rigid]);
             if(!collision.detected) continue;
+            system_interaction_by_index_record(
+                node,
+                rigid,
+                collision,
+                PHYSICS_INTERACTION_OVERLAP | PHYSICS_INTERACTION_CONTACT
+            );
             inverse_mass_node = physics_entity_movable_get(node) && mass[node] > 0.0f ? 1.0f / mass[node] : 0.0f;
             inverse_mass_rigid = physics_entity_movable_get(rigid) && mass[rigid] > 0.0f ? 1.0f / mass[rigid] : 0.0f;
             inverse_mass_sum = inverse_mass_node + inverse_mass_rigid;
@@ -1518,7 +1543,7 @@ static void system_soft_body_node_rigid_collisions_apply(void) {
 }
 
 void system_physics_update(double dt) {
-    physics_contacts_step_begin();
+    physics_interactions_step_begin();
     system_force_torque_accelerations_clear();
     system_joints_apply();
     system_soft_body_beams_apply();
