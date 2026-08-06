@@ -1,16 +1,16 @@
-#include "rohr_editor.h"
+#include "rohr_tools.h"
 
 int main(int argc, char **argv) {
-    RE_ComponentRegistry registry;
+    RohrToolsComponentRegistry registry;
 
     if(argc != 3) {
         return 1;
     }
 
-    RE_component_registry_init(&registry);
-    if(!RE_component_registry_component_add(
+    rohr_tools_component_registry_init(&registry);
+    if(!rohr_tools_component_registry_component_add(
             &registry,
-            (RE_ComponentDefinition){
+            (RohrToolsComponentDefinition){
                 .name = "BALL_ON_FIRE",
                 .type_name = "BallOnFire",
                 .type_declaration = "typedef bool BallOnFire;",
@@ -19,5 +19,5 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    return RE_component_registry_generate(&registry, argv[1], argv[2]) ? 0 : 1;
+    return rohr_tools_component_registry_generate(&registry, argv[1], argv[2]) ? 0 : 1;
 }

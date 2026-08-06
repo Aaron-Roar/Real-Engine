@@ -48,7 +48,7 @@ I look forward to releasing a game with Rohr Engine in the soon future.
 ## Public API
 
 * [Engine API reference](docs/engine_api.md)
-* [Editor API reference](docs/editor_api.md)
+* [Tools API reference](docs/tools_api.md)
 Application code should include the public Rohr API facade:
 
 ```c
@@ -79,13 +79,12 @@ Internal modules still exist under `include/` and `src/`, but examples are inten
 
 ```text
 engine/
-├── include/               # Engine and editor public facades
-├── src/                   # Engine and editor implementations
+├── include/               # Runtime and build-time tooling APIs
+├── src/                   # Engine and tooling implementations
 ├── docs/                  # Doxygen config and documentation source
 ├── docs/assets/           # README and documentation media
 ├── examples/
-│   ├── engine-core/       # Games using only librohr_engine
-│   └── editor/            # Programs using librohr_editor
+│   └── engine-core/       # Games using librohr_engine
 ├── lib/                   # Vendored third-party source dependencies
 └── build/                 # Generated objects, binaries, and docs
 ```
@@ -193,9 +192,8 @@ Use `windows-release` for an optimized build or `windows-examples` to build
 only the examples. SDL3, SDL3_image, SDL3_ttf, and FreeType are compiled from
 the vendored sources; no separate SDL installation or vcpkg setup is needed.
 
-Games include `rohr.h` and link the `rohr_engine` CMake target. Editor
-applications include `rohr_editor.h`, use the `RE_` API, and link the
-`rohr_editor` target.
+Games include `rohr.h` and link the `rohr_engine` CMake target. Build-time
+component generators include `rohr_tools.h` and link the `rohr_tools` target.
 
 ## Nix
 
@@ -217,7 +215,7 @@ cmake --build --preset linux --parallel
 Readable Markdown docs are committed in the repo:
 
 * [Engine API reference](docs/engine_api.md)
-* [Editor API reference](docs/editor_api.md)
+* [Tools API reference](docs/tools_api.md)
 * [Documentation overview](docs/README.md)
 * [Architecture notes](docs/architecture.md)
 * [Entity ids](docs/entity_ids.md)
@@ -258,7 +256,7 @@ Current examples:
   welded ramp geometry, a particle pit, and collision-triggered slow-motion
   camera zoom.
 * `view-port`: basic sprite movement and input handling.
-* `pong` (editor): generated app-owned fire component, rotated JSON-authored arena,
+* `pong`: generated app-owned fire component, rotated JSON-authored arena,
   two-player WASD/arrow controls, collision paddles, and scoring.
 
 Build output is separated the same way:

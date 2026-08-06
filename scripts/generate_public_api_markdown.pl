@@ -87,7 +87,7 @@ while ($text =~ m{/\*\*(.*?)\*/}sg) {
 
 sub group_name {
     my ($name) = @_;
-    return 'Editor' if $prefix eq 'RE_';
+    return 'Tools' if $prefix eq 'rohr_tools_';
     return 'Engine' if $name =~ /^rohr_engine_/;
     return 'Errors and Results' if $name =~ /^rohr_error_/;
     return 'Console' if $name =~ /^rohr_console_/;
@@ -96,7 +96,6 @@ sub group_name {
     return 'Graphics' if $name =~ /^rohr_graphics_/;
     return 'Math' if $name =~ /^rohr_math_/;
     return 'Systems' if $name =~ /^rohr_system_/;
-    return 'Level Editor' if $name =~ /^rohr_level_editor_/;
     return 'Controller Input' if $name =~ /^rohr_controller_/;
     return 'Spatial Grid' if $name =~ /^rohr_grid_/;
     return 'Tools' if $name =~ /^rohr_tools_/;
@@ -120,13 +119,12 @@ my @engine_order = (
     'Graphics',
     'Math',
     'Systems',
-    'Level Editor',
     'Controller Input',
     'Spatial Grid',
     'Tools',
     'Other',
 );
-my @order = $prefix eq 'RE_' ? ('Editor') : @engine_order;
+my @order = $prefix eq 'rohr_tools_' ? ('Tools') : @engine_order;
 my %groups = map { $_ => [] } @order;
 
 for my $entry (@entries) {
@@ -134,11 +132,11 @@ for my $entry (@entries) {
 }
 
 my @lines;
-my $is_editor = $prefix eq 'RE_';
-my $api_name = $is_editor ? 'Editor API Reference' : 'Engine API Reference';
-my $facade = $is_editor ? 'rohr_editor.h' : 'rohr.h';
-my $description = $is_editor
-    ? 'This page is the GitHub-readable reference for the public Real Engine editor C API.'
+my $is_tools = $prefix eq 'rohr_tools_';
+my $api_name = $is_tools ? 'Tools API Reference' : 'Engine API Reference';
+my $facade = $is_tools ? 'rohr_tools.h' : 'rohr.h';
+my $description = $is_tools
+    ? 'This page is the GitHub-readable reference for the public Rohr Engine build-time tooling C API.'
     : 'This page is the GitHub-readable reference for the public Rohr Engine core C API.';
 
 push @lines, '# ' . $api_name, '';
@@ -146,7 +144,7 @@ push @lines, $description;
 push @lines, 'The source of truth is [`include/' . $facade . '`](../include/' . $facade . '), which uses Doxygen comments for the generated HTML documentation.', '';
 push @lines, 'Application code should include the public facade:', '';
 push @lines, '```c', '#include "' . $facade . '"', '```', '';
-push @lines, 'Entity values are stable ids, not component table indexes. Use the public entity functions to validate ids and resolve indexes.', '' unless $is_editor;
+push @lines, 'Entity values are stable ids, not component table indexes. Use the public entity functions to validate ids and resolve indexes.', '' unless $is_tools;
 push @lines, '## Contents', '';
 
 for my $group (@order) {

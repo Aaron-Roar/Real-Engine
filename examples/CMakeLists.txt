@@ -8,5 +8,4 @@ add_subdirectory(engine-core/game-state ${CMAKE_BINARY_DIR}/examples/engine-core
 add_subdirectory(engine-core/user-interface ${CMAKE_BINARY_DIR}/examples/engine-core/user-interface/build)
 add_subdirectory(engine-core/joints ${CMAKE_BINARY_DIR}/examples/engine-core/joints/build)
 add_subdirectory(engine-core/soft-body ${CMAKE_BINARY_DIR}/examples/engine-core/soft-body/build)
-add_subdirectory(editor/basic-editor ${CMAKE_BINARY_DIR}/examples/editor/basic-editor/build)
-add_subdirectory(editor/pong ${CMAKE_BINARY_DIR}/examples/editor/pong/build)
+add_subdirectory(engine-core/pong ${CMAKE_BINARY_DIR}/examples/engine-core/pong/build)

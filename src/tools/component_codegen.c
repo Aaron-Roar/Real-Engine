@@ -1,10 +1,10 @@
-#include "rohr_editor.h"
+#include "rohr_tools.h"
 
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 
-static bool RE_identifier_check(const char *value) {
+static bool component_codegen_identifier_check(const char *value) {
     size_t i;
 
     if(value == NULL || value[0] == '\0') {
@@ -21,8 +21,8 @@ static bool RE_identifier_check(const char *value) {
     return true;
 }
 
-static bool RE_registry_name_check(
-        const RE_ComponentRegistry *registry,
+static bool component_codegen_registry_name_check(
+        const RohrToolsComponentRegistry *registry,
         const char *name
         ) {
     size_t i;
@@ -40,21 +40,21 @@ static bool RE_registry_name_check(
     return false;
 }
 
-static size_t RE_registry_count(const RE_ComponentRegistry *registry) {
+static size_t component_codegen_registry_count(const RohrToolsComponentRegistry *registry) {
     return registry->tag_count + registry->component_count;
 }
 
-void RE_component_registry_init(RE_ComponentRegistry *registry) {
+void rohr_tools_component_registry_init(RohrToolsComponentRegistry *registry) {
     if(registry == NULL) {
         return;
     }
     memset(registry, 0, sizeof(*registry));
 }
 
-bool RE_component_registry_tag_add(RE_ComponentRegistry *registry, const char *name) {
+bool rohr_tools_component_registry_tag_add(RohrToolsComponentRegistry *registry, const char *name) {
     size_t i;
 
-    if(registry == NULL || !RE_identifier_check(name)) {
+    if(registry == NULL || !component_codegen_identifier_check(name)) {
         return false;
     }
     for(i = 0; i < registry->tag_count; i += 1) {
@@ -62,10 +62,10 @@ bool RE_component_registry_tag_add(RE_ComponentRegistry *registry, const char *n
             return true;
         }
     }
-    if(RE_registry_name_check(registry, name)) {
+    if(component_codegen_registry_name_check(registry, name)) {
         return false;
     }
-    if(RE_registry_count(registry) >= RE_GAME_COMPONENT_LIMIT) {
+    if(component_codegen_registry_count(registry) >= ROHR_TOOLS_GAME_COMPONENT_LIMIT) {
         return false;
     }
     registry->tags[registry->tag_count] = name;
@@ -73,14 +73,14 @@ bool RE_component_registry_tag_add(RE_ComponentRegistry *registry, const char *n
     return true;
 }
 
-bool RE_component_registry_component_add(
-        RE_ComponentRegistry *registry,
-        RE_ComponentDefinition definition
+bool rohr_tools_component_registry_component_add(
+        RohrToolsComponentRegistry *registry,
+        RohrToolsComponentDefinition definition
         ) {
     size_t i;
 
-    if(registry == NULL || !RE_identifier_check(definition.name) ||
-            !RE_identifier_check(definition.type_name) ||
+    if(registry == NULL || !component_codegen_identifier_check(definition.name) ||
+            !component_codegen_identifier_check(definition.type_name) ||
             definition.type_declaration == NULL ||
             definition.type_declaration[0] == '\0') {
         return false;
@@ -94,10 +94,10 @@ bool RE_component_registry_component_add(
                 ) == 0;
         }
     }
-    if(RE_registry_name_check(registry, definition.name)) {
+    if(component_codegen_registry_name_check(registry, definition.name)) {
         return false;
     }
-    if(RE_registry_count(registry) >= RE_GAME_COMPONENT_LIMIT) {
+    if(component_codegen_registry_count(registry) >= ROHR_TOOLS_GAME_COMPONENT_LIMIT) {
         return false;
     }
     registry->components[registry->component_count] = definition;
@@ -105,7 +105,7 @@ bool RE_component_registry_component_add(
     return true;
 }
 
-static bool RE_identifier_lower(const char *name, char *output, size_t size) {
+static bool component_codegen_identifier_lower(const char *name, char *output, size_t size) {
     size_t i;
     size_t length;
 
@@ -120,7 +120,7 @@ static bool RE_identifier_lower(const char *name, char *output, size_t size) {
     return true;
 }
 
-static const char *RE_path_basename(const char *path) {
+static const char *component_codegen_path_basename(const char *path) {
     const char *basename = path;
     const char *cursor;
 
@@ -132,8 +132,8 @@ static const char *RE_path_basename(const char *path) {
     return basename;
 }
 
-static bool RE_header_generate(
-        const RE_ComponentRegistry *registry,
+static bool component_codegen_header_generate(
+        const RohrToolsComponentRegistry *registry,
         FILE *header
         ) {
     size_t i;
@@ -173,7 +173,7 @@ static bool RE_header_generate(
     }
 
     for(i = 0; i < registry->tag_count; i += 1) {
-        if(!RE_identifier_lower(registry->tags[i], lower_name, sizeof(lower_name))) {
+        if(!component_codegen_identifier_lower(registry->tags[i], lower_name, sizeof(lower_name))) {
             return false;
         }
         if(fprintf(header,
@@ -186,8 +186,8 @@ static bool RE_header_generate(
     }
 
     for(i = 0; i < registry->component_count; i += 1) {
-        const RE_ComponentDefinition *component = &registry->components[i];
-        if(!RE_identifier_lower(component->name, lower_name, sizeof(lower_name))) {
+        const RohrToolsComponentDefinition *component = &registry->components[i];
+        if(!component_codegen_identifier_lower(component->name, lower_name, sizeof(lower_name))) {
             return false;
         }
         if(fprintf(header,
@@ -216,7 +216,7 @@ static bool RE_header_generate(
     return fprintf(header, "#endif\n") >= 0;
 }
 
-static bool RE_source_prelude_generate(FILE *source, const char *header_name) {
+static bool component_codegen_source_prelude_generate(FILE *source, const char *header_name) {
     return fprintf(source,
         "#include \"%s\"\n\n"
         "#include <stdlib.h>\n"
@@ -343,9 +343,9 @@ static bool RE_source_prelude_generate(FILE *source, const char *header_name) {
         header_name) >= 0;
 }
 
-static bool RE_tag_source_generate(FILE *source, const char *name) {
+static bool component_codegen_tag_source_generate(FILE *source, const char *name) {
     char lower_name[128];
-    if(!RE_identifier_lower(name, lower_name, sizeof(lower_name))) {
+    if(!component_codegen_identifier_lower(name, lower_name, sizeof(lower_name))) {
         return false;
     }
     return fprintf(source,
@@ -363,15 +363,15 @@ static bool RE_tag_source_generate(FILE *source, const char *name) {
         lower_name, name) >= 0;
 }
 
-static bool RE_component_source_generate(
+static bool component_codegen_component_source_generate(
         FILE *source,
-        const RE_ComponentDefinition *component
+        const RohrToolsComponentDefinition *component
         ) {
     char name[128];
     const char *type = component->type_name;
     const char *symbol = component->name;
 
-    if(!RE_identifier_lower(symbol, name, sizeof(name))) {
+    if(!component_codegen_identifier_lower(symbol, name, sizeof(name))) {
         return false;
     }
     if(fprintf(source,
@@ -518,8 +518,8 @@ static bool RE_component_source_generate(
         symbol) >= 0;
 }
 
-static bool RE_source_epilogue_generate(
-        const RE_ComponentRegistry *registry,
+static bool component_codegen_source_epilogue_generate(
+        const RohrToolsComponentRegistry *registry,
         FILE *source
         ) {
     size_t i;
@@ -534,13 +534,13 @@ static bool RE_source_epilogue_generate(
         return false;
     }
     for(i = 0; i < registry->component_count; i += 1) {
-        if(!RE_identifier_lower(registry->components[i].name, lower_name, sizeof(lower_name)) ||
+        if(!component_codegen_identifier_lower(registry->components[i].name, lower_name, sizeof(lower_name)) ||
                 fprintf(source, "    game_%s_remove(entity);\n", lower_name) < 0) {
             return false;
         }
     }
     for(i = 0; i < registry->tag_count; i += 1) {
-        if(!RE_identifier_lower(registry->tags[i], lower_name, sizeof(lower_name)) ||
+        if(!component_codegen_identifier_lower(registry->tags[i], lower_name, sizeof(lower_name)) ||
                 fprintf(source, "    game_%s_remove(entity);\n", lower_name) < 0) {
             return false;
         }
@@ -549,7 +549,7 @@ static bool RE_source_epilogue_generate(
         return false;
     }
     for(i = 0; i < registry->component_count; i += 1) {
-        if(!RE_identifier_lower(registry->components[i].name, lower_name, sizeof(lower_name)) ||
+        if(!component_codegen_identifier_lower(registry->components[i].name, lower_name, sizeof(lower_name)) ||
                 fprintf(source,
                     "    if(game_%s_destroy_hook != NULL) {\n"
                     "        size_t i;\n"
@@ -578,8 +578,8 @@ static bool RE_source_epilogue_generate(
         "}\n") >= 0;
 }
 
-bool RE_component_registry_generate(
-        const RE_ComponentRegistry *registry,
+bool rohr_tools_component_registry_generate(
+        const RohrToolsComponentRegistry *registry,
         const char *header_path,
         const char *source_path
         ) {
@@ -602,16 +602,16 @@ bool RE_component_registry_generate(
         return false;
     }
 
-    success = RE_header_generate(registry, header) &&
-        RE_source_prelude_generate(source, RE_path_basename(header_path));
+    success = component_codegen_header_generate(registry, header) &&
+        component_codegen_source_prelude_generate(source, component_codegen_path_basename(header_path));
     for(i = 0; success && i < registry->tag_count; i += 1) {
-        success = RE_tag_source_generate(source, registry->tags[i]);
+        success = component_codegen_tag_source_generate(source, registry->tags[i]);
     }
     for(i = 0; success && i < registry->component_count; i += 1) {
-        success = RE_component_source_generate(source, &registry->components[i]);
+        success = component_codegen_component_source_generate(source, &registry->components[i]);
     }
     if(success) {
-        success = RE_source_epilogue_generate(registry, source);
+        success = component_codegen_source_epilogue_generate(registry, source);
     }
     if(fclose(header) != 0 || fclose(source) != 0) {
         success = false;

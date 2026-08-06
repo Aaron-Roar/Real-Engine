@@ -16,8 +16,8 @@ updates, AABB/grid updates, and collision resolution.
 
 ## Generated game components
 
-The editor keeps game tags and data components separate from engine-owned
-components. Engine APIs use `RohrComponentMask`; generated games own a distinct
+The component-generation tools keep game tags and data components separate from
+engine-owned components. Engine APIs use `RohrComponentMask`; generated games own a distinct
 `GameComponentMask` and never pass it to engine component functions.
 
 Tags consume one generated mask bit and have no value storage. Data components

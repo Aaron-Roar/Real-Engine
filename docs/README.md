@@ -16,7 +16,7 @@ smaller internal module headers and implementations.
 ## Public API
 
 - [Engine API reference](engine_api.md)
-- [Editor API reference](editor_api.md)
+- [Tools API reference](tools_api.md)
 
 ## Local Generation
 
@@ -47,7 +47,7 @@ are generated from the Doxygen comments in the public headers under `include/`.
 ## Useful Pages
 
 - [Engine API reference](engine_api.md)
-- [Editor API reference](editor_api.md)
+- [Tools API reference](tools_api.md)
 - [Architecture](architecture.md)
 - [Entity ids](entity_ids.md)
 - [Error handling](errors.md)

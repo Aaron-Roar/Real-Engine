@@ -1,4 +1,4 @@
-#include "rohr_editor.h"
+#include "rohr.h"
 #include "game_components.h"
 #include "example_runtime.h"
 #include <stdio.h>
@@ -259,37 +259,37 @@ int main(void) {
         rohr_error_stderr_print(load_result.result.error);
         goto fail;
     }
-    EntityResult wall_bottom_result = RE_entity_by_name_get("wall_bottom");
+    EntityResult wall_bottom_result = rohr_entity_by_name_get("wall_bottom");
     if(rohr_error_check(wall_bottom_result)) {
         rohr_error_stderr_print(wall_bottom_result.result.error);
         goto fail;
     }
     wall_bottom = wall_bottom_result.result.value;
-    EntityResult wall_top_result = RE_entity_by_name_get("wall_top");
+    EntityResult wall_top_result = rohr_entity_by_name_get("wall_top");
     if(rohr_error_check(wall_top_result)) {
         rohr_error_stderr_print(wall_top_result.result.error);
         goto fail;
     }
     wall_top = wall_top_result.result.value;
-    EntityResult center_line_result = RE_entity_by_name_get("center_line");
+    EntityResult center_line_result = rohr_entity_by_name_get("center_line");
     if(rohr_error_check(center_line_result)) {
         rohr_error_stderr_print(center_line_result.result.error);
         goto fail;
     }
     center_line = center_line_result.result.value;
-    EntityResult paddle_left_result = RE_entity_by_name_get("paddle_left");
+    EntityResult paddle_left_result = rohr_entity_by_name_get("paddle_left");
     if(rohr_error_check(paddle_left_result)) {
         rohr_error_stderr_print(paddle_left_result.result.error);
         goto fail;
     }
     paddle_left = paddle_left_result.result.value;
-    EntityResult paddle_right_result = RE_entity_by_name_get("paddle_right");
+    EntityResult paddle_right_result = rohr_entity_by_name_get("paddle_right");
     if(rohr_error_check(paddle_right_result)) {
         rohr_error_stderr_print(paddle_right_result.result.error);
         goto fail;
     }
     paddle_right = paddle_right_result.result.value;
-    EntityResult ball_result = RE_entity_by_name_get("ball");
+    EntityResult ball_result = rohr_entity_by_name_get("ball");
     if(rohr_error_check(ball_result)) {
         rohr_error_stderr_print(ball_result.result.error);
         goto fail;

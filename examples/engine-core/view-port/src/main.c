@@ -26,7 +26,6 @@ int main(void) {
     }
     KeyboardState keyboard = {0};
     MouseState mouse = {0};
-    //rohr_level_editor_init();
     {
         EngineResult graphics_result = rohr_graphics_start();
         if(rohr_error_check(graphics_result)) {
@@ -74,7 +73,6 @@ int main(void) {
     //Game Loop
     //rohr_graphics_recording_start("examples/engine-core/view-port/recording.mp4",60);
     while(true) {
-        //rohr_level_editor_update(renderer);
 
         //physics
         Tick ticks_advanced = rohr_system_tick_update();

@@ -93,18 +93,13 @@ if(NOT MSVC)
     target_link_libraries(rohr_engine PUBLIC m)
 endif()
 
-add_library(rohr_editor STATIC
-    src/component_codegen.c
-    src/level_editor.c
-    src/rohr_editor.c
+add_library(rohr_tools STATIC
+    src/tools/component_codegen.c
 )
-target_include_directories(rohr_editor
+target_include_directories(rohr_tools
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
-target_link_libraries(rohr_editor PUBLIC rohr_engine)
 
 if(ROHR_BUILD_EXAMPLES)
     add_subdirectory(examples)
@@ -119,13 +114,11 @@ if(ROHR_BUILD_EXAMPLES)
         user_interface
         joints
         soft_body
+        pong
     )
 
-    add_custom_target(editor_examples)
-    add_dependencies(editor_examples basic_editor pong)
-
     add_custom_target(examples)
-    add_dependencies(examples core_examples editor_examples)
+    add_dependencies(examples core_examples)
 endif()
 
 if(ROHR_BUILD_TESTS)
@@ -205,18 +198,18 @@ if(ROHR_BUILD_TESTS)
     set_target_properties(contact_manifold_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
     add_test(NAME contact_manifold COMMAND contact_manifold_test)
 
-    add_executable(editor_component_registry_test
-        tests/editor_component_registry.c
+    add_executable(component_registry_test
+        tests/component_registry.c
     )
-    target_link_libraries(editor_component_registry_test PRIVATE rohr_editor)
-    set_target_properties(editor_component_registry_test
+    target_link_libraries(component_registry_test PRIVATE rohr_tools)
+    set_target_properties(component_registry_test
         PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests
     )
 
     add_test(
-        NAME editor_component_registry
-        COMMAND editor_component_registry_test
+        NAME component_registry
+        COMMAND component_registry_test
     )
 
     set(ROHR_GENERATED_COMPONENT_FIXTURE_DIR
@@ -232,7 +225,7 @@ if(ROHR_BUILD_TESTS)
     add_executable(component_fixture_generator
         tests/generate_component_fixture.c
     )
-    target_link_libraries(component_fixture_generator PRIVATE rohr_editor)
+    target_link_libraries(component_fixture_generator PRIVATE rohr_tools)
 
     add_custom_command(
         OUTPUT
@@ -287,7 +280,7 @@ if(ROHR_BUILD_TESTS)
         physics_interaction_set
         constraint_solver
         contact_manifold
-        editor_component_registry
+        component_registry
         generated_components
         PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy"
     )
@@ -307,7 +300,7 @@ if(ROHR_BUILD_TESTS)
         physics_interaction_set_test
         constraint_solver_test
         contact_manifold_test
-        editor_component_registry_test
+        component_registry_test
         generated_components_test
     )
 endif()
@@ -337,22 +330,22 @@ if(ROHR_ENABLE_DOCUMENTATION)
             VERBATIM
         )
 
-        add_custom_target(generate_editor_api
+        add_custom_target(generate_tools_api
             COMMAND
                 ${PERL_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/scripts/generate_public_api_markdown.pl
-                ${CMAKE_SOURCE_DIR}/include/rohr_editor.h
-                ${CMAKE_SOURCE_DIR}/docs/editor_api.md
-                RE_
+                ${CMAKE_SOURCE_DIR}/include/rohr_tools.h
+                ${CMAKE_SOURCE_DIR}/docs/tools_api.md
+                rohr_tools_
             DEPENDS
-                ${CMAKE_SOURCE_DIR}/include/rohr_editor.h
+                ${CMAKE_SOURCE_DIR}/include/rohr_tools.h
                 ${CMAKE_SOURCE_DIR}/scripts/generate_public_api_markdown.pl
-            COMMENT "Generating editor API Markdown"
+            COMMENT "Generating tools API Markdown"
             VERBATIM
         )
 
         add_custom_target(generate_public_api)
-        add_dependencies(generate_public_api generate_engine_api generate_editor_api)
+        add_dependencies(generate_public_api generate_engine_api generate_tools_api)
 
         add_custom_command(
             OUTPUT ${ROHR_README_HTML}
