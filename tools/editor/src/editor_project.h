@@ -171,6 +171,10 @@ bool editor_project_hitbox_line_length_set(EditorHitbox *hitbox, uint32_t line_i
     float length);
 EditorJoint *editor_project_joint_add(EditorProject *project, EditorObject *object,
     EditorJointKind kind);
+bool editor_project_joint_kind_set(EditorObject *object, EditorJoint *joint,
+    EditorJointKind kind);
+bool editor_project_joint_constraints_apply(EditorObject *object, EditorJoint *joint);
+void editor_project_anchor_constraints_apply(EditorObject *object, EditorAnchorId anchor);
 bool editor_project_joint_remove(EditorObject *object, EditorJointId id);
 EditorAnchor *editor_project_anchor_add(EditorProject *project, EditorObject *object,
     Position position, EditorRigidBodyId rigid_body, bool generated);

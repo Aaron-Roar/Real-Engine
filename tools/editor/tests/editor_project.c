@@ -59,7 +59,16 @@ int main(void) {
     generated_a = joint->anchor_a;
     joint_two = editor_project_joint_add(&project, object, EDITOR_JOINT_WELD);
     joint_two_id = joint_two == NULL ? 0 : joint_two->id;
-    if(joint_two == NULL || !editor_project_joint_anchor_set(
+    if(joint_two == NULL || !position_equal(
+            (Position){chassis->position.x +
+                    editor_project_anchor_get(object, joint_two->anchor_a)->position.x,
+                chassis->position.y +
+                    editor_project_anchor_get(object, joint_two->anchor_a)->position.y},
+            (Position){wheel->position.x +
+                    editor_project_anchor_get(object, joint_two->anchor_b)->position.x,
+                wheel->position.y +
+                    editor_project_anchor_get(object, joint_two->anchor_b)->position.y}) ||
+            !editor_project_joint_anchor_set(
             object, joint_two, 0, generated_a)) return 1;
     manual_anchor = editor_project_anchor_add(&project, object,
         (Position){5.0f, 6.0f}, chassis->id, false);

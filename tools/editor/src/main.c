@@ -1240,7 +1240,8 @@ int main(void) {
                         kind_options, 3, (size_t)joint->kind,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 118.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 30.0f}, NULL);
-                    if(result.changed) joint->kind = (EditorJointKind)result.selected_index;
+                    if(result.changed) (void)editor_project_joint_kind_set(
+                        selected, joint, (EditorJointKind)result.selected_index);
                 }
                 {
                     const TextAsset *anchor_options[EDITOR_ANCHOR_MAX + 1];
@@ -1511,6 +1512,9 @@ int main(void) {
                         .number = &anchor->position.y}, &y_field,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 34.0f, 124.0f,
                         EDITOR_TOOLS_WIDTH - 44.0f, 26.0f}, NULL);
+                if(x_result.changed || y_result.changed) {
+                    editor_project_anchor_constraints_apply(selected, anchor->id);
+                }
                 rohr_ui_label(&rigid_body_label,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 158.0f, 90.0f, 28.0f});
                 {
@@ -1537,9 +1541,12 @@ int main(void) {
                         viewport_state.preview_rigid_body =
                             selected->rigid_bodies[result.hovered_index - 1].id;
                     }
-                    if(result.changed) (void)editor_project_anchor_rigid_body_set(
-                        selected, anchor, result.selected_index == 0 ? 0 :
-                            selected->rigid_bodies[result.selected_index - 1].id);
+                    if(result.changed) {
+                        (void)editor_project_anchor_rigid_body_set(
+                            selected, anchor, result.selected_index == 0 ? 0 :
+                                selected->rigid_bodies[result.selected_index - 1].id);
+                        editor_project_anchor_constraints_apply(selected, anchor->id);
+                    }
                 }
                 rohr_ui_label(&rotation_label,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 192.0f, 76.0f, 26.0f});
@@ -1548,6 +1555,9 @@ int main(void) {
                         .number = &anchor->rotation}, &length_field,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 86.0f, 192.0f,
                         EDITOR_TOOLS_WIDTH - 96.0f, 26.0f}, NULL);
+                if(rotation_result.changed) {
+                    editor_project_anchor_constraints_apply(selected, anchor->id);
+                }
                 field_editing = x_result.active || y_result.active || rotation_result.active;
                 {
                     const TextAsset *position_options[] = {
@@ -1573,6 +1583,9 @@ int main(void) {
                     if(orientation_result.changed) {
                         (void)editor_project_anchor_rotation_lock_set(
                             selected, anchor, orientation_result.selected_index == 1);
+                    }
+                    if(position_result.changed || orientation_result.changed) {
+                        editor_project_anchor_constraints_apply(selected, anchor->id);
                     }
                 }
                 {

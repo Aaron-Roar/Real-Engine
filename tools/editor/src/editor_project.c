@@ -436,6 +436,80 @@ bool editor_project_hitbox_line_length_set(EditorHitbox *hitbox,
     return true;
 }
 
+static Position editor_anchor_world_position_get(EditorObject *object,
+    EditorAnchor *anchor) {
+    EditorRigidBody *body = editor_project_rigid_body_get(object, anchor->rigid_body);
+    if(body != NULL && anchor->position_follows_body) {
+        Position offset = editor_position_rotate(anchor->position, body->rotation);
+        return (Position){body->position.x + offset.x, body->position.y + offset.y};
+    }
+    return anchor->position;
+}
+
+static float editor_anchor_world_rotation_get(EditorObject *object,
+    EditorAnchor *anchor) {
+    EditorRigidBody *body = editor_project_rigid_body_get(object, anchor->rigid_body);
+    return anchor->rotation +
+        (body != NULL && anchor->rotation_follows_body ? body->rotation : 0.0f);
+}
+
+bool editor_project_joint_constraints_apply(EditorObject *object, EditorJoint *joint) {
+    EditorAnchor *a;
+    EditorAnchor *b;
+    EditorRigidBody *body_a;
+    EditorRigidBody *body_b;
+    Position world_a;
+    Position world_b;
+
+    if(object == NULL || joint == NULL) return false;
+    if(joint->kind == EDITOR_JOINT_SPRING) return true;
+    a = editor_project_anchor_get(object, joint->anchor_a);
+    b = editor_project_anchor_get(object, joint->anchor_b);
+    if(a == NULL || b == NULL) return true;
+    body_a = editor_project_rigid_body_get(object, a->rigid_body);
+    body_b = editor_project_rigid_body_get(object, b->rigid_body);
+    if(joint->kind == EDITOR_JOINT_WELD) {
+        float rotation_delta = editor_anchor_world_rotation_get(object, a) -
+            editor_anchor_world_rotation_get(object, b);
+        if(body_b != NULL && b->rotation_follows_body && body_b != body_a) {
+            body_b->rotation += rotation_delta;
+        } else {
+            b->rotation += rotation_delta;
+        }
+    }
+    world_a = editor_anchor_world_position_get(object, a);
+    world_b = editor_anchor_world_position_get(object, b);
+    if(body_b != NULL && b->position_follows_body && body_b != body_a) {
+        body_b->position.x += world_a.x - world_b.x;
+        body_b->position.y += world_a.y - world_b.y;
+    } else if(body_b != NULL && b->position_follows_body) {
+        Position local = {world_a.x - body_b->position.x,
+            world_a.y - body_b->position.y};
+        b->position = editor_position_rotate(local, -body_b->rotation);
+    } else {
+        b->position = world_a;
+    }
+    return true;
+}
+
+bool editor_project_joint_kind_set(EditorObject *object, EditorJoint *joint,
+    EditorJointKind kind) {
+    if(object == NULL || joint == NULL || kind < EDITOR_JOINT_REVOLUTE ||
+            kind > EDITOR_JOINT_SPRING) return false;
+    joint->kind = kind;
+    return editor_project_joint_constraints_apply(object, joint);
+}
+
+void editor_project_anchor_constraints_apply(EditorObject *object, EditorAnchorId anchor) {
+    if(object == NULL || anchor == 0) return;
+    for(size_t i = 0; i < object->joint_count; i += 1) {
+        EditorJoint *joint = &object->joint_items[i];
+        if(joint->anchor_a == anchor || joint->anchor_b == anchor) {
+            (void)editor_project_joint_constraints_apply(object, joint);
+        }
+    }
+}
+
 EditorJoint *editor_project_joint_add(EditorProject *project, EditorObject *object,
     EditorJointKind kind) {
     EditorJoint *joint;
@@ -463,6 +537,7 @@ EditorJoint *editor_project_joint_add(EditorProject *project, EditorObject *obje
     joint->rest_length = hypotf(b->position.x - a->position.x,
         b->position.y - a->position.y);
     snprintf(joint->name, sizeof(joint->name), "joint_%u", joint->id);
+    (void)editor_project_joint_constraints_apply(object, joint);
     return joint;
 }
 
@@ -494,7 +569,7 @@ bool editor_project_joint_anchor_set(EditorObject *object, EditorJoint *joint,
     if(endpoint == 0) joint->anchor_a = anchor;
     else joint->anchor_b = anchor;
     if(previous != anchor) editor_generated_anchor_collect(object, previous);
-    return true;
+    return editor_project_joint_constraints_apply(object, joint);
 }
 
 EditorSoftBody *editor_project_soft_body_add(EditorProject *project, EditorObject *object) {

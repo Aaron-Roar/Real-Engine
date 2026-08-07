@@ -302,6 +302,7 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
             editor_project_rigid_body_get(object, anchor->rigid_body);
         if(anchor != NULL) editor_anchor_world_set(object, anchor, anchor_body,
             (Position){pointer.x - state->drag_offset.x, pointer.y - state->drag_offset.y});
+        if(anchor != NULL) editor_project_anchor_constraints_apply(object, anchor->id);
         return true;
     }
     if(body != NULL && state->dragged_body && (primary_button == MOUSE_BUTTON_STATE_DOWN ||
@@ -643,6 +644,7 @@ bool editor_viewport_selection_nudge(EditorViewportState *state,
         world.x += screen_delta.x;
         world.y += screen_delta.y;
         editor_anchor_world_set(object, anchor, anchor_body, world);
+        editor_project_anchor_constraints_apply(object, anchor->id);
         return true;
     }
     return false;
