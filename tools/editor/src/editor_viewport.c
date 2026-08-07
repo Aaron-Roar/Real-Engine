@@ -163,24 +163,6 @@ static EditorHitbox *editor_selected_hitbox_get(EditorObject *object,
     return body == NULL ? NULL : editor_project_hitbox_get(body, state->selected_hitbox);
 }
 
-static bool editor_viewport_double_click_get(EditorViewportState *state,
-    EditorHierarchySelection selection, EditorObjectId object, uint32_t index) {
-    Uint64 now;
-    bool double_clicked;
-
-    if(state == NULL) return false;
-    now = SDL_GetTicks();
-    double_clicked = state->last_viewport_click_selection == selection &&
-        state->last_viewport_click_object == object &&
-        state->last_viewport_click_index == index &&
-        now - state->last_viewport_click_at <= 400;
-    state->last_viewport_click_selection = selection;
-    state->last_viewport_click_object = object;
-    state->last_viewport_click_index = index;
-    state->last_viewport_click_at = now;
-    return double_clicked;
-}
-
 void editor_viewport_state_init(EditorViewportState *state) {
     if(state == NULL) return;
     *state = (EditorViewportState){.dragged_vertex = -1};
@@ -320,7 +302,7 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                     (pointer.y - world.y) * (pointer.y - world.y) > 100.0f) continue;
             state->selection = EDITOR_SELECTION_ANCHOR;
             state->selected_anchor = anchor->id;
-            state->mode = EDITOR_VIEWPORT_JOINT;
+            state->mode = EDITOR_VIEWPORT_ANCHOR;
             state->dragged_anchor = true;
             state->drag_offset = (Vec2D){pointer.x - world.x, pointer.y - world.y};
             return true;
@@ -363,9 +345,7 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                 state->selection = EDITOR_SELECTION_SOFT_NODE;
                 state->selected_soft_body = soft_body->id;
                 state->selected_soft_node = node->id;
-                state->mode = EDITOR_VIEWPORT_SOFT_BODY;
-                if(editor_viewport_double_click_get(state, EDITOR_SELECTION_SOFT_NODE,
-                        object->id, node->id)) state->mode = EDITOR_VIEWPORT_SOFT_NODE;
+                state->mode = EDITOR_VIEWPORT_SOFT_NODE;
                 return true;
             }
             for(size_t i = 0; i < soft_body->beam_count; i += 1) {
@@ -383,9 +363,7 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                 state->selection = EDITOR_SELECTION_SOFT_BEAM;
                 state->selected_soft_body = soft_body->id;
                 state->selected_soft_beam = beam->id;
-                state->mode = EDITOR_VIEWPORT_SOFT_BODY;
-                if(editor_viewport_double_click_get(state, EDITOR_SELECTION_SOFT_BEAM,
-                        object->id, beam->id)) state->mode = EDITOR_VIEWPORT_SOFT_BEAM;
+                state->mode = EDITOR_VIEWPORT_SOFT_BEAM;
                 return true;
             }
         }
@@ -398,12 +376,7 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
             if(delta.x * delta.x + delta.y * delta.y > 100.0f) continue;
             state->selection = EDITOR_SELECTION_VERTEX;
             state->selected_vertex = i;
-            if(editor_viewport_double_click_get(state, EDITOR_SELECTION_VERTEX,
-                    object->id, hitbox->vertices[i].id)) {
-                editor_viewport_vertex_editor_enter(state, i);
-            } else {
-                state->mode = EDITOR_VIEWPORT_HITBOX;
-            }
+            editor_viewport_vertex_editor_enter(state, i);
             if(!hitbox->vertices[i].position_locked) state->dragged_vertex = (int)i;
             return true;
         }
@@ -426,12 +399,7 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
             if(distance.x * distance.x + distance.y * distance.y > 36.0f) continue;
             state->selection = EDITOR_SELECTION_LINE;
             state->selected_line = i;
-            if(editor_viewport_double_click_get(state, EDITOR_SELECTION_LINE,
-                    object->id, hitbox->vertices[i].id)) {
-                editor_viewport_line_editor_enter(state, i);
-            } else {
-                state->mode = EDITOR_VIEWPORT_HITBOX;
-            }
+            editor_viewport_line_editor_enter(state, i);
             return true;
         }
     }
@@ -447,19 +415,16 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
             }
             if(state->mode == EDITOR_VIEWPORT_HIERARCHY) {
                 state->selection = EDITOR_SELECTION_OBJECT;
-                if(editor_viewport_double_click_get(state, EDITOR_SELECTION_OBJECT,
-                        object->id, 0)) editor_viewport_object_editor_enter(state);
+                editor_viewport_object_editor_enter(state);
             } else if(state->mode == EDITOR_VIEWPORT_OBJECT) {
                 state->selection = EDITOR_SELECTION_RIGID_BODY;
                 state->selected_rigid_body = candidate_body->id;
-                if(editor_viewport_double_click_get(state, EDITOR_SELECTION_RIGID_BODY,
-                        object->id, candidate_body->id)) state->mode = EDITOR_VIEWPORT_RIGID_BODY;
+                state->mode = EDITOR_VIEWPORT_RIGID_BODY;
             } else {
                 state->selection = EDITOR_SELECTION_HITBOX;
                 state->selected_rigid_body = candidate_body->id;
                 state->selected_hitbox = candidate->id;
-                if(editor_viewport_double_click_get(state, EDITOR_SELECTION_HITBOX,
-                        object->id, candidate->id)) editor_viewport_hitbox_editor_enter(state);
+                editor_viewport_hitbox_editor_enter(state);
             }
             return true;
         }
