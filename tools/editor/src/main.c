@@ -266,63 +266,154 @@ static bool editor_selected_delete(
     selected = editor_project_selected_get(project);
     if(selected == NULL) return false;
     if(viewport_state->selection == EDITOR_SELECTION_OBJECT) {
+        size_t index = (size_t)(selected - project->objects);
         if(!editor_project_object_remove(project, selected->id)) return false;
         editor_viewport_hitbox_editor_exit(viewport_state);
+        if(index < project->object_count) {
+            (void)editor_project_object_select(project, project->objects[index].id);
+            viewport_state->selection = EDITOR_SELECTION_OBJECT;
+        }
         return true;
     }
     if(viewport_state->selection == EDITOR_SELECTION_HITBOX) {
         EditorRigidBody *body = editor_selected_body_get(selected, viewport_state);
+        EditorHitbox *hitbox = editor_selected_hitbox_get(selected, viewport_state);
+        size_t index;
+        if(body == NULL || hitbox == NULL) return false;
+        index = (size_t)(hitbox - body->hitboxes);
         if(body == NULL || !editor_project_hitbox_remove(
                 body, viewport_state->selected_hitbox)) return false;
         viewport_state->mode = EDITOR_VIEWPORT_RIGID_BODY;
-        viewport_state->selection = EDITOR_SELECTION_RIGID_BODY;
+        if(index < body->hitbox_count) {
+            viewport_state->selection = EDITOR_SELECTION_HITBOX;
+            viewport_state->selected_hitbox = body->hitboxes[index].id;
+        } else {
+            viewport_state->selection = EDITOR_SELECTION_RIGID_BODY;
+        }
         return true;
     }
     if(viewport_state->selection == EDITOR_SELECTION_RIGID_BODY) {
+        EditorRigidBody *body = editor_selected_body_get(selected, viewport_state);
+        size_t index;
+        if(body == NULL) return false;
+        index = (size_t)(body - selected->rigid_bodies);
         if(!editor_project_rigid_body_remove(
                 selected, viewport_state->selected_rigid_body)) return false;
-        editor_viewport_object_editor_enter(viewport_state);
+        viewport_state->mode = EDITOR_VIEWPORT_OBJECT;
+        if(index < selected->rigid_body_count) {
+            viewport_state->selection = EDITOR_SELECTION_RIGID_BODY;
+            viewport_state->selected_rigid_body = selected->rigid_bodies[index].id;
+        } else if(selected->joint_count > 0) {
+            viewport_state->selection = EDITOR_SELECTION_JOINT;
+            viewport_state->selected_joint = selected->joint_items[0].id;
+        } else if(selected->soft_body_count > 0) {
+            viewport_state->selection = EDITOR_SELECTION_SOFT_BODY;
+            viewport_state->selected_soft_body = selected->soft_body_items[0].id;
+        } else {
+            viewport_state->selection = EDITOR_SELECTION_OBJECT;
+        }
         return true;
     }
     if(viewport_state->selection == EDITOR_SELECTION_JOINT) {
+        EditorJoint *joint = editor_selected_joint_get(selected, viewport_state);
+        size_t index;
+        if(joint == NULL) return false;
+        index = (size_t)(joint - selected->joint_items);
         if(!editor_project_joint_remove(selected, viewport_state->selected_joint)) return false;
-        editor_viewport_object_editor_enter(viewport_state);
+        viewport_state->mode = EDITOR_VIEWPORT_OBJECT;
+        if(index < selected->joint_count) {
+            viewport_state->selection = EDITOR_SELECTION_JOINT;
+            viewport_state->selected_joint = selected->joint_items[index].id;
+        } else if(selected->soft_body_count > 0) {
+            viewport_state->selection = EDITOR_SELECTION_SOFT_BODY;
+            viewport_state->selected_soft_body = selected->soft_body_items[0].id;
+        } else {
+            viewport_state->selection = EDITOR_SELECTION_OBJECT;
+        }
         return true;
     }
     if(viewport_state->selection == EDITOR_SELECTION_SOFT_BODY) {
+        EditorSoftBody *body = editor_selected_soft_body_get(selected, viewport_state);
+        size_t index;
+        if(body == NULL) return false;
+        index = (size_t)(body - selected->soft_body_items);
         if(!editor_project_soft_body_remove(
                 selected, viewport_state->selected_soft_body)) return false;
-        editor_viewport_object_editor_enter(viewport_state);
+        viewport_state->mode = EDITOR_VIEWPORT_OBJECT;
+        if(index < selected->soft_body_count) {
+            viewport_state->selection = EDITOR_SELECTION_SOFT_BODY;
+            viewport_state->selected_soft_body = selected->soft_body_items[index].id;
+        } else {
+            viewport_state->selection = EDITOR_SELECTION_OBJECT;
+        }
         return true;
     }
     if(viewport_state->selection == EDITOR_SELECTION_SOFT_NODE) {
         EditorSoftBody *body = editor_selected_soft_body_get(selected, viewport_state);
+        EditorSoftNode *node = editor_selected_soft_node_get(body, viewport_state);
+        size_t index;
+        if(body == NULL || node == NULL) return false;
+        index = (size_t)(node - body->nodes);
         if(body == NULL || !editor_project_soft_node_remove(
                 body, viewport_state->selected_soft_node)) return false;
         viewport_state->mode = EDITOR_VIEWPORT_SOFT_BODY;
-        viewport_state->selection = EDITOR_SELECTION_SOFT_BODY;
+        if(index < body->node_count) {
+            viewport_state->selection = EDITOR_SELECTION_SOFT_NODE;
+            viewport_state->selected_soft_node = body->nodes[index].id;
+        } else if(body->beam_count > 0) {
+            viewport_state->selection = EDITOR_SELECTION_SOFT_BEAM;
+            viewport_state->selected_soft_beam = body->beams[0].id;
+        } else {
+            viewport_state->selection = EDITOR_SELECTION_SOFT_BODY;
+        }
         return true;
     }
     if(viewport_state->selection == EDITOR_SELECTION_SOFT_BEAM) {
         EditorSoftBody *body = editor_selected_soft_body_get(selected, viewport_state);
+        EditorSoftBeam *beam = editor_selected_soft_beam_get(body, viewport_state);
+        size_t index;
+        if(body == NULL || beam == NULL) return false;
+        index = (size_t)(beam - body->beams);
         if(body == NULL || !editor_project_soft_beam_remove(
                 body, viewport_state->selected_soft_beam)) return false;
         viewport_state->mode = EDITOR_VIEWPORT_SOFT_BODY;
-        viewport_state->selection = EDITOR_SELECTION_SOFT_BODY;
+        if(index < body->beam_count) {
+            viewport_state->selection = EDITOR_SELECTION_SOFT_BEAM;
+            viewport_state->selected_soft_beam = body->beams[index].id;
+        } else {
+            viewport_state->selection = EDITOR_SELECTION_SOFT_BODY;
+        }
         return true;
     }
     if(viewport_state->selection == EDITOR_SELECTION_VERTEX) {
         EditorHitbox *hitbox = editor_selected_hitbox_get(selected, viewport_state);
+        uint32_t index = viewport_state->selected_vertex;
         if(!editor_project_hitbox_vertex_remove(
                 hitbox, viewport_state->selected_vertex)) return false;
-        editor_viewport_hitbox_editor_enter(viewport_state);
+        viewport_state->mode = EDITOR_VIEWPORT_HITBOX;
+        if(index < hitbox->vertex_count) {
+            viewport_state->selection = EDITOR_SELECTION_VERTEX;
+            viewport_state->selected_vertex = index;
+        } else if(hitbox->vertex_count > 0) {
+            viewport_state->selection = EDITOR_SELECTION_LINE;
+            viewport_state->selected_line = 0;
+        } else {
+            viewport_state->selection = EDITOR_SELECTION_HITBOX;
+        }
         return true;
     }
     if(viewport_state->selection == EDITOR_SELECTION_LINE) {
         EditorHitbox *hitbox = editor_selected_hitbox_get(selected, viewport_state);
+        uint32_t index = viewport_state->selected_line;
         if(!editor_project_hitbox_line_remove(
                 hitbox, viewport_state->selected_line)) return false;
-        editor_viewport_hitbox_editor_enter(viewport_state);
+        viewport_state->mode = EDITOR_VIEWPORT_HITBOX;
+        if(index < hitbox->vertex_count) {
+            viewport_state->selection = EDITOR_SELECTION_LINE;
+            viewport_state->selected_line = index;
+        } else {
+            viewport_state->selection = EDITOR_SELECTION_HITBOX;
+        }
         return true;
     }
     return false;
