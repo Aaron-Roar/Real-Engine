@@ -42,6 +42,7 @@ void editor_project_init(EditorProject *project) {
         .next_rigid_body_id = 1,
         .next_hitbox_id = 1,
         .next_joint_id = 1,
+        .next_anchor_id = 1,
         .next_soft_body_id = 1,
         .next_soft_node_id = 1,
         .next_soft_beam_id = 1
@@ -136,15 +137,81 @@ bool editor_project_rigid_body_remove(EditorObject *object, EditorRigidBodyId id
         }
         object->rigid_body_count -= 1;
         object->rigid_bodies[object->rigid_body_count] = (EditorRigidBody){0};
-        for(size_t j = object->joint_count; j > 0; j -= 1) {
-            EditorJoint *joint = &object->joint_items[j - 1];
-            if(joint->body_a == id || joint->body_b == id) {
-                (void)editor_project_joint_remove(object, joint->id);
+        for(size_t j = object->anchor_count; j > 0; j -= 1) {
+            EditorAnchor *anchor = &object->anchors[j - 1];
+            EditorAnchorId anchor_id;
+            if(anchor->rigid_body != id) continue;
+            anchor_id = anchor->id;
+            for(size_t k = object->joint_count; k > 0; k -= 1) {
+                EditorJoint *joint = &object->joint_items[k - 1];
+                if(joint->anchor_a == anchor_id || joint->anchor_b == anchor_id) {
+                    (void)editor_project_joint_remove(object, joint->id);
+                }
             }
+            (void)editor_project_anchor_remove(object, anchor_id);
         }
         return true;
     }
     return false;
+}
+
+EditorAnchor *editor_project_anchor_get(EditorObject *object, EditorAnchorId id) {
+    if(object == NULL || id == 0) return NULL;
+    for(size_t i = 0; i < object->anchor_count; i += 1) {
+        if(object->anchors[i].id == id) return &object->anchors[i];
+    }
+    return NULL;
+}
+
+EditorAnchor *editor_project_anchor_add(EditorProject *project, EditorObject *object,
+    Position position, EditorRigidBodyId rigid_body, bool generated) {
+    EditorAnchor *anchor;
+
+    if(project == NULL || object == NULL || object->anchor_count >= EDITOR_ANCHOR_MAX ||
+            (rigid_body != 0 && editor_project_rigid_body_get(object, rigid_body) == NULL)) {
+        return NULL;
+    }
+    anchor = &object->anchors[object->anchor_count++];
+    *anchor = (EditorAnchor){.id = project->next_anchor_id++, .position = position,
+        .rigid_body = rigid_body, .generated = generated, .visible = true};
+    snprintf(anchor->name, sizeof(anchor->name), "anchor_%u", anchor->id);
+    return anchor;
+}
+
+static bool editor_anchor_referenced_get(const EditorObject *object, EditorAnchorId id) {
+    if(object == NULL || id == 0) return false;
+    for(size_t i = 0; i < object->joint_count; i += 1) {
+        if(object->joint_items[i].anchor_a == id || object->joint_items[i].anchor_b == id) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool editor_project_anchor_remove(EditorObject *object, EditorAnchorId id) {
+    if(object == NULL || id == 0) return false;
+    for(size_t i = 0; i < object->joint_count; i += 1) {
+        EditorJoint *joint = &object->joint_items[i];
+        if(joint->anchor_a == id) joint->anchor_a = 0;
+        if(joint->anchor_b == id) joint->anchor_b = 0;
+    }
+    for(size_t i = 0; i < object->anchor_count; i += 1) {
+        if(object->anchors[i].id != id) continue;
+        for(size_t j = i + 1; j < object->anchor_count; j += 1) {
+            object->anchors[j - 1] = object->anchors[j];
+        }
+        object->anchor_count -= 1;
+        object->anchors[object->anchor_count] = (EditorAnchor){0};
+        return true;
+    }
+    return false;
+}
+
+static void editor_generated_anchor_collect(EditorObject *object, EditorAnchorId id) {
+    EditorAnchor *anchor = editor_project_anchor_get(object, id);
+    if(anchor != NULL && anchor->generated && !editor_anchor_referenced_get(object, id)) {
+        (void)editor_project_anchor_remove(object, id);
+    }
 }
 
 EditorHitbox *editor_project_hitbox_add(EditorProject *project, EditorRigidBody *body) {
@@ -282,14 +349,28 @@ bool editor_project_hitbox_line_length_set(EditorHitbox *hitbox,
 EditorJoint *editor_project_joint_add(EditorProject *project, EditorObject *object,
     EditorJointKind kind) {
     EditorJoint *joint;
+    EditorAnchor *a;
+    EditorAnchor *b;
 
-    if(project == NULL || object == NULL || object->joint_count >= EDITOR_JOINT_MAX) {
+    if(project == NULL || object == NULL || object->joint_count >= EDITOR_JOINT_MAX ||
+            object->anchor_count + 2 > EDITOR_ANCHOR_MAX) {
+        return NULL;
+    }
+    a = editor_project_anchor_add(project, object, (Position){-20.0f, 0.0f},
+        object->rigid_body_count > 0 ? object->rigid_bodies[0].id : 0, true);
+    b = editor_project_anchor_add(project, object, (Position){20.0f, 0.0f},
+        object->rigid_body_count > 1 ? object->rigid_bodies[1].id :
+            (object->rigid_body_count > 0 ? object->rigid_bodies[0].id : 0), true);
+    if(a == NULL || b == NULL) {
+        if(a != NULL) (void)editor_project_anchor_remove(object, a->id);
         return NULL;
     }
     joint = &object->joint_items[object->joint_count++];
     *joint = (EditorJoint){
         .id = project->next_joint_id++,
         .kind = kind,
+        .anchor_a = a->id,
+        .anchor_b = b->id,
         .visible = true
     };
     snprintf(joint->name, sizeof(joint->name), "joint_%u", joint->id);
@@ -300,14 +381,31 @@ bool editor_project_joint_remove(EditorObject *object, EditorJointId id) {
     if(object == NULL || id == 0) return false;
     for(size_t i = 0; i < object->joint_count; i += 1) {
         if(object->joint_items[i].id != id) continue;
+        EditorAnchorId anchor_a = object->joint_items[i].anchor_a;
+        EditorAnchorId anchor_b = object->joint_items[i].anchor_b;
         for(size_t j = i + 1; j < object->joint_count; j += 1) {
             object->joint_items[j - 1] = object->joint_items[j];
         }
         object->joint_count -= 1;
         object->joint_items[object->joint_count] = (EditorJoint){0};
+        editor_generated_anchor_collect(object, anchor_a);
+        if(anchor_b != anchor_a) editor_generated_anchor_collect(object, anchor_b);
         return true;
     }
     return false;
+}
+
+bool editor_project_joint_anchor_set(EditorObject *object, EditorJoint *joint,
+    uint32_t endpoint, EditorAnchorId anchor) {
+    EditorAnchorId previous;
+
+    if(object == NULL || joint == NULL || endpoint > 1 ||
+            (anchor != 0 && editor_project_anchor_get(object, anchor) == NULL)) return false;
+    previous = endpoint == 0 ? joint->anchor_a : joint->anchor_b;
+    if(endpoint == 0) joint->anchor_a = anchor;
+    else joint->anchor_b = anchor;
+    if(previous != anchor) editor_generated_anchor_collect(object, previous);
+    return true;
 }
 
 EditorSoftBody *editor_project_soft_body_add(EditorProject *project, EditorObject *object) {

@@ -13,6 +13,11 @@ int main(void) {
     EditorRigidBody *wheel;
     EditorHitbox *hitbox;
     EditorJoint *joint;
+    EditorJoint *joint_two;
+    EditorAnchor *manual_anchor;
+    EditorAnchorId generated_a;
+    EditorAnchorId manual_anchor_id;
+    EditorJointId joint_two_id;
     EditorSoftBody *soft_body;
     EditorSoftNode *node_a;
     EditorSoftNode *node_b;
@@ -41,10 +46,29 @@ int main(void) {
             hitbox->vertex_count != 3) return 1;
 
     joint = editor_project_joint_add(&project, object, EDITOR_JOINT_SPRING);
-    if(joint == NULL) return 1;
-    joint->body_a = chassis->id;
-    joint->body_b = wheel->id;
-    if(!editor_project_rigid_body_remove(object, wheel->id) ||
+    if(joint == NULL || object->anchor_count != 2 ||
+            !editor_project_anchor_get(object, joint->anchor_a)->generated) return 1;
+    generated_a = joint->anchor_a;
+    joint_two = editor_project_joint_add(&project, object, EDITOR_JOINT_WELD);
+    joint_two_id = joint_two == NULL ? 0 : joint_two->id;
+    if(joint_two == NULL || !editor_project_joint_anchor_set(
+            object, joint_two, 0, generated_a)) return 1;
+    manual_anchor = editor_project_anchor_add(&project, object,
+        (Position){5.0f, 6.0f}, chassis->id, false);
+    manual_anchor_id = manual_anchor == NULL ? 0 : manual_anchor->id;
+    if(manual_anchor == NULL || !editor_project_joint_anchor_set(
+            object, joint, 0, manual_anchor_id) ||
+            editor_project_anchor_get(object, generated_a) == NULL ||
+            !editor_project_joint_anchor_set(
+            object, joint_two, 0, manual_anchor_id) ||
+            editor_project_anchor_get(object, generated_a) != NULL ||
+            !editor_project_joint_remove(object, joint->id) ||
+            editor_project_anchor_get(object, manual_anchor_id) == NULL ||
+            !editor_project_joint_remove(object, joint_two_id) ||
+            object->anchor_count != 1 ||
+            editor_project_anchor_get(object, manual_anchor_id) == NULL) return 1;
+    joint = editor_project_joint_add(&project, object, EDITOR_JOINT_SPRING);
+    if(joint == NULL || !editor_project_rigid_body_remove(object, wheel->id) ||
             object->joint_count != 0) return 1;
 
     soft_body = editor_project_soft_body_add(&project, object);

@@ -10,6 +10,7 @@
 #define EDITOR_RIGID_BODY_MAX 16
 #define EDITOR_BODY_HITBOX_MAX 8
 #define EDITOR_JOINT_MAX 32
+#define EDITOR_ANCHOR_MAX 64
 #define EDITOR_SOFT_BODY_MAX 8
 #define EDITOR_SOFT_NODE_MAX 64
 #define EDITOR_SOFT_BEAM_MAX 128
@@ -19,6 +20,7 @@ typedef uint32_t EditorVertexId;
 typedef uint32_t EditorRigidBodyId;
 typedef uint32_t EditorHitboxId;
 typedef uint32_t EditorJointId;
+typedef uint32_t EditorAnchorId;
 typedef uint32_t EditorSoftBodyId;
 typedef uint32_t EditorSoftNodeId;
 typedef uint32_t EditorSoftBeamId;
@@ -55,14 +57,21 @@ typedef enum EditorJointKind {
     EDITOR_JOINT_SPRING
 } EditorJointKind;
 
+typedef struct EditorAnchor {
+    EditorAnchorId id;
+    char name[EDITOR_OBJECT_NAME_MAX];
+    Position position;
+    EditorRigidBodyId rigid_body;
+    bool generated;
+    bool visible;
+} EditorAnchor;
+
 typedef struct EditorJoint {
     EditorJointId id;
     char name[EDITOR_OBJECT_NAME_MAX];
     EditorJointKind kind;
-    EditorRigidBodyId body_a;
-    EditorRigidBodyId body_b;
-    Position anchor_a;
-    Position anchor_b;
+    EditorAnchorId anchor_a;
+    EditorAnchorId anchor_b;
     bool visible;
 } EditorJoint;
 
@@ -103,6 +112,8 @@ typedef struct EditorObject {
     size_t rigid_body_count;
     EditorJoint joint_items[EDITOR_JOINT_MAX];
     size_t joint_count;
+    EditorAnchor anchors[EDITOR_ANCHOR_MAX];
+    size_t anchor_count;
     EditorSoftBody soft_body_items[EDITOR_SOFT_BODY_MAX];
     size_t soft_body_count;
 } EditorObject;
@@ -115,6 +126,7 @@ typedef struct EditorProject {
     EditorRigidBodyId next_rigid_body_id;
     EditorHitboxId next_hitbox_id;
     EditorJointId next_joint_id;
+    EditorAnchorId next_anchor_id;
     EditorSoftBodyId next_soft_body_id;
     EditorSoftNodeId next_soft_node_id;
     EditorSoftBeamId next_soft_beam_id;
@@ -145,6 +157,12 @@ bool editor_project_hitbox_line_length_set(EditorHitbox *hitbox, uint32_t line_i
 EditorJoint *editor_project_joint_add(EditorProject *project, EditorObject *object,
     EditorJointKind kind);
 bool editor_project_joint_remove(EditorObject *object, EditorJointId id);
+EditorAnchor *editor_project_anchor_add(EditorProject *project, EditorObject *object,
+    Position position, EditorRigidBodyId rigid_body, bool generated);
+EditorAnchor *editor_project_anchor_get(EditorObject *object, EditorAnchorId id);
+bool editor_project_anchor_remove(EditorObject *object, EditorAnchorId id);
+bool editor_project_joint_anchor_set(EditorObject *object, EditorJoint *joint,
+    uint32_t endpoint, EditorAnchorId anchor);
 EditorSoftBody *editor_project_soft_body_add(EditorProject *project, EditorObject *object);
 bool editor_project_soft_body_remove(EditorObject *object, EditorSoftBodyId id);
 EditorSoftNode *editor_project_soft_node_add(EditorProject *project, EditorSoftBody *body,

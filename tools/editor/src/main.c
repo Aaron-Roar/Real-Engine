@@ -181,6 +181,17 @@ static EditorRigidBodyId editor_body_id_next_get(const EditorObject *object,
     return object->rigid_bodies[0].id;
 }
 
+static EditorAnchorId editor_anchor_id_next_get(const EditorObject *object,
+    EditorAnchorId current) {
+    if(object == NULL || object->anchor_count == 0) return 0;
+    if(current == 0) return object->anchors[0].id;
+    for(size_t i = 0; i < object->anchor_count; i += 1) {
+        if(object->anchors[i].id != current) continue;
+        return i + 1 < object->anchor_count ? object->anchors[i + 1].id : 0;
+    }
+    return object->anchors[0].id;
+}
+
 static EditorJoint *editor_selected_joint_get(EditorObject *object,
     const EditorViewportState *state) {
     if(object == NULL || state == NULL) return NULL;
@@ -429,6 +440,7 @@ int main(void) {
     TextAsset hitbox_label = {0};
     TextAsset add_rigid_body_label = {0};
     TextAsset add_joint_label = {0};
+    TextAsset add_anchor_label = {0};
     TextAsset add_soft_body_label = {0};
     TextAsset add_node_label = {0};
     TextAsset add_beam_label = {0};
@@ -438,6 +450,7 @@ int main(void) {
     TextAsset spring_label = {0};
     TextAsset body_a_label = {0};
     TextAsset body_b_label = {0};
+    TextAsset rigid_body_label = {0};
     TextAsset node_a_label = {0};
     TextAsset node_b_label = {0};
     TextAsset mass_label = {0};
@@ -446,15 +459,18 @@ int main(void) {
     TextAsset joint_body_b_display = {0};
     TextAsset beam_node_a_display = {0};
     TextAsset beam_node_b_display = {0};
+    TextAsset anchor_body_display = {0};
     TextAsset rigid_body_labels[EDITOR_RIGID_BODY_MAX] = {0};
     TextAsset body_hitbox_labels[EDITOR_BODY_HITBOX_MAX] = {0};
     TextAsset joint_labels[EDITOR_JOINT_MAX] = {0};
+    TextAsset anchor_labels[EDITOR_ANCHOR_MAX] = {0};
     TextAsset soft_body_labels[EDITOR_SOFT_BODY_MAX] = {0};
     TextAsset soft_node_labels[EDITOR_SOFT_NODE_MAX] = {0};
     TextAsset soft_beam_labels[EDITOR_SOFT_BEAM_MAX] = {0};
     char rigid_body_cache[EDITOR_RIGID_BODY_MAX][EDITOR_OBJECT_NAME_MAX] = {{0}};
     char body_hitbox_cache[EDITOR_BODY_HITBOX_MAX][EDITOR_OBJECT_NAME_MAX] = {{0}};
     char joint_cache[EDITOR_JOINT_MAX][EDITOR_OBJECT_NAME_MAX] = {{0}};
+    char anchor_cache[EDITOR_ANCHOR_MAX][EDITOR_OBJECT_NAME_MAX] = {{0}};
     char soft_body_cache[EDITOR_SOFT_BODY_MAX][EDITOR_OBJECT_NAME_MAX] = {{0}};
     char soft_node_cache[EDITOR_SOFT_NODE_MAX][EDITOR_OBJECT_NAME_MAX] = {{0}};
     char soft_beam_cache[EDITOR_SOFT_BEAM_MAX][EDITOR_OBJECT_NAME_MAX] = {{0}};
@@ -526,6 +542,7 @@ int main(void) {
             !editor_text_create(&font, "Hitbox", &hitbox_label) ||
             !editor_text_create(&font, "Add Rigid Body", &add_rigid_body_label) ||
             !editor_text_create(&font, "Add Joint", &add_joint_label) ||
+            !editor_text_create(&font, "Add Anchor", &add_anchor_label) ||
             !editor_text_create(&font, "Add Soft Body", &add_soft_body_label) ||
             !editor_text_create(&font, "Add Node", &add_node_label) ||
             !editor_text_create(&font, "Add Beam", &add_beam_label) ||
@@ -533,8 +550,9 @@ int main(void) {
             !editor_text_create(&font, "Revolute", &revolute_label) ||
             !editor_text_create(&font, "Weld", &weld_label) ||
             !editor_text_create(&font, "Spring", &spring_label) ||
-            !editor_text_create(&font, "Body A", &body_a_label) ||
-            !editor_text_create(&font, "Body B", &body_b_label) ||
+            !editor_text_create(&font, "Anchor A", &body_a_label) ||
+            !editor_text_create(&font, "Anchor B", &body_b_label) ||
+            !editor_text_create(&font, "Rigid Body", &rigid_body_label) ||
             !editor_text_create(&font, "Node A", &node_a_label) ||
             !editor_text_create(&font, "Node B", &node_b_label) ||
             !editor_text_create(&font, "Mass", &mass_label) ||
@@ -543,6 +561,7 @@ int main(void) {
             !editor_text_create(&font, "", &joint_body_b_display) ||
             !editor_text_create(&font, "", &beam_node_a_display) ||
             !editor_text_create(&font, "", &beam_node_b_display) ||
+            !editor_text_create(&font, "", &anchor_body_display) ||
             !editor_text_create(&font, "Vertices", &vertices_label) ||
             !editor_text_create(&font, "Lines", &lines_label) ||
             !editor_text_create(&font, "Lock Position", &lock_label) ||
@@ -903,8 +922,8 @@ int main(void) {
                 const TextAsset *kind_label = joint->kind == EDITOR_JOINT_WELD ?
                     &weld_label : (joint->kind == EDITOR_JOINT_SPRING ?
                         &spring_label : &revolute_label);
-                EditorRigidBody *body_a = editor_project_rigid_body_get(selected, joint->body_a);
-                EditorRigidBody *body_b = editor_project_rigid_body_get(selected, joint->body_b);
+                EditorAnchor *body_a = editor_project_anchor_get(selected, joint->anchor_a);
+                EditorAnchor *body_b = editor_project_anchor_get(selected, joint->anchor_b);
                 UIButtonStyle delete_style = editor_delete_button_style_get();
                 if(!editor_named_text_sync(&font, joint->name, &joint_labels[index],
                         joint_cache[index], EDITOR_OBJECT_NAME_MAX)) goto fail;
@@ -929,12 +948,92 @@ int main(void) {
                 if(rohr_ui_button("editor.joint.body_a", &joint_body_a_display,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 63.0f, 158.0f,
                             EDITOR_TOOLS_WIDTH - 73.0f, 28.0f}, NULL).clicked) {
-                    joint->body_a = editor_body_id_next_get(selected, joint->body_a);
+                    (void)editor_project_joint_anchor_set(selected, joint, 0,
+                        editor_anchor_id_next_get(selected, joint->anchor_a));
+                    viewport_state.selected_anchor = joint->anchor_a;
                 }
                 if(rohr_ui_button("editor.joint.body_b", &joint_body_b_display,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 63.0f, 194.0f,
                             EDITOR_TOOLS_WIDTH - 73.0f, 28.0f}, NULL).clicked) {
-                    joint->body_b = editor_body_id_next_get(selected, joint->body_b);
+                    (void)editor_project_joint_anchor_set(selected, joint, 1,
+                        editor_anchor_id_next_get(selected, joint->anchor_b));
+                    viewport_state.selected_anchor = joint->anchor_b;
+                }
+                if(rohr_ui_button("editor.joint.add_anchor", &add_anchor_label,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 232.0f,
+                            EDITOR_TOOLS_WIDTH - 20.0f, 30.0f}, NULL).clicked) {
+                    EditorAnchor *added = editor_project_anchor_add(&project, selected,
+                        (Position){0}, selected->rigid_body_count > 0 ?
+                            selected->rigid_bodies[0].id : 0, false);
+                    if(added != NULL) viewport_state.selected_anchor = added->id;
+                }
+                {
+                    size_t anchor_start = 0;
+                    for(size_t i = 0; i < selected->anchor_count; i += 1) {
+                        if(selected->anchors[i].id == viewport_state.selected_anchor && i >= 6) {
+                            anchor_start = i - 5;
+                        }
+                    }
+                for(size_t i = anchor_start; i < selected->anchor_count &&
+                        i < anchor_start + 6; i += 1) {
+                    EditorAnchor *anchor = &selected->anchors[i];
+                    UIButtonStyle selected_style = editor_selected_button_style_get();
+                    char id[64];
+                    char visibility_id[72];
+                    if(!editor_named_text_sync(&font, anchor->name, &anchor_labels[i],
+                            anchor_cache[i], EDITOR_OBJECT_NAME_MAX)) goto fail;
+                    snprintf(id, sizeof(id), "editor.anchor.%u", anchor->id);
+                    snprintf(visibility_id, sizeof(visibility_id),
+                        "editor.anchor.%u.visibility", anchor->id);
+                    (void)editor_visibility_toggle(visibility_id, &visibility_icon_label,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
+                                270.0f + (float)(i - anchor_start) * 27.0f,
+                                23.0f, 23.0f}, &anchor->visible);
+                    if(rohr_ui_button(id, &anchor_labels[i],
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f,
+                                270.0f + (float)(i - anchor_start) * 27.0f,
+                                EDITOR_TOOLS_WIDTH - 48.0f, 23.0f},
+                            viewport_state.selected_anchor == anchor->id ?
+                                &selected_style : NULL).clicked) {
+                        viewport_state.selected_anchor = anchor->id;
+                    }
+                }
+                }
+                {
+                    EditorAnchor *anchor = editor_project_anchor_get(
+                        selected, viewport_state.selected_anchor);
+                    if(anchor != NULL) {
+                        EditorRigidBody *anchor_body = editor_project_rigid_body_get(
+                            selected, anchor->rigid_body);
+                        UIFieldResult x_result;
+                        UIFieldResult y_result;
+                        (void)rohr_graphics_text_value_set(&anchor_body_display,
+                            anchor_body == NULL ? "None" : anchor_body->name);
+                        rohr_ui_label(&x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                            442.0f, 24.0f, 26.0f});
+                        x_result = rohr_ui_field("editor.anchor.x",
+                            (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                                .number = &anchor->position.x}, &x_field,
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 34.0f, 442.0f,
+                                EDITOR_TOOLS_WIDTH - 44.0f, 26.0f}, NULL);
+                        rohr_ui_label(&y_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                            476.0f, 24.0f, 26.0f});
+                        y_result = rohr_ui_field("editor.anchor.y",
+                            (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                                .number = &anchor->position.y}, &y_field,
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 34.0f, 476.0f,
+                                EDITOR_TOOLS_WIDTH - 44.0f, 26.0f}, NULL);
+                        field_editing = x_result.active || y_result.active;
+                        rohr_ui_label(&rigid_body_label,
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 510.0f,
+                                90.0f, 28.0f});
+                        if(rohr_ui_button("editor.anchor.rigid_body", &anchor_body_display,
+                                (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 510.0f,
+                                    EDITOR_TOOLS_WIDTH - 110.0f, 28.0f}, NULL).clicked) {
+                            anchor->rigid_body = editor_body_id_next_get(
+                                selected, anchor->rigid_body);
+                        }
+                    }
                 }
                 if(rohr_ui_button("editor.joint.delete", &delete_joint_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 660.0f,
@@ -1372,6 +1471,7 @@ int main(void) {
         rohr_graphics_show();
     }
 
+    rohr_graphics_text_destroy(&anchor_body_display);
     rohr_graphics_text_destroy(&beam_node_b_display);
     rohr_graphics_text_destroy(&beam_node_a_display);
     rohr_graphics_text_destroy(&joint_body_b_display);
@@ -1382,6 +1482,7 @@ int main(void) {
     rohr_graphics_text_destroy(&node_a_label);
     rohr_graphics_text_destroy(&body_b_label);
     rohr_graphics_text_destroy(&body_a_label);
+    rohr_graphics_text_destroy(&rigid_body_label);
     rohr_graphics_text_destroy(&spring_label);
     rohr_graphics_text_destroy(&weld_label);
     rohr_graphics_text_destroy(&revolute_label);
@@ -1390,6 +1491,7 @@ int main(void) {
     rohr_graphics_text_destroy(&add_node_label);
     rohr_graphics_text_destroy(&add_soft_body_label);
     rohr_graphics_text_destroy(&add_joint_label);
+    rohr_graphics_text_destroy(&add_anchor_label);
     rohr_graphics_text_destroy(&add_rigid_body_label);
     rohr_graphics_text_destroy(&delete_beam_label);
     rohr_graphics_text_destroy(&delete_node_label);
@@ -1404,6 +1506,9 @@ int main(void) {
     }
     for(size_t i = 0; i < EDITOR_JOINT_MAX; i += 1) {
         rohr_graphics_text_destroy(&joint_labels[i]);
+    }
+    for(size_t i = 0; i < EDITOR_ANCHOR_MAX; i += 1) {
+        rohr_graphics_text_destroy(&anchor_labels[i]);
     }
     for(size_t i = 0; i < EDITOR_SOFT_BODY_MAX; i += 1) {
         rohr_graphics_text_destroy(&soft_body_labels[i]);
@@ -1449,6 +1554,7 @@ int main(void) {
     return 0;
 
 fail:
+    rohr_graphics_text_destroy(&anchor_body_display);
     rohr_graphics_text_destroy(&beam_node_b_display);
     rohr_graphics_text_destroy(&beam_node_a_display);
     rohr_graphics_text_destroy(&joint_body_b_display);
@@ -1459,6 +1565,7 @@ fail:
     rohr_graphics_text_destroy(&node_a_label);
     rohr_graphics_text_destroy(&body_b_label);
     rohr_graphics_text_destroy(&body_a_label);
+    rohr_graphics_text_destroy(&rigid_body_label);
     rohr_graphics_text_destroy(&spring_label);
     rohr_graphics_text_destroy(&weld_label);
     rohr_graphics_text_destroy(&revolute_label);
@@ -1467,6 +1574,7 @@ fail:
     rohr_graphics_text_destroy(&add_node_label);
     rohr_graphics_text_destroy(&add_soft_body_label);
     rohr_graphics_text_destroy(&add_joint_label);
+    rohr_graphics_text_destroy(&add_anchor_label);
     rohr_graphics_text_destroy(&add_rigid_body_label);
     rohr_graphics_text_destroy(&delete_beam_label);
     rohr_graphics_text_destroy(&delete_node_label);
@@ -1481,6 +1589,9 @@ fail:
     }
     for(size_t i = 0; i < EDITOR_JOINT_MAX; i += 1) {
         rohr_graphics_text_destroy(&joint_labels[i]);
+    }
+    for(size_t i = 0; i < EDITOR_ANCHOR_MAX; i += 1) {
+        rohr_graphics_text_destroy(&anchor_labels[i]);
     }
     for(size_t i = 0; i < EDITOR_SOFT_BODY_MAX; i += 1) {
         rohr_graphics_text_destroy(&soft_body_labels[i]);

@@ -42,6 +42,7 @@ typedef struct EditorViewportState {
     EditorRigidBodyId selected_rigid_body;
     EditorHitboxId selected_hitbox;
     EditorJointId selected_joint;
+    EditorAnchorId selected_anchor;
     EditorSoftBodyId selected_soft_body;
     EditorSoftNodeId selected_soft_node;
     EditorSoftBeamId selected_soft_beam;

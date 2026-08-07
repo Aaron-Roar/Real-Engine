@@ -17,6 +17,18 @@ static Position editor_soft_node_world_get(const EditorObject *object,
         object->position.y + body->position.y + node->position.y};
 }
 
+static Position editor_anchor_world_get(const EditorObject *object,
+    const EditorAnchor *anchor) {
+    const EditorRigidBody *body = NULL;
+    if(object == NULL || anchor == NULL) return (Position){0};
+    for(size_t i = 0; i < object->rigid_body_count; i += 1) {
+        if(object->rigid_bodies[i].id == anchor->rigid_body) body = &object->rigid_bodies[i];
+    }
+    return (Position){object->position.x + (body == NULL ? 0.0f : body->position.x) +
+            anchor->position.x,
+        object->position.y + (body == NULL ? 0.0f : body->position.y) + anchor->position.y};
+}
+
 static float editor_segment_distance_squared(Position point, Position start, Position end) {
     Vec2D edge = {end.x - start.x, end.y - start.y};
     float length_squared = edge.x * edge.x + edge.y * edge.y;
@@ -379,20 +391,25 @@ void editor_viewport_draw(const EditorProject *project, const EditorViewportStat
 
     for(size_t joint_index = 0; joint_index < object->joint_count; joint_index += 1) {
         const EditorJoint *joint = &object->joint_items[joint_index];
-        const EditorRigidBody *a = NULL;
-        const EditorRigidBody *b = NULL;
+        const EditorAnchor *a = NULL;
+        const EditorAnchor *b = NULL;
         if(!joint->visible) continue;
-        for(size_t i = 0; i < object->rigid_body_count; i += 1) {
-            if(object->rigid_bodies[i].id == joint->body_a) a = &object->rigid_bodies[i];
-            if(object->rigid_bodies[i].id == joint->body_b) b = &object->rigid_bodies[i];
+        for(size_t i = 0; i < object->anchor_count; i += 1) {
+            if(object->anchors[i].id == joint->anchor_a) a = &object->anchors[i];
+            if(object->anchors[i].id == joint->anchor_b) b = &object->anchors[i];
         }
         if(a != NULL && b != NULL) editor_line_draw(
-            (Position){object->position.x + a->position.x + joint->anchor_a.x,
-                object->position.y + a->position.y + joint->anchor_a.y},
-            (Position){object->position.x + b->position.x + joint->anchor_b.x,
-                object->position.y + b->position.y + joint->anchor_b.y},
+            editor_anchor_world_get(object, a), editor_anchor_world_get(object, b),
             state->selection == EDITOR_SELECTION_JOINT &&
                 state->selected_joint == joint->id ?
                 (Color){255, 215, 70, 255} : (Color){220, 120, 210, 255});
+    }
+    for(size_t i = 0; i < object->anchor_count; i += 1) {
+        const EditorAnchor *anchor = &object->anchors[i];
+        if(!anchor->visible) continue;
+        (void)rohr_graphics_screen_quad_draw(editor_anchor_world_get(object, anchor),
+            9.0f, 9.0f, 0.78539816339f,
+            state->selected_anchor == anchor->id ?
+                (Color){255, 215, 70, 255} : (Color){235, 150, 215, 255});
     }
 }
