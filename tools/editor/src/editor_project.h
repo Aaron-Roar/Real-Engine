@@ -45,6 +45,7 @@ EditorObject *editor_project_object_add(EditorProject *project, Position positio
 bool editor_project_object_remove(EditorProject *project, EditorObjectId id);
 EditorObject *editor_project_selected_get(EditorProject *project);
 bool editor_project_object_select(EditorProject *project, EditorObjectId id);
+void editor_project_selection_clear(EditorProject *project);
 void editor_project_hitbox_add(EditorProject *project, EditorObject *object);
 bool editor_project_hitbox_remove(EditorObject *object);
 bool editor_project_hitbox_vertex_remove(EditorObject *object, uint32_t vertex_index);

@@ -184,6 +184,25 @@ static bool editor_open_item_delete(
     return editor_selected_delete(project, viewport_state);
 }
 
+static void editor_current_selection_clear(
+    EditorProject *project,
+    EditorViewportState *viewport_state
+) {
+    if(project == NULL || viewport_state == NULL) return;
+    if(viewport_state->mode == EDITOR_VIEWPORT_HIERARCHY) {
+        editor_project_selection_clear(project);
+        viewport_state->selection = EDITOR_SELECTION_NONE;
+    } else if(viewport_state->mode == EDITOR_VIEWPORT_OBJECT) {
+        viewport_state->selection = EDITOR_SELECTION_OBJECT;
+    } else if(viewport_state->mode == EDITOR_VIEWPORT_HITBOX) {
+        viewport_state->selection = EDITOR_SELECTION_HITBOX;
+    } else if(viewport_state->mode == EDITOR_VIEWPORT_VERTEX) {
+        viewport_state->selection = EDITOR_SELECTION_VERTEX;
+    } else if(viewport_state->mode == EDITOR_VIEWPORT_LINE) {
+        viewport_state->selection = EDITOR_SELECTION_LINE;
+    }
+}
+
 int main(void) {
     KeyboardState keyboard = {0};
     MouseState mouse = {0};
@@ -645,12 +664,20 @@ int main(void) {
                 }
             }
         }
-        editor_viewport_update(
-            &viewport_state,
-            &project,
-            rohr_graphics_mouse_screen_position_get(),
-            mouse.button_states[MOUSE_BUTTON_LEFT],
-            rohr_ui_pointer_consumed_get());
+        {
+            bool ui_consumed = rohr_ui_pointer_consumed_get();
+            bool viewport_consumed = editor_viewport_update(
+                &viewport_state,
+                &project,
+                rohr_graphics_mouse_screen_position_get(),
+                mouse.button_states[MOUSE_BUTTON_LEFT],
+                ui_consumed);
+
+            if(mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_PRESSED &&
+                    !ui_consumed && !viewport_consumed && !panel_resizing) {
+                editor_current_selection_clear(&project, &viewport_state);
+            }
+        }
         rohr_ui_frame_end();
         rohr_graphics_screen_clip_clear();
         (void)rohr_graphics_screen_clip_set(

@@ -132,7 +132,7 @@ void editor_viewport_back(EditorViewportState *state) {
     state->dragged_vertex = -1;
 }
 
-void editor_viewport_update(
+bool editor_viewport_update(
     EditorViewportState *state,
     EditorProject *project,
     Position pointer,
@@ -141,13 +141,14 @@ void editor_viewport_update(
 ) {
     EditorObject *object;
 
-    if(state == NULL || project == NULL) return;
+    if(state == NULL || project == NULL) return false;
     if(!pointer_consumed && pointer.x >= 0.0f &&
             pointer.x < EDITOR_VIEWPORT_WIDTH &&
             primary_button == MOUSE_BUTTON_STATE_PRESSED &&
             state->mode == EDITOR_VIEWPORT_HIERARCHY) {
         for(size_t i = project->object_count; i > 0; i -= 1) {
             EditorObject *candidate = &project->objects[i - 1];
+            if(candidate->id != project->selected) continue;
             if(!editor_object_point_contains(candidate, pointer)) continue;
             (void)editor_project_object_select(project, candidate->id);
             state->selection = EDITOR_SELECTION_OBJECT;
@@ -155,31 +156,31 @@ void editor_viewport_update(
                     candidate->id, 0)) {
                 editor_viewport_object_editor_enter(state);
             }
-            return;
+            return true;
         }
     }
     object = editor_project_selected_get(project);
     if(object == NULL || !object->has_hitbox) {
         state->dragged_vertex = -1;
-        return;
+        return false;
     }
     if(primary_button == MOUSE_BUTTON_STATE_RELEASED) {
         state->dragged_vertex = -1;
-        return;
+        return false;
     }
     if(state->dragged_vertex >= 0 &&
             (primary_button == MOUSE_BUTTON_STATE_DOWN ||
                 primary_button == MOUSE_BUTTON_STATE_PRESSED)) {
-        if(object->hitbox.vertices[state->dragged_vertex].position_locked) return;
+        if(object->hitbox.vertices[state->dragged_vertex].position_locked) return true;
         object->hitbox.vertices[state->dragged_vertex].position = (Position){
             pointer.x - object->position.x,
             pointer.y - object->position.y
         };
-        return;
+        return true;
     }
     if(pointer_consumed || pointer.x < 0.0f ||
             pointer.x >= EDITOR_VIEWPORT_WIDTH ||
-            primary_button != MOUSE_BUTTON_STATE_PRESSED) return;
+            primary_button != MOUSE_BUTTON_STATE_PRESSED) return false;
     for(uint32_t i = 0; i < object->hitbox.vertex_count; i += 1) {
         Position vertex = editor_vertex_world_get(object, i);
         Vec2D delta = {pointer.x - vertex.x, pointer.y - vertex.y};
@@ -196,7 +197,7 @@ void editor_viewport_update(
             if(!object->hitbox.vertices[i].position_locked) {
                 state->dragged_vertex = (int)i;
             }
-            return;
+            return true;
         }
     }
     for(uint32_t i = 0; i < object->hitbox.vertex_count; i += 1) {
@@ -225,7 +226,7 @@ void editor_viewport_update(
             } else if(state->mode != EDITOR_VIEWPORT_LINE) {
                 state->mode = EDITOR_VIEWPORT_HITBOX;
             }
-            return;
+            return true;
         }
     }
     if(editor_object_point_contains(object, pointer)) {
@@ -236,7 +237,9 @@ void editor_viewport_update(
         } else if(state->mode != EDITOR_VIEWPORT_OBJECT) {
             state->mode = EDITOR_VIEWPORT_HITBOX;
         }
+        return true;
     }
+    return false;
 }
 
 void editor_viewport_draw(
@@ -258,7 +261,7 @@ void editor_viewport_draw(
             line_color = (Color){255, 215, 70, 255};
         }
 
-        if(!object->has_hitbox) continue;
+        if(!selected_object || !object->has_hitbox) continue;
         for(uint32_t i = 0; i < object->hitbox.vertex_count; i += 1) {
             Position start = editor_vertex_world_get(object, i);
             Position end = editor_vertex_world_get(

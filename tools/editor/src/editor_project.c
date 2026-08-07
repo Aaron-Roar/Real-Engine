@@ -90,6 +90,11 @@ bool editor_project_object_select(EditorProject *project, EditorObjectId id) {
     return false;
 }
 
+void editor_project_selection_clear(EditorProject *project) {
+    if(project == NULL) return;
+    project->selected = EDITOR_OBJECT_INVALID;
+}
+
 void editor_project_hitbox_add(EditorProject *project, EditorObject *object) {
     if(project == NULL || object == NULL) return;
     object->has_hitbox = true;

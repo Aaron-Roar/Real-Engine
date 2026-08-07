@@ -22,6 +22,9 @@ int main(void) {
             editor_project_selected_get(&project) != first ||
             editor_project_object_select(&project, EDITOR_OBJECT_INVALID)) return 1;
     if(!editor_project_object_select(&project, second->id)) return 1;
+    editor_project_selection_clear(&project);
+    if(editor_project_selected_get(&project) != NULL ||
+            !editor_project_object_select(&project, second->id)) return 1;
     editor_project_hitbox_add(&project, second);
     if(!second->has_hitbox || second->hitbox.vertex_count != 3) return 1;
     for(uint32_t i = 0; i < EDITOR_HITBOX_VERTEX_MIN; i += 1) {

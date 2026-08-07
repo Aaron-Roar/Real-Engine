@@ -39,7 +39,7 @@ bool editor_viewport_hitbox_editor_active_get(const EditorViewportState *state);
 void editor_viewport_line_editor_enter(EditorViewportState *state, uint32_t line);
 void editor_viewport_vertex_editor_enter(EditorViewportState *state, uint32_t vertex);
 void editor_viewport_back(EditorViewportState *state);
-void editor_viewport_update(
+bool editor_viewport_update(
     EditorViewportState *state,
     EditorProject *project,
     Position pointer,
