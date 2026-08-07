@@ -466,6 +466,9 @@ void rohr_ui_content(const TextAsset *text, UIRect bounds) { ui_content(text, bo
 void rohr_ui_quad(Position center, float width, float height, float angle, Color color) { ui_quad(center, width, height, angle, color); }
 bool rohr_ui_clip_begin(UIRect bounds) { return ui_clip_begin(bounds); }
 void rohr_ui_clip_end(void) { ui_clip_end(); }
+bool rohr_ui_navigation_move(UINavigationDirection direction) { return ui_navigation_move(direction); }
+bool rohr_ui_navigation_activate(void) { return ui_navigation_activate(); }
+bool rohr_ui_navigation_focus_bounds_get(UIRect *bounds) { return ui_navigation_focus_bounds_get(bounds); }
 void rohr_ui_label(const TextAsset *text, UIRect bounds) { ui_label(text, bounds); }
 EngineResult rohr_ui_physics_debug_panel_init(UIPhysicsDebugPanel *panel, FontDescriptor font) { return ui_physics_debug_panel_init(panel, font); }
 void rohr_ui_physics_debug_panel_draw(UIPhysicsDebugPanel *panel) { ui_physics_debug_panel_draw(panel); }

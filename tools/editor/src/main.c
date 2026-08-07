@@ -726,10 +726,59 @@ int main(void) {
                 rohr_controller_key_pressed_get(&keyboard, SDLK_DELETE)) {
             (void)editor_selected_delete(&project, &viewport_state);
         }
-        if(!field_editing && viewport_state.selection != EDITOR_SELECTION_NONE &&
-                (rohr_controller_key_pressed_get(&keyboard, SDLK_RETURN) ||
-                    rohr_controller_key_pressed_get(&keyboard, SDLK_KP_ENTER))) {
-            (void)editor_selected_open(&project, &viewport_state);
+        if(!field_editing) {
+            Position pointer = rohr_graphics_mouse_screen_position_get();
+            bool pointer_in_viewport = pointer.x >= 0.0f &&
+                pointer.x < EDITOR_VIEWPORT_WIDTH;
+            bool up = rohr_controller_key_pressed_get(&keyboard, SDLK_UP);
+            bool down = rohr_controller_key_pressed_get(&keyboard, SDLK_DOWN);
+            bool left = rohr_controller_key_pressed_get(&keyboard, SDLK_LEFT);
+            bool right = rohr_controller_key_pressed_get(&keyboard, SDLK_RIGHT);
+            bool enter = rohr_controller_key_pressed_get(&keyboard, SDLK_RETURN) ||
+                rohr_controller_key_pressed_get(&keyboard, SDLK_KP_ENTER);
+            if(pointer_in_viewport) {
+                if(up) (void)editor_viewport_selection_nudge(
+                    &viewport_state, &project, (Vec2D){0.0f, -1.0f});
+                if(down) (void)editor_viewport_selection_nudge(
+                    &viewport_state, &project, (Vec2D){0.0f, 1.0f});
+                if(left) (void)editor_viewport_selection_nudge(
+                    &viewport_state, &project, (Vec2D){-1.0f, 0.0f});
+                if(right) (void)editor_viewport_selection_nudge(
+                    &viewport_state, &project, (Vec2D){1.0f, 0.0f});
+                if(enter && viewport_state.selection != EDITOR_SELECTION_NONE) {
+                    (void)editor_selected_open(&project, &viewport_state);
+                }
+            } else {
+                bool moved = false;
+                if(up) moved = rohr_ui_navigation_move(UI_NAVIGATION_UP) || moved;
+                if(down) moved = rohr_ui_navigation_move(UI_NAVIGATION_DOWN) || moved;
+                if(left && !rohr_ui_navigation_move(UI_NAVIGATION_LEFT)) {
+                    if(editor_viewport_hitbox_editor_active_get(&viewport_state)) {
+                        editor_viewport_back(&viewport_state);
+                    }
+                } else if(left) {
+                    moved = true;
+                }
+                if(right && !rohr_ui_navigation_move(UI_NAVIGATION_RIGHT)) {
+                    (void)rohr_ui_navigation_activate();
+                } else if(right) {
+                    moved = true;
+                }
+                if(enter && !rohr_ui_navigation_activate() &&
+                        viewport_state.selection != EDITOR_SELECTION_NONE) {
+                    (void)editor_selected_open(&project, &viewport_state);
+                }
+                if(moved) {
+                    UIRect focused;
+                    if(rohr_ui_navigation_focus_bounds_get(&focused)) {
+                        if(focused.y < 8.0f) panel_scroll_offset += focused.y - 8.0f;
+                        if(focused.y + focused.height > WINDOW_HEIGHT - 8.0f) {
+                            panel_scroll_offset += focused.y + focused.height -
+                                (WINDOW_HEIGHT - 8.0f);
+                        }
+                    }
+                }
+            }
         }
         if(!running) break;
         editor_window_layout_sync();
@@ -846,7 +895,7 @@ int main(void) {
                         viewport_state.selection == EDITOR_SELECTION_HITBOX &&
                             viewport_state.selected_hitbox == box->id ?
                             &selected_style : NULL);
-                    if(result.clicked) {
+                    if(result.clicked || result.focus_changed) {
                         viewport_state.selection = EDITOR_SELECTION_HITBOX;
                         viewport_state.selected_hitbox = box->id;
                         if(result.double_clicked) (void)editor_selected_open(
@@ -888,7 +937,7 @@ int main(void) {
                     result = rohr_ui_button(id, &vertex_labels[i],
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 18.0f, y,
                             EDITOR_TOOLS_WIDTH - 26.0f, 23.0f}, style);
-                    if(result.clicked) {
+                    if(result.clicked || result.focus_changed) {
                         viewport_state.selection = EDITOR_SELECTION_VERTEX;
                         viewport_state.selected_vertex = i;
                         if(result.double_clicked) {
@@ -912,7 +961,7 @@ int main(void) {
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 18.0f,
                                 base + 28.0f + (float)i * 27.0f,
                                 EDITOR_TOOLS_WIDTH - 26.0f, 23.0f}, style);
-                        if(result.clicked) {
+                        if(result.clicked || result.focus_changed) {
                             viewport_state.selection = EDITOR_SELECTION_LINE;
                             viewport_state.selected_line = i;
                             if(result.double_clicked) {
@@ -1154,12 +1203,14 @@ int main(void) {
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
                                 270.0f + (float)(i - anchor_start) * 27.0f,
                                 23.0f, 23.0f}, &anchor->visible);
-                    if(rohr_ui_button(id, &anchor_labels[i],
+                    UIButtonResult result = rohr_ui_button(id, &anchor_labels[i],
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f,
                                 270.0f + (float)(i - anchor_start) * 27.0f,
                                 EDITOR_TOOLS_WIDTH - 48.0f, 23.0f},
                             viewport_state.selected_anchor == anchor->id ?
-                                &selected_style : NULL).clicked) {
+                                &selected_style : NULL);
+                    if(result.clicked || result.focus_changed) {
+                        viewport_state.selection = EDITOR_SELECTION_ANCHOR;
                         viewport_state.selected_anchor = anchor->id;
                     }
                 }
@@ -1320,7 +1371,7 @@ int main(void) {
                                 viewport_state.selection == EDITOR_SELECTION_SOFT_NODE &&
                                     viewport_state.selected_soft_node == node->id ?
                                     &selected_style : NULL);
-                            if(result.clicked) {
+                            if(result.clicked || result.focus_changed) {
                                 viewport_state.selection = EDITOR_SELECTION_SOFT_NODE;
                                 viewport_state.selected_soft_node = node->id;
                                 if(result.double_clicked) (void)editor_selected_open(
@@ -1348,7 +1399,7 @@ int main(void) {
                                 viewport_state.selection == EDITOR_SELECTION_SOFT_BEAM &&
                                     viewport_state.selected_soft_beam == beam->id ?
                                     &selected_style : NULL);
-                            if(result.clicked) {
+                            if(result.clicked || result.focus_changed) {
                                 viewport_state.selection = EDITOR_SELECTION_SOFT_BEAM;
                                 viewport_state.selected_soft_beam = beam->id;
                                 if(result.double_clicked) (void)editor_selected_open(
@@ -1547,7 +1598,7 @@ int main(void) {
                             viewport_state.selection == EDITOR_SELECTION_RIGID_BODY &&
                                 viewport_state.selected_rigid_body == body->id ?
                                 &selected_style : NULL);
-                        if(result.clicked) {
+                        if(result.clicked || result.focus_changed) {
                             viewport_state.selection = EDITOR_SELECTION_RIGID_BODY;
                             viewport_state.selected_rigid_body = body->id;
                             if(result.double_clicked) (void)editor_selected_open(
@@ -1574,7 +1625,7 @@ int main(void) {
                             viewport_state.selection == EDITOR_SELECTION_JOINT &&
                                 viewport_state.selected_joint == joint->id ?
                                 &selected_style : NULL);
-                        if(result.clicked) {
+                        if(result.clicked || result.focus_changed) {
                             viewport_state.selection = EDITOR_SELECTION_JOINT;
                             viewport_state.selected_joint = joint->id;
                             if(result.double_clicked) (void)editor_selected_open(
@@ -1601,7 +1652,7 @@ int main(void) {
                             viewport_state.selection == EDITOR_SELECTION_SOFT_BODY &&
                                 viewport_state.selected_soft_body == body->id ?
                                 &selected_style : NULL);
-                        if(result.clicked) {
+                        if(result.clicked || result.focus_changed) {
                             viewport_state.selection = EDITOR_SELECTION_SOFT_BODY;
                             viewport_state.selected_soft_body = body->id;
                             if(result.double_clicked) (void)editor_selected_open(
@@ -1667,7 +1718,7 @@ int main(void) {
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, y,
                         EDITOR_TOOLS_WIDTH - 48.0f, 28.0f}, style);
                 }
-                if(object_result.clicked) {
+                if(object_result.clicked || object_result.focus_changed) {
                     (void)editor_project_object_select(&project, object->id);
                     viewport_state.selection = EDITOR_SELECTION_OBJECT;
                     if(object_result.double_clicked) {

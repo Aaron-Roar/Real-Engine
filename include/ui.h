@@ -36,10 +36,20 @@ typedef struct UIButtonStyle {
 /** Interaction result returned for one button. */
 typedef struct UIButtonResult {
     bool hovered;
+    bool focused;
+    bool focus_changed;
     bool pressed;
     bool clicked;
     bool double_clicked;
+    bool keyboard_activated;
 } UIButtonResult;
+
+typedef enum UINavigationDirection {
+    UI_NAVIGATION_UP,
+    UI_NAVIGATION_DOWN,
+    UI_NAVIGATION_LEFT,
+    UI_NAVIGATION_RIGHT
+} UINavigationDirection;
 
 typedef struct UIDropdownResult {
     bool hovered;
@@ -216,6 +226,12 @@ void ui_quad(Position center, float width, float height, float angle, Color colo
 /** Begin and end a clipped UI component region. */
 bool ui_clip_begin(UIRect bounds);
 void ui_clip_end(void);
+/** Move keyboard focus spatially among controls registered last frame. */
+bool ui_navigation_move(UINavigationDirection direction);
+/** Activate the currently keyboard-focused control on its next draw. */
+bool ui_navigation_activate(void);
+/** Return the focused control's last registered screen bounds. */
+bool ui_navigation_focus_bounds_get(UIRect *bounds);
 
 /** Draw reusable text centered inside logical screen-space bounds. */
 void ui_label(const TextAsset *text, UIRect bounds);

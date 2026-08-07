@@ -331,6 +331,7 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
             Position center = {object->position.x + body->position.x,
                 object->position.y + body->position.y};
             state->rotated_body = true;
+            state->selection = EDITOR_SELECTION_RIGID_BODY;
             state->rotation_pointer_offset = body->rotation -
                 atan2f(pointer.y - center.y, pointer.x - center.x);
             return true;
@@ -339,6 +340,7 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
             if(body->hitboxes[i].visible && editor_hitbox_point_contains(
                     object, body, &body->hitboxes[i], pointer)) {
                 state->dragged_body = true;
+                state->selection = EDITOR_SELECTION_RIGID_BODY;
                 state->drag_offset = (Vec2D){pointer.x - object->position.x - body->position.x,
                     pointer.y - object->position.y - body->position.y};
                 return true;
@@ -594,4 +596,45 @@ void editor_viewport_draw(const EditorProject *project, const EditorViewportStat
             state->selected_anchor == anchor->id || state->preview_anchor == anchor->id ?
                 (Color){255, 215, 70, 255} : (Color){235, 150, 215, 255});
     }
+}
+
+bool editor_viewport_selection_nudge(EditorViewportState *state,
+    EditorProject *project, Vec2D screen_delta) {
+    EditorObject *object;
+    EditorRigidBody *body;
+
+    if(state == NULL || project == NULL) return false;
+    object = editor_project_selected_get(project);
+    if(object == NULL) return false;
+    body = editor_selected_body_get(object, state);
+    if(state->selection == EDITOR_SELECTION_RIGID_BODY && body != NULL) {
+        body->position.x += screen_delta.x;
+        body->position.y += screen_delta.y;
+        return true;
+    }
+    if(state->selection == EDITOR_SELECTION_VERTEX && body != NULL) {
+        EditorHitbox *hitbox = editor_selected_hitbox_get(object, state);
+        float cosine = cosf(-body->rotation);
+        float sine = sinf(-body->rotation);
+        if(hitbox == NULL || state->selected_vertex >= hitbox->vertex_count ||
+                hitbox->vertices[state->selected_vertex].position_locked) return false;
+        hitbox->vertices[state->selected_vertex].position.x +=
+            screen_delta.x * cosine - screen_delta.y * sine;
+        hitbox->vertices[state->selected_vertex].position.y +=
+            screen_delta.x * sine + screen_delta.y * cosine;
+        return true;
+    }
+    if(state->selection == EDITOR_SELECTION_ANCHOR) {
+        EditorAnchor *anchor = editor_project_anchor_get(object, state->selected_anchor);
+        EditorRigidBody *anchor_body;
+        Position world;
+        if(anchor == NULL) return false;
+        anchor_body = editor_project_rigid_body_get(object, anchor->rigid_body);
+        world = editor_anchor_world_get(object, anchor);
+        world.x += screen_delta.x;
+        world.y += screen_delta.y;
+        editor_anchor_world_set(object, anchor, anchor_body, world);
+        return true;
+    }
+    return false;
 }

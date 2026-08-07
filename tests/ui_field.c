@@ -168,5 +168,32 @@ int main(void) {
         rohr_ui_scroll_region_end();
         rohr_ui_frame_end();
     }
+
+    rohr_ui_frame_begin((UIInput){0});
+    (void)rohr_ui_button("nav-a", NULL, (UIRect){0.0f, 0.0f, 80.0f, 20.0f}, NULL);
+    (void)rohr_ui_button("nav-b", NULL, (UIRect){120.0f, 0.0f, 80.0f, 20.0f}, NULL);
+    (void)rohr_ui_button("nav-c", NULL, (UIRect){0.0f, 40.0f, 80.0f, 20.0f}, NULL);
+    rohr_ui_frame_end();
+    {
+        UIRect focused;
+        if(!rohr_ui_navigation_move(UI_NAVIGATION_DOWN) ||
+                !rohr_ui_navigation_focus_bounds_get(&focused) ||
+                fabsf(focused.x) > 0.001f ||
+                !rohr_ui_navigation_move(UI_NAVIGATION_RIGHT) ||
+                !rohr_ui_navigation_focus_bounds_get(&focused) ||
+                fabsf(focused.x - 120.0f) > 0.001f ||
+                !rohr_ui_navigation_activate()) return 1;
+    }
+    rohr_ui_frame_begin((UIInput){0});
+    (void)rohr_ui_button("nav-a", NULL, (UIRect){0.0f, 0.0f, 80.0f, 20.0f}, NULL);
+    {
+        UIButtonResult activated = rohr_ui_button(
+            "nav-b", NULL, (UIRect){120.0f, 0.0f, 80.0f, 20.0f}, NULL);
+        if(!activated.clicked || !activated.double_clicked ||
+                !activated.keyboard_activated || !activated.focused ||
+                !activated.focus_changed) return 1;
+    }
+    (void)rohr_ui_button("nav-c", NULL, (UIRect){0.0f, 40.0f, 80.0f, 20.0f}, NULL);
+    rohr_ui_frame_end();
     return 0;
 }

@@ -9,6 +9,12 @@
 #define UI_DROPDOWN_OPTION_MAX 128
 #define UI_DROPDOWN_VISIBLE_MAX 8
 #define UI_SCROLL_REGION_MAX 8
+#define UI_NAVIGATION_ITEM_MAX 512
+
+typedef struct UINavigationItem {
+    uint64_t id;
+    UIRect bounds;
+} UINavigationItem;
 
 typedef struct UIContext {
     UIInput input;
@@ -40,6 +46,13 @@ typedef struct UIContext {
     float scroll_offset_stack[UI_SCROLL_REGION_MAX];
     float scroll_content_stack[UI_SCROLL_REGION_MAX];
     size_t scroll_depth;
+    UINavigationItem navigation_items[UI_NAVIGATION_ITEM_MAX];
+    UINavigationItem navigation_previous[UI_NAVIGATION_ITEM_MAX];
+    size_t navigation_item_count;
+    size_t navigation_previous_count;
+    uint64_t navigation_focus_id;
+    uint64_t navigation_focus_changed_id;
+    uint64_t navigation_activate_id;
 } UIContext;
 
 static UIContext ui_context = {0};
@@ -88,6 +101,11 @@ static void ui_border_raw(UIRect bounds, float thickness, Color color) {
 }
 
 static void ui_label_raw(const TextAsset *text, UIRect bounds);
+static void ui_navigation_item_register(uint64_t id, UIRect bounds) {
+    if(id == 0 || ui_context.navigation_item_count >= UI_NAVIGATION_ITEM_MAX) return;
+    ui_context.navigation_items[ui_context.navigation_item_count++] =
+        (UINavigationItem){.id = id, .bounds = bounds};
+}
 static void ui_surface_raw(UIRect bounds, Color color) {
     (void)graphics_screen_rect_draw(bounds.x, bounds.y, bounds.width, bounds.height, color);
 }
@@ -132,6 +150,14 @@ static UIButtonResult ui_interaction_id(uint64_t interaction_id, bool hovered) {
     UIButtonResult result = {0};
 
     if(!ui_context.frame_active || interaction_id == 0) return result;
+    result.focused = ui_context.navigation_focus_id == interaction_id;
+    result.focus_changed = ui_context.navigation_focus_changed_id == interaction_id;
+    if(ui_context.navigation_activate_id == interaction_id) {
+        result.clicked = true;
+        result.double_clicked = true;
+        result.keyboard_activated = true;
+        ui_context.navigation_activate_id = 0;
+    }
     if(hovered && !ui_context.pointer_claimed) {
         result.hovered = true;
         ui_context.pointer_claimed = true;
@@ -142,11 +168,13 @@ static UIButtonResult ui_interaction_id(uint64_t interaction_id, bool hovered) {
         result.pressed = ui_context.input.primary_button == MOUSE_BUTTON_STATE_PRESSED ||
             ui_context.input.primary_button == MOUSE_BUTTON_STATE_DOWN;
         if(ui_context.input.primary_button == MOUSE_BUTTON_STATE_RELEASED) {
-            result.clicked = result.hovered;
-            if(result.clicked) {
+            bool pointer_clicked = result.hovered;
+            result.clicked = result.clicked || pointer_clicked;
+            if(pointer_clicked) {
                 Uint64 now = SDL_GetTicks();
-                result.double_clicked = ui_context.last_clicked_id == interaction_id &&
-                    now - ui_context.last_clicked_at <= 400;
+                result.double_clicked = result.double_clicked ||
+                    (ui_context.last_clicked_id == interaction_id &&
+                        now - ui_context.last_clicked_at <= 400);
                 ui_context.last_clicked_id = interaction_id;
                 ui_context.last_clicked_at = now;
             }
@@ -154,6 +182,8 @@ static UIButtonResult ui_interaction_id(uint64_t interaction_id, bool hovered) {
         }
     } else if(result.hovered && ui_context.active_id == 0 &&
             ui_context.input.primary_button == MOUSE_BUTTON_STATE_PRESSED) {
+        ui_context.navigation_focus_id = interaction_id;
+        result.focused = true;
         ui_context.active_id = interaction_id;
         ui_context.active_seen = true;
         ui_context.pointer_consumed = true;
@@ -164,13 +194,83 @@ static UIButtonResult ui_interaction_id(uint64_t interaction_id, bool hovered) {
 }
 
 static UIButtonResult ui_interaction_resolved(const char *id, UIRect bounds) {
-    return ui_interaction_id(ui_hash_id(id),
+    uint64_t interaction_id = ui_hash_id(id);
+    ui_navigation_item_register(interaction_id, bounds);
+    return ui_interaction_id(interaction_id,
         ui_point_in_rect(ui_context.input.pointer, bounds) &&
             ui_point_in_scroll_clip(ui_context.input.pointer));
 }
 
 UIButtonResult ui_interaction(const char *id, UIRect bounds) {
     return ui_interaction_resolved(id, ui_bounds_resolve(bounds));
+}
+
+bool ui_navigation_move(UINavigationDirection direction) {
+    const UINavigationItem *current = NULL;
+    size_t best = SIZE_MAX;
+    float best_score = INFINITY;
+
+    if(ui_context.navigation_previous_count == 0) return false;
+    for(size_t i = 0; i < ui_context.navigation_previous_count; i += 1) {
+        if(ui_context.navigation_previous[i].id == ui_context.navigation_focus_id) {
+            current = &ui_context.navigation_previous[i];
+            break;
+        }
+    }
+    if(current == NULL) {
+        ui_context.navigation_focus_id = ui_context.navigation_previous[0].id;
+        ui_context.navigation_focus_changed_id = ui_context.navigation_focus_id;
+        return true;
+    }
+    {
+        float current_x = current->bounds.x + current->bounds.width * 0.5f;
+        float current_y = current->bounds.y + current->bounds.height * 0.5f;
+        for(size_t i = 0; i < ui_context.navigation_previous_count; i += 1) {
+            const UINavigationItem *candidate = &ui_context.navigation_previous[i];
+            float x = candidate->bounds.x + candidate->bounds.width * 0.5f;
+            float y = candidate->bounds.y + candidate->bounds.height * 0.5f;
+            float dx = x - current_x;
+            float dy = y - current_y;
+            float primary;
+            float cross;
+            bool eligible = false;
+            if(candidate->id == current->id) continue;
+            if(direction == UI_NAVIGATION_UP && dy < -0.5f) {
+                primary = -dy; cross = fabsf(dx); eligible = true;
+            } else if(direction == UI_NAVIGATION_DOWN && dy > 0.5f) {
+                primary = dy; cross = fabsf(dx); eligible = true;
+            } else if(direction == UI_NAVIGATION_LEFT && dx < -0.5f) {
+                primary = -dx; cross = fabsf(dy); eligible = true;
+            } else if(direction == UI_NAVIGATION_RIGHT && dx > 0.5f) {
+                primary = dx; cross = fabsf(dy); eligible = true;
+            }
+            if(eligible && primary + cross * 0.25f < best_score) {
+                best_score = primary + cross * 0.25f;
+                best = i;
+            }
+        }
+    }
+    if(best == SIZE_MAX) return false;
+    ui_context.navigation_focus_id = ui_context.navigation_previous[best].id;
+    ui_context.navigation_focus_changed_id = ui_context.navigation_focus_id;
+    return true;
+}
+
+bool ui_navigation_activate(void) {
+    if(ui_context.navigation_focus_id == 0) return false;
+    ui_context.navigation_activate_id = ui_context.navigation_focus_id;
+    return true;
+}
+
+bool ui_navigation_focus_bounds_get(UIRect *bounds) {
+    if(bounds == NULL || ui_context.navigation_focus_id == 0) return false;
+    for(size_t i = 0; i < ui_context.navigation_previous_count; i += 1) {
+        if(ui_context.navigation_previous[i].id == ui_context.navigation_focus_id) {
+            *bounds = ui_context.navigation_previous[i].bounds;
+            return true;
+        }
+    }
+    return false;
 }
 
 UIButtonStyle ui_button_style_default_get(void) {
@@ -272,6 +372,7 @@ void ui_frame_begin(UIInput input) {
     ui_context.pointer_consumed = false;
     ui_context.translation_y = 0.0f;
     ui_context.scroll_depth = 0;
+    ui_context.navigation_item_count = 0;
     ui_context.frame_active = true;
 }
 
@@ -357,7 +458,8 @@ UIFieldResult ui_field(const char *id, UIFieldBinding binding,
             bounds.height <= 0.0f) return result;
     interaction = ui_interaction(id, bounds);
     result.hovered = interaction.hovered;
-    if(result.hovered && ui_context.input.primary_button == MOUSE_BUTTON_STATE_PRESSED) {
+    if((result.hovered && ui_context.input.primary_button == MOUSE_BUTTON_STATE_PRESSED) ||
+            interaction.keyboard_activated) {
         ui_context.field_id = field_id;
         ui_context.field_replace_pending = binding.kind == UI_FIELD_FLOAT;
         ui_field_binding_display_set(binding, display);
@@ -373,6 +475,7 @@ UIFieldResult ui_field(const char *id, UIFieldBinding binding,
             bool edited = false;
 
             if(key == SDLK_RETURN || key == SDLK_KP_ENTER) {
+                if(interaction.keyboard_activated) continue;
                 result.submitted = true;
                 ui_context.field_id = 0;
             } else if(key == SDLK_ESCAPE) {
@@ -406,7 +509,8 @@ UIFieldResult ui_field(const char *id, UIFieldBinding binding,
         }
     }
     ui_surface(bounds,
-        result.active ? resolved.pressed : (result.hovered ? resolved.hovered : resolved.idle));
+        result.active ? resolved.pressed :
+            ((result.hovered || interaction.focused) ? resolved.hovered : resolved.idle));
     ui_content(display, bounds);
     return result;
 }
@@ -422,7 +526,7 @@ UIButtonResult ui_button(
     result = ui_interaction(id, bounds);
     ui_surface(bounds,
         result.pressed ? resolved_style.pressed :
-            (result.hovered ? resolved_style.hovered : resolved_style.idle)
+            ((result.hovered || result.focused) ? resolved_style.hovered : resolved_style.idle)
     );
     ui_content(label, bounds);
     return result;
@@ -634,6 +738,8 @@ UISliderResult ui_slider_with_text(
                 resolved.style.step_button_size,
                 resolved.angle
             ) && ui_point_in_scroll_clip(ui_context.input.pointer);
+            ui_navigation_item_register(step_id, (UIRect){step_centers[step_index].x - 0.5f,
+                step_centers[step_index].y - 0.5f, 1.0f, 1.0f});
             UIButtonResult interaction = ui_interaction_id(step_id, inside);
             step_hovered[step_index] = interaction.hovered;
             step_pressed[step_index] = interaction.pressed;
@@ -650,6 +756,8 @@ UISliderResult ui_slider_with_text(
     }
     contains_pointer = ui_point_in_slider(ui_context.input.pointer, &resolved) &&
         ui_point_in_scroll_clip(ui_context.input.pointer);
+    ui_navigation_item_register(slider_id, (UIRect){resolved.center.x - 0.5f,
+        resolved.center.y - 0.5f, 1.0f, 1.0f});
     slider_interaction = ui_interaction_id(slider_id, contains_pointer);
     result.hovered = result.hovered || slider_interaction.hovered;
     result.pressed = result.pressed || slider_interaction.pressed;
@@ -724,7 +832,8 @@ UISliderResult ui_slider_with_text(
         resolved.style.handle_height,
         resolved.angle,
         result.pressed ? resolved.style.handle_pressed
-            : (result.hovered ? resolved.style.handle_hovered : resolved.style.handle)
+            : ((result.hovered || slider_interaction.focused) ?
+                resolved.style.handle_hovered : resolved.style.handle)
     );
     if(text != NULL) {
         float height = fmaxf(resolved.style.handle_height, resolved.style.track_thickness);
@@ -869,6 +978,21 @@ void ui_frame_end(void) {
     if(ui_context.dropdown_id != 0 && !ui_context.dropdown_seen) {
         ui_context.dropdown_id = 0;
     }
+    ui_context.navigation_previous_count = ui_context.navigation_item_count;
+    memcpy(ui_context.navigation_previous, ui_context.navigation_items,
+        ui_context.navigation_item_count * sizeof(ui_context.navigation_items[0]));
+    if(ui_context.navigation_focus_id != 0) {
+        bool found = false;
+        for(size_t i = 0; i < ui_context.navigation_previous_count; i += 1) {
+            if(ui_context.navigation_previous[i].id == ui_context.navigation_focus_id) {
+                found = true;
+                break;
+            }
+        }
+        if(!found) ui_context.navigation_focus_id = 0;
+    }
+    ui_context.navigation_activate_id = 0;
+    ui_context.navigation_focus_changed_id = 0;
     ui_context.field_key_count = 0;
     ui_context.wheel_y = 0.0f;
     ui_context.frame_active = false;

@@ -76,5 +76,7 @@ void editor_viewport_draw(
     const EditorProject *project,
     const EditorViewportState *state
 );
+bool editor_viewport_selection_nudge(EditorViewportState *state,
+    EditorProject *project, Vec2D screen_delta);
 
 #endif

@@ -1954,6 +1954,12 @@ void rohr_ui_quad(Position center, float width, float height, float angle, Color
 /** @brief Begins and ends a clipped UI component region. */
 bool rohr_ui_clip_begin(UIRect bounds);
 void rohr_ui_clip_end(void);
+/** @brief Moves UI keyboard focus in a screen-space direction. */
+bool rohr_ui_navigation_move(UINavigationDirection direction);
+/** @brief Activates the currently focused UI control. */
+bool rohr_ui_navigation_activate(void);
+/** @brief Returns the focused control's previous-frame screen bounds. */
+bool rohr_ui_navigation_focus_bounds_get(UIRect *bounds);
 
 /** @brief Draws reusable text centered inside bounds. */
 void rohr_ui_label(const TextAsset *text, UIRect bounds);
