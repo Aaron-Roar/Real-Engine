@@ -388,6 +388,7 @@ int main(void) {
                 EditorVertex *a = &selected->hitbox.vertices[line];
                 EditorVertex *b = &selected->hitbox.vertices[(line + 1) % selected->hitbox.vertex_count];
                 bool constrained = a->position_locked && b->position_locked;
+                bool vertex_inserted = false;
                 float length = editor_project_hitbox_line_length_get(selected, line);
                 UISliderConfig slider = rohr_ui_slider_config_default_get();
                 rohr_ui_label(&line_labels[line], (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
@@ -397,44 +398,49 @@ int main(void) {
                             EDITOR_TOOLS_WIDTH - 20.0f, 34.0f}, NULL).clicked &&
                         editor_project_hitbox_vertex_insert(&project, selected, line)) {
                     editor_viewport_hitbox_editor_enter(&viewport_state);
+                    vertex_inserted = true;
                 }
-                rohr_ui_label(&length_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
-                    126.0f, EDITOR_TOOLS_WIDTH - 16.0f, 22.0f});
-                if(constrained) {
-                    editor_numeric_field_disabled_draw(&length_field, length,
-                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
-                            150.0f, EDITOR_TOOLS_WIDTH - 20.0f, 26.0f});
-                    rohr_ui_label(&constrained_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 5.0f,
-                        190.0f, EDITOR_TOOLS_WIDTH - 10.0f, 38.0f});
-                } else {
-                    UIFieldResult length_result = rohr_ui_field(
-                        "editor.line.length.field",
-                        (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &length},
-                        &length_field,
-                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 150.0f,
-                            EDITOR_TOOLS_WIDTH - 20.0f, 26.0f}, NULL);
-                    field_editing = length_result.active;
-                    if(length_result.changed) {
-                        (void)editor_project_hitbox_line_length_set(selected, line, length);
+                if(!vertex_inserted) {
+                    rohr_ui_label(&length_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                        126.0f, EDITOR_TOOLS_WIDTH - 16.0f, 22.0f});
+                    if(constrained) {
+                        editor_numeric_field_disabled_draw(&length_field, length,
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
+                                150.0f, EDITOR_TOOLS_WIDTH - 20.0f, 26.0f});
+                        rohr_ui_label(&constrained_label,
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 5.0f,
+                                190.0f, EDITOR_TOOLS_WIDTH - 10.0f, 38.0f});
+                    } else {
+                        UIFieldResult length_result = rohr_ui_field(
+                            "editor.line.length.field",
+                            (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &length},
+                            &length_field,
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 150.0f,
+                                EDITOR_TOOLS_WIDTH - 20.0f, 26.0f}, NULL);
+                        field_editing = length_result.active;
+                        if(length_result.changed) {
+                            (void)editor_project_hitbox_line_length_set(
+                                selected, line, length);
+                        }
+                        slider.center = (Position){EDITOR_VIEWPORT_WIDTH +
+                            EDITOR_TOOLS_WIDTH * 0.5f, 202.0f};
+                        slider.length = EDITOR_TOOLS_WIDTH - 36.0f;
+                        slider.min_value = 5.0f;
+                        slider.max_value = EDITOR_VIEWPORT_WIDTH;
+                        (void)editor_project_hitbox_line_length_set(selected, line,
+                            rohr_ui_slider("editor.line.length", length, &slider).value);
                     }
-                    slider.center = (Position){EDITOR_VIEWPORT_WIDTH +
-                        EDITOR_TOOLS_WIDTH * 0.5f, 202.0f};
-                    slider.length = EDITOR_TOOLS_WIDTH - 36.0f;
-                    slider.min_value = 5.0f;
-                    slider.max_value = EDITOR_VIEWPORT_WIDTH;
-                    (void)editor_project_hitbox_line_length_set(selected, line,
-                        rohr_ui_slider("editor.line.length", length, &slider).value);
-                }
-                {
-                    UIButtonStyle delete_style = editor_delete_button_style_get();
-                    UIRect delete_bounds = {EDITOR_VIEWPORT_WIDTH + 10.0f, 238.0f,
-                        EDITOR_TOOLS_WIDTH - 20.0f, 30.0f};
-                    if(selected->hitbox.vertex_count <= EDITOR_HITBOX_VERTEX_MIN) {
-                        rohr_ui_button_disabled(delete_bounds, &delete_style);
-                        rohr_ui_label(&delete_line_label, delete_bounds);
-                    } else if(rohr_ui_button("editor.line.delete", &delete_line_label,
-                            delete_bounds, &delete_style).clicked) {
-                        (void)editor_selected_delete(&project, &viewport_state);
+                    {
+                        UIButtonStyle delete_style = editor_delete_button_style_get();
+                        UIRect delete_bounds = {EDITOR_VIEWPORT_WIDTH + 10.0f, 238.0f,
+                            EDITOR_TOOLS_WIDTH - 20.0f, 30.0f};
+                        if(selected->hitbox.vertex_count <= EDITOR_HITBOX_VERTEX_MIN) {
+                            rohr_ui_button_disabled(delete_bounds, &delete_style);
+                            rohr_ui_label(&delete_line_label, delete_bounds);
+                        } else if(rohr_ui_button("editor.line.delete", &delete_line_label,
+                                delete_bounds, &delete_style).clicked) {
+                            (void)editor_selected_delete(&project, &viewport_state);
+                        }
                     }
                 }
             }
