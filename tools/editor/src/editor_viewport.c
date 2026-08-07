@@ -109,6 +109,27 @@ static void editor_circle_draw(Position center, float radius, Color color) {
     }
 }
 
+static void editor_body_origin_draw(const EditorObject *object,
+    const EditorRigidBody *body) {
+    Position center;
+    Position x_end;
+    Position y_end;
+    const float axis_length = 16.0f;
+
+    if(object == NULL || body == NULL) return;
+    center = (Position){object->position.x + body->position.x,
+        object->position.y + body->position.y};
+    x_end = (Position){center.x + cosf(body->rotation) * axis_length,
+        center.y + sinf(body->rotation) * axis_length};
+    y_end = (Position){center.x - sinf(body->rotation) * axis_length,
+        center.y + cosf(body->rotation) * axis_length};
+    editor_line_draw(center, x_end, (Color){235, 95, 95, 255});
+    editor_line_draw(center, y_end, (Color){95, 220, 135, 255});
+    editor_circle_draw(center, 5.0f, (Color){245, 245, 250, 255});
+    (void)rohr_graphics_screen_quad_draw(center, 3.0f, 3.0f, 0.0f,
+        (Color){245, 245, 250, 255});
+}
+
 static bool editor_hitbox_point_contains(const EditorObject *object,
     const EditorRigidBody *body, const EditorHitbox *hitbox, Position point) {
     bool inside = false;
@@ -484,19 +505,27 @@ void editor_viewport_draw(const EditorProject *project, const EditorViewportStat
         }
     }
 
-    if(state->mode == EDITOR_VIEWPORT_RIGID_BODY) {
+    {
         const EditorRigidBody *selected = NULL;
         for(size_t i = 0; i < object->rigid_body_count; i += 1) {
             if(object->rigid_bodies[i].id == state->selected_rigid_body) {
                 selected = &object->rigid_bodies[i];
             }
         }
-        if(selected != NULL && selected->visible) {
+        if(selected != NULL && selected->visible &&
+                (state->mode == EDITOR_VIEWPORT_RIGID_BODY ||
+                    state->mode == EDITOR_VIEWPORT_HITBOX ||
+                    state->mode == EDITOR_VIEWPORT_LINE ||
+                    state->mode == EDITOR_VIEWPORT_VERTEX ||
+                    state->selection == EDITOR_SELECTION_RIGID_BODY)) {
             Position center = {object->position.x + selected->position.x,
                 object->position.y + selected->position.y};
-            Position handle = editor_body_rotation_handle_get(object, selected);
-            editor_line_draw(center, handle, (Color){255, 215, 70, 255});
-            editor_circle_draw(handle, 10.0f, (Color){255, 215, 70, 255});
+            editor_body_origin_draw(object, selected);
+            if(state->mode == EDITOR_VIEWPORT_RIGID_BODY) {
+                Position handle = editor_body_rotation_handle_get(object, selected);
+                editor_line_draw(center, handle, (Color){255, 215, 70, 255});
+                editor_circle_draw(handle, 10.0f, (Color){255, 215, 70, 255});
+            }
         }
     }
 
