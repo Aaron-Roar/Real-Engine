@@ -17,6 +17,7 @@ int main(void) {
     float number = 0.0f;
     char string[32] = "a";
     const TextAsset *dropdown_options[2] = {NULL, NULL};
+    const TextAsset *long_dropdown_options[10] = {0};
 
     rohr_ui_frame_begin((UIInput){
         .pointer = {10.0f, 10.0f},
@@ -112,5 +113,45 @@ int main(void) {
         if(!result.changed || result.selected_index != 1 || result.open) return 1;
     }
     rohr_ui_frame_end();
+
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f},
+        .primary_button = MOUSE_BUTTON_STATE_PRESSED});
+    (void)rohr_ui_dropdown("long-dropdown", long_dropdown_options, 10, 0, bounds, NULL);
+    rohr_ui_frame_end();
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f},
+        .primary_button = MOUSE_BUTTON_STATE_RELEASED});
+    if(!rohr_ui_dropdown("long-dropdown", long_dropdown_options,
+            10, 0, bounds, NULL).open) return 1;
+    rohr_ui_frame_end();
+    {
+        SDL_Event wheel = {0};
+        UIDropdownResult result;
+        wheel.type = SDL_EVENT_MOUSE_WHEEL;
+        wheel.wheel.y = -1.0f;
+        rohr_ui_field_event_add(&wheel);
+        rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 40.0f}});
+        result = rohr_ui_dropdown("long-dropdown", long_dropdown_options,
+            10, 0, bounds, NULL);
+        if(!result.open || result.hovered_index != 1) return 1;
+        rohr_ui_frame_end();
+    }
+
+    {
+        SDL_Event wheel = {0};
+        UIScrollRegionResult scroll;
+        wheel.type = SDL_EVENT_MOUSE_WHEEL;
+        wheel.wheel.y = -1.0f;
+        rohr_ui_field_event_add(&wheel);
+        rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 35.0f}});
+        scroll = rohr_ui_scroll_region_begin("scroll", (UIRect){0.0f, 0.0f,
+            100.0f, 50.0f}, 100.0f, 0.0f, 10.0f);
+        if(!scroll.changed || fabsf(scroll.offset - 10.0f) > 0.001f ||
+                !rohr_ui_button("scrolled-button", NULL,
+                    (UIRect){0.0f, 40.0f, 100.0f, 20.0f}, NULL).hovered ||
+                rohr_ui_button("clipped-button", NULL,
+                    (UIRect){0.0f, 100.0f, 100.0f, 20.0f}, NULL).hovered) return 1;
+        rohr_ui_scroll_region_end();
+        rohr_ui_frame_end();
+    }
     return 0;
 }

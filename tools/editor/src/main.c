@@ -44,6 +44,42 @@ static bool editor_result_ok(EngineResult result) {
     return false;
 }
 
+static float editor_panel_content_height_get(const EditorProject *project,
+    const EditorViewportState *state) {
+    const EditorObject *object = NULL;
+    float height = WINDOW_HEIGHT;
+
+    if(project == NULL || state == NULL) return height;
+    for(size_t i = 0; i < project->object_count; i += 1) {
+        if(project->objects[i].id == project->selected) object = &project->objects[i];
+    }
+    if(state->mode == EDITOR_VIEWPORT_HIERARCHY) {
+        return fmaxf(height, 80.0f + (float)project->object_count * 34.0f);
+    }
+    if(object == NULL) return height;
+    if(state->mode == EDITOR_VIEWPORT_OBJECT) {
+        return fmaxf(height, 290.0f + (float)(object->rigid_body_count +
+            object->joint_count + object->soft_body_count) * 30.0f);
+    }
+    if(state->mode == EDITOR_VIEWPORT_RIGID_BODY) {
+        for(size_t i = 0; i < object->rigid_body_count; i += 1) {
+            if(object->rigid_bodies[i].id == state->selected_rigid_body) {
+                return fmaxf(height, 270.0f +
+                    (float)object->rigid_bodies[i].hitbox_count * 30.0f);
+            }
+        }
+    }
+    if(state->mode == EDITOR_VIEWPORT_SOFT_BODY) {
+        for(size_t i = 0; i < object->soft_body_count; i += 1) {
+            if(object->soft_body_items[i].id == state->selected_soft_body) {
+                return fmaxf(height, 250.0f + (float)(object->soft_body_items[i].node_count +
+                    object->soft_body_items[i].beam_count) * 28.0f);
+            }
+        }
+    }
+    return height;
+}
+
 static bool editor_use_executable_directory(void) {
     const char *base_path = SDL_GetBasePath();
 
@@ -484,6 +520,8 @@ int main(void) {
     bool running = true;
     bool field_editing = false;
     bool panel_resizing = false;
+    float panel_scroll_offset = 0.0f;
+    EditorViewportMode panel_scroll_mode = EDITOR_VIEWPORT_HIERARCHY;
 
     editor_project_init(&project);
     editor_viewport_state_init(&viewport_state);
@@ -576,7 +614,7 @@ int main(void) {
         rohr_controller_key_states_update(&keyboard);
         rohr_controller_mouse_states_update(&mouse);
         while((event = rohr_engine_event_poll()).type != 0) {
-            rohr_ui_field_event_add(&event);
+            rohr_ui_event_add(&event);
             rohr_controller_key_event_add(
                 &keyboard,
                 rohr_controller_keyboard_event_capture(&event));
@@ -639,6 +677,14 @@ int main(void) {
             .pointer = rohr_graphics_mouse_screen_position_get(),
             .primary_button = mouse.button_states[MOUSE_BUTTON_LEFT]
         });
+        if(panel_scroll_mode != viewport_state.mode) {
+            panel_scroll_mode = viewport_state.mode;
+            panel_scroll_offset = 0.0f;
+        }
+        panel_scroll_offset = rohr_ui_scroll_region_begin("editor.tools.scroll",
+            (UIRect){EDITOR_VIEWPORT_WIDTH, 0.0f, EDITOR_TOOLS_WIDTH, WINDOW_HEIGHT},
+            editor_panel_content_height_get(&project, &viewport_state),
+            panel_scroll_offset, 42.0f).offset;
         viewport_state.preview_rigid_body = 0;
         viewport_state.preview_anchor = 0;
         viewport_state.preview_soft_node = 0;
@@ -1553,6 +1599,7 @@ int main(void) {
                 editor_current_selection_clear(&project, &viewport_state);
             }
         }
+        rohr_ui_scroll_region_end();
         rohr_ui_frame_end();
         rohr_graphics_screen_clip_clear();
         (void)rohr_graphics_screen_clip_set(

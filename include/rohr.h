@@ -1913,6 +1913,8 @@ float rohr_tools_random_range_float(float min, float max);
 
 /** @brief Starts a UI frame with logical screen-space pointer input. */
 void rohr_ui_frame_begin(UIInput input);
+/** Queues keyboard and pointer events used by UI controls. */
+void rohr_ui_event_add(const SDL_Event *event);
 /** Queues a keyboard event for focused UI fields. */
 void rohr_ui_field_event_add(const SDL_Event *event);
 /** Draws and edits a caller-owned string or float field. */
@@ -1934,6 +1936,11 @@ UIButtonResult rohr_ui_button(
 UIDropdownResult rohr_ui_dropdown(const char *id, const TextAsset *const *options,
     size_t option_count, size_t selected_index, UIRect bounds,
     const UIButtonStyle *style);
+/** @brief Begins a clipped vertical scroll region for subsequent UI controls. */
+UIScrollRegionResult rohr_ui_scroll_region_begin(const char *id, UIRect bounds,
+    float content_height, float offset, float wheel_step);
+/** @brief Ends the current UI scroll region. */
+void rohr_ui_scroll_region_end(void);
 
 /** @brief Draws reusable text centered inside bounds. */
 void rohr_ui_label(const TextAsset *text, UIRect bounds);

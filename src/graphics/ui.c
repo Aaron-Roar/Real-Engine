@@ -7,6 +7,8 @@
 #include <string.h>
 
 #define UI_DROPDOWN_OPTION_MAX 128
+#define UI_DROPDOWN_VISIBLE_MAX 8
+#define UI_SCROLL_REGION_MAX 8
 
 typedef struct UIContext {
     UIInput input;
@@ -30,6 +32,14 @@ typedef struct UIContext {
     size_t dropdown_option_count;
     UIRect dropdown_bounds;
     UIButtonStyle dropdown_style;
+    size_t dropdown_first_option;
+    float wheel_y;
+    float translation_y;
+    float translation_stack[UI_SCROLL_REGION_MAX];
+    UIRect scroll_clip_stack[UI_SCROLL_REGION_MAX];
+    float scroll_offset_stack[UI_SCROLL_REGION_MAX];
+    float scroll_content_stack[UI_SCROLL_REGION_MAX];
+    size_t scroll_depth;
 } UIContext;
 
 static UIContext ui_context = {0};
@@ -56,6 +66,17 @@ static bool ui_point_in_rect(Position point, UIRect rect) {
         point.y >= rect.y && point.y < rect.y + rect.height;
 }
 
+static UIRect ui_bounds_resolve(UIRect bounds) {
+    bounds.y += ui_context.translation_y;
+    return bounds;
+}
+
+static bool ui_point_in_scroll_clip(Position point) {
+    if(ui_context.scroll_depth == 0) return true;
+    return ui_point_in_rect(point,
+        ui_context.scroll_clip_stack[ui_context.scroll_depth - 1]);
+}
+
 static void ui_rect_border_draw(UIRect bounds, float thickness, Color color) {
     if(bounds.width <= 0.0f || bounds.height <= 0.0f || thickness <= 0.0f) return;
     (void)graphics_screen_rect_draw(bounds.x, bounds.y, bounds.width, thickness, color);
@@ -65,6 +86,8 @@ static void ui_rect_border_draw(UIRect bounds, float thickness, Color color) {
     (void)graphics_screen_rect_draw(bounds.x + bounds.width - thickness, bounds.y,
         thickness, bounds.height, color);
 }
+
+static void ui_label_raw(const TextAsset *text, UIRect bounds);
 
 UIButtonStyle ui_button_style_default_get(void) {
     return (UIButtonStyle){
@@ -163,13 +186,24 @@ void ui_frame_begin(UIInput input) {
     ui_context.dropdown_seen = false;
     ui_context.pointer_claimed = false;
     ui_context.pointer_consumed = false;
+    ui_context.translation_y = 0.0f;
+    ui_context.scroll_depth = 0;
     ui_context.frame_active = true;
 }
 
-void ui_field_event_add(const SDL_Event *event) {
-    if(event == NULL || event->type != SDL_EVENT_KEY_DOWN || event->key.repeat ||
+void ui_event_add(const SDL_Event *event) {
+    if(event == NULL) return;
+    if(event->type == SDL_EVENT_MOUSE_WHEEL) {
+        ui_context.wheel_y += event->wheel.y;
+        return;
+    }
+    if(event->type != SDL_EVENT_KEY_DOWN || event->key.repeat ||
             ui_context.field_key_count >= UI_FIELD_KEY_EVENT_MAX) return;
     ui_context.field_keys[ui_context.field_key_count++] = event->key.key;
+}
+
+void ui_field_event_add(const SDL_Event *event) {
+    ui_event_add(event);
 }
 
 static void ui_field_binding_display_set(UIFieldBinding binding, TextAsset *display) {
@@ -234,9 +268,12 @@ UIFieldResult ui_field(const char *id, UIFieldBinding binding,
     UIButtonStyle resolved = style == NULL ? ui_button_style_default_get() : *style;
     uint64_t field_id = ui_hash_id(id);
 
+    bounds = ui_bounds_resolve(bounds);
+
     if(!ui_context.frame_active || field_id == 0 || bounds.width <= 0.0f ||
             bounds.height <= 0.0f) return result;
     result.hovered = ui_point_in_rect(ui_context.input.pointer, bounds) &&
+        ui_point_in_scroll_clip(ui_context.input.pointer) &&
         !ui_context.pointer_claimed;
     if(result.hovered) {
         ui_context.pointer_claimed = true;
@@ -292,7 +329,7 @@ UIFieldResult ui_field(const char *id, UIFieldBinding binding,
     }
     (void)graphics_screen_rect_draw(bounds.x, bounds.y, bounds.width, bounds.height,
         result.active ? resolved.pressed : (result.hovered ? resolved.hovered : resolved.idle));
-    ui_label(display, bounds);
+    ui_label_raw(display, bounds);
     return result;
 }
 
@@ -307,11 +344,14 @@ UIButtonResult ui_button(
     uint64_t button_id = ui_hash_id(id);
     bool contains_pointer;
 
+    bounds = ui_bounds_resolve(bounds);
+
     if(!ui_context.frame_active || button_id == 0) {
         return result;
     }
 
-    contains_pointer = ui_point_in_rect(ui_context.input.pointer, bounds);
+    contains_pointer = ui_point_in_rect(ui_context.input.pointer, bounds) &&
+        ui_point_in_scroll_clip(ui_context.input.pointer);
     if(contains_pointer && !ui_context.pointer_claimed) {
         result.hovered = true;
         ui_context.pointer_claimed = true;
@@ -356,7 +396,7 @@ UIButtonResult ui_button(
         result.pressed ? resolved_style.pressed :
             (result.hovered ? resolved_style.hovered : resolved_style.idle)
     );
-    ui_label(label, bounds);
+    ui_label_raw(label, bounds);
     return result;
 }
 
@@ -366,36 +406,65 @@ UIDropdownResult ui_dropdown(const char *id, const TextAsset *const *options,
     UIDropdownResult result = {.selected_index = selected_index, .hovered_index = -1};
     uint64_t dropdown_id = ui_hash_id(id);
     UIButtonResult button;
+    UIRect resolved_bounds = ui_bounds_resolve(bounds);
 
     if(!ui_context.frame_active || dropdown_id == 0 || options == NULL ||
             option_count == 0 || option_count > UI_DROPDOWN_OPTION_MAX ||
             selected_index >= option_count ||
             bounds.width <= 0.0f || bounds.height <= 0.0f) return result;
     button = ui_button(id, options[selected_index], bounds, style);
-    ui_rect_border_draw(bounds, 2.0f, (Color){0, 0, 0, 255});
+    ui_rect_border_draw(resolved_bounds, 2.0f, (Color){0, 0, 0, 255});
     result.button_hovered = button.hovered;
     result.hovered = button.hovered;
     if(button.clicked) {
-        ui_context.dropdown_id = ui_context.dropdown_id == dropdown_id ? 0 : dropdown_id;
+        if(ui_context.dropdown_id == dropdown_id) {
+            ui_context.dropdown_id = 0;
+        } else {
+            ui_context.dropdown_id = dropdown_id;
+            ui_context.dropdown_first_option = selected_index >= UI_DROPDOWN_VISIBLE_MAX ?
+                selected_index - UI_DROPDOWN_VISIBLE_MAX + 1 : 0;
+        }
     }
     result.open = ui_context.dropdown_id == dropdown_id;
     if(!result.open) return result;
     ui_context.dropdown_seen = true;
+    {
+        size_t visible_count = option_count < UI_DROPDOWN_VISIBLE_MAX ?
+            option_count : UI_DROPDOWN_VISIBLE_MAX;
+        UIRect menu_bounds = {resolved_bounds.x, resolved_bounds.y + resolved_bounds.height,
+            resolved_bounds.width, resolved_bounds.height * (float)visible_count};
+        if(ui_point_in_rect(ui_context.input.pointer, menu_bounds) &&
+                ui_context.wheel_y != 0.0f && option_count > visible_count) {
+            int direction = ui_context.wheel_y < 0.0f ? 1 : -1;
+            int first = (int)ui_context.dropdown_first_option + direction;
+            int maximum = (int)(option_count - visible_count);
+            if(first < 0) first = 0;
+            if(first > maximum) first = maximum;
+            ui_context.dropdown_first_option = (size_t)first;
+            ui_context.wheel_y = 0.0f;
+            ui_context.pointer_consumed = true;
+        }
+    }
     ui_context.dropdown_render_id = dropdown_id;
-    ui_context.dropdown_option_count = option_count;
-    ui_context.dropdown_bounds = bounds;
+    ui_context.dropdown_option_count = option_count - ui_context.dropdown_first_option;
+    if(ui_context.dropdown_option_count > UI_DROPDOWN_VISIBLE_MAX) {
+        ui_context.dropdown_option_count = UI_DROPDOWN_VISIBLE_MAX;
+    }
+    ui_context.dropdown_bounds = resolved_bounds;
     ui_context.dropdown_style = style == NULL ? ui_button_style_default_get() : *style;
     for(size_t i = 0; i < ui_context.dropdown_option_count; i += 1) {
-        ui_context.dropdown_options[i] = options[i];
+        ui_context.dropdown_options[i] = options[ui_context.dropdown_first_option + i];
     }
-    for(size_t i = 0; i < option_count; i += 1) {
+    for(size_t slot = 0; slot < ui_context.dropdown_option_count; slot += 1) {
+        size_t i = ui_context.dropdown_first_option + slot;
         char option_id[160];
-        UIRect option_bounds = {bounds.x, bounds.y + bounds.height * (float)(i + 1),
+        UIRect option_bounds = {bounds.x, bounds.y + bounds.height * (float)(slot + 1),
             bounds.width, bounds.height};
         UIButtonResult option_result;
         snprintf(option_id, sizeof(option_id), "%s.option.%zu", id, i);
         option_result = ui_button(option_id, options[i], option_bounds, style);
-        ui_rect_border_draw(option_bounds, 2.0f, (Color){0, 0, 0, 255});
+        ui_rect_border_draw(ui_bounds_resolve(option_bounds), 2.0f,
+            (Color){0, 0, 0, 255});
         if(option_result.hovered) {
             result.hovered = true;
             result.hovered_index = (int)i;
@@ -408,12 +477,68 @@ UIDropdownResult ui_dropdown(const char *id, const TextAsset *const *options,
         }
     }
     if(ui_context.input.primary_button == MOUSE_BUTTON_STATE_PRESSED &&
-            !ui_point_in_rect(ui_context.input.pointer, (UIRect){bounds.x, bounds.y,
-                bounds.width, bounds.height * (float)(option_count + 1)})) {
+            !ui_point_in_rect(ui_context.input.pointer, (UIRect){resolved_bounds.x,
+                resolved_bounds.y, resolved_bounds.width,
+                resolved_bounds.height * (float)(ui_context.dropdown_option_count + 1)})) {
         ui_context.dropdown_id = 0;
         result.open = false;
     }
     return result;
+}
+
+UIScrollRegionResult ui_scroll_region_begin(const char *id, UIRect bounds,
+    float content_height, float offset, float wheel_step) {
+    UIScrollRegionResult result = {.offset = offset};
+    UIRect resolved_bounds;
+    float maximum;
+
+    if(!ui_context.frame_active || ui_hash_id(id) == 0 || bounds.width <= 0.0f ||
+            bounds.height <= 0.0f || content_height < 0.0f || wheel_step <= 0.0f ||
+            ui_context.scroll_depth >= UI_SCROLL_REGION_MAX) return result;
+    resolved_bounds = ui_bounds_resolve(bounds);
+    result.hovered = ui_point_in_rect(ui_context.input.pointer, resolved_bounds) &&
+        ui_point_in_scroll_clip(ui_context.input.pointer);
+    maximum = fmaxf(0.0f, content_height - bounds.height);
+    if(result.hovered && ui_context.wheel_y != 0.0f) {
+        result.offset -= ui_context.wheel_y * wheel_step;
+        ui_context.wheel_y = 0.0f;
+        result.changed = true;
+        ui_context.pointer_consumed = true;
+    }
+    result.offset = fminf(maximum, fmaxf(0.0f, result.offset));
+    ui_context.translation_stack[ui_context.scroll_depth] = ui_context.translation_y;
+    ui_context.scroll_clip_stack[ui_context.scroll_depth] = resolved_bounds;
+    ui_context.scroll_offset_stack[ui_context.scroll_depth] = result.offset;
+    ui_context.scroll_content_stack[ui_context.scroll_depth] = content_height;
+    ui_context.scroll_depth += 1;
+    ui_context.translation_y -= result.offset;
+    (void)graphics_screen_clip_push(resolved_bounds.x, resolved_bounds.y,
+        resolved_bounds.width, resolved_bounds.height);
+    return result;
+}
+
+void ui_scroll_region_end(void) {
+    UIRect bounds;
+    float offset;
+    float content_height;
+
+    if(!ui_context.frame_active || ui_context.scroll_depth == 0) return;
+    ui_context.scroll_depth -= 1;
+    bounds = ui_context.scroll_clip_stack[ui_context.scroll_depth];
+    offset = ui_context.scroll_offset_stack[ui_context.scroll_depth];
+    content_height = ui_context.scroll_content_stack[ui_context.scroll_depth];
+    ui_context.translation_y = ui_context.translation_stack[ui_context.scroll_depth];
+    graphics_screen_clip_pop();
+    if(content_height > bounds.height) {
+        float handle_height = fmaxf(20.0f, bounds.height * bounds.height / content_height);
+        float travel = bounds.height - handle_height;
+        float maximum = content_height - bounds.height;
+        float handle_y = bounds.y + (maximum <= 0.0f ? 0.0f : offset / maximum * travel);
+        (void)graphics_screen_rect_draw(bounds.x + bounds.width - 5.0f, bounds.y,
+            5.0f, bounds.height, (Color){18, 20, 25, 210});
+        (void)graphics_screen_rect_draw(bounds.x + bounds.width - 5.0f, handle_y,
+            5.0f, handle_height, (Color){105, 115, 135, 255});
+    }
 }
 
 UISliderResult ui_slider_with_text(
@@ -435,6 +560,8 @@ UISliderResult ui_slider_with_text(
     bool step_hovered[2] = {false, false};
     bool step_pressed[2] = {false, false};
     int step_index;
+
+    resolved.center.y += ui_context.translation_y;
 
     if(!ui_context.frame_active || slider_id == 0
             || !isfinite(value) || !isfinite(resolved.length)
@@ -479,7 +606,8 @@ UISliderResult ui_slider_with_text(
                 resolved.style.step_button_size,
                 resolved.angle
             );
-            if(inside && !ui_context.pointer_claimed) {
+            if(inside && ui_point_in_scroll_clip(ui_context.input.pointer) &&
+                    !ui_context.pointer_claimed) {
                 step_hovered[step_index] = true;
                 result.hovered = true;
                 ui_context.pointer_claimed = true;
@@ -514,7 +642,8 @@ UISliderResult ui_slider_with_text(
             }
         }
     }
-    contains_pointer = ui_point_in_slider(ui_context.input.pointer, &resolved);
+    contains_pointer = ui_point_in_slider(ui_context.input.pointer, &resolved) &&
+        ui_point_in_scroll_clip(ui_context.input.pointer);
     if(contains_pointer && !ui_context.pointer_claimed) {
         result.hovered = true;
         ui_context.pointer_claimed = true;
@@ -585,7 +714,7 @@ UISliderResult ui_slider_with_text(
                         : resolved.style.handle)
             );
             if(text != NULL) symbol = is_minus ? text->minus : text->plus;
-            ui_label(symbol, symbol_bounds);
+            ui_label_raw(symbol, symbol_bounds);
         }
     }
     fill_length = resolved.length * amount;
@@ -628,8 +757,8 @@ UISliderResult ui_slider_with_text(
             120.0f,
             28.0f,
         };
-        ui_label(text->label, label_bounds);
-        ui_label(text->value, value_bounds);
+        ui_label_raw(text->label, label_bounds);
+        ui_label_raw(text->value, value_bounds);
     }
     return result;
 }
@@ -638,7 +767,7 @@ UISliderResult ui_slider(const char *id, float value, const UISliderConfig *conf
     return ui_slider_with_text(id, value, config, NULL);
 }
 
-void ui_label(const TextAsset *text, UIRect bounds) {
+static void ui_label_raw(const TextAsset *text, UIRect bounds) {
     Position position;
     bool clipped;
 
@@ -653,6 +782,10 @@ void ui_label(const TextAsset *text, UIRect bounds) {
         bounds.x, bounds.y, bounds.width, bounds.height);
     (void)graphics_text_draw(text, position);
     if(clipped) graphics_screen_clip_pop();
+}
+
+void ui_label(const TextAsset *text, UIRect bounds) {
+    ui_label_raw(text, ui_bounds_resolve(bounds));
 }
 
 EngineResult ui_physics_debug_panel_init(UIPhysicsDebugPanel *panel, FontDescriptor descriptor) {
@@ -712,6 +845,7 @@ void ui_physics_debug_panel_destroy(UIPhysicsDebugPanel *panel) {
 void ui_button_disabled(UIRect bounds, const UIButtonStyle *style) {
     UIButtonStyle resolved_style = style == NULL ? ui_button_style_default_get() : *style;
 
+    bounds = ui_bounds_resolve(bounds);
     graphics_screen_rect_draw(
         bounds.x,
         bounds.y,
@@ -746,7 +880,7 @@ void ui_frame_end(void) {
                 ui_context.active_id == option_hash ? ui_context.dropdown_style.pressed :
                     (hovered ? ui_context.dropdown_style.hovered :
                         ui_context.dropdown_style.idle));
-            ui_label(ui_context.dropdown_options[i], bounds);
+            ui_label_raw(ui_context.dropdown_options[i], bounds);
             ui_rect_border_draw(bounds, 2.0f, (Color){0, 0, 0, 255});
         }
     }
@@ -761,5 +895,6 @@ void ui_frame_end(void) {
         ui_context.dropdown_id = 0;
     }
     ui_context.field_key_count = 0;
+    ui_context.wheel_y = 0.0f;
     ui_context.frame_active = false;
 }

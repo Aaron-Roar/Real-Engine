@@ -452,10 +452,13 @@ int rohr_tools_random_range(int min, int max) { return tools_random_range(min, m
 float rohr_tools_random_range_float(float min, float max) { return tools_random_range_float(min, max); }
 
 void rohr_ui_frame_begin(UIInput input) { ui_frame_begin(input); }
+void rohr_ui_event_add(const SDL_Event *event) { ui_event_add(event); }
 void rohr_ui_field_event_add(const SDL_Event *event) { ui_field_event_add(event); }
 UIFieldResult rohr_ui_field(const char *id, UIFieldBinding binding, TextAsset *display, UIRect bounds, const UIButtonStyle *style) { return ui_field(id, binding, display, bounds, style); }
 UIButtonResult rohr_ui_button(const char *id, const TextAsset *label, UIRect bounds, const UIButtonStyle *style) { return ui_button(id, label, bounds, style); }
 UIDropdownResult rohr_ui_dropdown(const char *id, const TextAsset *const *options, size_t option_count, size_t selected_index, UIRect bounds, const UIButtonStyle *style) { return ui_dropdown(id, options, option_count, selected_index, bounds, style); }
+UIScrollRegionResult rohr_ui_scroll_region_begin(const char *id, UIRect bounds, float content_height, float offset, float wheel_step) { return ui_scroll_region_begin(id, bounds, content_height, offset, wheel_step); }
+void rohr_ui_scroll_region_end(void) { ui_scroll_region_end(); }
 void rohr_ui_label(const TextAsset *text, UIRect bounds) { ui_label(text, bounds); }
 EngineResult rohr_ui_physics_debug_panel_init(UIPhysicsDebugPanel *panel, FontDescriptor font) { return ui_physics_debug_panel_init(panel, font); }
 void rohr_ui_physics_debug_panel_draw(UIPhysicsDebugPanel *panel) { ui_physics_debug_panel_draw(panel); }

@@ -50,6 +50,12 @@ typedef struct UIDropdownResult {
     int hovered_index;
 } UIDropdownResult;
 
+typedef struct UIScrollRegionResult {
+    bool hovered;
+    bool changed;
+    float offset;
+} UIScrollRegionResult;
+
 typedef enum UIFieldKind {
     UI_FIELD_STRING,
     UI_FIELD_FLOAT
@@ -169,6 +175,7 @@ ERROR_DECLARE_RESULT_TYPE(UISliderDefinitionResult, UISliderDefinition);
 
 /** Start a UI frame with pointer coordinates in logical screen space. */
 void ui_frame_begin(UIInput input);
+void ui_event_add(const SDL_Event *event);
 void ui_field_event_add(const SDL_Event *event);
 UIFieldResult ui_field(const char *id, UIFieldBinding binding,
     TextAsset *display, UIRect bounds, const UIButtonStyle *style);
@@ -189,6 +196,12 @@ UIButtonResult ui_button(
 UIDropdownResult ui_dropdown(const char *id, const TextAsset *const *options,
     size_t option_count, size_t selected_index, UIRect bounds,
     const UIButtonStyle *style);
+
+/** Begin a clipped vertical scroll region and translate child UI controls. */
+UIScrollRegionResult ui_scroll_region_begin(const char *id, UIRect bounds,
+    float content_height, float offset, float wheel_step);
+/** End the current scroll region. */
+void ui_scroll_region_end(void);
 
 /** Draw reusable text centered inside logical screen-space bounds. */
 void ui_label(const TextAsset *text, UIRect bounds);
