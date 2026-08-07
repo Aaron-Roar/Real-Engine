@@ -332,6 +332,28 @@ static bool editor_selected_delete(
         }
         return true;
     }
+    if(viewport_state->selection == EDITOR_SELECTION_ANCHOR) {
+        EditorAnchor *anchor = editor_project_anchor_get(
+            selected, viewport_state->selected_anchor);
+        size_t index;
+        if(anchor == NULL) return false;
+        index = (size_t)(anchor - selected->anchors);
+        if(!editor_project_anchor_remove(
+                selected, viewport_state->selected_anchor)) return false;
+        viewport_state->mode = EDITOR_VIEWPORT_JOINT;
+        if(index < selected->anchor_count) {
+            viewport_state->selection = EDITOR_SELECTION_ANCHOR;
+            viewport_state->selected_anchor = selected->anchors[index].id;
+        } else if(selected->anchor_count > 0) {
+            viewport_state->selection = EDITOR_SELECTION_ANCHOR;
+            viewport_state->selected_anchor =
+                selected->anchors[selected->anchor_count - 1].id;
+        } else {
+            viewport_state->selection = EDITOR_SELECTION_JOINT;
+            viewport_state->selected_anchor = 0;
+        }
+        return true;
+    }
     if(viewport_state->selection == EDITOR_SELECTION_SOFT_BODY) {
         EditorSoftBody *body = editor_selected_soft_body_get(selected, viewport_state);
         size_t index;
@@ -611,6 +633,7 @@ int main(void) {
     TextAsset delete_object_label = {0};
     TextAsset delete_rigid_body_label = {0};
     TextAsset delete_joint_label = {0};
+    TextAsset delete_anchor_label = {0};
     TextAsset delete_soft_body_label = {0};
     TextAsset delete_node_label = {0};
     TextAsset delete_beam_label = {0};
@@ -710,6 +733,7 @@ int main(void) {
             !editor_text_create(&font, "Delete Object", &delete_object_label) ||
             !editor_text_create(&font, "Delete Rigid Body", &delete_rigid_body_label) ||
             !editor_text_create(&font, "Delete Joint", &delete_joint_label) ||
+            !editor_text_create(&font, "Delete Anchor", &delete_anchor_label) ||
             !editor_text_create(&font, "Delete Soft Body", &delete_soft_body_label) ||
             !editor_text_create(&font, "Delete Node", &delete_node_label) ||
             !editor_text_create(&font, "Delete Beam", &delete_beam_label) ||
@@ -1558,6 +1582,15 @@ int main(void) {
                             selected, anchor, orientation_result.selected_index == 1);
                     }
                 }
+                {
+                    UIButtonStyle delete_style = editor_delete_button_style_get();
+                    if(rohr_ui_button("editor.anchor.delete", &delete_anchor_label,
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 660.0f,
+                                EDITOR_TOOLS_WIDTH - 20.0f, 34.0f},
+                            &delete_style).clicked) {
+                        (void)editor_open_item_delete(&project, &viewport_state);
+                    }
+                }
             }
         } else if(viewport_state.mode == EDITOR_VIEWPORT_SOFT_BODY) {
             EditorObject *selected = editor_project_selected_get(&project);
@@ -2037,6 +2070,7 @@ int main(void) {
     rohr_graphics_text_destroy(&delete_node_label);
     rohr_graphics_text_destroy(&delete_soft_body_label);
     rohr_graphics_text_destroy(&delete_joint_label);
+    rohr_graphics_text_destroy(&delete_anchor_label);
     rohr_graphics_text_destroy(&delete_rigid_body_label);
     for(size_t i = 0; i < EDITOR_RIGID_BODY_MAX; i += 1) {
         rohr_graphics_text_destroy(&rigid_body_labels[i]);
@@ -2131,6 +2165,7 @@ fail:
     rohr_graphics_text_destroy(&delete_node_label);
     rohr_graphics_text_destroy(&delete_soft_body_label);
     rohr_graphics_text_destroy(&delete_joint_label);
+    rohr_graphics_text_destroy(&delete_anchor_label);
     rohr_graphics_text_destroy(&delete_rigid_body_label);
     for(size_t i = 0; i < EDITOR_RIGID_BODY_MAX; i += 1) {
         rohr_graphics_text_destroy(&rigid_body_labels[i]);
