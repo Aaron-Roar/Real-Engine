@@ -84,7 +84,6 @@ typedef struct EditorJoint {
     float stiffness;
     float damping;
     float visual_size;
-    bool damping_enabled;
     bool visible;
 } EditorJoint;
 

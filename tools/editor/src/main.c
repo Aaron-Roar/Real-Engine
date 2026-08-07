@@ -597,8 +597,6 @@ int main(void) {
     TextAsset visual_size_label = {0};
     TextAsset dynamic_label = {0};
     TextAsset static_label = {0};
-    TextAsset enabled_label = {0};
-    TextAsset disabled_label = {0};
     TextAsset rotation_locked_label = {0};
     TextAsset rotation_unlocked_label = {0};
     TextAsset stiffness_label = {0};
@@ -714,8 +712,6 @@ int main(void) {
             !editor_text_create(&font, "Visual Size", &visual_size_label) ||
             !editor_text_create(&font, "Dynamic", &dynamic_label) ||
             !editor_text_create(&font, "Static", &static_label) ||
-            !editor_text_create(&font, "Enabled", &enabled_label) ||
-            !editor_text_create(&font, "Disabled", &disabled_label) ||
             !editor_text_create(&font, "Rotation: Locked", &rotation_locked_label) ||
             !editor_text_create(&font, "Rotation: Unlocked", &rotation_unlocked_label) ||
             !editor_text_create(&font, "Stiffness", &stiffness_label) ||
@@ -1337,24 +1333,15 @@ int main(void) {
                 }
                 }
                 if(joint->kind == EDITOR_JOINT_REVOLUTE) {
-                    const TextAsset *options[] = {&disabled_label, &enabled_label};
                     rohr_ui_label(&damping_label,
-                        (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 442.0f, 76.0f, 28.0f});
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 442.0f, 76.0f, 26.0f});
                     {
-                        UIDropdownResult result = rohr_ui_dropdown(
-                            "editor.joint.revolute.damping_enabled", options, 2,
-                            joint->damping_enabled ? 1 : 0,
-                            (UIRect){EDITOR_VIEWPORT_WIDTH + 86.0f, 442.0f,
-                                EDITOR_TOOLS_WIDTH - 96.0f, 28.0f}, NULL);
-                        if(result.changed) joint->damping_enabled = result.selected_index == 1;
-                    }
-                    if(joint->damping_enabled) {
                         UIFieldResult result = rohr_ui_field(
                             "editor.joint.revolute.damping",
                             (UIFieldBinding){.kind = UI_FIELD_FLOAT,
                                 .number = &joint->damping}, &length_field,
-                            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 476.0f,
-                                EDITOR_TOOLS_WIDTH - 20.0f, 26.0f}, NULL);
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 86.0f, 442.0f,
+                                EDITOR_TOOLS_WIDTH - 96.0f, 26.0f}, NULL);
                         if(result.changed && joint->damping < 0.0f) joint->damping = 0.0f;
                         field_editing = field_editing || result.active;
                     }
@@ -1383,23 +1370,14 @@ int main(void) {
                         if(result.changed && joint->stiffness < 0.0f) joint->stiffness = 0.0f;
                         field_editing = field_editing || result.active;
                     }
+                    rohr_ui_label(&damping_label,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 506.0f, 76.0f, 26.0f});
                     {
-                        const TextAsset *options[] = {&disabled_label, &enabled_label};
-                        rohr_ui_label(&damping_label,
-                            (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 506.0f, 76.0f, 28.0f});
-                        UIDropdownResult result = rohr_ui_dropdown(
-                            "editor.joint.spring.damping_enabled", options, 2,
-                            joint->damping_enabled ? 1 : 0,
-                            (UIRect){EDITOR_VIEWPORT_WIDTH + 86.0f, 506.0f,
-                                EDITOR_TOOLS_WIDTH - 96.0f, 28.0f}, NULL);
-                        if(result.changed) joint->damping_enabled = result.selected_index == 1;
-                    }
-                    if(joint->damping_enabled) {
                         UIFieldResult result = rohr_ui_field("editor.joint.spring.damping",
                             (UIFieldBinding){.kind = UI_FIELD_FLOAT,
                                 .number = &joint->damping}, &length_field,
-                            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 540.0f,
-                                EDITOR_TOOLS_WIDTH - 20.0f, 26.0f}, NULL);
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 86.0f, 506.0f,
+                                EDITOR_TOOLS_WIDTH - 96.0f, 26.0f}, NULL);
                         if(result.changed && joint->damping < 0.0f) joint->damping = 0.0f;
                         field_editing = field_editing || result.active;
                     }
@@ -2063,8 +2041,6 @@ int main(void) {
     rohr_graphics_text_destroy(&visual_size_label);
     rohr_graphics_text_destroy(&dynamic_label);
     rohr_graphics_text_destroy(&static_label);
-    rohr_graphics_text_destroy(&enabled_label);
-    rohr_graphics_text_destroy(&disabled_label);
     rohr_graphics_text_destroy(&rotation_locked_label);
     rohr_graphics_text_destroy(&rotation_unlocked_label);
     rohr_graphics_text_destroy(&node_b_label);
@@ -2159,8 +2135,6 @@ fail:
     rohr_graphics_text_destroy(&visual_size_label);
     rohr_graphics_text_destroy(&dynamic_label);
     rohr_graphics_text_destroy(&static_label);
-    rohr_graphics_text_destroy(&enabled_label);
-    rohr_graphics_text_destroy(&disabled_label);
     rohr_graphics_text_destroy(&rotation_locked_label);
     rohr_graphics_text_destroy(&rotation_unlocked_label);
     rohr_graphics_text_destroy(&node_b_label);

@@ -55,8 +55,7 @@ int main(void) {
             fabsf(joint->rest_length - 40.0f) > 0.001f ||
             fabsf(joint->stiffness - 100.0f) > 0.001f ||
             fabsf(joint->damping - 10.0f) > 0.001f ||
-            fabsf(joint->visual_size - 1.0f) > 0.001f ||
-            !joint->damping_enabled) return 1;
+            fabsf(joint->visual_size - 1.0f) > 0.001f) return 1;
     generated_a = joint->anchor_a;
     joint_two = editor_project_joint_add(&project, object, EDITOR_JOINT_WELD);
     joint_two_id = joint_two == NULL ? 0 : joint_two->id;
