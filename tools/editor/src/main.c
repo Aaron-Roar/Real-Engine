@@ -64,7 +64,7 @@ static float editor_panel_content_height_get(const EditorProject *project,
     if(state->mode == EDITOR_VIEWPORT_RIGID_BODY) {
         for(size_t i = 0; i < object->rigid_body_count; i += 1) {
             if(object->rigid_bodies[i].id == state->selected_rigid_body) {
-                return fmaxf(height, 270.0f +
+                return fmaxf(height, 438.0f +
                     (float)object->rigid_bodies[i].hitbox_count * 30.0f);
             }
         }
@@ -446,6 +446,11 @@ static bool editor_selected_open(
         viewport_state->mode = EDITOR_VIEWPORT_JOINT;
         return true;
     }
+    if(viewport_state->selection == EDITOR_SELECTION_ANCHOR &&
+            editor_project_anchor_get(selected, viewport_state->selected_anchor) != NULL) {
+        viewport_state->mode = EDITOR_VIEWPORT_ANCHOR;
+        return true;
+    }
     if(viewport_state->selection == EDITOR_SELECTION_SOFT_BODY) {
         viewport_state->mode = EDITOR_VIEWPORT_SOFT_BODY;
         return true;
@@ -493,6 +498,8 @@ static bool editor_open_item_delete(
         viewport_state->selection = EDITOR_SELECTION_LINE;
     } else if(viewport_state->mode == EDITOR_VIEWPORT_JOINT) {
         viewport_state->selection = EDITOR_SELECTION_JOINT;
+    } else if(viewport_state->mode == EDITOR_VIEWPORT_ANCHOR) {
+        viewport_state->selection = EDITOR_SELECTION_ANCHOR;
     } else if(viewport_state->mode == EDITOR_VIEWPORT_SOFT_BODY) {
         viewport_state->selection = EDITOR_SELECTION_SOFT_BODY;
     } else if(viewport_state->mode == EDITOR_VIEWPORT_SOFT_NODE) {
@@ -525,6 +532,8 @@ static void editor_current_selection_clear(
         viewport_state->selection = EDITOR_SELECTION_LINE;
     } else if(viewport_state->mode == EDITOR_VIEWPORT_JOINT) {
         viewport_state->selection = EDITOR_SELECTION_JOINT;
+    } else if(viewport_state->mode == EDITOR_VIEWPORT_ANCHOR) {
+        viewport_state->selection = EDITOR_SELECTION_ANCHOR;
     } else if(viewport_state->mode == EDITOR_VIEWPORT_SOFT_BODY) {
         viewport_state->selection = EDITOR_SELECTION_SOFT_BODY;
     } else if(viewport_state->mode == EDITOR_VIEWPORT_SOFT_NODE) {
@@ -559,6 +568,16 @@ int main(void) {
     TextAsset node_a_label = {0};
     TextAsset node_b_label = {0};
     TextAsset mass_label = {0};
+    TextAsset friction_label = {0};
+    TextAsset restitution_label = {0};
+    TextAsset rest_length_label = {0};
+    TextAsset damping_label = {0};
+    TextAsset dynamic_label = {0};
+    TextAsset static_label = {0};
+    TextAsset enabled_label = {0};
+    TextAsset disabled_label = {0};
+    TextAsset rotation_locked_label = {0};
+    TextAsset rotation_unlocked_label = {0};
     TextAsset stiffness_label = {0};
     TextAsset rotation_label = {0};
     TextAsset position_body_label = {0};
@@ -664,6 +683,16 @@ int main(void) {
             !editor_text_create(&font, "Node A", &node_a_label) ||
             !editor_text_create(&font, "Node B", &node_b_label) ||
             !editor_text_create(&font, "Mass", &mass_label) ||
+            !editor_text_create(&font, "Friction", &friction_label) ||
+            !editor_text_create(&font, "Restitution", &restitution_label) ||
+            !editor_text_create(&font, "Rest Length", &rest_length_label) ||
+            !editor_text_create(&font, "Damping", &damping_label) ||
+            !editor_text_create(&font, "Dynamic", &dynamic_label) ||
+            !editor_text_create(&font, "Static", &static_label) ||
+            !editor_text_create(&font, "Enabled", &enabled_label) ||
+            !editor_text_create(&font, "Disabled", &disabled_label) ||
+            !editor_text_create(&font, "Rotation: Locked", &rotation_locked_label) ||
+            !editor_text_create(&font, "Rotation: Unlocked", &rotation_unlocked_label) ||
             !editor_text_create(&font, "Stiffness", &stiffness_label) ||
             !editor_text_create(&font, "Rotation", &rotation_label) ||
             !editor_text_create(&font, "Position: Body", &position_body_label) ||
@@ -865,8 +894,59 @@ int main(void) {
                     field_editing = x_result.active || y_result.active ||
                         rotation_result.active;
                 }
+                rohr_ui_label(&mass_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    180.0f, 76.0f, 26.0f});
+                {
+                    UIFieldResult result = rohr_ui_field("editor.rigid_body.mass",
+                        (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                            .number = &body->mass_value},
+                        &length_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 86.0f, 180.0f,
+                            EDITOR_TOOLS_WIDTH - 96.0f, 26.0f}, NULL);
+                    if(result.changed && body->mass_value < 0.0f) body->mass_value = 0.0f;
+                    field_editing = field_editing || result.active;
+                }
+                rohr_ui_label(&friction_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    212.0f, 76.0f, 26.0f});
+                {
+                    UIFieldResult result = rohr_ui_field("editor.rigid_body.friction",
+                        (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &body->friction},
+                        &length_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 86.0f, 212.0f,
+                            EDITOR_TOOLS_WIDTH - 96.0f, 26.0f}, NULL);
+                    if(result.changed && body->friction < 0.0f) body->friction = 0.0f;
+                    field_editing = field_editing || result.active;
+                }
+                rohr_ui_label(&restitution_label,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 244.0f, 96.0f, 26.0f});
+                {
+                    UIFieldResult result = rohr_ui_field("editor.rigid_body.restitution",
+                        (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                            .number = &body->restitution}, &length_field,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 106.0f, 244.0f,
+                            EDITOR_TOOLS_WIDTH - 116.0f, 26.0f}, NULL);
+                    if(result.changed) body->restitution =
+                        fminf(1.0f, fmaxf(0.0f, body->restitution));
+                    field_editing = field_editing || result.active;
+                }
+                {
+                    const TextAsset *options[] = {&dynamic_label, &static_label};
+                    UIDropdownResult result = rohr_ui_dropdown("editor.rigid_body.motion",
+                        options, 2, body->static_body ? 1 : 0,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 276.0f,
+                            EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, NULL);
+                    if(result.changed) body->static_body = result.selected_index == 1;
+                }
+                {
+                    const TextAsset *options[] = {
+                        &rotation_unlocked_label, &rotation_locked_label
+                    };
+                    UIDropdownResult result = rohr_ui_dropdown("editor.rigid_body.rotation_lock",
+                        options, 2, body->rotation_locked ? 1 : 0,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 308.0f,
+                            EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, NULL);
+                    if(result.changed) body->rotation_locked = result.selected_index == 1;
+                }
                 if(rohr_ui_button("editor.rigid_body.add_hitbox", &add_hitbox_label,
-                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 180.0f,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 346.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 32.0f}, NULL).clicked) {
                     EditorHitbox *added = editor_project_hitbox_add(&project, body);
                     if(added != NULL) {
@@ -887,10 +967,10 @@ int main(void) {
                         "editor.hitbox.%u.visibility", box->id);
                     (void)editor_visibility_toggle(visibility_id, &visibility_icon_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
-                            222.0f + (float)i * 30.0f, 26.0f, 26.0f}, &box->visible);
+                            388.0f + (float)i * 30.0f, 26.0f, 26.0f}, &box->visible);
                     result = rohr_ui_button(id, &body_hitbox_labels[i],
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 42.0f,
-                            222.0f + (float)i * 30.0f,
+                            388.0f + (float)i * 30.0f,
                             EDITOR_TOOLS_WIDTH - 50.0f, 26.0f},
                         viewport_state.selection == EDITOR_SELECTION_HITBOX &&
                             viewport_state.selected_hitbox == box->id ?
@@ -1212,13 +1292,83 @@ int main(void) {
                     if(result.clicked || result.focus_changed) {
                         viewport_state.selection = EDITOR_SELECTION_ANCHOR;
                         viewport_state.selected_anchor = anchor->id;
+                        if(result.double_clicked) (void)editor_selected_open(
+                            &project, &viewport_state);
                     }
                 }
+                }
+                if(joint->kind == EDITOR_JOINT_REVOLUTE) {
+                    const TextAsset *options[] = {&disabled_label, &enabled_label};
+                    rohr_ui_label(&damping_label,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 442.0f, 76.0f, 28.0f});
+                    {
+                        UIDropdownResult result = rohr_ui_dropdown(
+                            "editor.joint.revolute.damping_enabled", options, 2,
+                            joint->damping_enabled ? 1 : 0,
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 86.0f, 442.0f,
+                                EDITOR_TOOLS_WIDTH - 96.0f, 28.0f}, NULL);
+                        if(result.changed) joint->damping_enabled = result.selected_index == 1;
+                    }
+                    if(joint->damping_enabled) {
+                        UIFieldResult result = rohr_ui_field(
+                            "editor.joint.revolute.damping",
+                            (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                                .number = &joint->damping}, &length_field,
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 476.0f,
+                                EDITOR_TOOLS_WIDTH - 20.0f, 26.0f}, NULL);
+                        if(result.changed && joint->damping < 0.0f) joint->damping = 0.0f;
+                        field_editing = field_editing || result.active;
+                    }
+                } else if(joint->kind == EDITOR_JOINT_SPRING) {
+                    rohr_ui_label(&rest_length_label,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 442.0f, 96.0f, 26.0f});
+                    {
+                        UIFieldResult result = rohr_ui_field("editor.joint.spring.rest_length",
+                            (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                                .number = &joint->rest_length}, &length_field,
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 106.0f, 442.0f,
+                                EDITOR_TOOLS_WIDTH - 116.0f, 26.0f}, NULL);
+                        if(result.changed && joint->rest_length < 0.0f) {
+                            joint->rest_length = 0.0f;
+                        }
+                        field_editing = field_editing || result.active;
+                    }
+                    rohr_ui_label(&stiffness_label,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 474.0f, 90.0f, 26.0f});
+                    {
+                        UIFieldResult result = rohr_ui_field("editor.joint.spring.stiffness",
+                            (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                                .number = &joint->stiffness}, &length_field,
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 474.0f,
+                                EDITOR_TOOLS_WIDTH - 110.0f, 26.0f}, NULL);
+                        if(result.changed && joint->stiffness < 0.0f) joint->stiffness = 0.0f;
+                        field_editing = field_editing || result.active;
+                    }
+                    {
+                        const TextAsset *options[] = {&disabled_label, &enabled_label};
+                        rohr_ui_label(&damping_label,
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 506.0f, 76.0f, 28.0f});
+                        UIDropdownResult result = rohr_ui_dropdown(
+                            "editor.joint.spring.damping_enabled", options, 2,
+                            joint->damping_enabled ? 1 : 0,
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 86.0f, 506.0f,
+                                EDITOR_TOOLS_WIDTH - 96.0f, 28.0f}, NULL);
+                        if(result.changed) joint->damping_enabled = result.selected_index == 1;
+                    }
+                    if(joint->damping_enabled) {
+                        UIFieldResult result = rohr_ui_field("editor.joint.spring.damping",
+                            (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                                .number = &joint->damping}, &length_field,
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 540.0f,
+                                EDITOR_TOOLS_WIDTH - 20.0f, 26.0f}, NULL);
+                        if(result.changed && joint->damping < 0.0f) joint->damping = 0.0f;
+                        field_editing = field_editing || result.active;
+                    }
                 }
                 {
                     EditorAnchor *anchor = editor_project_anchor_get(
                         selected, viewport_state.selected_anchor);
-                    if(anchor != NULL) {
+                    if(anchor != NULL && viewport_state.mode == EDITOR_VIEWPORT_ANCHOR) {
                         UIFieldResult x_result;
                         UIFieldResult y_result;
                         UIFieldResult rotation_result;
@@ -1310,6 +1460,103 @@ int main(void) {
                             EDITOR_TOOLS_WIDTH - 20.0f, 34.0f},
                         &delete_style).clicked) {
                     (void)editor_open_item_delete(&project, &viewport_state);
+                }
+            }
+        } else if(viewport_state.mode == EDITOR_VIEWPORT_ANCHOR) {
+            EditorObject *selected = editor_project_selected_get(&project);
+            EditorAnchor *anchor = editor_project_anchor_get(
+                selected, viewport_state.selected_anchor);
+            if(anchor != NULL) {
+                size_t anchor_index = (size_t)(anchor - selected->anchors);
+                UIFieldResult x_result;
+                UIFieldResult y_result;
+                UIFieldResult rotation_result;
+                if(!editor_named_text_sync(&font, anchor->name,
+                        &anchor_labels[anchor_index], anchor_cache[anchor_index],
+                        EDITOR_OBJECT_NAME_MAX)) goto fail;
+                rohr_ui_label(&anchor_labels[anchor_index],
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, 42.0f,
+                        EDITOR_TOOLS_WIDTH - 48.0f, 30.0f});
+                (void)editor_visibility_toggle("editor.anchor.visibility",
+                    &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                        44.0f, 26.0f, 26.0f}, &anchor->visible);
+                rohr_ui_label(&x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    90.0f, 24.0f, 26.0f});
+                x_result = rohr_ui_field("editor.anchor.x",
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                        .number = &anchor->position.x}, &x_field,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 34.0f, 90.0f,
+                        EDITOR_TOOLS_WIDTH - 44.0f, 26.0f}, NULL);
+                rohr_ui_label(&y_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    124.0f, 24.0f, 26.0f});
+                y_result = rohr_ui_field("editor.anchor.y",
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                        .number = &anchor->position.y}, &y_field,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 34.0f, 124.0f,
+                        EDITOR_TOOLS_WIDTH - 44.0f, 26.0f}, NULL);
+                rohr_ui_label(&rigid_body_label,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 158.0f, 90.0f, 28.0f});
+                {
+                    const TextAsset *body_options[EDITOR_RIGID_BODY_MAX + 1];
+                    size_t selected_body = 0;
+                    body_options[0] = &none_label;
+                    for(size_t i = 0; i < selected->rigid_body_count; i += 1) {
+                        if(!editor_named_text_sync(&font, selected->rigid_bodies[i].name,
+                                &rigid_body_labels[i], rigid_body_cache[i],
+                                EDITOR_OBJECT_NAME_MAX)) goto fail;
+                        body_options[i + 1] = &rigid_body_labels[i];
+                        if(selected->rigid_bodies[i].id == anchor->rigid_body) {
+                            selected_body = i + 1;
+                        }
+                    }
+                    UIDropdownResult result = rohr_ui_dropdown(
+                        "editor.anchor.rigid_body", body_options,
+                        selected->rigid_body_count + 1, selected_body,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 158.0f,
+                            EDITOR_TOOLS_WIDTH - 110.0f, 28.0f}, NULL);
+                    if(result.button_hovered) {
+                        viewport_state.preview_rigid_body = anchor->rigid_body;
+                    } else if(result.hovered_index > 0) {
+                        viewport_state.preview_rigid_body =
+                            selected->rigid_bodies[result.hovered_index - 1].id;
+                    }
+                    if(result.changed) (void)editor_project_anchor_rigid_body_set(
+                        selected, anchor, result.selected_index == 0 ? 0 :
+                            selected->rigid_bodies[result.selected_index - 1].id);
+                }
+                rohr_ui_label(&rotation_label,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 192.0f, 76.0f, 26.0f});
+                rotation_result = rohr_ui_field("editor.anchor.rotation",
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                        .number = &anchor->rotation}, &length_field,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 86.0f, 192.0f,
+                        EDITOR_TOOLS_WIDTH - 96.0f, 26.0f}, NULL);
+                field_editing = x_result.active || y_result.active || rotation_result.active;
+                {
+                    const TextAsset *position_options[] = {
+                        &position_global_label, &position_body_label
+                    };
+                    const TextAsset *rotation_options[] = {
+                        &rotation_global_label, &rotation_body_label
+                    };
+                    UIDropdownResult position_result = rohr_ui_dropdown(
+                        "editor.anchor.position_lock", position_options, 2,
+                        anchor->position_follows_body ? 1 : 0,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 226.0f,
+                            EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, NULL);
+                    UIDropdownResult orientation_result = rohr_ui_dropdown(
+                        "editor.anchor.rotation_lock", rotation_options, 2,
+                        anchor->rotation_follows_body ? 1 : 0,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 258.0f,
+                            EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, NULL);
+                    if(position_result.changed) {
+                        (void)editor_project_anchor_position_lock_set(
+                            selected, anchor, position_result.selected_index == 1);
+                    }
+                    if(orientation_result.changed) {
+                        (void)editor_project_anchor_rotation_lock_set(
+                            selected, anchor, orientation_result.selected_index == 1);
+                    }
                 }
             }
         } else if(viewport_state.mode == EDITOR_VIEWPORT_SOFT_BODY) {
@@ -1761,6 +2008,16 @@ int main(void) {
     rohr_graphics_text_destroy(&position_body_label);
     rohr_graphics_text_destroy(&rotation_label);
     rohr_graphics_text_destroy(&mass_label);
+    rohr_graphics_text_destroy(&friction_label);
+    rohr_graphics_text_destroy(&restitution_label);
+    rohr_graphics_text_destroy(&rest_length_label);
+    rohr_graphics_text_destroy(&damping_label);
+    rohr_graphics_text_destroy(&dynamic_label);
+    rohr_graphics_text_destroy(&static_label);
+    rohr_graphics_text_destroy(&enabled_label);
+    rohr_graphics_text_destroy(&disabled_label);
+    rohr_graphics_text_destroy(&rotation_locked_label);
+    rohr_graphics_text_destroy(&rotation_unlocked_label);
     rohr_graphics_text_destroy(&node_b_label);
     rohr_graphics_text_destroy(&node_a_label);
     rohr_graphics_text_destroy(&body_b_label);
@@ -1845,6 +2102,16 @@ fail:
     rohr_graphics_text_destroy(&position_body_label);
     rohr_graphics_text_destroy(&rotation_label);
     rohr_graphics_text_destroy(&mass_label);
+    rohr_graphics_text_destroy(&friction_label);
+    rohr_graphics_text_destroy(&restitution_label);
+    rohr_graphics_text_destroy(&rest_length_label);
+    rohr_graphics_text_destroy(&damping_label);
+    rohr_graphics_text_destroy(&dynamic_label);
+    rohr_graphics_text_destroy(&static_label);
+    rohr_graphics_text_destroy(&enabled_label);
+    rohr_graphics_text_destroy(&disabled_label);
+    rohr_graphics_text_destroy(&rotation_locked_label);
+    rohr_graphics_text_destroy(&rotation_unlocked_label);
     rohr_graphics_text_destroy(&node_b_label);
     rohr_graphics_text_destroy(&node_a_label);
     rohr_graphics_text_destroy(&body_b_label);

@@ -32,7 +32,10 @@ int main(void) {
     wheel = editor_project_rigid_body_add(&project, object);
     if(chassis == NULL || wheel == NULL || chassis->id == wheel->id ||
             !chassis->visible || chassis->hitbox_count != 1 ||
-            wheel->hitbox_count != 1) return 1;
+            wheel->hitbox_count != 1 || fabsf(chassis->mass_value - 1.0f) > 0.001f ||
+            fabsf(chassis->friction - 0.5f) > 0.001f ||
+            fabsf(chassis->restitution) > 0.001f || chassis->static_body ||
+            chassis->rotation_locked) return 1;
     hitbox = &chassis->hitboxes[0];
     if(hitbox == NULL || !hitbox->visible || hitbox->vertex_count != 3) return 1;
     first = hitbox->vertices[0].position;
@@ -48,7 +51,11 @@ int main(void) {
 
     joint = editor_project_joint_add(&project, object, EDITOR_JOINT_SPRING);
     if(joint == NULL || object->anchor_count != 2 ||
-            !editor_project_anchor_get(object, joint->anchor_a)->generated) return 1;
+            !editor_project_anchor_get(object, joint->anchor_a)->generated ||
+            fabsf(joint->rest_length - 40.0f) > 0.001f ||
+            fabsf(joint->stiffness - 100.0f) > 0.001f ||
+            fabsf(joint->damping - 10.0f) > 0.001f ||
+            !joint->damping_enabled) return 1;
     generated_a = joint->anchor_a;
     joint_two = editor_project_joint_add(&project, object, EDITOR_JOINT_WELD);
     joint_two_id = joint_two == NULL ? 0 : joint_two->id;

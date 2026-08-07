@@ -46,6 +46,11 @@ typedef struct EditorRigidBody {
     char name[EDITOR_OBJECT_NAME_MAX];
     Position position;
     float rotation;
+    float mass_value;
+    float friction;
+    float restitution;
+    bool static_body;
+    bool rotation_locked;
     bool visible;
     EditorHitbox hitboxes[EDITOR_BODY_HITBOX_MAX];
     size_t hitbox_count;
@@ -75,8 +80,15 @@ typedef struct EditorJoint {
     EditorJointKind kind;
     EditorAnchorId anchor_a;
     EditorAnchorId anchor_b;
+    float rest_length;
+    float stiffness;
+    float damping;
+    bool damping_enabled;
     bool visible;
 } EditorJoint;
+
+EditorRigidBody editor_project_rigid_body_default_get(void);
+EditorJoint editor_project_joint_default_get(EditorJointKind kind);
 
 typedef struct EditorSoftNode {
     EditorSoftNodeId id;

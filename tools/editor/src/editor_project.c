@@ -104,6 +104,26 @@ void editor_project_selection_clear(EditorProject *project) {
     project->selected = EDITOR_OBJECT_INVALID;
 }
 
+EditorRigidBody editor_project_rigid_body_default_get(void) {
+    return (EditorRigidBody){
+        .mass_value = 1.0f,
+        .friction = 0.5f,
+        .restitution = 0.0f,
+        .visible = true
+    };
+}
+
+EditorJoint editor_project_joint_default_get(EditorJointKind kind) {
+    return (EditorJoint){
+        .kind = kind,
+        .rest_length = 0.0f,
+        .stiffness = 100.0f,
+        .damping = kind == EDITOR_JOINT_SPRING ? 10.0f : 0.0f,
+        .damping_enabled = kind == EDITOR_JOINT_SPRING,
+        .visible = true
+    };
+}
+
 EditorRigidBody *editor_project_rigid_body_add(EditorProject *project,
     EditorObject *object) {
     EditorRigidBody *body;
@@ -111,10 +131,8 @@ EditorRigidBody *editor_project_rigid_body_add(EditorProject *project,
     if(project == NULL || object == NULL ||
             object->rigid_body_count >= EDITOR_RIGID_BODY_MAX) return NULL;
     body = &object->rigid_bodies[object->rigid_body_count++];
-    *body = (EditorRigidBody){
-        .id = project->next_rigid_body_id++,
-        .visible = true
-    };
+    *body = editor_project_rigid_body_default_get();
+    body->id = project->next_rigid_body_id++;
     snprintf(body->name, sizeof(body->name), "rigid_body_%u", body->id);
     if(editor_project_hitbox_add(project, body) == NULL) {
         object->rigid_body_count -= 1;
@@ -438,13 +456,12 @@ EditorJoint *editor_project_joint_add(EditorProject *project, EditorObject *obje
         return NULL;
     }
     joint = &object->joint_items[object->joint_count++];
-    *joint = (EditorJoint){
-        .id = project->next_joint_id++,
-        .kind = kind,
-        .anchor_a = a->id,
-        .anchor_b = b->id,
-        .visible = true
-    };
+    *joint = editor_project_joint_default_get(kind);
+    joint->id = project->next_joint_id++;
+    joint->anchor_a = a->id;
+    joint->anchor_b = b->id;
+    joint->rest_length = hypotf(b->position.x - a->position.x,
+        b->position.y - a->position.y);
     snprintf(joint->name, sizeof(joint->name), "joint_%u", joint->id);
     return joint;
 }

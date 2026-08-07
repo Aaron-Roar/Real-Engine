@@ -518,9 +518,9 @@ UIFieldResult ui_field(const char *id, UIFieldBinding binding,
                 edited = ui_field_character_add(binding, (char)key);
             }
             if(edited && ui_field_binding_store(binding)) result.changed = true;
-            if(display != NULL) {
-                (void)graphics_text_value_set(display, ui_context.field_edit);
-            }
+        }
+        if(display != NULL) {
+            (void)graphics_text_value_set(display, ui_context.field_edit);
         }
     } else if(display != NULL) {
         char value[UI_FIELD_EDIT_MAX];
