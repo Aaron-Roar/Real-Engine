@@ -31,8 +31,9 @@ int main(void) {
     chassis = editor_project_rigid_body_add(&project, object);
     wheel = editor_project_rigid_body_add(&project, object);
     if(chassis == NULL || wheel == NULL || chassis->id == wheel->id ||
-            !chassis->visible) return 1;
-    hitbox = editor_project_hitbox_add(&project, chassis);
+            !chassis->visible || chassis->hitbox_count != 1 ||
+            wheel->hitbox_count != 1) return 1;
+    hitbox = &chassis->hitboxes[0];
     if(hitbox == NULL || !hitbox->visible || hitbox->vertex_count != 3) return 1;
     first = hitbox->vertices[0].position;
     second = hitbox->vertices[1].position;

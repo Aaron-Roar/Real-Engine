@@ -116,6 +116,11 @@ EditorRigidBody *editor_project_rigid_body_add(EditorProject *project,
         .visible = true
     };
     snprintf(body->name, sizeof(body->name), "rigid_body_%u", body->id);
+    if(editor_project_hitbox_add(project, body) == NULL) {
+        object->rigid_body_count -= 1;
+        object->rigid_bodies[object->rigid_body_count] = (EditorRigidBody){0};
+        return NULL;
+    }
     return body;
 }
 
