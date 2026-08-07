@@ -173,9 +173,76 @@ EditorAnchor *editor_project_anchor_add(EditorProject *project, EditorObject *ob
     }
     anchor = &object->anchors[object->anchor_count++];
     *anchor = (EditorAnchor){.id = project->next_anchor_id++, .position = position,
-        .rigid_body = rigid_body, .generated = generated, .visible = true};
+        .rigid_body = rigid_body, .position_follows_body = rigid_body != 0,
+        .rotation_follows_body = rigid_body != 0, .generated = generated, .visible = true};
     snprintf(anchor->name, sizeof(anchor->name), "anchor_%u", anchor->id);
     return anchor;
+}
+
+static Position editor_position_rotate(Position position, float rotation) {
+    float cosine = cosf(rotation);
+    float sine = sinf(rotation);
+    return (Position){position.x * cosine - position.y * sine,
+        position.x * sine + position.y * cosine};
+}
+
+bool editor_project_anchor_position_lock_set(EditorObject *object, EditorAnchor *anchor,
+    bool locked) {
+    EditorRigidBody *body;
+    Position position;
+
+    if(object == NULL || anchor == NULL) return false;
+    if(anchor->position_follows_body == locked) return true;
+    body = editor_project_rigid_body_get(object, anchor->rigid_body);
+    if(body == NULL) return false;
+    if(locked) {
+        position = (Position){anchor->position.x - body->position.x,
+            anchor->position.y - body->position.y};
+        anchor->position = editor_position_rotate(position, -body->rotation);
+    } else {
+        position = editor_position_rotate(anchor->position, body->rotation);
+        anchor->position = (Position){body->position.x + position.x,
+            body->position.y + position.y};
+    }
+    anchor->position_follows_body = locked;
+    return true;
+}
+
+bool editor_project_anchor_rotation_lock_set(EditorObject *object, EditorAnchor *anchor,
+    bool locked) {
+    EditorRigidBody *body;
+
+    if(object == NULL || anchor == NULL) return false;
+    if(anchor->rotation_follows_body == locked) return true;
+    body = editor_project_rigid_body_get(object, anchor->rigid_body);
+    if(body == NULL) return false;
+    anchor->rotation += locked ? -body->rotation : body->rotation;
+    anchor->rotation_follows_body = locked;
+    return true;
+}
+
+bool editor_project_anchor_rigid_body_set(EditorObject *object, EditorAnchor *anchor,
+    EditorRigidBodyId rigid_body) {
+    bool position_locked;
+    bool rotation_locked;
+
+    if(object == NULL || anchor == NULL || (rigid_body != 0 &&
+            editor_project_rigid_body_get(object, rigid_body) == NULL)) return false;
+    if(anchor->rigid_body == rigid_body) return true;
+    position_locked = anchor->position_follows_body;
+    rotation_locked = anchor->rotation_follows_body;
+    if(position_locked && !editor_project_anchor_position_lock_set(object, anchor, false)) {
+        return false;
+    }
+    if(rotation_locked && !editor_project_anchor_rotation_lock_set(object, anchor, false)) {
+        return false;
+    }
+    anchor->rigid_body = rigid_body;
+    if(rigid_body != 0) {
+        if(position_locked) (void)editor_project_anchor_position_lock_set(object, anchor, true);
+        if(rotation_locked) (void)editor_project_anchor_rotation_lock_set(object, anchor, true);
+    }
+    return true;
 }
 
 static bool editor_anchor_referenced_get(const EditorObject *object, EditorAnchorId id) {

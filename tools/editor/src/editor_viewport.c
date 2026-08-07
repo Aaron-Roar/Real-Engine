@@ -5,9 +5,12 @@
 
 static Position editor_hitbox_vertex_world_get(const EditorObject *object,
     const EditorRigidBody *body, const EditorHitbox *hitbox, uint32_t vertex) {
+    float cosine = cosf(body->rotation);
+    float sine = sinf(body->rotation);
+    Position local = hitbox->vertices[vertex].position;
     return (Position){
-        object->position.x + body->position.x + hitbox->vertices[vertex].position.x,
-        object->position.y + body->position.y + hitbox->vertices[vertex].position.y
+        object->position.x + body->position.x + local.x * cosine - local.y * sine,
+        object->position.y + body->position.y + local.x * sine + local.y * cosine
     };
 }
 
@@ -24,9 +27,51 @@ static Position editor_anchor_world_get(const EditorObject *object,
     for(size_t i = 0; i < object->rigid_body_count; i += 1) {
         if(object->rigid_bodies[i].id == anchor->rigid_body) body = &object->rigid_bodies[i];
     }
-    return (Position){object->position.x + (body == NULL ? 0.0f : body->position.x) +
-            anchor->position.x,
-        object->position.y + (body == NULL ? 0.0f : body->position.y) + anchor->position.y};
+    if(body != NULL && anchor->position_follows_body) {
+        float cosine = cosf(body->rotation);
+        float sine = sinf(body->rotation);
+        return (Position){object->position.x + body->position.x +
+                anchor->position.x * cosine - anchor->position.y * sine,
+            object->position.y + body->position.y +
+                anchor->position.x * sine + anchor->position.y * cosine};
+    }
+    return (Position){object->position.x + anchor->position.x,
+        object->position.y + anchor->position.y};
+}
+
+static void editor_anchor_world_set(const EditorObject *object, EditorAnchor *anchor,
+    const EditorRigidBody *body, Position world) {
+    Position local = {world.x - object->position.x, world.y - object->position.y};
+    if(body != NULL && anchor->position_follows_body) {
+        float cosine = cosf(-body->rotation);
+        float sine = sinf(-body->rotation);
+        local.x -= body->position.x;
+        local.y -= body->position.y;
+        anchor->position = (Position){local.x * cosine - local.y * sine,
+            local.x * sine + local.y * cosine};
+    } else {
+        anchor->position = local;
+    }
+}
+
+static float editor_body_radius_get(const EditorRigidBody *body) {
+    float radius = 30.0f;
+    if(body == NULL) return radius;
+    for(size_t i = 0; i < body->hitbox_count; i += 1) {
+        for(uint32_t j = 0; j < body->hitboxes[i].vertex_count; j += 1) {
+            Position point = body->hitboxes[i].vertices[j].position;
+            float distance = sqrtf(point.x * point.x + point.y * point.y);
+            if(distance > radius) radius = distance;
+        }
+    }
+    return radius;
+}
+
+static Position editor_body_rotation_handle_get(const EditorObject *object,
+    const EditorRigidBody *body) {
+    float distance = editor_body_radius_get(body) + 28.0f;
+    return (Position){object->position.x + body->position.x + sinf(body->rotation) * distance,
+        object->position.y + body->position.y - cosf(body->rotation) * distance};
 }
 
 static float editor_segment_distance_squared(Position point, Position start, Position end) {
@@ -51,6 +96,17 @@ static void editor_line_draw(Position start, Position end, Color color) {
     (void)rohr_graphics_screen_quad_draw(
         (Position){(start.x + end.x) * 0.5f, (start.y + end.y) * 0.5f},
         length, 2.0f, -atan2f(delta.y, delta.x), color);
+}
+
+static void editor_circle_draw(Position center, float radius, Color color) {
+    Position previous = {center.x + radius, center.y};
+    for(uint32_t i = 1; i <= 16; i += 1) {
+        float angle = 6.28318530718f * (float)i / 16.0f;
+        Position current = {center.x + cosf(angle) * radius,
+            center.y + sinf(angle) * radius};
+        editor_line_draw(previous, current, color);
+        previous = current;
+    }
 }
 
 static bool editor_hitbox_point_contains(const EditorObject *object,
@@ -186,20 +242,88 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
             pointer.x >= EDITOR_VIEWPORT_WIDTH) return false;
     if(primary_button == MOUSE_BUTTON_STATE_RELEASED) {
         state->dragged_vertex = -1;
+        state->dragged_body = false;
+        state->rotated_body = false;
+        state->dragged_anchor = false;
         return false;
     }
     body = editor_selected_body_get(object, state);
     hitbox = editor_selected_hitbox_get(object, state);
+    if(state->dragged_anchor && (primary_button == MOUSE_BUTTON_STATE_DOWN ||
+            primary_button == MOUSE_BUTTON_STATE_PRESSED)) {
+        EditorAnchor *anchor = editor_project_anchor_get(object, state->selected_anchor);
+        EditorRigidBody *anchor_body = anchor == NULL ? NULL :
+            editor_project_rigid_body_get(object, anchor->rigid_body);
+        if(anchor != NULL) editor_anchor_world_set(object, anchor, anchor_body,
+            (Position){pointer.x - state->drag_offset.x, pointer.y - state->drag_offset.y});
+        return true;
+    }
+    if(body != NULL && state->dragged_body && (primary_button == MOUSE_BUTTON_STATE_DOWN ||
+            primary_button == MOUSE_BUTTON_STATE_PRESSED)) {
+        body->position = (Position){pointer.x - object->position.x - state->drag_offset.x,
+            pointer.y - object->position.y - state->drag_offset.y};
+        return true;
+    }
+    if(body != NULL && state->rotated_body && (primary_button == MOUSE_BUTTON_STATE_DOWN ||
+            primary_button == MOUSE_BUTTON_STATE_PRESSED)) {
+        Position center = {object->position.x + body->position.x,
+            object->position.y + body->position.y};
+        body->rotation = atan2f(pointer.y - center.y, pointer.x - center.x) +
+            state->rotation_pointer_offset;
+        return true;
+    }
     if(hitbox != NULL && state->dragged_vertex >= 0 &&
             (primary_button == MOUSE_BUTTON_STATE_DOWN ||
                 primary_button == MOUSE_BUTTON_STATE_PRESSED)) {
         if(hitbox->vertices[state->dragged_vertex].position_locked) return true;
-        hitbox->vertices[state->dragged_vertex].position = (Position){
-            pointer.x - object->position.x - body->position.x,
-            pointer.y - object->position.y - body->position.y};
+        {
+            Position local = {pointer.x - object->position.x - body->position.x,
+                pointer.y - object->position.y - body->position.y};
+            float cosine = cosf(-body->rotation);
+            float sine = sinf(-body->rotation);
+            hitbox->vertices[state->dragged_vertex].position = (Position){
+                local.x * cosine - local.y * sine, local.x * sine + local.y * cosine};
+        }
         return true;
     }
     if(primary_button != MOUSE_BUTTON_STATE_PRESSED) return false;
+
+    if(object->visible) {
+        for(size_t i = 0; i < object->anchor_count; i += 1) {
+            EditorAnchor *anchor = &object->anchors[i];
+            Position world = editor_anchor_world_get(object, anchor);
+            if(!anchor->visible || (pointer.x - world.x) * (pointer.x - world.x) +
+                    (pointer.y - world.y) * (pointer.y - world.y) > 100.0f) continue;
+            state->selection = EDITOR_SELECTION_ANCHOR;
+            state->selected_anchor = anchor->id;
+            state->mode = EDITOR_VIEWPORT_JOINT;
+            state->dragged_anchor = true;
+            state->drag_offset = (Vec2D){pointer.x - world.x, pointer.y - world.y};
+            return true;
+        }
+    }
+
+    if(body != NULL && body->visible && state->mode == EDITOR_VIEWPORT_RIGID_BODY) {
+        Position handle = editor_body_rotation_handle_get(object, body);
+        if((pointer.x - handle.x) * (pointer.x - handle.x) +
+                (pointer.y - handle.y) * (pointer.y - handle.y) <= 144.0f) {
+            Position center = {object->position.x + body->position.x,
+                object->position.y + body->position.y};
+            state->rotated_body = true;
+            state->rotation_pointer_offset = body->rotation -
+                atan2f(pointer.y - center.y, pointer.x - center.x);
+            return true;
+        }
+        for(size_t i = 0; i < body->hitbox_count; i += 1) {
+            if(body->hitboxes[i].visible && editor_hitbox_point_contains(
+                    object, body, &body->hitboxes[i], pointer)) {
+                state->dragged_body = true;
+                state->drag_offset = (Vec2D){pointer.x - object->position.x - body->position.x,
+                    pointer.y - object->position.y - body->position.y};
+                return true;
+            }
+        }
+    }
 
     if(object->visible) {
         for(size_t soft_index = 0; soft_index < object->soft_body_count; soft_index += 1) {
@@ -314,6 +438,22 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
             return true;
         }
     }
+
+    if(state->mode == EDITOR_VIEWPORT_RIGID_BODY) {
+        const EditorRigidBody *selected = NULL;
+        for(size_t i = 0; i < object->rigid_body_count; i += 1) {
+            if(object->rigid_bodies[i].id == state->selected_rigid_body) {
+                selected = &object->rigid_bodies[i];
+            }
+        }
+        if(selected != NULL && selected->visible) {
+            Position center = {object->position.x + selected->position.x,
+                object->position.y + selected->position.y};
+            Position handle = editor_body_rotation_handle_get(object, selected);
+            editor_line_draw(center, handle, (Color){255, 215, 70, 255});
+            editor_circle_draw(handle, 10.0f, (Color){255, 215, 70, 255});
+        }
+    }
     return false;
 }
 
@@ -406,9 +546,19 @@ void editor_viewport_draw(const EditorProject *project, const EditorViewportStat
     }
     for(size_t i = 0; i < object->anchor_count; i += 1) {
         const EditorAnchor *anchor = &object->anchors[i];
+        const EditorRigidBody *anchor_body = NULL;
+        float rotation = anchor->rotation;
         if(!anchor->visible) continue;
+        for(size_t j = 0; j < object->rigid_body_count; j += 1) {
+            if(object->rigid_bodies[j].id == anchor->rigid_body) {
+                anchor_body = &object->rigid_bodies[j];
+            }
+        }
+        if(anchor_body != NULL && anchor->rotation_follows_body) {
+            rotation += anchor_body->rotation;
+        }
         (void)rohr_graphics_screen_quad_draw(editor_anchor_world_get(object, anchor),
-            9.0f, 9.0f, 0.78539816339f,
+            9.0f, 9.0f, rotation + 0.78539816339f,
             state->selected_anchor == anchor->id ?
                 (Color){255, 215, 70, 255} : (Color){235, 150, 215, 255});
     }

@@ -455,6 +455,11 @@ int main(void) {
     TextAsset node_b_label = {0};
     TextAsset mass_label = {0};
     TextAsset stiffness_label = {0};
+    TextAsset rotation_label = {0};
+    TextAsset position_body_label = {0};
+    TextAsset position_global_label = {0};
+    TextAsset rotation_body_label = {0};
+    TextAsset rotation_global_label = {0};
     TextAsset joint_body_a_display = {0};
     TextAsset joint_body_b_display = {0};
     TextAsset beam_node_a_display = {0};
@@ -557,6 +562,11 @@ int main(void) {
             !editor_text_create(&font, "Node B", &node_b_label) ||
             !editor_text_create(&font, "Mass", &mass_label) ||
             !editor_text_create(&font, "Stiffness", &stiffness_label) ||
+            !editor_text_create(&font, "Rotation", &rotation_label) ||
+            !editor_text_create(&font, "Position: Body", &position_body_label) ||
+            !editor_text_create(&font, "Position: Global", &position_global_label) ||
+            !editor_text_create(&font, "Orientation: Body", &rotation_body_label) ||
+            !editor_text_create(&font, "Orientation: Global", &rotation_global_label) ||
             !editor_text_create(&font, "", &joint_body_a_display) ||
             !editor_text_create(&font, "", &joint_body_b_display) ||
             !editor_text_create(&font, "", &beam_node_a_display) ||
@@ -675,8 +685,30 @@ int main(void) {
                 (void)editor_visibility_toggle("editor.rigid_body.visibility",
                     &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         44.0f, 26.0f, 26.0f}, &body->visible);
+                rohr_ui_label(&x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    80.0f, 24.0f, 26.0f});
+                {
+                    UIFieldResult x_result = rohr_ui_field("editor.rigid_body.x",
+                        (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &body->position.x},
+                        &x_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 34.0f, 80.0f,
+                            EDITOR_TOOLS_WIDTH - 44.0f, 26.0f}, NULL);
+                    rohr_ui_label(&y_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                        112.0f, 24.0f, 26.0f});
+                    UIFieldResult y_result = rohr_ui_field("editor.rigid_body.y",
+                        (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &body->position.y},
+                        &y_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 34.0f, 112.0f,
+                            EDITOR_TOOLS_WIDTH - 44.0f, 26.0f}, NULL);
+                    rohr_ui_label(&rotation_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                        144.0f, 76.0f, 26.0f});
+                    UIFieldResult rotation_result = rohr_ui_field("editor.rigid_body.rotation",
+                        (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &body->rotation},
+                        &length_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 86.0f, 144.0f,
+                            EDITOR_TOOLS_WIDTH - 96.0f, 26.0f}, NULL);
+                    field_editing = x_result.active || y_result.active ||
+                        rotation_result.active;
+                }
                 if(rohr_ui_button("editor.rigid_body.add_hitbox", &add_hitbox_label,
-                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 118.0f,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 180.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 32.0f}, NULL).clicked) {
                     EditorHitbox *added = editor_project_hitbox_add(&project, body);
                     if(added != NULL) {
@@ -697,10 +729,10 @@ int main(void) {
                         "editor.hitbox.%u.visibility", box->id);
                     (void)editor_visibility_toggle(visibility_id, &visibility_icon_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
-                            164.0f + (float)i * 30.0f, 26.0f, 26.0f}, &box->visible);
+                            222.0f + (float)i * 30.0f, 26.0f, 26.0f}, &box->visible);
                     result = rohr_ui_button(id, &body_hitbox_labels[i],
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 42.0f,
-                            164.0f + (float)i * 30.0f,
+                            222.0f + (float)i * 30.0f,
                             EDITOR_TOOLS_WIDTH - 50.0f, 26.0f},
                         viewport_state.selection == EDITOR_SELECTION_HITBOX &&
                             viewport_state.selected_hitbox == box->id ?
@@ -1007,6 +1039,7 @@ int main(void) {
                             selected, anchor->rigid_body);
                         UIFieldResult x_result;
                         UIFieldResult y_result;
+                        UIFieldResult rotation_result;
                         (void)rohr_graphics_text_value_set(&anchor_body_display,
                             anchor_body == NULL ? "None" : anchor_body->name);
                         rohr_ui_label(&x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
@@ -1030,8 +1063,33 @@ int main(void) {
                         if(rohr_ui_button("editor.anchor.rigid_body", &anchor_body_display,
                                 (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 510.0f,
                                     EDITOR_TOOLS_WIDTH - 110.0f, 28.0f}, NULL).clicked) {
-                            anchor->rigid_body = editor_body_id_next_get(
-                                selected, anchor->rigid_body);
+                            (void)editor_project_anchor_rigid_body_set(selected, anchor,
+                                editor_body_id_next_get(selected, anchor->rigid_body));
+                        }
+                        rohr_ui_label(&rotation_label,
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 544.0f,
+                                76.0f, 26.0f});
+                        rotation_result = rohr_ui_field("editor.anchor.rotation",
+                            (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                                .number = &anchor->rotation}, &length_field,
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 86.0f, 544.0f,
+                                EDITOR_TOOLS_WIDTH - 96.0f, 26.0f}, NULL);
+                        field_editing = field_editing || rotation_result.active;
+                        if(rohr_ui_button("editor.anchor.position_lock",
+                                anchor->position_follows_body ? &position_body_label :
+                                    &position_global_label,
+                                (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 578.0f,
+                                    EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, NULL).clicked) {
+                            (void)editor_project_anchor_position_lock_set(selected, anchor,
+                                !anchor->position_follows_body);
+                        }
+                        if(rohr_ui_button("editor.anchor.rotation_lock",
+                                anchor->rotation_follows_body ? &rotation_body_label :
+                                    &rotation_global_label,
+                                (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 610.0f,
+                                    EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, NULL).clicked) {
+                            (void)editor_project_anchor_rotation_lock_set(selected, anchor,
+                                !anchor->rotation_follows_body);
                         }
                     }
                 }
@@ -1477,6 +1535,11 @@ int main(void) {
     rohr_graphics_text_destroy(&joint_body_b_display);
     rohr_graphics_text_destroy(&joint_body_a_display);
     rohr_graphics_text_destroy(&stiffness_label);
+    rohr_graphics_text_destroy(&rotation_global_label);
+    rohr_graphics_text_destroy(&rotation_body_label);
+    rohr_graphics_text_destroy(&position_global_label);
+    rohr_graphics_text_destroy(&position_body_label);
+    rohr_graphics_text_destroy(&rotation_label);
     rohr_graphics_text_destroy(&mass_label);
     rohr_graphics_text_destroy(&node_b_label);
     rohr_graphics_text_destroy(&node_a_label);
@@ -1560,6 +1623,11 @@ fail:
     rohr_graphics_text_destroy(&joint_body_b_display);
     rohr_graphics_text_destroy(&joint_body_a_display);
     rohr_graphics_text_destroy(&stiffness_label);
+    rohr_graphics_text_destroy(&rotation_global_label);
+    rohr_graphics_text_destroy(&rotation_body_label);
+    rohr_graphics_text_destroy(&position_global_label);
+    rohr_graphics_text_destroy(&position_body_label);
+    rohr_graphics_text_destroy(&rotation_label);
     rohr_graphics_text_destroy(&mass_label);
     rohr_graphics_text_destroy(&node_b_label);
     rohr_graphics_text_destroy(&node_a_label);

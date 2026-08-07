@@ -22,6 +22,7 @@ typedef enum EditorHierarchySelection {
     EDITOR_SELECTION_RIGID_BODY,
     EDITOR_SELECTION_HITBOX,
     EDITOR_SELECTION_JOINT,
+    EDITOR_SELECTION_ANCHOR,
     EDITOR_SELECTION_SOFT_BODY,
     EDITOR_SELECTION_SOFT_NODE,
     EDITOR_SELECTION_SOFT_BEAM,
@@ -31,6 +32,11 @@ typedef enum EditorHierarchySelection {
 
 typedef struct EditorViewportState {
     int dragged_vertex;
+    bool dragged_body;
+    bool rotated_body;
+    bool dragged_anchor;
+    Vec2D drag_offset;
+    float rotation_pointer_offset;
     EditorViewportMode mode;
     EditorHierarchySelection selection;
     EditorHierarchySelection last_viewport_click_selection;

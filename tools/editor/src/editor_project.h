@@ -61,7 +61,10 @@ typedef struct EditorAnchor {
     EditorAnchorId id;
     char name[EDITOR_OBJECT_NAME_MAX];
     Position position;
+    float rotation;
     EditorRigidBodyId rigid_body;
+    bool position_follows_body;
+    bool rotation_follows_body;
     bool generated;
     bool visible;
 } EditorAnchor;
@@ -163,6 +166,12 @@ EditorAnchor *editor_project_anchor_get(EditorObject *object, EditorAnchorId id)
 bool editor_project_anchor_remove(EditorObject *object, EditorAnchorId id);
 bool editor_project_joint_anchor_set(EditorObject *object, EditorJoint *joint,
     uint32_t endpoint, EditorAnchorId anchor);
+bool editor_project_anchor_position_lock_set(EditorObject *object, EditorAnchor *anchor,
+    bool locked);
+bool editor_project_anchor_rotation_lock_set(EditorObject *object, EditorAnchor *anchor,
+    bool locked);
+bool editor_project_anchor_rigid_body_set(EditorObject *object, EditorAnchor *anchor,
+    EditorRigidBodyId rigid_body);
 EditorSoftBody *editor_project_soft_body_add(EditorProject *project, EditorObject *object);
 bool editor_project_soft_body_remove(EditorObject *object, EditorSoftBodyId id);
 EditorSoftNode *editor_project_soft_node_add(EditorProject *project, EditorSoftBody *body,

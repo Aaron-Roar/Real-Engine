@@ -67,6 +67,20 @@ int main(void) {
             !editor_project_joint_remove(object, joint_two_id) ||
             object->anchor_count != 1 ||
             editor_project_anchor_get(object, manual_anchor_id) == NULL) return 1;
+    manual_anchor = editor_project_anchor_get(object, manual_anchor_id);
+    if(manual_anchor == NULL || !editor_project_anchor_position_lock_set(
+            object, manual_anchor, false) || !editor_project_anchor_rotation_lock_set(
+            object, manual_anchor, false)) return 1;
+    chassis->position = (Position){10.0f, 0.0f};
+    chassis->rotation = 1.57079632679f;
+    if(!editor_project_anchor_position_lock_set(object, manual_anchor, true) ||
+            !position_equal(manual_anchor->position, (Position){6.0f, 5.0f}) ||
+            !editor_project_anchor_position_lock_set(object, manual_anchor, false) ||
+            !position_equal(manual_anchor->position, (Position){5.0f, 6.0f}) ||
+            !editor_project_anchor_rotation_lock_set(object, manual_anchor, true) ||
+            fabsf(manual_anchor->rotation + 1.57079632679f) > 0.001f ||
+            !editor_project_anchor_rotation_lock_set(object, manual_anchor, false) ||
+            fabsf(manual_anchor->rotation) > 0.001f) return 1;
     joint = editor_project_joint_add(&project, object, EDITOR_JOINT_SPRING);
     if(joint == NULL || !editor_project_rigid_body_remove(object, wheel->id) ||
             object->joint_count != 0) return 1;
