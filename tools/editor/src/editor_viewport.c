@@ -439,21 +439,6 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
         }
     }
 
-    if(state->mode == EDITOR_VIEWPORT_RIGID_BODY) {
-        const EditorRigidBody *selected = NULL;
-        for(size_t i = 0; i < object->rigid_body_count; i += 1) {
-            if(object->rigid_bodies[i].id == state->selected_rigid_body) {
-                selected = &object->rigid_bodies[i];
-            }
-        }
-        if(selected != NULL && selected->visible) {
-            Position center = {object->position.x + selected->position.x,
-                object->position.y + selected->position.y};
-            Position handle = editor_body_rotation_handle_get(object, selected);
-            editor_line_draw(center, handle, (Color){255, 215, 70, 255});
-            editor_circle_draw(handle, 10.0f, (Color){255, 215, 70, 255});
-        }
-    }
     return false;
 }
 
@@ -496,6 +481,22 @@ void editor_viewport_draw(const EditorProject *project, const EditorViewportStat
                     (void)rohr_graphics_screen_quad_draw(start, 10.0f, 10.0f, 0.0f, point);
                 }
             }
+        }
+    }
+
+    if(state->mode == EDITOR_VIEWPORT_RIGID_BODY) {
+        const EditorRigidBody *selected = NULL;
+        for(size_t i = 0; i < object->rigid_body_count; i += 1) {
+            if(object->rigid_bodies[i].id == state->selected_rigid_body) {
+                selected = &object->rigid_bodies[i];
+            }
+        }
+        if(selected != NULL && selected->visible) {
+            Position center = {object->position.x + selected->position.x,
+                object->position.y + selected->position.y};
+            Position handle = editor_body_rotation_handle_get(object, selected);
+            editor_line_draw(center, handle, (Color){255, 215, 70, 255});
+            editor_circle_draw(handle, 10.0f, (Color){255, 215, 70, 255});
         }
     }
 
