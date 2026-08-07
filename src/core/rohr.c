@@ -250,6 +250,8 @@ void rohr_graphics_end(void) { graphics_end(); }
 bool rohr_graphics_events_poll(SDL_Event *event) { return graphics_events_poll(event); }
 void rohr_graphics_background_draw(Color color) { graphics_background_draw(color); }
 bool rohr_graphics_screen_rect_draw(float x, float y, float width, float height, Color color) { return graphics_screen_rect_draw(x, y, width, height, color); }
+bool rohr_graphics_screen_clip_set(float x, float y, float width, float height) { return graphics_screen_clip_set(x, y, width, height); }
+void rohr_graphics_screen_clip_clear(void) { graphics_screen_clip_clear(); }
 bool rohr_graphics_screen_quad_draw(Position center, float width, float height, float angle, Color color) { return graphics_screen_quad_draw(center, width, height, angle, color); }
 void rohr_graphics_show(void) { graphics_show(); }
 void rohr_graphics_hit_box_draw(Entity entity, Fill fill_type) { graphics_hit_box_draw(entity, fill_type); }

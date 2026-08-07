@@ -1174,6 +1174,10 @@ void rohr_graphics_background_draw(Color color);
  * @return true when SDL accepted the draw command.
  */
 bool rohr_graphics_screen_rect_draw(float x, float y, float width, float height, Color color);
+/** Clips subsequent screen-space drawing until the clip is cleared. */
+bool rohr_graphics_screen_clip_set(float x, float y, float width, float height);
+/** Clears the active screen-space drawing clip. */
+void rohr_graphics_screen_clip_clear(void);
 
 /** @brief Draws a centered rotated rectangle in logical screen space. */
 bool rohr_graphics_screen_quad_draw(Position center, float width, float height, float angle, Color color);

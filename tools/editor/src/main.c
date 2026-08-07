@@ -3,6 +3,7 @@
 #include "editor_viewport.h"
 #include "editor_layout.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -13,6 +14,12 @@
 #include <unistd.h>
 #define editor_chdir chdir
 #endif
+
+#define EDITOR_VIEWPORT_MIN_WIDTH 100.0f
+#define EDITOR_TOOLS_MIN_WIDTH 40.0f
+#define EDITOR_DIVIDER_GRAB_WIDTH 6.0f
+
+float editor_viewport_width = WINDOW_WIDTH * 0.8f;
 
 static bool editor_result_ok(EngineResult result) {
     if(!rohr_error_check(result)) return true;
@@ -126,8 +133,6 @@ int main(void) {
     KeyboardState keyboard = {0};
     MouseState mouse = {0};
     FontAsset font = {0};
-    TextAsset tools_title = {0};
-    TextAsset hierarchy_label = {0};
     TextAsset hitbox_editor_label = {0};
     TextAsset add_object_label = {0};
     TextAsset add_hitbox_label = {0};
@@ -158,6 +163,7 @@ int main(void) {
     bool running = true;
     bool name_editing = false;
     bool field_editing = false;
+    bool panel_resizing = false;
 
     editor_project_init(&project);
     editor_viewport_state_init(&viewport_state);
@@ -187,9 +193,7 @@ int main(void) {
         if(rohr_error_check(result)) goto fail;
         font = result.result.value;
     }
-    if(!editor_text_create(&font, "Tools", &tools_title) ||
-            !editor_text_create(&font, "Hierarchy", &hierarchy_label) ||
-            !editor_text_create(&font, "Hitbox Editor", &hitbox_editor_label) ||
+    if(!editor_text_create(&font, "Hitbox Editor", &hitbox_editor_label) ||
             !editor_text_create(&font, "Add Object", &add_object_label) ||
             !editor_text_create(&font, "Add Hitbox", &add_hitbox_label) ||
             !editor_text_create(&font, "Hitbox", &hitbox_label) ||
@@ -258,6 +262,26 @@ int main(void) {
         }
         if(!running) break;
 
+        {
+            Position pointer = rohr_graphics_mouse_screen_position_get();
+            MouseButtonState primary = mouse.button_states[MOUSE_BUTTON_LEFT];
+
+            if(!panel_resizing && primary == MOUSE_BUTTON_STATE_PRESSED &&
+                    fabsf(pointer.x - EDITOR_VIEWPORT_WIDTH) <=
+                        EDITOR_DIVIDER_GRAB_WIDTH) {
+                panel_resizing = true;
+            }
+            if(panel_resizing && (primary == MOUSE_BUTTON_STATE_PRESSED ||
+                    primary == MOUSE_BUTTON_STATE_DOWN)) {
+                EDITOR_VIEWPORT_WIDTH = fmaxf(EDITOR_VIEWPORT_MIN_WIDTH,
+                    fminf(pointer.x, WINDOW_WIDTH - EDITOR_TOOLS_MIN_WIDTH));
+            }
+            if(primary == MOUSE_BUTTON_STATE_RELEASED ||
+                    primary == MOUSE_BUTTON_STATE_UP) {
+                panel_resizing = false;
+            }
+        }
+
         rohr_graphics_background_draw((Color){18, 21, 27, 255});
         (void)rohr_graphics_screen_rect_draw(
             0.0f, 0.0f, EDITOR_VIEWPORT_WIDTH, WINDOW_HEIGHT,
@@ -265,18 +289,14 @@ int main(void) {
         (void)rohr_graphics_screen_rect_draw(
             EDITOR_VIEWPORT_WIDTH, 0.0f, EDITOR_TOOLS_WIDTH, WINDOW_HEIGHT,
             (Color){38, 43, 53, 255});
-        (void)rohr_graphics_screen_rect_draw(
-            EDITOR_VIEWPORT_WIDTH, 0.0f, 1.0f, WINDOW_HEIGHT,
-            (Color){75, 84, 100, 255});
 
+        (void)rohr_graphics_screen_clip_set(
+            EDITOR_VIEWPORT_WIDTH, 0.0f, EDITOR_TOOLS_WIDTH, WINDOW_HEIGHT);
         rohr_ui_frame_begin((UIInput){
             .pointer = rohr_graphics_mouse_screen_position_get(),
             .primary_button = mouse.button_states[MOUSE_BUTTON_LEFT]
         });
         field_editing = false;
-        rohr_ui_label(&tools_title,
-            (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 14.0f,
-                EDITOR_TOOLS_WIDTH - 16.0f, 24.0f});
         if(viewport_state.mode == EDITOR_VIEWPORT_HITBOX) {
             EditorObject *selected = editor_project_selected_get(&project);
 
@@ -489,21 +509,21 @@ int main(void) {
         } else {
             UIButtonResult add_object = rohr_ui_button(
                 "editor.add_object", &add_object_label,
-                (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 58.0f,
+                (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 10.0f,
                     EDITOR_TOOLS_WIDTH - 20.0f, 38.0f}, NULL);
             if(add_object.clicked) {
-                EditorObject *added = editor_project_object_add(
+                (void)editor_project_object_add(
                     &project,
                     (Position){EDITOR_VIEWPORT_WIDTH * 0.5f,
                         WINDOW_HEIGHT * 0.5f});
-                if(added != NULL) editor_viewport_object_editor_enter(&viewport_state);
             }
-            rohr_ui_label(&hierarchy_label,
-                (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 108.0f,
-                    EDITOR_TOOLS_WIDTH - 16.0f, 24.0f});
+            (void)rohr_graphics_screen_rect_draw(
+                EDITOR_VIEWPORT_WIDTH + 10.0f, 58.0f,
+                EDITOR_TOOLS_WIDTH - 20.0f, 1.0f,
+                (Color){75, 84, 100, 255});
             for(size_t i = 0; i < project.object_count; i += 1) {
                 EditorObject *object = &project.objects[i];
-                float y = 142.0f + (float)i * 34.0f;
+                float y = 70.0f + (float)i * 34.0f;
                 char object_button_id[64];
                 UIButtonResult object_result;
 
@@ -533,8 +553,15 @@ int main(void) {
             rohr_graphics_mouse_screen_position_get(),
             mouse.button_states[MOUSE_BUTTON_LEFT],
             rohr_ui_pointer_consumed_get());
-        editor_viewport_draw(&project, &viewport_state);
         rohr_ui_frame_end();
+        rohr_graphics_screen_clip_clear();
+        (void)rohr_graphics_screen_clip_set(
+            0.0f, 0.0f, EDITOR_VIEWPORT_WIDTH, WINDOW_HEIGHT);
+        editor_viewport_draw(&project, &viewport_state);
+        rohr_graphics_screen_clip_clear();
+        (void)rohr_graphics_screen_rect_draw(
+            EDITOR_VIEWPORT_WIDTH - 1.0f, 0.0f, 3.0f, WINDOW_HEIGHT,
+            (Color){75, 84, 100, 255});
         rohr_graphics_show();
     }
 
@@ -565,8 +592,6 @@ int main(void) {
     rohr_graphics_text_destroy(&add_hitbox_label);
     rohr_graphics_text_destroy(&add_object_label);
     rohr_graphics_text_destroy(&hitbox_editor_label);
-    rohr_graphics_text_destroy(&hierarchy_label);
-    rohr_graphics_text_destroy(&tools_title);
     rohr_graphics_font_destroy(&font);
     if(viewport != 0) (void)rohr_viewport_destroy(viewport);
     rohr_graphics_end();
@@ -601,8 +626,6 @@ fail:
     rohr_graphics_text_destroy(&add_hitbox_label);
     rohr_graphics_text_destroy(&add_object_label);
     rohr_graphics_text_destroy(&hitbox_editor_label);
-    rohr_graphics_text_destroy(&hierarchy_label);
-    rohr_graphics_text_destroy(&tools_title);
     rohr_graphics_font_destroy(&font);
     if(viewport != 0) (void)rohr_viewport_destroy(viewport);
     rohr_graphics_end();

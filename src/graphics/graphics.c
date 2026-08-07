@@ -5,6 +5,7 @@
 #include "systems.h"
 #include "physics.h"
 #include "core/platform_process.h"
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -14,6 +15,15 @@ static TTF_TextEngine *ttf_text_engine = NULL;
 static bool ttf_initialized = false;
 static bool graphics_aabb_tree_debug_enabled = false;
 static Camera camera = {0};
+
+#define GRAPHICS_CLIP_STACK_MAX 16
+typedef struct GraphicsClipState {
+    SDL_Rect rectangle;
+    bool active;
+} GraphicsClipState;
+static GraphicsClipState graphics_clip_state = {0};
+static GraphicsClipState graphics_clip_stack[GRAPHICS_CLIP_STACK_MAX] = {0};
+static size_t graphics_clip_stack_count = 0;
 
 typedef struct ActiveCameraAttachment {
     CameraAttachment value;
@@ -1433,6 +1443,76 @@ bool graphics_screen_rect_draw(float x, float y, float width, float height, Colo
         return false;
     }
     return SDL_RenderFillRect(sdl_renderer, &rect);
+}
+
+bool graphics_screen_clip_set(float x, float y, float width, float height) {
+    SDL_Rect clip;
+    int left;
+    int top;
+    int right;
+    int bottom;
+
+    if(sdl_renderer == NULL || width <= 0.0f || height <= 0.0f) return false;
+    left = (int)ceilf(x);
+    top = (int)ceilf(y);
+    right = (int)floorf(x + width);
+    bottom = (int)floorf(y + height);
+    if(right <= left || bottom <= top) return false;
+    clip = (SDL_Rect){left, top, right - left, bottom - top};
+    if(!SDL_SetRenderClipRect(sdl_renderer, &clip)) return false;
+    graphics_clip_state = (GraphicsClipState){.rectangle = clip, .active = true};
+    graphics_clip_stack_count = 0;
+    return true;
+}
+
+void graphics_screen_clip_clear(void) {
+    if(sdl_renderer != NULL) (void)SDL_SetRenderClipRect(sdl_renderer, NULL);
+    graphics_clip_state = (GraphicsClipState){0};
+    graphics_clip_stack_count = 0;
+}
+
+bool graphics_screen_clip_push(float x, float y, float width, float height) {
+    SDL_Rect clip;
+    int left;
+    int top;
+    int right;
+    int bottom;
+
+    if(sdl_renderer == NULL || width <= 0.0f || height <= 0.0f ||
+            graphics_clip_stack_count >= GRAPHICS_CLIP_STACK_MAX) return false;
+    left = (int)ceilf(x);
+    top = (int)ceilf(y);
+    right = (int)floorf(x + width);
+    bottom = (int)floorf(y + height);
+    if(graphics_clip_state.active) {
+        left = left > graphics_clip_state.rectangle.x ?
+            left : graphics_clip_state.rectangle.x;
+        top = top > graphics_clip_state.rectangle.y ?
+            top : graphics_clip_state.rectangle.y;
+        right = right < graphics_clip_state.rectangle.x +
+            graphics_clip_state.rectangle.w ? right :
+            graphics_clip_state.rectangle.x + graphics_clip_state.rectangle.w;
+        bottom = bottom < graphics_clip_state.rectangle.y +
+            graphics_clip_state.rectangle.h ? bottom :
+            graphics_clip_state.rectangle.y + graphics_clip_state.rectangle.h;
+    }
+    graphics_clip_stack[graphics_clip_stack_count++] = graphics_clip_state;
+    clip = (SDL_Rect){left, top,
+        right > left ? right - left : 0,
+        bottom > top ? bottom - top : 0};
+    if(!SDL_SetRenderClipRect(sdl_renderer, &clip)) {
+        graphics_clip_stack_count -= 1;
+        return false;
+    }
+    graphics_clip_state = (GraphicsClipState){.rectangle = clip, .active = true};
+    return true;
+}
+
+void graphics_screen_clip_pop(void) {
+    if(sdl_renderer == NULL || graphics_clip_stack_count == 0) return;
+    graphics_clip_state = graphics_clip_stack[--graphics_clip_stack_count];
+    (void)SDL_SetRenderClipRect(sdl_renderer,
+        graphics_clip_state.active ? &graphics_clip_state.rectangle : NULL);
 }
 
 bool graphics_screen_quad_draw(

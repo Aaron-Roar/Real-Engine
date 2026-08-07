@@ -555,6 +555,7 @@ UISliderResult ui_slider(const char *id, float value, const UISliderConfig *conf
 
 void ui_label(const TextAsset *text, UIRect bounds) {
     Position position;
+    bool clipped;
 
     if(text == NULL || text->text == NULL) {
         return;
@@ -563,7 +564,10 @@ void ui_label(const TextAsset *text, UIRect bounds) {
         .x = bounds.x + (bounds.width - text->size.x) * 0.5f,
         .y = bounds.y + (bounds.height - text->size.y) * 0.5f,
     };
+    clipped = graphics_screen_clip_push(
+        bounds.x, bounds.y, bounds.width, bounds.height);
     (void)graphics_text_draw(text, position);
+    if(clipped) graphics_screen_clip_pop();
 }
 
 EngineResult ui_physics_debug_panel_init(UIPhysicsDebugPanel *panel, FontDescriptor descriptor) {

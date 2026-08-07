@@ -3,7 +3,9 @@
 
 #include "rohr.h"
 
-#define EDITOR_VIEWPORT_WIDTH (WINDOW_WIDTH * 0.8f)
-#define EDITOR_TOOLS_WIDTH (WINDOW_WIDTH - EDITOR_VIEWPORT_WIDTH)
+#define EDITOR_VIEWPORT_WIDTH editor_viewport_width
+#define EDITOR_TOOLS_WIDTH (WINDOW_WIDTH - editor_viewport_width)
+
+extern float editor_viewport_width;
 
 #endif

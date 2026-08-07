@@ -279,6 +279,10 @@ void graphics_background_draw(Color color);
 
 /** Draw a filled rectangle in logical screen coordinates. */
 bool graphics_screen_rect_draw(float x, float y, float width, float height, Color color);
+bool graphics_screen_clip_set(float x, float y, float width, float height);
+void graphics_screen_clip_clear(void);
+bool graphics_screen_clip_push(float x, float y, float width, float height);
+void graphics_screen_clip_pop(void);
 
 /** Draw a centered, rotated rectangle in logical screen coordinates. */
 bool graphics_screen_quad_draw(
