@@ -70,7 +70,6 @@ typedef struct EditorAnchor {
     EditorRigidBodyId rigid_body;
     bool position_follows_body;
     bool rotation_follows_body;
-    bool generated;
     bool visible;
 } EditorAnchor;
 
@@ -177,7 +176,7 @@ bool editor_project_joint_constraints_apply(EditorObject *object, EditorJoint *j
 void editor_project_anchor_constraints_apply(EditorObject *object, EditorAnchorId anchor);
 bool editor_project_joint_remove(EditorObject *object, EditorJointId id);
 EditorAnchor *editor_project_anchor_add(EditorProject *project, EditorObject *object,
-    Position position, EditorRigidBodyId rigid_body, bool generated);
+    Position position, EditorRigidBodyId rigid_body);
 EditorAnchor *editor_project_anchor_get(EditorObject *object, EditorAnchorId id);
 bool editor_project_anchor_remove(EditorObject *object, EditorAnchorId id);
 bool editor_project_joint_anchor_set(EditorObject *object, EditorJoint *joint,

@@ -155,24 +155,22 @@ bool editor_project_rigid_body_remove(EditorObject *object, EditorRigidBodyId id
     if(object == NULL || id == 0) return false;
     for(size_t i = 0; i < object->rigid_body_count; i += 1) {
         if(object->rigid_bodies[i].id != id) continue;
+        for(size_t j = 0; j < object->anchor_count; j += 1) {
+            EditorAnchor *anchor = &object->anchors[j];
+            if(anchor->rigid_body != id) continue;
+            if(anchor->position_follows_body) {
+                (void)editor_project_anchor_position_lock_set(object, anchor, false);
+            }
+            if(anchor->rotation_follows_body) {
+                (void)editor_project_anchor_rotation_lock_set(object, anchor, false);
+            }
+            anchor->rigid_body = 0;
+        }
         for(size_t j = i + 1; j < object->rigid_body_count; j += 1) {
             object->rigid_bodies[j - 1] = object->rigid_bodies[j];
         }
         object->rigid_body_count -= 1;
         object->rigid_bodies[object->rigid_body_count] = (EditorRigidBody){0};
-        for(size_t j = object->anchor_count; j > 0; j -= 1) {
-            EditorAnchor *anchor = &object->anchors[j - 1];
-            EditorAnchorId anchor_id;
-            if(anchor->rigid_body != id) continue;
-            anchor_id = anchor->id;
-            for(size_t k = object->joint_count; k > 0; k -= 1) {
-                EditorJoint *joint = &object->joint_items[k - 1];
-                if(joint->anchor_a == anchor_id || joint->anchor_b == anchor_id) {
-                    (void)editor_project_joint_remove(object, joint->id);
-                }
-            }
-            (void)editor_project_anchor_remove(object, anchor_id);
-        }
         return true;
     }
     return false;
@@ -187,7 +185,7 @@ EditorAnchor *editor_project_anchor_get(EditorObject *object, EditorAnchorId id)
 }
 
 EditorAnchor *editor_project_anchor_add(EditorProject *project, EditorObject *object,
-    Position position, EditorRigidBodyId rigid_body, bool generated) {
+    Position position, EditorRigidBodyId rigid_body) {
     EditorAnchor *anchor;
 
     if(project == NULL || object == NULL || object->anchor_count >= EDITOR_ANCHOR_MAX ||
@@ -197,7 +195,7 @@ EditorAnchor *editor_project_anchor_add(EditorProject *project, EditorObject *ob
     anchor = &object->anchors[object->anchor_count++];
     *anchor = (EditorAnchor){.id = project->next_anchor_id++, .position = position,
         .rigid_body = rigid_body, .position_follows_body = rigid_body != 0,
-        .rotation_follows_body = rigid_body != 0, .generated = generated, .visible = true};
+        .rotation_follows_body = rigid_body != 0, .visible = true};
     snprintf(anchor->name, sizeof(anchor->name), "anchor_%u", anchor->id);
     return anchor;
 }
@@ -268,16 +266,6 @@ bool editor_project_anchor_rigid_body_set(EditorObject *object, EditorAnchor *an
     return true;
 }
 
-static bool editor_anchor_referenced_get(const EditorObject *object, EditorAnchorId id) {
-    if(object == NULL || id == 0) return false;
-    for(size_t i = 0; i < object->joint_count; i += 1) {
-        if(object->joint_items[i].anchor_a == id || object->joint_items[i].anchor_b == id) {
-            return true;
-        }
-    }
-    return false;
-}
-
 bool editor_project_anchor_remove(EditorObject *object, EditorAnchorId id) {
     if(object == NULL || id == 0) return false;
     for(size_t i = 0; i < object->joint_count; i += 1) {
@@ -295,13 +283,6 @@ bool editor_project_anchor_remove(EditorObject *object, EditorAnchorId id) {
         return true;
     }
     return false;
-}
-
-static void editor_generated_anchor_collect(EditorObject *object, EditorAnchorId id) {
-    EditorAnchor *anchor = editor_project_anchor_get(object, id);
-    if(anchor != NULL && anchor->generated && !editor_anchor_referenced_get(object, id)) {
-        (void)editor_project_anchor_remove(object, id);
-    }
 }
 
 EditorHitbox *editor_project_hitbox_add(EditorProject *project, EditorRigidBody *body) {
@@ -513,31 +494,14 @@ void editor_project_anchor_constraints_apply(EditorObject *object, EditorAnchorI
 EditorJoint *editor_project_joint_add(EditorProject *project, EditorObject *object,
     EditorJointKind kind) {
     EditorJoint *joint;
-    EditorAnchor *a;
-    EditorAnchor *b;
 
-    if(project == NULL || object == NULL || object->joint_count >= EDITOR_JOINT_MAX ||
-            object->anchor_count + 2 > EDITOR_ANCHOR_MAX) {
-        return NULL;
-    }
-    a = editor_project_anchor_add(project, object, (Position){-20.0f, 0.0f},
-        object->rigid_body_count > 0 ? object->rigid_bodies[0].id : 0, true);
-    b = editor_project_anchor_add(project, object, (Position){20.0f, 0.0f},
-        object->rigid_body_count > 1 ? object->rigid_bodies[1].id :
-            (object->rigid_body_count > 0 ? object->rigid_bodies[0].id : 0), true);
-    if(a == NULL || b == NULL) {
-        if(a != NULL) (void)editor_project_anchor_remove(object, a->id);
+    if(project == NULL || object == NULL || object->joint_count >= EDITOR_JOINT_MAX) {
         return NULL;
     }
     joint = &object->joint_items[object->joint_count++];
     *joint = editor_project_joint_default_get(kind);
     joint->id = project->next_joint_id++;
-    joint->anchor_a = a->id;
-    joint->anchor_b = b->id;
-    joint->rest_length = hypotf(b->position.x - a->position.x,
-        b->position.y - a->position.y);
     snprintf(joint->name, sizeof(joint->name), "joint_%u", joint->id);
-    (void)editor_project_joint_constraints_apply(object, joint);
     return joint;
 }
 
@@ -545,15 +509,11 @@ bool editor_project_joint_remove(EditorObject *object, EditorJointId id) {
     if(object == NULL || id == 0) return false;
     for(size_t i = 0; i < object->joint_count; i += 1) {
         if(object->joint_items[i].id != id) continue;
-        EditorAnchorId anchor_a = object->joint_items[i].anchor_a;
-        EditorAnchorId anchor_b = object->joint_items[i].anchor_b;
         for(size_t j = i + 1; j < object->joint_count; j += 1) {
             object->joint_items[j - 1] = object->joint_items[j];
         }
         object->joint_count -= 1;
         object->joint_items[object->joint_count] = (EditorJoint){0};
-        editor_generated_anchor_collect(object, anchor_a);
-        if(anchor_b != anchor_a) editor_generated_anchor_collect(object, anchor_b);
         return true;
     }
     return false;
@@ -561,14 +521,18 @@ bool editor_project_joint_remove(EditorObject *object, EditorJointId id) {
 
 bool editor_project_joint_anchor_set(EditorObject *object, EditorJoint *joint,
     uint32_t endpoint, EditorAnchorId anchor) {
-    EditorAnchorId previous;
-
     if(object == NULL || joint == NULL || endpoint > 1 ||
             (anchor != 0 && editor_project_anchor_get(object, anchor) == NULL)) return false;
-    previous = endpoint == 0 ? joint->anchor_a : joint->anchor_b;
     if(endpoint == 0) joint->anchor_a = anchor;
     else joint->anchor_b = anchor;
-    if(previous != anchor) editor_generated_anchor_collect(object, previous);
+    if(joint->kind == EDITOR_JOINT_SPRING && joint->anchor_a != 0 &&
+            joint->anchor_b != 0) {
+        EditorAnchor *a = editor_project_anchor_get(object, joint->anchor_a);
+        EditorAnchor *b = editor_project_anchor_get(object, joint->anchor_b);
+        Position world_a = editor_anchor_world_position_get(object, a);
+        Position world_b = editor_anchor_world_position_get(object, b);
+        joint->rest_length = hypotf(world_b.x - world_a.x, world_b.y - world_a.y);
+    }
     return editor_project_joint_constraints_apply(object, joint);
 }
 
@@ -622,11 +586,10 @@ bool editor_project_soft_node_remove(EditorSoftBody *body, EditorSoftNodeId id) 
     if(body == NULL || id == 0) return false;
     for(size_t i = 0; i < body->node_count; i += 1) {
         if(body->nodes[i].id != id) continue;
-        for(size_t j = body->beam_count; j > 0; j -= 1) {
-            EditorSoftBeam *beam = &body->beams[j - 1];
-            if(beam->node_a == id || beam->node_b == id) {
-                (void)editor_project_soft_beam_remove(body, beam->id);
-            }
+        for(size_t j = 0; j < body->beam_count; j += 1) {
+            EditorSoftBeam *beam = &body->beams[j];
+            if(beam->node_a == id) beam->node_a = 0;
+            if(beam->node_b == id) beam->node_b = 0;
         }
         for(size_t j = i + 1; j < body->node_count; j += 1) {
             body->nodes[j - 1] = body->nodes[j];
@@ -641,10 +604,10 @@ bool editor_project_soft_node_remove(EditorSoftBody *body, EditorSoftNodeId id) 
 EditorSoftBeam *editor_project_soft_beam_add(EditorProject *project, EditorSoftBody *body,
     EditorSoftNodeId node_a, EditorSoftNodeId node_b) {
     EditorSoftBeam *beam;
-    bool found_a = false;
-    bool found_b = false;
+    bool found_a = node_a == 0;
+    bool found_b = node_b == 0;
 
-    if(project == NULL || body == NULL || node_a == node_b ||
+    if(project == NULL || body == NULL || (node_a != 0 && node_a == node_b) ||
             body->beam_count >= EDITOR_SOFT_BEAM_MAX) return NULL;
     for(size_t i = 0; i < body->node_count; i += 1) {
         if(body->nodes[i].id == node_a) found_a = true;

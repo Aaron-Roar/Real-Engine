@@ -15,8 +15,9 @@ int main(void) {
     EditorJoint *joint;
     EditorJoint *joint_two;
     EditorAnchor *manual_anchor;
-    EditorAnchorId generated_a;
+    EditorAnchor *second_anchor;
     EditorAnchorId manual_anchor_id;
+    EditorAnchorId second_anchor_id;
     EditorJointId joint_two_id;
     EditorSoftBody *soft_body;
     EditorSoftNode *node_a;
@@ -50,40 +51,33 @@ int main(void) {
             hitbox->vertex_count != 3) return 1;
 
     joint = editor_project_joint_add(&project, object, EDITOR_JOINT_SPRING);
-    if(joint == NULL || object->anchor_count != 2 ||
-            !editor_project_anchor_get(object, joint->anchor_a)->generated ||
-            fabsf(joint->rest_length - 40.0f) > 0.001f ||
+    if(joint == NULL || object->anchor_count != 0 || joint->anchor_a != 0 ||
+            joint->anchor_b != 0 || fabsf(joint->rest_length) > 0.001f ||
             fabsf(joint->stiffness - 100.0f) > 0.001f ||
             fabsf(joint->damping - 10.0f) > 0.001f ||
             fabsf(joint->visual_size - 1.0f) > 0.001f) return 1;
-    generated_a = joint->anchor_a;
     joint_two = editor_project_joint_add(&project, object, EDITOR_JOINT_WELD);
     joint_two_id = joint_two == NULL ? 0 : joint_two->id;
-    if(joint_two == NULL || !position_equal(
-            (Position){chassis->position.x +
-                    editor_project_anchor_get(object, joint_two->anchor_a)->position.x,
-                chassis->position.y +
-                    editor_project_anchor_get(object, joint_two->anchor_a)->position.y},
-            (Position){wheel->position.x +
-                    editor_project_anchor_get(object, joint_two->anchor_b)->position.x,
-                wheel->position.y +
-                    editor_project_anchor_get(object, joint_two->anchor_b)->position.y}) ||
-            !editor_project_joint_anchor_set(
-            object, joint_two, 0, generated_a)) return 1;
+    if(joint_two == NULL || joint_two->anchor_a != 0 || joint_two->anchor_b != 0) return 1;
     manual_anchor = editor_project_anchor_add(&project, object,
-        (Position){5.0f, 6.0f}, chassis->id, false);
+        (Position){5.0f, 6.0f}, chassis->id);
+    second_anchor = editor_project_anchor_add(&project, object,
+        (Position){25.0f, 6.0f}, wheel->id);
     manual_anchor_id = manual_anchor == NULL ? 0 : manual_anchor->id;
-    if(manual_anchor == NULL || !editor_project_joint_anchor_set(
-            object, joint, 0, manual_anchor_id) ||
-            editor_project_anchor_get(object, generated_a) == NULL ||
-            !editor_project_joint_anchor_set(
-            object, joint_two, 0, manual_anchor_id) ||
-            editor_project_anchor_get(object, generated_a) != NULL ||
+    second_anchor_id = second_anchor == NULL ? 0 : second_anchor->id;
+    if(manual_anchor == NULL || second_anchor == NULL ||
+            !editor_project_joint_anchor_set(object, joint, 0, manual_anchor_id) ||
+            !editor_project_joint_anchor_set(object, joint, 1, second_anchor_id) ||
+            fabsf(joint->rest_length - 20.0f) > 0.001f ||
             !editor_project_joint_remove(object, joint->id) ||
             editor_project_anchor_get(object, manual_anchor_id) == NULL ||
+            editor_project_anchor_get(object, second_anchor_id) == NULL ||
+            !editor_project_joint_anchor_set(object, joint_two, 0, manual_anchor_id) ||
+            !editor_project_joint_anchor_set(object, joint_two, 1, second_anchor_id) ||
             !editor_project_joint_remove(object, joint_two_id) ||
-            object->anchor_count != 1 ||
-            editor_project_anchor_get(object, manual_anchor_id) == NULL) return 1;
+            object->anchor_count != 2 ||
+            editor_project_anchor_get(object, manual_anchor_id) == NULL ||
+            editor_project_anchor_get(object, second_anchor_id) == NULL) return 1;
     manual_anchor = editor_project_anchor_get(object, manual_anchor_id);
     if(manual_anchor == NULL || !editor_project_anchor_position_lock_set(
             object, manual_anchor, false) || !editor_project_anchor_rotation_lock_set(
@@ -99,17 +93,30 @@ int main(void) {
             !editor_project_anchor_rotation_lock_set(object, manual_anchor, false) ||
             fabsf(manual_anchor->rotation) > 0.001f) return 1;
     joint = editor_project_joint_add(&project, object, EDITOR_JOINT_SPRING);
-    if(joint == NULL || !editor_project_rigid_body_remove(object, wheel->id) ||
-            object->joint_count != 0) return 1;
+    if(joint == NULL || !editor_project_joint_anchor_set(
+            object, joint, 0, manual_anchor_id) ||
+            !editor_project_joint_anchor_set(object, joint, 1, second_anchor_id) ||
+            !editor_project_rigid_body_remove(object, wheel->id) ||
+            object->joint_count != 1 ||
+            editor_project_anchor_get(object, second_anchor_id) == NULL ||
+            editor_project_anchor_get(object, second_anchor_id)->rigid_body != 0 ||
+            !editor_project_joint_remove(object, joint->id)) return 1;
 
     soft_body = editor_project_soft_body_add(&project, object);
     node_a = editor_project_soft_node_add(&project, soft_body, (Position){0});
     node_b = editor_project_soft_node_add(&project, soft_body, (Position){20.0f, 0.0f});
     if(soft_body == NULL || node_a == NULL || node_b == NULL) return 1;
+    beam = editor_project_soft_beam_add(&project, soft_body, 0, 0);
+    if(beam == NULL || !beam->visible || beam->node_a != 0 || beam->node_b != 0) return 1;
+    beam->node_a = node_a->id;
+    beam->node_b = node_b->id;
+    if(!editor_project_soft_beam_remove(soft_body, beam->id) ||
+            soft_body->node_count != 2) return 1;
     beam = editor_project_soft_beam_add(&project, soft_body, node_a->id, node_b->id);
-    if(beam == NULL || !beam->visible ||
+    if(beam == NULL ||
             !editor_project_soft_node_remove(soft_body, node_a->id) ||
-            soft_body->beam_count != 0) return 1;
+            soft_body->beam_count != 1 || beam->node_a != 0 ||
+            soft_body->node_count != 1 || beam->node_b != soft_body->nodes[0].id) return 1;
 
     editor_project_selection_clear(&project);
     if(editor_project_selected_get(&project) != NULL ||

@@ -1294,7 +1294,7 @@ int main(void) {
                             EDITOR_TOOLS_WIDTH - 20.0f, 30.0f}, NULL).clicked) {
                     EditorAnchor *added = editor_project_anchor_add(&project, selected,
                         (Position){0}, selected->rigid_body_count > 0 ?
-                            selected->rigid_bodies[0].id : 0, false);
+                            selected->rigid_bodies[0].id : 0);
                     if(added != NULL) viewport_state.selected_anchor = added->id;
                 }
                 {
@@ -1625,11 +1625,9 @@ int main(void) {
                 }
                 if(rohr_ui_button("editor.soft_body.add_beam", &add_beam_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 154.0f,
-                            EDITOR_TOOLS_WIDTH - 20.0f, 30.0f}, NULL).clicked &&
-                        body->node_count >= 2) {
-                    EditorSoftBeam *beam = editor_project_soft_beam_add(&project, body,
-                        body->nodes[body->node_count - 2].id,
-                        body->nodes[body->node_count - 1].id);
+                            EDITOR_TOOLS_WIDTH - 20.0f, 30.0f}, NULL).clicked) {
+                    EditorSoftBeam *beam = editor_project_soft_beam_add(
+                        &project, body, 0, 0);
                     if(beam != NULL) {
                         viewport_state.selection = EDITOR_SELECTION_SOFT_BEAM;
                         viewport_state.selected_soft_beam = beam->id;
