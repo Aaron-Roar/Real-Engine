@@ -36,7 +36,10 @@ int main(void) {
                 anchor_b.result.value
             ))) goto fail;
 
-    rohr_system_physics_update(0.0);
+    rohr_physics_pipeline_substep_begin();
+    rohr_physics_pipeline_joints_gather();
+    rohr_physics_pipeline_constraints_solve(
+        rohr_physics_solver_iterations_get());
     index_a = rohr_entity_index_get(body_a.result.value);
     index_b = rohr_entity_index_get(body_b.result.value);
     if(rohr_error_check(index_a) || rohr_error_check(index_b) ||

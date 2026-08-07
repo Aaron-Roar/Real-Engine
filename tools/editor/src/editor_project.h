@@ -82,6 +82,7 @@ typedef struct EditorJoint {
     float rest_length;
     float stiffness;
     float damping;
+    float rest_angle;
     float visual_size;
     bool visible;
 } EditorJoint;
@@ -174,6 +175,8 @@ bool editor_project_joint_kind_set(EditorObject *object, EditorJoint *joint,
     EditorJointKind kind);
 bool editor_project_joint_constraints_apply(EditorObject *object, EditorJoint *joint);
 void editor_project_anchor_constraints_apply(EditorObject *object, EditorAnchorId anchor);
+void editor_project_rigid_body_constraints_apply(EditorObject *object,
+    EditorRigidBodyId rigid_body);
 bool editor_project_joint_remove(EditorObject *object, EditorJointId id);
 EditorAnchor *editor_project_anchor_add(EditorProject *project, EditorObject *object,
     Position position, EditorRigidBodyId rigid_body);

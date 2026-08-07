@@ -434,6 +434,26 @@ uint32_t rohr_physics_solver_iterations_get(void);
 EngineResult rohr_physics_substeps_set(uint32_t substeps);
 /** Returns physics substeps. Defaults to 1. */
 uint32_t rohr_physics_substeps_get(void);
+/** Begins a complete custom physics step and advances interaction state. */
+void rohr_physics_pipeline_step_begin(void);
+/** Clears transient constraints before one custom substep. */
+void rohr_physics_pipeline_substep_begin(void);
+/** Clears force-derived acceleration from the previous substep. */
+void rohr_physics_pipeline_accelerations_clear(void);
+/** Applies spring-joint and soft-body-beam forces. */
+void rohr_physics_pipeline_forces_apply(void);
+/** Integrates rigid-body state by dt seconds. */
+void rohr_physics_pipeline_integrate(double dt);
+/** Detects contacts and gathers contact constraints. */
+void rohr_physics_pipeline_contacts_gather(void);
+/** Gathers active pin and weld joint constraints. */
+void rohr_physics_pipeline_joints_gather(void);
+/** Solves currently gathered contacts and joints. */
+void rohr_physics_pipeline_constraints_solve(uint32_t iterations);
+/** Runs one standard physics substep. */
+void rohr_physics_pipeline_substep(double dt);
+/** Runs the standard plug-and-play physics pipeline. */
+void rohr_physics_pipeline_update(double dt);
 /** Advances physics using the supplied number of elapsed engine ticks. */
 void rohr_physics_update(Tick ticks);
 /** Advances physics once with an explicit exceptional delta. */

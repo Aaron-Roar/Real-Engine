@@ -71,8 +71,8 @@ int main(void) {
             fabsf(joint->rest_length - 20.0f) > 0.001f ||
             !editor_project_joint_remove(object, joint->id) ||
             editor_project_anchor_get(object, manual_anchor_id) == NULL ||
-            editor_project_anchor_get(object, second_anchor_id) == NULL ||
-            !editor_project_joint_anchor_set(object, joint_two, 0, manual_anchor_id) ||
+            editor_project_anchor_get(object, second_anchor_id) == NULL) return 1;
+    if(!editor_project_joint_anchor_set(object, joint_two, 0, manual_anchor_id) ||
             !editor_project_joint_anchor_set(object, joint_two, 1, second_anchor_id) ||
             !editor_project_joint_remove(object, joint_two_id) ||
             object->anchor_count != 2 ||
@@ -117,6 +117,38 @@ int main(void) {
             !editor_project_soft_node_remove(soft_body, node_a->id) ||
             soft_body->beam_count != 1 || beam->node_a != 0 ||
             soft_body->node_count != 1 || beam->node_b != soft_body->nodes[0].id) return 1;
+
+    {
+        static EditorProject weld_project;
+        EditorObject *weld_object;
+        EditorRigidBody *body_a;
+        EditorRigidBody *body_b;
+        EditorAnchor *anchor_a;
+        EditorAnchor *anchor_b;
+        EditorJoint *weld;
+
+        editor_project_init(&weld_project);
+        weld_object = editor_project_object_add(&weld_project, (Position){0});
+        body_a = editor_project_rigid_body_add(&weld_project, weld_object);
+        body_b = editor_project_rigid_body_add(&weld_project, weld_object);
+        if(body_a == NULL || body_b == NULL) return 1;
+        body_a->rotation = 0.25f;
+        body_b->rotation = 1.0f;
+        anchor_a = editor_project_anchor_add(&weld_project, weld_object,
+            (Position){0.0f, 0.0f}, body_a->id);
+        anchor_b = editor_project_anchor_add(&weld_project, weld_object,
+            (Position){20.0f, 0.0f}, body_b->id);
+        weld = editor_project_joint_add(&weld_project, weld_object, EDITOR_JOINT_WELD);
+        if(anchor_a == NULL || anchor_b == NULL || weld == NULL ||
+                !editor_project_joint_anchor_set(
+                    weld_object, weld, 0, anchor_a->id) ||
+                !editor_project_joint_anchor_set(
+                    weld_object, weld, 1, anchor_b->id) ||
+                fabsf(weld->rest_angle - 0.75f) > 0.001f) return 1;
+        body_a->rotation = 0.5f;
+        editor_project_rigid_body_constraints_apply(weld_object, body_a->id);
+        if(fabsf(body_b->rotation - 1.25f) > 0.001f) return 1;
+    }
 
     editor_project_selection_clear(&project);
     if(editor_project_selected_get(&project) != NULL ||

@@ -99,6 +99,16 @@ EngineResult rohr_physics_solver_iterations_set(uint32_t iterations) { return ph
 uint32_t rohr_physics_solver_iterations_get(void) { return physics_solver_iterations_get(); }
 EngineResult rohr_physics_substeps_set(uint32_t substeps) { return physics_substeps_set(substeps); }
 uint32_t rohr_physics_substeps_get(void) { return physics_substeps_get(); }
+void rohr_physics_pipeline_step_begin(void) { physics_pipeline_step_begin(); }
+void rohr_physics_pipeline_substep_begin(void) { physics_pipeline_substep_begin(); }
+void rohr_physics_pipeline_accelerations_clear(void) { physics_pipeline_accelerations_clear(); }
+void rohr_physics_pipeline_forces_apply(void) { physics_pipeline_forces_apply(); }
+void rohr_physics_pipeline_integrate(double dt) { physics_pipeline_integrate(dt); }
+void rohr_physics_pipeline_contacts_gather(void) { physics_pipeline_contacts_gather(); }
+void rohr_physics_pipeline_joints_gather(void) { physics_pipeline_joints_gather(); }
+void rohr_physics_pipeline_constraints_solve(uint32_t iterations) { physics_pipeline_constraints_solve(iterations); }
+void rohr_physics_pipeline_substep(double dt) { physics_pipeline_substep(dt); }
+void rohr_physics_pipeline_update(double dt) { physics_pipeline_update(dt); }
 void rohr_physics_update(Tick ticks) { physics_update(ticks); }
 void rohr_physics_dt_update(Time dt) { physics_dt_update(dt); }
 Shape rohr_physics_shape_world_translate(Shape shape, Position position, Orientation angle) { return physics_shape_world_translate(shape, position, angle); }

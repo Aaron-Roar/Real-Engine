@@ -71,6 +71,8 @@ set(ROHR_ENGINE_SOURCES
     src/physics/particles/particle.c
     src/physics/physics.c
     src/physics/physics_step.c
+    src/physics/pipeline/physics_pipeline.c
+    src/physics/pipeline/physics_stages.c
     src/physics/rigid_body/rigid_body.c
     src/physics/rigid_body/rigid_body_step.c
     src/physics/soft_body/soft_body.c

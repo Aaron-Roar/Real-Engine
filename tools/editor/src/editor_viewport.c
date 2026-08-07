@@ -333,6 +333,7 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
             primary_button == MOUSE_BUTTON_STATE_PRESSED)) {
         body->position = (Position){pointer.x - object->position.x - state->drag_offset.x,
             pointer.y - object->position.y - state->drag_offset.y};
+        editor_project_rigid_body_constraints_apply(object, body->id);
         return true;
     }
     if(body != NULL && state->rotated_body && (primary_button == MOUSE_BUTTON_STATE_DOWN ||
@@ -341,6 +342,7 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
             object->position.y + body->position.y};
         body->rotation = atan2f(pointer.y - center.y, pointer.x - center.x) +
             state->rotation_pointer_offset;
+        editor_project_rigid_body_constraints_apply(object, body->id);
         return true;
     }
     if(hitbox != NULL && state->dragged_vertex >= 0 &&
@@ -646,6 +648,7 @@ bool editor_viewport_selection_nudge(EditorViewportState *state,
     if(state->selection == EDITOR_SELECTION_RIGID_BODY && body != NULL) {
         body->position.x += screen_delta.x;
         body->position.y += screen_delta.y;
+        editor_project_rigid_body_constraints_apply(object, body->id);
         return true;
     }
     if(state->selection == EDITOR_SELECTION_VERTEX && body != NULL) {

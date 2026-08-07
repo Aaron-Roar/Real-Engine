@@ -765,6 +765,81 @@ void rohr_physics_engine_time_per_tick_use(void);
 
  Restores the engine time-per-tick default.
 
+### Modular physics pipeline
+
+Most games should call `rohr_physics_update` or
+`rohr_physics_pipeline_update`. The latter runs the following public stages for
+each configured substep without changing the standard simulation order:
+
+```c
+rohr_physics_pipeline_step_begin();
+
+rohr_physics_pipeline_substep_begin();
+rohr_physics_pipeline_accelerations_clear();
+rohr_physics_pipeline_forces_apply();
+rohr_physics_pipeline_integrate(dt);
+rohr_physics_pipeline_contacts_gather();
+rohr_physics_pipeline_joints_gather();
+rohr_physics_pipeline_constraints_solve(
+    rohr_physics_solver_iterations_get());
+```
+
+The stages operate on the engine's component pools and reusable internal
+constraint storage. They do not allocate a separate physics world.
+
+- Call `rohr_physics_pipeline_step_begin` once per complete logical physics
+  step. It advances entered/stayed/exited interaction state and resets debug
+  counters.
+- Call `rohr_physics_pipeline_substep_begin` before gathering constraints. It
+  clears transient contact and joint constraint lists.
+- Force stages must precede integration when using spring joints or soft-body
+  beams.
+- Gather before solving. Contacts and rigid joints are normally gathered
+  together so the iterative solver can alternate between them.
+- `rohr_physics_pipeline_constraints_solve` does nothing when passed zero
+  iterations.
+
+Tools may intentionally use only part of the pipeline. For example, an editor
+can enforce pin and weld joints without gravity, velocity integration, contact
+detection, or interaction events:
+
+```c
+rohr_physics_pipeline_substep_begin();
+rohr_physics_pipeline_joints_gather();
+rohr_physics_pipeline_constraints_solve(
+    rohr_physics_solver_iterations_get());
+```
+
+This partial sequence does not call `step_begin`, because it is not producing a
+new collision-interaction frame.
+
+### `rohr_physics_pipeline_update`
+
+```c
+void rohr_physics_pipeline_update(double dt);
+```
+
+Runs the standard plug-and-play pipeline using the configured substep and
+solver-iteration counts.
+
+### Individual pipeline stages
+
+```c
+void rohr_physics_pipeline_step_begin(void);
+void rohr_physics_pipeline_substep_begin(void);
+void rohr_physics_pipeline_accelerations_clear(void);
+void rohr_physics_pipeline_forces_apply(void);
+void rohr_physics_pipeline_integrate(double dt);
+void rohr_physics_pipeline_contacts_gather(void);
+void rohr_physics_pipeline_joints_gather(void);
+void rohr_physics_pipeline_constraints_solve(uint32_t iterations);
+void rohr_physics_pipeline_substep(double dt);
+```
+
+These functions expose the standard pipeline's individual operations for
+custom schedules. `rohr_physics_pipeline_substep` runs every substep stage in
+the standard order, but does not advance interaction state by itself.
+
 ### `rohr_physics_update`
 
 ```c

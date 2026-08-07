@@ -29,6 +29,27 @@ EngineResult physics_solver_iterations_set(uint32_t iterations);
 uint32_t physics_solver_iterations_get(void);
 EngineResult physics_substeps_set(uint32_t substeps);
 uint32_t physics_substeps_get(void);
+
+/** Begin a complete physics step and advance interaction transition state. */
+void physics_pipeline_step_begin(void);
+/** Clear transient constraints before assembling one physics substep. */
+void physics_pipeline_substep_begin(void);
+/** Clear force-derived acceleration accumulated during the previous substep. */
+void physics_pipeline_accelerations_clear(void);
+/** Apply spring-joint and soft-body-beam forces for the current substep. */
+void physics_pipeline_forces_apply(void);
+/** Integrate rigid-body positions and velocities for one substep. */
+void physics_pipeline_integrate(double dt);
+/** Detect rigid and soft-body contacts and gather their constraints. */
+void physics_pipeline_contacts_gather(void);
+/** Gather active pin and weld joint constraints. */
+void physics_pipeline_joints_gather(void);
+/** Solve all currently gathered contact and joint constraints. */
+void physics_pipeline_constraints_solve(uint32_t iterations);
+/** Run the standard sequence for one substep. */
+void physics_pipeline_substep(double dt);
+/** Run the plug-and-play physics pipeline, including configured substeps. */
+void physics_pipeline_update(double dt);
 /** Result type for functions that return a Shape. */
 ERROR_DECLARE_RESULT_TYPE(ShapeResult, Shape);
 

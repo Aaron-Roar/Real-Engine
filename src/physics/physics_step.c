@@ -26,7 +26,7 @@ static bool system_hitbox_dirty[MAX_ENTITIES];
 static EntityIndex system_hitbox_dirty_entities[MAX_ENTITIES];
 static size_t system_hitbox_dirty_count;
 
-static double system_elapsed_ms(uint64_t start) {
+double physics_step_elapsed_ms(uint64_t start) {
     return (double)(SDL_GetPerformanceCounter() - start) * 1000.0 /
         (double)SDL_GetPerformanceFrequency();
 }
@@ -155,7 +155,7 @@ void physics_step_transform_lock_by_index_remove(EntityIndex index) {
     physics_transform_lock_remove(entity);
 }
 
-static void system_contact_constraints_solve_callback(
+void physics_pipeline_contact_constraints_solve(
     ContactConstraintList *constraints,
     float position_fraction,
     void *context
@@ -172,7 +172,7 @@ static void system_contact_constraints_solve_callback(
     }
 }
 
-static void system_contact_constraints_finalize_callback(
+void physics_pipeline_contact_constraints_finalize(
     ContactConstraintList *constraints,
     void *context
 ) {
@@ -188,61 +188,13 @@ static void system_contact_constraints_finalize_callback(
     }
 }
 
-static void system_joint_constraints_solve_callback(void *context) {
+void physics_pipeline_joint_constraints_solve(void *context) {
     (void)context;
     physics_joint_constraints_solve();
 }
 
-static void system_physics_substep_update(double dt) {
-    uint64_t phase_started;
-    double broadphase_build_before = physics_step_debug_stats.broadphase_build_ms;
-    double narrowphase_before = physics_step_debug_stats.narrowphase_ms;
-
-    contact_constraint_list_clear(&physics_step_contact_constraints);
-    joint_constraint_list_clear(&physics_step_joint_constraints);
-    physics_rigid_accelerations_clear();
-    physics_joint_spring_forces_apply();
-    physics_soft_body_beams_apply();
-    physics_rigid_integrate(dt);
-
-    if(physics_step_debug_stats_enabled) phase_started = SDL_GetPerformanceCounter();
-    physics_rigid_constraints_gather();
-    physics_soft_body_constraints_gather();
-    if(physics_step_debug_stats_enabled) {
-        double broadphase_query_ms =
-            system_elapsed_ms(phase_started) -
-            (physics_step_debug_stats.broadphase_build_ms -
-                broadphase_build_before) -
-            (physics_step_debug_stats.narrowphase_ms - narrowphase_before);
-        if(broadphase_query_ms < 0.0) broadphase_query_ms = 0.0;
-        physics_step_debug_stats.broadphase_query_ms += broadphase_query_ms;
-        phase_started = SDL_GetPerformanceCounter();
-    }
-    physics_joint_constraints_gather();
-    constraint_solver_run(
-        &physics_step_contact_constraints,
-        physics_solver_iterations_get(),
-        system_contact_constraints_solve_callback,
-        system_joint_constraints_solve_callback,
-        system_contact_constraints_finalize_callback,
-        NULL);
-    if(physics_step_debug_stats_enabled) {
-        physics_step_debug_stats.response_ms += system_elapsed_ms(phase_started);
-    }
-}
-
 void system_physics_update(double dt) {
-    uint64_t total_started = physics_step_debug_stats_enabled ? SDL_GetPerformanceCounter() : 0;
-    uint32_t substeps = physics_substeps_get();
-    double substep_dt = dt / (double)substeps;
-
-    physics_step_debug_stats = (PhysicsDebugStats){0};
-    physics_interactions_step_begin();
-    for(uint32_t substep = 0; substep < substeps; substep += 1) {
-        system_physics_substep_update(substep_dt);
-    }
-    if(!physics_step_debug_stats_enabled) return;
-    physics_step_debug_stats.total_ms = system_elapsed_ms(total_started);
+    physics_pipeline_update(dt);
 }
 
 void print_entity_movement(Entity entity) {

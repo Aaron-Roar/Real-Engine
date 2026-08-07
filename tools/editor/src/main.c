@@ -915,6 +915,9 @@ int main(void) {
                             EDITOR_TOOLS_WIDTH - 96.0f, 26.0f}, NULL);
                     field_editing = x_result.active || y_result.active ||
                         rotation_result.active;
+                    if(x_result.changed || y_result.changed || rotation_result.changed) {
+                        editor_project_rigid_body_constraints_apply(selected, body->id);
+                    }
                 }
                 rohr_ui_label(&mass_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     180.0f, 76.0f, 26.0f});
