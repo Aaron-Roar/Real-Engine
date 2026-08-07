@@ -203,6 +203,20 @@ UIScrollRegionResult ui_scroll_region_begin(const char *id, UIRect bounds,
 /** End the current scroll region. */
 void ui_scroll_region_end(void);
 
+/** Update pointer interaction without drawing a visual element. */
+UIButtonResult ui_interaction(const char *id, UIRect bounds);
+/** Draw a filled rectangular UI surface. */
+void ui_surface(UIRect bounds, Color color);
+/** Draw a rectangular border. */
+void ui_border(UIRect bounds, float thickness, Color color);
+/** Draw a centered, clipped text asset. */
+void ui_content(const TextAsset *text, UIRect bounds);
+/** Draw an oriented rectangular primitive. */
+void ui_quad(Position center, float width, float height, float angle, Color color);
+/** Begin and end a clipped UI component region. */
+bool ui_clip_begin(UIRect bounds);
+void ui_clip_end(void);
+
 /** Draw reusable text centered inside logical screen-space bounds. */
 void ui_label(const TextAsset *text, UIRect bounds);
 

@@ -77,7 +77,7 @@ static bool ui_point_in_scroll_clip(Position point) {
         ui_context.scroll_clip_stack[ui_context.scroll_depth - 1]);
 }
 
-static void ui_rect_border_draw(UIRect bounds, float thickness, Color color) {
+static void ui_border_raw(UIRect bounds, float thickness, Color color) {
     if(bounds.width <= 0.0f || bounds.height <= 0.0f || thickness <= 0.0f) return;
     (void)graphics_screen_rect_draw(bounds.x, bounds.y, bounds.width, thickness, color);
     (void)graphics_screen_rect_draw(bounds.x, bounds.y + bounds.height - thickness,
@@ -88,6 +88,90 @@ static void ui_rect_border_draw(UIRect bounds, float thickness, Color color) {
 }
 
 static void ui_label_raw(const TextAsset *text, UIRect bounds);
+static void ui_surface_raw(UIRect bounds, Color color) {
+    (void)graphics_screen_rect_draw(bounds.x, bounds.y, bounds.width, bounds.height, color);
+}
+
+static void ui_quad_raw(Position center, float width, float height, float angle,
+    Color color) {
+    (void)graphics_screen_quad_draw(center, width, height, angle, color);
+}
+
+static bool ui_clip_raw_begin(UIRect bounds) {
+    return graphics_screen_clip_push(bounds.x, bounds.y, bounds.width, bounds.height);
+}
+
+void ui_surface(UIRect bounds, Color color) {
+    bounds = ui_bounds_resolve(bounds);
+    ui_surface_raw(bounds, color);
+}
+
+void ui_border(UIRect bounds, float thickness, Color color) {
+    ui_border_raw(ui_bounds_resolve(bounds), thickness, color);
+}
+
+void ui_content(const TextAsset *text, UIRect bounds) {
+    ui_label_raw(text, ui_bounds_resolve(bounds));
+}
+
+void ui_quad(Position center, float width, float height, float angle, Color color) {
+    center.y += ui_context.translation_y;
+    ui_quad_raw(center, width, height, angle, color);
+}
+
+bool ui_clip_begin(UIRect bounds) {
+    bounds = ui_bounds_resolve(bounds);
+    return ui_clip_raw_begin(bounds);
+}
+
+void ui_clip_end(void) {
+    graphics_screen_clip_pop();
+}
+
+static UIButtonResult ui_interaction_id(uint64_t interaction_id, bool hovered) {
+    UIButtonResult result = {0};
+
+    if(!ui_context.frame_active || interaction_id == 0) return result;
+    if(hovered && !ui_context.pointer_claimed) {
+        result.hovered = true;
+        ui_context.pointer_claimed = true;
+    }
+    if(ui_context.active_id == interaction_id) {
+        ui_context.active_seen = true;
+        ui_context.pointer_consumed = true;
+        result.pressed = ui_context.input.primary_button == MOUSE_BUTTON_STATE_PRESSED ||
+            ui_context.input.primary_button == MOUSE_BUTTON_STATE_DOWN;
+        if(ui_context.input.primary_button == MOUSE_BUTTON_STATE_RELEASED) {
+            result.clicked = result.hovered;
+            if(result.clicked) {
+                Uint64 now = SDL_GetTicks();
+                result.double_clicked = ui_context.last_clicked_id == interaction_id &&
+                    now - ui_context.last_clicked_at <= 400;
+                ui_context.last_clicked_id = interaction_id;
+                ui_context.last_clicked_at = now;
+            }
+            ui_context.active_id = 0;
+        }
+    } else if(result.hovered && ui_context.active_id == 0 &&
+            ui_context.input.primary_button == MOUSE_BUTTON_STATE_PRESSED) {
+        ui_context.active_id = interaction_id;
+        ui_context.active_seen = true;
+        ui_context.pointer_consumed = true;
+        result.pressed = true;
+    }
+    if(result.hovered) ui_context.pointer_consumed = true;
+    return result;
+}
+
+static UIButtonResult ui_interaction_resolved(const char *id, UIRect bounds) {
+    return ui_interaction_id(ui_hash_id(id),
+        ui_point_in_rect(ui_context.input.pointer, bounds) &&
+            ui_point_in_scroll_clip(ui_context.input.pointer));
+}
+
+UIButtonResult ui_interaction(const char *id, UIRect bounds) {
+    return ui_interaction_resolved(id, ui_bounds_resolve(bounds));
+}
 
 UIButtonStyle ui_button_style_default_get(void) {
     return (UIButtonStyle){
@@ -267,18 +351,12 @@ UIFieldResult ui_field(const char *id, UIFieldBinding binding,
     UIFieldResult result = {0};
     UIButtonStyle resolved = style == NULL ? ui_button_style_default_get() : *style;
     uint64_t field_id = ui_hash_id(id);
-
-    bounds = ui_bounds_resolve(bounds);
+    UIButtonResult interaction;
 
     if(!ui_context.frame_active || field_id == 0 || bounds.width <= 0.0f ||
             bounds.height <= 0.0f) return result;
-    result.hovered = ui_point_in_rect(ui_context.input.pointer, bounds) &&
-        ui_point_in_scroll_clip(ui_context.input.pointer) &&
-        !ui_context.pointer_claimed;
-    if(result.hovered) {
-        ui_context.pointer_claimed = true;
-        ui_context.pointer_consumed = true;
-    }
+    interaction = ui_interaction(id, bounds);
+    result.hovered = interaction.hovered;
     if(result.hovered && ui_context.input.primary_button == MOUSE_BUTTON_STATE_PRESSED) {
         ui_context.field_id = field_id;
         ui_context.field_replace_pending = binding.kind == UI_FIELD_FLOAT;
@@ -327,9 +405,9 @@ UIFieldResult ui_field(const char *id, UIFieldBinding binding,
             (void)graphics_text_value_set(display, binding.string);
         }
     }
-    (void)graphics_screen_rect_draw(bounds.x, bounds.y, bounds.width, bounds.height,
+    ui_surface(bounds,
         result.active ? resolved.pressed : (result.hovered ? resolved.hovered : resolved.idle));
-    ui_label_raw(display, bounds);
+    ui_content(display, bounds);
     return result;
 }
 
@@ -339,64 +417,14 @@ UIButtonResult ui_button(
     UIRect bounds,
     const UIButtonStyle *style
 ) {
-    UIButtonResult result = {0};
+    UIButtonResult result;
     UIButtonStyle resolved_style = style == NULL ? ui_button_style_default_get() : *style;
-    uint64_t button_id = ui_hash_id(id);
-    bool contains_pointer;
-
-    bounds = ui_bounds_resolve(bounds);
-
-    if(!ui_context.frame_active || button_id == 0) {
-        return result;
-    }
-
-    contains_pointer = ui_point_in_rect(ui_context.input.pointer, bounds) &&
-        ui_point_in_scroll_clip(ui_context.input.pointer);
-    if(contains_pointer && !ui_context.pointer_claimed) {
-        result.hovered = true;
-        ui_context.pointer_claimed = true;
-    }
-
-    if(ui_context.active_id == button_id) {
-        ui_context.active_seen = true;
-        ui_context.pointer_consumed = true;
-        result.pressed = ui_context.input.primary_button == MOUSE_BUTTON_STATE_PRESSED ||
-            ui_context.input.primary_button == MOUSE_BUTTON_STATE_DOWN;
-
-        if(ui_context.input.primary_button == MOUSE_BUTTON_STATE_RELEASED) {
-            result.clicked = result.hovered;
-            if(result.clicked) {
-                Uint64 now = SDL_GetTicks();
-                result.double_clicked = ui_context.last_clicked_id == button_id &&
-                    now - ui_context.last_clicked_at <= 400;
-                ui_context.last_clicked_id = button_id;
-                ui_context.last_clicked_at = now;
-            }
-            ui_context.active_id = 0;
-        }
-    }
-    else if(result.hovered &&
-            ui_context.active_id == 0 &&
-            ui_context.input.primary_button == MOUSE_BUTTON_STATE_PRESSED) {
-        ui_context.active_id = button_id;
-        ui_context.active_seen = true;
-        ui_context.pointer_consumed = true;
-        result.pressed = true;
-    }
-
-    if(result.hovered) {
-        ui_context.pointer_consumed = true;
-    }
-
-    graphics_screen_rect_draw(
-        bounds.x,
-        bounds.y,
-        bounds.width,
-        bounds.height,
+    result = ui_interaction(id, bounds);
+    ui_surface(bounds,
         result.pressed ? resolved_style.pressed :
             (result.hovered ? resolved_style.hovered : resolved_style.idle)
     );
-    ui_label_raw(label, bounds);
+    ui_content(label, bounds);
     return result;
 }
 
@@ -413,7 +441,7 @@ UIDropdownResult ui_dropdown(const char *id, const TextAsset *const *options,
             selected_index >= option_count ||
             bounds.width <= 0.0f || bounds.height <= 0.0f) return result;
     button = ui_button(id, options[selected_index], bounds, style);
-    ui_rect_border_draw(resolved_bounds, 2.0f, (Color){0, 0, 0, 255});
+    ui_border_raw(resolved_bounds, 2.0f, (Color){0, 0, 0, 255});
     result.button_hovered = button.hovered;
     result.hovered = button.hovered;
     if(button.clicked) {
@@ -463,7 +491,7 @@ UIDropdownResult ui_dropdown(const char *id, const TextAsset *const *options,
         UIButtonResult option_result;
         snprintf(option_id, sizeof(option_id), "%s.option.%zu", id, i);
         option_result = ui_button(option_id, options[i], option_bounds, style);
-        ui_rect_border_draw(ui_bounds_resolve(option_bounds), 2.0f,
+        ui_border_raw(ui_bounds_resolve(option_bounds), 2.0f,
             (Color){0, 0, 0, 255});
         if(option_result.hovered) {
             result.hovered = true;
@@ -512,8 +540,7 @@ UIScrollRegionResult ui_scroll_region_begin(const char *id, UIRect bounds,
     ui_context.scroll_content_stack[ui_context.scroll_depth] = content_height;
     ui_context.scroll_depth += 1;
     ui_context.translation_y -= result.offset;
-    (void)graphics_screen_clip_push(resolved_bounds.x, resolved_bounds.y,
-        resolved_bounds.width, resolved_bounds.height);
+    (void)ui_clip_raw_begin(resolved_bounds);
     return result;
 }
 
@@ -528,16 +555,16 @@ void ui_scroll_region_end(void) {
     offset = ui_context.scroll_offset_stack[ui_context.scroll_depth];
     content_height = ui_context.scroll_content_stack[ui_context.scroll_depth];
     ui_context.translation_y = ui_context.translation_stack[ui_context.scroll_depth];
-    graphics_screen_clip_pop();
+    ui_clip_end();
     if(content_height > bounds.height) {
         float handle_height = fmaxf(20.0f, bounds.height * bounds.height / content_height);
         float travel = bounds.height - handle_height;
         float maximum = content_height - bounds.height;
         float handle_y = bounds.y + (maximum <= 0.0f ? 0.0f : offset / maximum * travel);
-        (void)graphics_screen_rect_draw(bounds.x + bounds.width - 5.0f, bounds.y,
-            5.0f, bounds.height, (Color){18, 20, 25, 210});
-        (void)graphics_screen_rect_draw(bounds.x + bounds.width - 5.0f, handle_y,
-            5.0f, handle_height, (Color){105, 115, 135, 255});
+        ui_surface_raw((UIRect){bounds.x + bounds.width - 5.0f, bounds.y,
+            5.0f, bounds.height}, (Color){18, 20, 25, 210});
+        ui_surface_raw((UIRect){bounds.x + bounds.width - 5.0f, handle_y,
+            5.0f, handle_height}, (Color){105, 115, 135, 255});
     }
 }
 
@@ -559,6 +586,7 @@ UISliderResult ui_slider_with_text(
     Position step_centers[2];
     bool step_hovered[2] = {false, false};
     bool step_pressed[2] = {false, false};
+    UIButtonResult slider_interaction;
     int step_index;
 
     resolved.center.y += ui_context.translation_y;
@@ -605,78 +633,33 @@ UISliderResult ui_slider_with_text(
                 step_centers[step_index],
                 resolved.style.step_button_size,
                 resolved.angle
-            );
-            if(inside && ui_point_in_scroll_clip(ui_context.input.pointer) &&
-                    !ui_context.pointer_claimed) {
-                step_hovered[step_index] = true;
-                result.hovered = true;
-                ui_context.pointer_claimed = true;
-                ui_context.pointer_consumed = true;
-            }
-            if(ui_context.active_id == step_id) {
-                ui_context.active_seen = true;
-                ui_context.pointer_consumed = true;
-                step_pressed[step_index] =
-                    ui_context.input.primary_button == MOUSE_BUTTON_STATE_PRESSED
-                    || ui_context.input.primary_button == MOUSE_BUTTON_STATE_DOWN;
-                result.pressed = result.pressed || step_pressed[step_index];
-                if(ui_context.input.primary_button == MOUSE_BUTTON_STATE_RELEASED) {
-                    if(step_hovered[step_index]) {
-                        float direction = step_index == 0 ? -1.0f : 1.0f;
-                        if(resolved.max_value < resolved.min_value) direction = -direction;
-                        result.value = ui_slider_snap(
-                            result.value + direction * resolved.step,
-                            &resolved
-                        );
-                        result.changed = result.changed || result.value != value;
-                    }
-                    ui_context.active_id = 0;
-                }
-            } else if(step_hovered[step_index] && ui_context.active_id == 0
-                    && ui_context.input.primary_button == MOUSE_BUTTON_STATE_PRESSED) {
-                ui_context.active_id = step_id;
-                ui_context.active_seen = true;
-                ui_context.pointer_consumed = true;
-                step_pressed[step_index] = true;
-                result.pressed = true;
+            ) && ui_point_in_scroll_clip(ui_context.input.pointer);
+            UIButtonResult interaction = ui_interaction_id(step_id, inside);
+            step_hovered[step_index] = interaction.hovered;
+            step_pressed[step_index] = interaction.pressed;
+            result.hovered = result.hovered || interaction.hovered;
+            result.pressed = result.pressed || interaction.pressed;
+            if(interaction.clicked) {
+                float direction = step_index == 0 ? -1.0f : 1.0f;
+                if(resolved.max_value < resolved.min_value) direction = -direction;
+                result.value = ui_slider_snap(result.value + direction * resolved.step,
+                    &resolved);
+                result.changed = result.changed || result.value != value;
             }
         }
     }
     contains_pointer = ui_point_in_slider(ui_context.input.pointer, &resolved) &&
         ui_point_in_scroll_clip(ui_context.input.pointer);
-    if(contains_pointer && !ui_context.pointer_claimed) {
-        result.hovered = true;
-        ui_context.pointer_claimed = true;
-    }
-
-    if(ui_context.active_id == slider_id) {
-        ui_context.active_seen = true;
-        ui_context.pointer_consumed = true;
-        result.pressed = ui_context.input.primary_button == MOUSE_BUTTON_STATE_PRESSED
-            || ui_context.input.primary_button == MOUSE_BUTTON_STATE_DOWN;
-        if(result.pressed || ui_context.input.primary_button == MOUSE_BUTTON_STATE_RELEASED) {
-            float previous = result.value;
-            amount = ui_slider_pointer_amount(ui_context.input.pointer, &resolved);
-            result.value = ui_slider_snap(resolved.min_value
-                + amount * (resolved.max_value - resolved.min_value), &resolved);
-            result.changed = result.changed || result.value != previous;
-        }
-        if(ui_context.input.primary_button == MOUSE_BUTTON_STATE_RELEASED) {
-            ui_context.active_id = 0;
-        }
-    } else if(result.hovered && ui_context.active_id == 0
-            && ui_context.input.primary_button == MOUSE_BUTTON_STATE_PRESSED) {
+    slider_interaction = ui_interaction_id(slider_id, contains_pointer);
+    result.hovered = result.hovered || slider_interaction.hovered;
+    result.pressed = result.pressed || slider_interaction.pressed;
+    if(slider_interaction.pressed || slider_interaction.clicked) {
         float previous = result.value;
-        ui_context.active_id = slider_id;
-        ui_context.active_seen = true;
-        ui_context.pointer_consumed = true;
-        result.pressed = true;
         amount = ui_slider_pointer_amount(ui_context.input.pointer, &resolved);
         result.value = ui_slider_snap(resolved.min_value
             + amount * (resolved.max_value - resolved.min_value), &resolved);
         result.changed = result.changed || result.value != previous;
     }
-    if(result.hovered) ui_context.pointer_consumed = true;
 
     amount = ui_clamp_unit(
         (result.value - resolved.min_value) /
@@ -686,7 +669,7 @@ UISliderResult ui_slider_with_text(
         resolved.center.x - axis.x * resolved.length * 0.5f,
         resolved.center.y - axis.y * resolved.length * 0.5f,
     };
-    (void)graphics_screen_quad_draw(
+    ui_quad_raw(
         resolved.center,
         resolved.length,
         resolved.style.track_thickness,
@@ -704,7 +687,7 @@ UISliderResult ui_slider_with_text(
                 resolved.style.step_button_size,
                 resolved.style.step_button_size,
             };
-            (void)graphics_screen_quad_draw(
+            ui_quad_raw(
                 step_centers[step_index],
                 resolved.style.step_button_size,
                 resolved.style.step_button_size,
@@ -723,7 +706,7 @@ UISliderResult ui_slider_with_text(
             start.x + axis.x * fill_length * 0.5f,
             start.y + axis.y * fill_length * 0.5f,
         };
-        (void)graphics_screen_quad_draw(
+        ui_quad_raw(
             fill_center,
             fill_length,
             resolved.style.track_thickness,
@@ -735,7 +718,7 @@ UISliderResult ui_slider_with_text(
         start.x + axis.x * resolved.length * amount,
         start.y + axis.y * resolved.length * amount,
     };
-    (void)graphics_screen_quad_draw(
+    ui_quad_raw(
         handle_center,
         resolved.style.handle_width,
         resolved.style.handle_height,
@@ -778,10 +761,9 @@ static void ui_label_raw(const TextAsset *text, UIRect bounds) {
         .x = bounds.x + (bounds.width - text->size.x) * 0.5f,
         .y = bounds.y + (bounds.height - text->size.y) * 0.5f,
     };
-    clipped = graphics_screen_clip_push(
-        bounds.x, bounds.y, bounds.width, bounds.height);
+    clipped = ui_clip_raw_begin(bounds);
     (void)graphics_text_draw(text, position);
-    if(clipped) graphics_screen_clip_pop();
+    if(clipped) ui_clip_end();
 }
 
 void ui_label(const TextAsset *text, UIRect bounds) {
@@ -828,7 +810,7 @@ void ui_physics_debug_panel_draw(UIPhysicsDebugPanel *panel) {
     if(!graphics_text_value_set(&panel->text, value)) return;
     width = panel->text.size.x + 12.0f;
     height = panel->text.size.y + 12.0f;
-    (void)graphics_screen_rect_draw(WINDOW_WIDTH - width - 5.0f, 5.0f, width, height,
+    ui_surface((UIRect){WINDOW_WIDTH - width - 5.0f, 5.0f, width, height},
         (Color){0, 0, 0, 190});
     ui_label(&panel->text,
         (UIRect){WINDOW_WIDTH - width - 5.0f, 5.0f, width, height});
@@ -845,14 +827,7 @@ void ui_physics_debug_panel_destroy(UIPhysicsDebugPanel *panel) {
 void ui_button_disabled(UIRect bounds, const UIButtonStyle *style) {
     UIButtonStyle resolved_style = style == NULL ? ui_button_style_default_get() : *style;
 
-    bounds = ui_bounds_resolve(bounds);
-    graphics_screen_rect_draw(
-        bounds.x,
-        bounds.y,
-        bounds.width,
-        bounds.height,
-        resolved_style.disabled
-    );
+    ui_surface(bounds, resolved_style.disabled);
 }
 
 bool ui_pointer_consumed_get(void) {
@@ -876,12 +851,12 @@ void ui_frame_end(void) {
             snprintf(option_id, sizeof(option_id), "dropdown.option.%llu.%zu",
                 (unsigned long long)ui_context.dropdown_id, i);
             option_hash = ui_hash_id(option_id);
-            (void)graphics_screen_rect_draw(bounds.x, bounds.y, bounds.width, bounds.height,
+            ui_surface_raw(bounds,
                 ui_context.active_id == option_hash ? ui_context.dropdown_style.pressed :
                     (hovered ? ui_context.dropdown_style.hovered :
                         ui_context.dropdown_style.idle));
             ui_label_raw(ui_context.dropdown_options[i], bounds);
-            ui_rect_border_draw(bounds, 2.0f, (Color){0, 0, 0, 255});
+            ui_border_raw(bounds, 2.0f, (Color){0, 0, 0, 255});
         }
     }
     if(ui_context.input.primary_button == MOUSE_BUTTON_STATE_RELEASED ||

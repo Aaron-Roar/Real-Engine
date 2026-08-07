@@ -1941,6 +1941,19 @@ UIScrollRegionResult rohr_ui_scroll_region_begin(const char *id, UIRect bounds,
     float content_height, float offset, float wheel_step);
 /** @brief Ends the current UI scroll region. */
 void rohr_ui_scroll_region_end(void);
+/** @brief Updates pointer interaction without prescribing visuals. */
+UIButtonResult rohr_ui_interaction(const char *id, UIRect bounds);
+/** @brief Draws a filled rectangular UI primitive. */
+void rohr_ui_surface(UIRect bounds, Color color);
+/** @brief Draws a rectangular UI border primitive. */
+void rohr_ui_border(UIRect bounds, float thickness, Color color);
+/** @brief Draws centered clipped text content. */
+void rohr_ui_content(const TextAsset *text, UIRect bounds);
+/** @brief Draws an oriented UI rectangle primitive. */
+void rohr_ui_quad(Position center, float width, float height, float angle, Color color);
+/** @brief Begins and ends a clipped UI component region. */
+bool rohr_ui_clip_begin(UIRect bounds);
+void rohr_ui_clip_end(void);
 
 /** @brief Draws reusable text centered inside bounds. */
 void rohr_ui_label(const TextAsset *text, UIRect bounds);

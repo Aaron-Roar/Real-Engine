@@ -459,6 +459,13 @@ UIButtonResult rohr_ui_button(const char *id, const TextAsset *label, UIRect bou
 UIDropdownResult rohr_ui_dropdown(const char *id, const TextAsset *const *options, size_t option_count, size_t selected_index, UIRect bounds, const UIButtonStyle *style) { return ui_dropdown(id, options, option_count, selected_index, bounds, style); }
 UIScrollRegionResult rohr_ui_scroll_region_begin(const char *id, UIRect bounds, float content_height, float offset, float wheel_step) { return ui_scroll_region_begin(id, bounds, content_height, offset, wheel_step); }
 void rohr_ui_scroll_region_end(void) { ui_scroll_region_end(); }
+UIButtonResult rohr_ui_interaction(const char *id, UIRect bounds) { return ui_interaction(id, bounds); }
+void rohr_ui_surface(UIRect bounds, Color color) { ui_surface(bounds, color); }
+void rohr_ui_border(UIRect bounds, float thickness, Color color) { ui_border(bounds, thickness, color); }
+void rohr_ui_content(const TextAsset *text, UIRect bounds) { ui_content(text, bounds); }
+void rohr_ui_quad(Position center, float width, float height, float angle, Color color) { ui_quad(center, width, height, angle, color); }
+bool rohr_ui_clip_begin(UIRect bounds) { return ui_clip_begin(bounds); }
+void rohr_ui_clip_end(void) { ui_clip_end(); }
 void rohr_ui_label(const TextAsset *text, UIRect bounds) { ui_label(text, bounds); }
 EngineResult rohr_ui_physics_debug_panel_init(UIPhysicsDebugPanel *panel, FontDescriptor font) { return ui_physics_debug_panel_init(panel, font); }
 void rohr_ui_physics_debug_panel_draw(UIPhysicsDebugPanel *panel) { ui_physics_debug_panel_draw(panel); }
