@@ -131,6 +131,27 @@ int main(void) {
 
     rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f},
         .primary_button = MOUSE_BUTTON_STATE_PRESSED});
+    (void)rohr_ui_dropdown(
+        "keyboard-dropdown", dropdown_options, 2, 0, bounds, NULL);
+    rohr_ui_frame_end();
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f},
+        .primary_button = MOUSE_BUTTON_STATE_RELEASED});
+    if(!rohr_ui_dropdown("keyboard-dropdown", dropdown_options,
+            2, 0, bounds, NULL).open) return 1;
+    rohr_ui_frame_end();
+    if(!rohr_ui_navigation_move(UI_NAVIGATION_DOWN) ||
+            !rohr_ui_navigation_move(UI_NAVIGATION_DOWN) ||
+            !rohr_ui_navigation_activate()) return 1;
+    rohr_ui_frame_begin((UIInput){0});
+    {
+        UIDropdownResult result = rohr_ui_dropdown(
+            "keyboard-dropdown", dropdown_options, 2, 0, bounds, NULL);
+        if(result.open || !result.changed || result.selected_index != 1) return 1;
+    }
+    rohr_ui_frame_end();
+
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f},
+        .primary_button = MOUSE_BUTTON_STATE_PRESSED});
     (void)rohr_ui_dropdown("long-dropdown", long_dropdown_options, 10, 0, bounds, NULL);
     rohr_ui_frame_end();
     rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f},
@@ -150,6 +171,18 @@ int main(void) {
         if(!result.open || result.hovered_index != 1) return 1;
         rohr_ui_frame_end();
     }
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 40.0f},
+        .primary_button = MOUSE_BUTTON_STATE_PRESSED});
+    (void)rohr_ui_dropdown("long-dropdown", long_dropdown_options, 10, 0, bounds, NULL);
+    rohr_ui_frame_end();
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 40.0f},
+        .primary_button = MOUSE_BUTTON_STATE_RELEASED});
+    {
+        UIDropdownResult result = rohr_ui_dropdown(
+            "long-dropdown", long_dropdown_options, 10, 0, bounds, NULL);
+        if(result.open || !result.changed || result.selected_index != 1) return 1;
+    }
+    rohr_ui_frame_end();
 
     {
         SDL_Event wheel = {0};

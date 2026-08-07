@@ -10,9 +10,11 @@
 #define UI_DROPDOWN_VISIBLE_MAX 8
 #define UI_SCROLL_REGION_MAX 8
 #define UI_NAVIGATION_ITEM_MAX 512
+#define UI_DROPDOWN_DIVIDER_INSET 0.05f
 
 typedef struct UINavigationItem {
     uint64_t id;
+    uint64_t dropdown_id;
     UIRect bounds;
 } UINavigationItem;
 
@@ -35,10 +37,12 @@ typedef struct UIContext {
     bool dropdown_seen;
     uint64_t dropdown_render_id;
     const TextAsset *dropdown_options[UI_DROPDOWN_OPTION_MAX];
+    uint64_t dropdown_option_ids[UI_DROPDOWN_OPTION_MAX];
     size_t dropdown_option_count;
     UIRect dropdown_bounds;
     UIButtonStyle dropdown_style;
     size_t dropdown_first_option;
+    bool dropdown_option_interaction;
     float wheel_y;
     float translation_y;
     float translation_stack[UI_SCROLL_REGION_MAX];
@@ -104,10 +108,19 @@ static void ui_label_raw(const TextAsset *text, UIRect bounds);
 static void ui_navigation_item_register(uint64_t id, UIRect bounds) {
     if(id == 0 || ui_context.navigation_item_count >= UI_NAVIGATION_ITEM_MAX) return;
     ui_context.navigation_items[ui_context.navigation_item_count++] =
-        (UINavigationItem){.id = id, .bounds = bounds};
+        (UINavigationItem){.id = id,
+            .dropdown_id = ui_context.dropdown_option_interaction ?
+                ui_context.dropdown_id : 0,
+            .bounds = bounds};
 }
 static void ui_surface_raw(UIRect bounds, Color color) {
     (void)graphics_screen_rect_draw(bounds.x, bounds.y, bounds.width, bounds.height, color);
+}
+
+static void ui_dropdown_divider_raw(UIRect bounds) {
+    float inset = bounds.width * UI_DROPDOWN_DIVIDER_INSET;
+    (void)graphics_screen_rect_draw(bounds.x + inset, bounds.y,
+        bounds.width - inset * 2.0f, 1.0f, (Color){170, 174, 182, 255});
 }
 
 static void ui_quad_raw(Position center, float width, float height, float angle,
@@ -209,8 +222,9 @@ bool ui_navigation_move(UINavigationDirection direction) {
     const UINavigationItem *current = NULL;
     size_t best = SIZE_MAX;
     float best_score = INFINITY;
+    uint64_t dropdown_id = ui_context.dropdown_id;
 
-    if(ui_context.navigation_previous_count == 0) return false;
+    if(ui_context.navigation_previous_count == 0) return dropdown_id != 0;
     for(size_t i = 0; i < ui_context.navigation_previous_count; i += 1) {
         if(ui_context.navigation_previous[i].id == ui_context.navigation_focus_id) {
             current = &ui_context.navigation_previous[i];
@@ -218,7 +232,15 @@ bool ui_navigation_move(UINavigationDirection direction) {
         }
     }
     if(current == NULL) {
-        ui_context.navigation_focus_id = ui_context.navigation_previous[0].id;
+        size_t first = 0;
+        if(dropdown_id != 0) {
+            while(first < ui_context.navigation_previous_count &&
+                    ui_context.navigation_previous[first].dropdown_id != dropdown_id) {
+                first += 1;
+            }
+            if(first == ui_context.navigation_previous_count) return true;
+        }
+        ui_context.navigation_focus_id = ui_context.navigation_previous[first].id;
         ui_context.navigation_focus_changed_id = ui_context.navigation_focus_id;
         return true;
     }
@@ -235,6 +257,7 @@ bool ui_navigation_move(UINavigationDirection direction) {
             float cross;
             bool eligible = false;
             if(candidate->id == current->id) continue;
+            if(dropdown_id != 0 && candidate->dropdown_id != dropdown_id) continue;
             if(direction == UI_NAVIGATION_UP && dy < -0.5f) {
                 primary = -dy; cross = fabsf(dx); eligible = true;
             } else if(direction == UI_NAVIGATION_DOWN && dy > 0.5f) {
@@ -250,7 +273,7 @@ bool ui_navigation_move(UINavigationDirection direction) {
             }
         }
     }
-    if(best == SIZE_MAX) return false;
+    if(best == SIZE_MAX) return dropdown_id != 0;
     ui_context.navigation_focus_id = ui_context.navigation_previous[best].id;
     ui_context.navigation_focus_changed_id = ui_context.navigation_focus_id;
     return true;
@@ -594,9 +617,11 @@ UIDropdownResult ui_dropdown(const char *id, const TextAsset *const *options,
             bounds.width, bounds.height};
         UIButtonResult option_result;
         snprintf(option_id, sizeof(option_id), "%s.option.%zu", id, i);
+        ui_context.dropdown_option_ids[slot] = ui_hash_id(option_id);
+        ui_context.dropdown_option_interaction = true;
         option_result = ui_button(option_id, options[i], option_bounds, style);
-        ui_border_raw(ui_bounds_resolve(option_bounds), 2.0f,
-            (Color){0, 0, 0, 255});
+        ui_context.dropdown_option_interaction = false;
+        ui_dropdown_divider_raw(ui_bounds_resolve(option_bounds));
         if(option_result.hovered) {
             result.hovered = true;
             result.hovered_index = (int)i;
@@ -605,9 +630,14 @@ UIDropdownResult ui_dropdown(const char *id, const TextAsset *const *options,
             result.selected_index = i;
             result.changed = i != selected_index;
             result.open = false;
+            ui_context.navigation_focus_id = dropdown_id;
             ui_context.dropdown_id = 0;
         }
     }
+    ui_border_raw((UIRect){resolved_bounds.x, resolved_bounds.y + resolved_bounds.height,
+        resolved_bounds.width,
+        resolved_bounds.height * (float)ui_context.dropdown_option_count},
+        2.0f, (Color){0, 0, 0, 255});
     if(ui_context.input.primary_button == MOUSE_BUTTON_STATE_PRESSED &&
             !ui_point_in_rect(ui_context.input.pointer, (UIRect){resolved_bounds.x,
                 resolved_bounds.y, resolved_bounds.width,
@@ -950,23 +980,26 @@ void ui_frame_end(void) {
     if(ui_context.dropdown_id != 0 &&
             ui_context.dropdown_render_id == ui_context.dropdown_id) {
         for(size_t i = 0; i < ui_context.dropdown_option_count; i += 1) {
-            char option_id[160];
             UIRect bounds = {ui_context.dropdown_bounds.x,
                 ui_context.dropdown_bounds.y + ui_context.dropdown_bounds.height *
                     (float)(i + 1), ui_context.dropdown_bounds.width,
                 ui_context.dropdown_bounds.height};
             bool hovered = ui_point_in_rect(ui_context.input.pointer, bounds);
-            uint64_t option_hash;
-            snprintf(option_id, sizeof(option_id), "dropdown.option.%llu.%zu",
-                (unsigned long long)ui_context.dropdown_id, i);
-            option_hash = ui_hash_id(option_id);
+            uint64_t option_id = ui_context.dropdown_option_ids[i];
             ui_surface_raw(bounds,
-                ui_context.active_id == option_hash ? ui_context.dropdown_style.pressed :
-                    (hovered ? ui_context.dropdown_style.hovered :
+                ui_context.active_id == option_id ? ui_context.dropdown_style.pressed :
+                    ((hovered || ui_context.navigation_focus_id == option_id) ?
+                        ui_context.dropdown_style.hovered :
                         ui_context.dropdown_style.idle));
             ui_label_raw(ui_context.dropdown_options[i], bounds);
-            ui_border_raw(bounds, 2.0f, (Color){0, 0, 0, 255});
+            ui_dropdown_divider_raw(bounds);
         }
+        ui_border_raw((UIRect){ui_context.dropdown_bounds.x,
+            ui_context.dropdown_bounds.y + ui_context.dropdown_bounds.height,
+            ui_context.dropdown_bounds.width,
+            ui_context.dropdown_bounds.height *
+                (float)ui_context.dropdown_option_count},
+            2.0f, (Color){0, 0, 0, 255});
     }
     if(ui_context.input.primary_button == MOUSE_BUTTON_STATE_RELEASED ||
             (ui_context.active_id != 0 && !ui_context.active_seen)) {
