@@ -6,7 +6,12 @@
 typedef enum EditorViewportMode {
     EDITOR_VIEWPORT_HIERARCHY,
     EDITOR_VIEWPORT_OBJECT,
+    EDITOR_VIEWPORT_RIGID_BODY,
     EDITOR_VIEWPORT_HITBOX,
+    EDITOR_VIEWPORT_JOINT,
+    EDITOR_VIEWPORT_SOFT_BODY,
+    EDITOR_VIEWPORT_SOFT_NODE,
+    EDITOR_VIEWPORT_SOFT_BEAM,
     EDITOR_VIEWPORT_LINE,
     EDITOR_VIEWPORT_VERTEX
 } EditorViewportMode;
@@ -14,7 +19,12 @@ typedef enum EditorViewportMode {
 typedef enum EditorHierarchySelection {
     EDITOR_SELECTION_NONE,
     EDITOR_SELECTION_OBJECT,
+    EDITOR_SELECTION_RIGID_BODY,
     EDITOR_SELECTION_HITBOX,
+    EDITOR_SELECTION_JOINT,
+    EDITOR_SELECTION_SOFT_BODY,
+    EDITOR_SELECTION_SOFT_NODE,
+    EDITOR_SELECTION_SOFT_BEAM,
     EDITOR_SELECTION_LINE,
     EDITOR_SELECTION_VERTEX
 } EditorHierarchySelection;
@@ -29,6 +39,12 @@ typedef struct EditorViewportState {
     Uint64 last_viewport_click_at;
     uint32_t selected_line;
     uint32_t selected_vertex;
+    EditorRigidBodyId selected_rigid_body;
+    EditorHitboxId selected_hitbox;
+    EditorJointId selected_joint;
+    EditorSoftBodyId selected_soft_body;
+    EditorSoftNodeId selected_soft_node;
+    EditorSoftBeamId selected_soft_beam;
 } EditorViewportState;
 
 void editor_viewport_state_init(EditorViewportState *state);
