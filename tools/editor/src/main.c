@@ -594,6 +594,7 @@ int main(void) {
     TextAsset restitution_label = {0};
     TextAsset rest_length_label = {0};
     TextAsset damping_label = {0};
+    TextAsset visual_size_label = {0};
     TextAsset dynamic_label = {0};
     TextAsset static_label = {0};
     TextAsset enabled_label = {0};
@@ -710,6 +711,7 @@ int main(void) {
             !editor_text_create(&font, "Restitution", &restitution_label) ||
             !editor_text_create(&font, "Rest Length", &rest_length_label) ||
             !editor_text_create(&font, "Damping", &damping_label) ||
+            !editor_text_create(&font, "Visual Size", &visual_size_label) ||
             !editor_text_create(&font, "Dynamic", &dynamic_label) ||
             !editor_text_create(&font, "Static", &static_label) ||
             !editor_text_create(&font, "Enabled", &enabled_label) ||
@@ -1221,9 +1223,22 @@ int main(void) {
                         joint_cache[index], EDITOR_OBJECT_NAME_MAX)) goto fail;
                 rohr_ui_label(&joint_labels[index], (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f,
                     40.0f, EDITOR_TOOLS_WIDTH - 48.0f, 30.0f});
+                rohr_ui_label(&visual_size_label,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, 76.0f,
+                        EDITOR_TOOLS_WIDTH - 48.0f, 24.0f});
                 (void)editor_visibility_toggle("editor.joint.visibility",
-                    &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
-                        44.0f, 26.0f, 26.0f}, &joint->visible);
+                    &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
+                        94.0f, 24.0f, 24.0f}, &joint->visible);
+                {
+                    UISliderConfig slider = rohr_ui_slider_config_default_get();
+                    slider.center = (Position){EDITOR_VIEWPORT_WIDTH +
+                        (EDITOR_TOOLS_WIDTH + 40.0f) * 0.5f, 106.0f};
+                    slider.length = EDITOR_TOOLS_WIDTH - 60.0f;
+                    slider.min_value = 0.25f;
+                    slider.max_value = 3.0f;
+                    joint->visual_size = rohr_ui_slider(
+                        "editor.joint.visual_size", joint->visual_size, &slider).value;
+                }
                 {
                     UIDropdownResult result = rohr_ui_dropdown("editor.joint.kind",
                         kind_options, 3, (size_t)joint->kind,
@@ -2045,6 +2060,7 @@ int main(void) {
     rohr_graphics_text_destroy(&restitution_label);
     rohr_graphics_text_destroy(&rest_length_label);
     rohr_graphics_text_destroy(&damping_label);
+    rohr_graphics_text_destroy(&visual_size_label);
     rohr_graphics_text_destroy(&dynamic_label);
     rohr_graphics_text_destroy(&static_label);
     rohr_graphics_text_destroy(&enabled_label);
@@ -2140,6 +2156,7 @@ fail:
     rohr_graphics_text_destroy(&restitution_label);
     rohr_graphics_text_destroy(&rest_length_label);
     rohr_graphics_text_destroy(&damping_label);
+    rohr_graphics_text_destroy(&visual_size_label);
     rohr_graphics_text_destroy(&dynamic_label);
     rohr_graphics_text_destroy(&static_label);
     rohr_graphics_text_destroy(&enabled_label);

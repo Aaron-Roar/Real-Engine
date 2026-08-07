@@ -119,6 +119,7 @@ EditorJoint editor_project_joint_default_get(EditorJointKind kind) {
         .rest_length = 0.0f,
         .stiffness = 100.0f,
         .damping = kind == EDITOR_JOINT_SPRING ? 10.0f : 0.0f,
+        .visual_size = 1.0f,
         .damping_enabled = kind == EDITOR_JOINT_SPRING,
         .visible = true
     };

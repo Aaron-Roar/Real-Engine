@@ -109,6 +109,46 @@ static void editor_circle_draw(Position center, float radius, Color color) {
     }
 }
 
+static void editor_joint_symbol_draw(EditorJointKind kind, Position start,
+    Position end, float scale, Color color) {
+    Position center = {(start.x + end.x) * 0.5f, (start.y + end.y) * 0.5f};
+    float radius = 9.0f * scale;
+
+    if(kind == EDITOR_JOINT_REVOLUTE) {
+        editor_circle_draw(center, radius, color);
+        (void)rohr_graphics_screen_quad_draw(
+            center, 6.0f * scale, 6.0f * scale, 0.0f, color);
+    } else if(kind == EDITOR_JOINT_WELD) {
+        Position top_left = {center.x - radius, center.y - radius};
+        Position top_right = {center.x + radius, center.y - radius};
+        Position bottom_right = {center.x + radius, center.y + radius};
+        Position bottom_left = {center.x - radius, center.y + radius};
+        editor_line_draw(top_left, top_right, color);
+        editor_line_draw(top_right, bottom_right, color);
+        editor_line_draw(bottom_right, bottom_left, color);
+        editor_line_draw(bottom_left, top_left, color);
+        editor_line_draw(top_left, bottom_right, color);
+        editor_line_draw(top_right, bottom_left, color);
+    } else {
+        Position points[10];
+        Vec2D delta = {end.x - start.x, end.y - start.y};
+        float length = sqrtf(delta.x * delta.x + delta.y * delta.y);
+        if(length <= 0.001f) {
+            editor_circle_draw(start, radius, color);
+            return;
+        }
+        Vec2D perpendicular = {-delta.y / length, delta.x / length};
+        for(uint32_t i = 0; i < 10; i += 1) {
+            float amount = (float)i / 9.0f;
+            float offset = i == 0 || i == 9 ? 0.0f :
+                (i % 2 == 0 ? 7.0f * scale : -7.0f * scale);
+            points[i] = (Position){start.x + delta.x * amount + perpendicular.x * offset,
+                start.y + delta.y * amount + perpendicular.y * offset};
+            if(i > 0) editor_line_draw(points[i - 1], points[i], color);
+        }
+    }
+}
+
 static void editor_body_origin_draw(const EditorObject *object,
     const EditorRigidBody *body) {
     Position center;
@@ -540,8 +580,9 @@ void editor_viewport_draw(const EditorProject *project, const EditorViewportStat
             if(object->anchors[i].id == joint->anchor_a) a = &object->anchors[i];
             if(object->anchors[i].id == joint->anchor_b) b = &object->anchors[i];
         }
-        if(a != NULL && b != NULL) editor_line_draw(
+        if(a != NULL && b != NULL) editor_joint_symbol_draw(joint->kind,
             editor_anchor_world_get(object, a), editor_anchor_world_get(object, b),
+            fmaxf(0.1f, joint->visual_size),
             state->selection == EDITOR_SELECTION_JOINT &&
                 state->selected_joint == joint->id ?
                 (Color){255, 215, 70, 255} : (Color){220, 120, 210, 255});
