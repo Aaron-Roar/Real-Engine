@@ -256,6 +256,8 @@ bool rohr_graphics_screen_clip_set(float x, float y, float width, float height) 
 void rohr_graphics_screen_clip_clear(void) { graphics_screen_clip_clear(); }
 bool rohr_graphics_screen_quad_draw(Position center, float width, float height, float angle, Color color) { return graphics_screen_quad_draw(center, width, height, angle, color); }
 void rohr_graphics_show(void) { graphics_show(); }
+EngineResult rohr_graphics_vsync_set(bool enabled) { return graphics_vsync_set(enabled); }
+EngineResult rohr_graphics_frame_limit_set(int frames_per_second) { return graphics_frame_limit_set(frames_per_second); }
 void rohr_graphics_hit_box_draw(Entity entity, Fill fill_type) { graphics_hit_box_draw(entity, fill_type); }
 void rohr_graphics_hit_box_colored_draw(Entity entity, Fill fill_type, Color color) { graphics_hit_box_colored_draw(entity, fill_type, color); }
 void rohr_graphics_hit_boxes_draw(void) { graphics_hit_boxes_draw(); }

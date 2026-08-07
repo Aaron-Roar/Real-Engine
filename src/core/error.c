@@ -45,6 +45,12 @@ const char *error_default_message_get(EngineError error) {
             return "graphics tables initialization failed";
         case ERROR_ENGINE_GRAPHICS_INIT_FAILED:
             return "graphics initialization failed";
+        case ERROR_ENGINE_GRAPHICS_NOT_INITIALIZED:
+            return "graphics renderer is not initialized";
+        case ERROR_ENGINE_GRAPHICS_VSYNC_SET_FAILED:
+            return "graphics VSync mode could not be applied";
+        case ERROR_ENGINE_INVALID_FRAME_LIMIT:
+            return "frame limit cannot be negative";
         case ERROR_ENGINE_MAX_ENTITIES_EXCEEDED:
             return "maximum entity count exceeded";
         case ERROR_ENGINE_TABLE_EXPANSION_FAILED:

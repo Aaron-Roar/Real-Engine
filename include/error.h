@@ -43,6 +43,12 @@ typedef enum EngineError {
     ERROR_ENGINE_GRAPHICS_TABLES_INIT_FAILED,
     /** Graphics window or renderer initialization failed. */
     ERROR_ENGINE_GRAPHICS_INIT_FAILED,
+    /** A graphics operation requires an initialized renderer. */
+    ERROR_ENGINE_GRAPHICS_NOT_INITIALIZED,
+    /** SDL could not apply the requested VSync mode. */
+    ERROR_ENGINE_GRAPHICS_VSYNC_SET_FAILED,
+    /** A frame limit was negative. */
+    ERROR_ENGINE_INVALID_FRAME_LIMIT,
     /** An operation would exceed MAX_ENTITIES. */
     ERROR_ENGINE_MAX_ENTITIES_EXCEEDED,
     /** Entity-indexed subsystem tables could not grow. */

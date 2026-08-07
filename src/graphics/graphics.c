@@ -15,6 +15,12 @@ static TTF_TextEngine *ttf_text_engine = NULL;
 static bool ttf_initialized = false;
 static bool graphics_aabb_tree_debug_enabled = false;
 static Camera camera = {0};
+static bool graphics_vsync_enabled = true;
+static int graphics_frame_limit = 0;
+static Uint64 graphics_frame_start_ns = 0;
+
+#define GRAPHICS_FRAME_LIMIT_FALLBACK 120
+#define GRAPHICS_NANOSECONDS_PER_SECOND UINT64_C(1000000000)
 
 #define GRAPHICS_CLIP_STACK_MAX 16
 typedef struct GraphicsClipState {
@@ -1370,6 +1376,9 @@ EngineResult graphics_start(void) {
         WINDOW_HEIGHT,
         SDL_LOGICAL_PRESENTATION_LETTERBOX
     );
+    graphics_vsync_enabled = SDL_SetRenderVSync(sdl_renderer, 1);
+    graphics_frame_limit = 0;
+    graphics_frame_start_ns = SDL_GetTicksNS();
     ttf_text_engine = TTF_CreateRendererTextEngine(sdl_renderer);
     if(ttf_text_engine == NULL) {
         SDL_DestroyRenderer(sdl_renderer);
@@ -1409,6 +1418,9 @@ void graphics_renderer_end(void) {
     }
     SDL_DestroyRenderer(sdl_renderer);
     sdl_renderer = NULL;
+    graphics_vsync_enabled = true;
+    graphics_frame_limit = 0;
+    graphics_frame_start_ns = 0;
     console_write(LOG_ENGINE, "Renderer terminated\n");
 }
 
@@ -1744,12 +1756,47 @@ void graphics_show(void) {
     graphics_camera_motions_update();
     graphics_render_viewport_cameras();
     graphics_viewports_draw();
-      if(screen_recorder.recording) {
+    if(screen_recorder.recording) {
         if(!graphics_record_frame()) {
             graphics_recording_stop();
         }
     }
+    if(!graphics_vsync_enabled) {
+        int effective_limit = graphics_frame_limit > 0 ?
+            graphics_frame_limit : GRAPHICS_FRAME_LIMIT_FALLBACK;
+        Uint64 target_ns = GRAPHICS_NANOSECONDS_PER_SECOND /
+            (Uint64)effective_limit;
+        Uint64 now = SDL_GetTicksNS();
+        Uint64 elapsed = now - graphics_frame_start_ns;
+
+        if(elapsed < target_ns) SDL_DelayPrecise(target_ns - elapsed);
+    }
     SDL_RenderPresent(sdl_renderer);
+    graphics_frame_start_ns = SDL_GetTicksNS();
+}
+
+EngineResult graphics_vsync_set(bool enabled) {
+    if(sdl_renderer == NULL) {
+        return error_result_error(ERROR_ENGINE_GRAPHICS_NOT_INITIALIZED);
+    }
+    if(!SDL_SetRenderVSync(sdl_renderer, enabled ? 1 : 0)) {
+        return error_result_error(ERROR_ENGINE_GRAPHICS_VSYNC_SET_FAILED);
+    }
+    graphics_vsync_enabled = enabled;
+    graphics_frame_start_ns = SDL_GetTicksNS();
+    return error_result_value(true);
+}
+
+EngineResult graphics_frame_limit_set(int frames_per_second) {
+    if(sdl_renderer == NULL) {
+        return error_result_error(ERROR_ENGINE_GRAPHICS_NOT_INITIALIZED);
+    }
+    if(frames_per_second < 0) {
+        return error_result_error(ERROR_ENGINE_INVALID_FRAME_LIMIT);
+    }
+    graphics_frame_limit = frames_per_second;
+    graphics_frame_start_ns = SDL_GetTicksNS();
+    return error_result_value(true);
 }
 
 bool graphics_shape_outline_draw(Shape shape, Color color) {

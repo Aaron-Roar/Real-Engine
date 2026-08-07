@@ -11,8 +11,8 @@
 #include "math2d.h"
 #include "math.h"
 
-#define WINDOW_WIDTH 640
-#define WINDOW_HEIGHT 480
+#define WINDOW_WIDTH 1280
+#define WINDOW_HEIGHT 720
 #define MAX_TEXTURES 50
 #define MAX_ANIMATIONS_FRAMES 20
 #define MAX_ANIMATION_SETS 10
@@ -295,6 +295,8 @@ bool graphics_screen_quad_draw(
 
 /** Present the current frame. */
 void graphics_show(void);
+EngineResult graphics_vsync_set(bool enabled);
+EngineResult graphics_frame_limit_set(int frames_per_second);
 
 /** Draw one entity hitbox. */
 void graphics_hit_box_draw(Entity entity, Fill fill_type);

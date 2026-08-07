@@ -1190,6 +1190,10 @@ bool rohr_graphics_screen_quad_draw(Position center, float width, float height, 
  * @brief Presents the current graphics frame.
  */
 void rohr_graphics_show(void);
+/** Enables or disables synchronization with the display refresh rate. */
+EngineResult rohr_graphics_vsync_set(bool enabled);
+/** Sets the non-VSync frame limit; zero uses the 120 FPS fallback. */
+EngineResult rohr_graphics_frame_limit_set(int frames_per_second);
 
 /**
  * @brief Draws one entity hitbox.

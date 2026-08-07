@@ -23,6 +23,16 @@ int main(void) {
         rohr_engine_shutdown();
         return 1;
     }
+    {
+        EngineResult frame_limit_result = rohr_graphics_frame_limit_set(-1);
+        if(!rohr_error_check(frame_limit_result) ||
+                frame_limit_result.result.error != ERROR_ENGINE_INVALID_FRAME_LIMIT ||
+                rohr_error_check(rohr_graphics_frame_limit_set(0))) {
+            rohr_graphics_end();
+            rohr_engine_shutdown();
+            return 1;
+        }
+    }
     original = rohr_camera_active_get();
     config.position = (Position){10.0f, 20.0f};
     config.zoom = 2.0f;
@@ -36,7 +46,8 @@ int main(void) {
     camera_result = rohr_camera_get(first_result.result.value);
     screen = rohr_graphics_world_to_screen_get((Position){11.0f, 20.0f});
     if(rohr_error_check(camera_result) || camera_result.result.value.zoom != 2.0f ||
-            screen.x != 322.0f || screen.y != 240.0f ||
+            screen.x != WINDOW_WIDTH * 0.5f + 2.0f ||
+            screen.y != WINDOW_HEIGHT * 0.5f ||
             !rohr_error_check(rohr_camera_destroy(first_result.result.value)) ||
             rohr_error_check(rohr_camera_active_set(second_result.result.value)) ||
             rohr_error_check(rohr_camera_destroy(first_result.result.value)) ||
