@@ -92,6 +92,14 @@ static UIButtonStyle editor_delete_button_style_get(void) {
     return style;
 }
 
+static UIButtonStyle editor_selected_button_style_get(void) {
+    UIButtonStyle style = rohr_ui_button_style_default_get();
+
+    style.idle = (Color){118, 96, 35, 255};
+    style.hovered = (Color){145, 119, 45, 255};
+    return style;
+}
+
 static bool editor_selected_delete(
     EditorProject *project,
     EditorViewportState *viewport_state
@@ -101,29 +109,79 @@ static bool editor_selected_delete(
     if(project == NULL || viewport_state == NULL) return false;
     selected = editor_project_selected_get(project);
     if(selected == NULL) return false;
-    if(viewport_state->mode == EDITOR_VIEWPORT_OBJECT) {
+    if(viewport_state->selection == EDITOR_SELECTION_OBJECT) {
         if(!editor_project_object_remove(project, selected->id)) return false;
         editor_viewport_hitbox_editor_exit(viewport_state);
         return true;
     }
-    if(viewport_state->mode == EDITOR_VIEWPORT_HITBOX) {
+    if(viewport_state->selection == EDITOR_SELECTION_HITBOX) {
         if(!editor_project_hitbox_remove(selected)) return false;
         editor_viewport_object_editor_enter(viewport_state);
         return true;
     }
-    if(viewport_state->mode == EDITOR_VIEWPORT_VERTEX) {
+    if(viewport_state->selection == EDITOR_SELECTION_VERTEX) {
         if(!editor_project_hitbox_vertex_remove(
                 selected, viewport_state->selected_vertex)) return false;
         editor_viewport_hitbox_editor_enter(viewport_state);
         return true;
     }
-    if(viewport_state->mode == EDITOR_VIEWPORT_LINE) {
+    if(viewport_state->selection == EDITOR_SELECTION_LINE) {
         if(!editor_project_hitbox_line_remove(
                 selected, viewport_state->selected_line)) return false;
         editor_viewport_hitbox_editor_enter(viewport_state);
         return true;
     }
     return false;
+}
+
+static bool editor_selected_open(
+    EditorProject *project,
+    EditorViewportState *viewport_state
+) {
+    EditorObject *selected;
+
+    if(project == NULL || viewport_state == NULL) return false;
+    selected = editor_project_selected_get(project);
+    if(selected == NULL) return false;
+    if(viewport_state->selection == EDITOR_SELECTION_OBJECT) {
+        editor_viewport_object_editor_enter(viewport_state);
+        return true;
+    }
+    if(viewport_state->selection == EDITOR_SELECTION_HITBOX && selected->has_hitbox) {
+        editor_viewport_hitbox_editor_enter(viewport_state);
+        return true;
+    }
+    if(viewport_state->selection == EDITOR_SELECTION_VERTEX &&
+            viewport_state->selected_vertex < selected->hitbox.vertex_count) {
+        editor_viewport_vertex_editor_enter(
+            viewport_state, viewport_state->selected_vertex);
+        return true;
+    }
+    if(viewport_state->selection == EDITOR_SELECTION_LINE &&
+            viewport_state->selected_line < selected->hitbox.vertex_count) {
+        editor_viewport_line_editor_enter(viewport_state, viewport_state->selected_line);
+        return true;
+    }
+    return false;
+}
+
+static bool editor_open_item_delete(
+    EditorProject *project,
+    EditorViewportState *viewport_state
+) {
+    if(viewport_state == NULL) return false;
+    if(viewport_state->mode == EDITOR_VIEWPORT_OBJECT) {
+        viewport_state->selection = EDITOR_SELECTION_OBJECT;
+    } else if(viewport_state->mode == EDITOR_VIEWPORT_HITBOX) {
+        viewport_state->selection = EDITOR_SELECTION_HITBOX;
+    } else if(viewport_state->mode == EDITOR_VIEWPORT_VERTEX) {
+        viewport_state->selection = EDITOR_SELECTION_VERTEX;
+    } else if(viewport_state->mode == EDITOR_VIEWPORT_LINE) {
+        viewport_state->selection = EDITOR_SELECTION_LINE;
+    } else {
+        return false;
+    }
+    return editor_selected_delete(project, viewport_state);
 }
 
 int main(void) {
@@ -242,9 +300,14 @@ int main(void) {
                 running = false;
             }
         }
-        if(!field_editing && viewport_state.mode != EDITOR_VIEWPORT_HIERARCHY &&
+        if(!field_editing && viewport_state.selection != EDITOR_SELECTION_NONE &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_DELETE)) {
             (void)editor_selected_delete(&project, &viewport_state);
+        }
+        if(!field_editing && viewport_state.selection != EDITOR_SELECTION_NONE &&
+                (rohr_controller_key_pressed_get(&keyboard, SDLK_RETURN) ||
+                    rohr_controller_key_pressed_get(&keyboard, SDLK_KP_ENTER))) {
+            (void)editor_selected_open(&project, &viewport_state);
         }
         if(!running) break;
         editor_window_layout_sync();
@@ -297,11 +360,21 @@ int main(void) {
                 for(uint32_t i = 0; i < selected->hitbox.vertex_count; i += 1) {
                     char id[64];
                     float y = 110.0f + (float)i * 27.0f;
+                    UIButtonStyle selected_style = editor_selected_button_style_get();
+                    const UIButtonStyle *style = viewport_state.selection ==
+                        EDITOR_SELECTION_VERTEX && viewport_state.selected_vertex == i ?
+                        &selected_style : NULL;
+                    UIButtonResult result;
                     snprintf(id, sizeof(id), "editor.vertex.%u", selected->hitbox.vertices[i].id);
-                    if(rohr_ui_button(id, &vertex_labels[i],
-                            (UIRect){EDITOR_VIEWPORT_WIDTH + 18.0f, y,
-                                EDITOR_TOOLS_WIDTH - 26.0f, 23.0f}, NULL).clicked) {
-                        editor_viewport_vertex_editor_enter(&viewport_state, i);
+                    result = rohr_ui_button(id, &vertex_labels[i],
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 18.0f, y,
+                            EDITOR_TOOLS_WIDTH - 26.0f, 23.0f}, style);
+                    if(result.clicked) {
+                        viewport_state.selection = EDITOR_SELECTION_VERTEX;
+                        viewport_state.selected_vertex = i;
+                        if(result.double_clicked) {
+                            (void)editor_selected_open(&project, &viewport_state);
+                        }
                     }
                 }
                 {
@@ -310,12 +383,22 @@ int main(void) {
                         base, EDITOR_TOOLS_WIDTH - 20.0f, 24.0f});
                     for(uint32_t i = 0; i < selected->hitbox.vertex_count; i += 1) {
                         char id[64];
+                        UIButtonStyle selected_style = editor_selected_button_style_get();
+                        const UIButtonStyle *style = viewport_state.selection ==
+                            EDITOR_SELECTION_LINE && viewport_state.selected_line == i ?
+                            &selected_style : NULL;
+                        UIButtonResult result;
                         snprintf(id, sizeof(id), "editor.line.%u", i);
-                        if(rohr_ui_button(id, &line_labels[i],
-                                (UIRect){EDITOR_VIEWPORT_WIDTH + 18.0f,
-                                    base + 28.0f + (float)i * 27.0f,
-                                    EDITOR_TOOLS_WIDTH - 26.0f, 23.0f}, NULL).clicked) {
-                            editor_viewport_line_editor_enter(&viewport_state, i);
+                        result = rohr_ui_button(id, &line_labels[i],
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 18.0f,
+                                base + 28.0f + (float)i * 27.0f,
+                                EDITOR_TOOLS_WIDTH - 26.0f, 23.0f}, style);
+                        if(result.clicked) {
+                            viewport_state.selection = EDITOR_SELECTION_LINE;
+                            viewport_state.selected_line = i;
+                            if(result.double_clicked) {
+                                (void)editor_selected_open(&project, &viewport_state);
+                            }
                         }
                     }
                     {
@@ -327,7 +410,7 @@ int main(void) {
                                 (UIRect){EDITOR_VIEWPORT_WIDTH + 18.0f, delete_y,
                                     EDITOR_TOOLS_WIDTH - 26.0f, 30.0f},
                                 &delete_style).clicked) {
-                            (void)editor_selected_delete(&project, &viewport_state);
+                            (void)editor_open_item_delete(&project, &viewport_state);
                         }
                     }
                 }
@@ -384,7 +467,7 @@ int main(void) {
                         rohr_ui_label(&delete_vertex_label, delete_bounds);
                     } else if(rohr_ui_button("editor.vertex.delete", &delete_vertex_label,
                             delete_bounds, &delete_style).clicked) {
-                        (void)editor_selected_delete(&project, &viewport_state);
+                        (void)editor_open_item_delete(&project, &viewport_state);
                     }
                 }
             }
@@ -446,7 +529,7 @@ int main(void) {
                             rohr_ui_label(&delete_line_label, delete_bounds);
                         } else if(rohr_ui_button("editor.line.delete", &delete_line_label,
                                 delete_bounds, &delete_style).clicked) {
-                            (void)editor_selected_delete(&project, &viewport_state);
+                            (void)editor_open_item_delete(&project, &viewport_state);
                         }
                     }
                 }
@@ -482,14 +565,24 @@ int main(void) {
                 if(!selected->has_hitbox) {
                     if(rohr_ui_button("editor.add_hitbox", &add_hitbox_label,
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 98.0f,
-                                EDITOR_TOOLS_WIDTH - 20.0f, 36.0f}, NULL).clicked) {
+                            EDITOR_TOOLS_WIDTH - 20.0f, 36.0f}, NULL).clicked) {
                         editor_project_hitbox_add(&project, selected);
-                        editor_viewport_hitbox_editor_enter(&viewport_state);
+                        viewport_state.selection = EDITOR_SELECTION_HITBOX;
                     }
-                } else if(rohr_ui_button("editor.object.hitbox", &hitbox_label,
+                } else {
+                    UIButtonStyle selected_style = editor_selected_button_style_get();
+                    const UIButtonStyle *style = viewport_state.selection ==
+                        EDITOR_SELECTION_HITBOX ? &selected_style : NULL;
+                    UIButtonResult result = rohr_ui_button("editor.object.hitbox",
+                        &hitbox_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 18.0f, 100.0f,
-                            EDITOR_TOOLS_WIDTH - 26.0f, 30.0f}, NULL).clicked) {
-                    editor_viewport_hitbox_editor_enter(&viewport_state);
+                            EDITOR_TOOLS_WIDTH - 26.0f, 30.0f}, style);
+                    if(result.clicked) {
+                        viewport_state.selection = EDITOR_SELECTION_HITBOX;
+                        if(result.double_clicked) {
+                            (void)editor_selected_open(&project, &viewport_state);
+                        }
+                    }
                 }
                 {
                     UIButtonStyle delete_style = editor_delete_button_style_get();
@@ -497,7 +590,7 @@ int main(void) {
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 146.0f,
                                 EDITOR_TOOLS_WIDTH - 20.0f, 34.0f},
                             &delete_style).clicked) {
-                        (void)editor_selected_delete(&project, &viewport_state);
+                        (void)editor_open_item_delete(&project, &viewport_state);
                     }
                 }
             }
@@ -507,10 +600,11 @@ int main(void) {
                 (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 10.0f,
                     EDITOR_TOOLS_WIDTH - 20.0f, 38.0f}, NULL);
             if(add_object.clicked) {
-                (void)editor_project_object_add(
+                EditorObject *added = editor_project_object_add(
                     &project,
                     (Position){EDITOR_VIEWPORT_WIDTH * 0.5f,
                         WINDOW_HEIGHT * 0.5f});
+                if(added != NULL) viewport_state.selection = EDITOR_SELECTION_OBJECT;
             }
             (void)rohr_graphics_screen_rect_draw(
                 EDITOR_VIEWPORT_WIDTH + 10.0f, 58.0f,
@@ -532,13 +626,22 @@ int main(void) {
 
                 snprintf(object_button_id, sizeof(object_button_id),
                     "editor.object.%u", object->id);
+                {
+                    UIButtonStyle selected_style = editor_selected_button_style_get();
+                    const UIButtonStyle *style = viewport_state.selection ==
+                            EDITOR_SELECTION_OBJECT && project.selected == object->id ?
+                        &selected_style : NULL;
                 object_result = rohr_ui_button(
                     object_button_id, &object_name_labels[i],
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, y,
-                        EDITOR_TOOLS_WIDTH - 16.0f, 28.0f}, NULL);
+                        EDITOR_TOOLS_WIDTH - 16.0f, 28.0f}, style);
+                }
                 if(object_result.clicked) {
                     (void)editor_project_object_select(&project, object->id);
-                    editor_viewport_object_editor_enter(&viewport_state);
+                    viewport_state.selection = EDITOR_SELECTION_OBJECT;
+                    if(object_result.double_clicked) {
+                        (void)editor_selected_open(&project, &viewport_state);
+                    }
                 }
             }
         }

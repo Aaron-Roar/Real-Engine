@@ -11,9 +11,22 @@ typedef enum EditorViewportMode {
     EDITOR_VIEWPORT_VERTEX
 } EditorViewportMode;
 
+typedef enum EditorHierarchySelection {
+    EDITOR_SELECTION_NONE,
+    EDITOR_SELECTION_OBJECT,
+    EDITOR_SELECTION_HITBOX,
+    EDITOR_SELECTION_LINE,
+    EDITOR_SELECTION_VERTEX
+} EditorHierarchySelection;
+
 typedef struct EditorViewportState {
     int dragged_vertex;
     EditorViewportMode mode;
+    EditorHierarchySelection selection;
+    EditorHierarchySelection last_viewport_click_selection;
+    EditorObjectId last_viewport_click_object;
+    uint32_t last_viewport_click_index;
+    Uint64 last_viewport_click_at;
     uint32_t selected_line;
     uint32_t selected_vertex;
 } EditorViewportState;

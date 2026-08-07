@@ -26,6 +26,49 @@ static void editor_line_draw(Position start, Position end, Color color) {
         color);
 }
 
+static bool editor_object_point_contains(const EditorObject *object, Position point) {
+    bool inside = false;
+    uint32_t previous;
+
+    if(object == NULL || !object->has_hitbox || object->hitbox.vertex_count < 3) {
+        return false;
+    }
+    previous = object->hitbox.vertex_count - 1;
+    for(uint32_t i = 0; i < object->hitbox.vertex_count; i += 1) {
+        Position current = editor_vertex_world_get(object, i);
+        Position prior = editor_vertex_world_get(object, previous);
+        bool crosses = (current.y > point.y) != (prior.y > point.y) &&
+            point.x < (prior.x - current.x) * (point.y - current.y) /
+                (prior.y - current.y) + current.x;
+
+        if(crosses) inside = !inside;
+        previous = i;
+    }
+    return inside;
+}
+
+static bool editor_viewport_double_click_get(
+    EditorViewportState *state,
+    EditorHierarchySelection selection,
+    EditorObjectId object,
+    uint32_t index
+) {
+    Uint64 now;
+    bool double_clicked;
+
+    if(state == NULL) return false;
+    now = SDL_GetTicks();
+    double_clicked = state->last_viewport_click_selection == selection &&
+        state->last_viewport_click_object == object &&
+        state->last_viewport_click_index == index &&
+        now - state->last_viewport_click_at <= 400;
+    state->last_viewport_click_selection = selection;
+    state->last_viewport_click_object = object;
+    state->last_viewport_click_index = index;
+    state->last_viewport_click_at = now;
+    return double_clicked;
+}
+
 void editor_viewport_state_init(EditorViewportState *state) {
     if(state == NULL) return;
     *state = (EditorViewportState){
@@ -36,18 +79,21 @@ void editor_viewport_state_init(EditorViewportState *state) {
 void editor_viewport_hitbox_editor_enter(EditorViewportState *state) {
     if(state == NULL) return;
     state->mode = EDITOR_VIEWPORT_HITBOX;
+    state->selection = EDITOR_SELECTION_HITBOX;
     state->dragged_vertex = -1;
 }
 
 void editor_viewport_object_editor_enter(EditorViewportState *state) {
     if(state == NULL) return;
     state->mode = EDITOR_VIEWPORT_OBJECT;
+    state->selection = EDITOR_SELECTION_OBJECT;
     state->dragged_vertex = -1;
 }
 
 void editor_viewport_hitbox_editor_exit(EditorViewportState *state) {
     if(state == NULL) return;
     state->mode = EDITOR_VIEWPORT_HIERARCHY;
+    state->selection = EDITOR_SELECTION_NONE;
     state->dragged_vertex = -1;
 }
 
@@ -58,6 +104,7 @@ bool editor_viewport_hitbox_editor_active_get(const EditorViewportState *state) 
 void editor_viewport_line_editor_enter(EditorViewportState *state, uint32_t line) {
     if(state == NULL) return;
     state->mode = EDITOR_VIEWPORT_LINE;
+    state->selection = EDITOR_SELECTION_LINE;
     state->selected_line = line;
     state->dragged_vertex = -1;
 }
@@ -65,6 +112,7 @@ void editor_viewport_line_editor_enter(EditorViewportState *state, uint32_t line
 void editor_viewport_vertex_editor_enter(EditorViewportState *state, uint32_t vertex) {
     if(state == NULL) return;
     state->mode = EDITOR_VIEWPORT_VERTEX;
+    state->selection = EDITOR_SELECTION_VERTEX;
     state->selected_vertex = vertex;
     state->dragged_vertex = -1;
 }
@@ -73,10 +121,13 @@ void editor_viewport_back(EditorViewportState *state) {
     if(state == NULL) return;
     if(state->mode == EDITOR_VIEWPORT_LINE || state->mode == EDITOR_VIEWPORT_VERTEX) {
         state->mode = EDITOR_VIEWPORT_HITBOX;
+        state->selection = EDITOR_SELECTION_HITBOX;
     } else if(state->mode == EDITOR_VIEWPORT_HITBOX) {
         state->mode = EDITOR_VIEWPORT_OBJECT;
+        state->selection = EDITOR_SELECTION_OBJECT;
     } else if(state->mode == EDITOR_VIEWPORT_OBJECT) {
         state->mode = EDITOR_VIEWPORT_HIERARCHY;
+        state->selection = EDITOR_SELECTION_OBJECT;
     }
     state->dragged_vertex = -1;
 }
@@ -90,7 +141,23 @@ void editor_viewport_update(
 ) {
     EditorObject *object;
 
-    if(state == NULL || project == NULL || state->mode <= EDITOR_VIEWPORT_OBJECT) return;
+    if(state == NULL || project == NULL) return;
+    if(!pointer_consumed && pointer.x >= 0.0f &&
+            pointer.x < EDITOR_VIEWPORT_WIDTH &&
+            primary_button == MOUSE_BUTTON_STATE_PRESSED &&
+            state->mode == EDITOR_VIEWPORT_HIERARCHY) {
+        for(size_t i = project->object_count; i > 0; i -= 1) {
+            EditorObject *candidate = &project->objects[i - 1];
+            if(!editor_object_point_contains(candidate, pointer)) continue;
+            (void)editor_project_object_select(project, candidate->id);
+            state->selection = EDITOR_SELECTION_OBJECT;
+            if(editor_viewport_double_click_get(state, EDITOR_SELECTION_OBJECT,
+                    candidate->id, 0)) {
+                editor_viewport_object_editor_enter(state);
+            }
+            return;
+        }
+    }
     object = editor_project_selected_get(project);
     if(object == NULL || !object->has_hitbox) {
         state->dragged_vertex = -1;
@@ -118,7 +185,14 @@ void editor_viewport_update(
         Vec2D delta = {pointer.x - vertex.x, pointer.y - vertex.y};
 
         if(delta.x * delta.x + delta.y * delta.y <= 100.0f) {
-            editor_viewport_vertex_editor_enter(state, i);
+            state->selection = EDITOR_SELECTION_VERTEX;
+            state->selected_vertex = i;
+            if(editor_viewport_double_click_get(state, EDITOR_SELECTION_VERTEX,
+                    object->id, i)) {
+                editor_viewport_vertex_editor_enter(state, i);
+            } else if(state->mode != EDITOR_VIEWPORT_VERTEX) {
+                state->mode = EDITOR_VIEWPORT_HITBOX;
+            }
             if(!object->hitbox.vertices[i].position_locked) {
                 state->dragged_vertex = (int)i;
             }
@@ -143,8 +217,24 @@ void editor_viewport_update(
         nearest = (Position){start.x + edge.x * amount, start.y + edge.y * amount};
         distance = (Vec2D){pointer.x - nearest.x, pointer.y - nearest.y};
         if(distance.x * distance.x + distance.y * distance.y <= 36.0f) {
-            editor_viewport_line_editor_enter(state, i);
+            state->selection = EDITOR_SELECTION_LINE;
+            state->selected_line = i;
+            if(editor_viewport_double_click_get(state, EDITOR_SELECTION_LINE,
+                    object->id, i)) {
+                editor_viewport_line_editor_enter(state, i);
+            } else if(state->mode != EDITOR_VIEWPORT_LINE) {
+                state->mode = EDITOR_VIEWPORT_HITBOX;
+            }
             return;
+        }
+    }
+    if(editor_object_point_contains(object, pointer)) {
+        state->selection = EDITOR_SELECTION_HITBOX;
+        if(editor_viewport_double_click_get(state, EDITOR_SELECTION_HITBOX,
+                object->id, 0)) {
+            editor_viewport_hitbox_editor_enter(state);
+        } else if(state->mode != EDITOR_VIEWPORT_OBJECT) {
+            state->mode = EDITOR_VIEWPORT_HITBOX;
         }
     }
 }
@@ -158,9 +248,15 @@ void editor_viewport_draw(
             object_index < project->object_count;
             object_index += 1) {
         const EditorObject *object = &project->objects[object_index];
-        Color line_color = object->id == project->selected
+        bool selected_object = object->id == project->selected;
+        Color line_color = selected_object
             ? (Color){90, 190, 255, 255}
             : (Color){90, 105, 125, 255};
+
+        if(selected_object && (state->selection == EDITOR_SELECTION_OBJECT ||
+                state->selection == EDITOR_SELECTION_HITBOX)) {
+            line_color = (Color){255, 215, 70, 255};
+        }
 
         if(!object->has_hitbox) continue;
         for(uint32_t i = 0; i < object->hitbox.vertex_count; i += 1) {
@@ -169,20 +265,19 @@ void editor_viewport_draw(
                 object, (i + 1) % object->hitbox.vertex_count);
             Color edge_color = line_color;
 
-            if(object->id == project->selected &&
-                    state->mode == EDITOR_VIEWPORT_LINE &&
+            if(selected_object && state->selection == EDITOR_SELECTION_LINE &&
                     state->selected_line == i) {
                 edge_color = (Color){255, 215, 70, 255};
             }
 
             editor_line_draw(start, end, edge_color);
-            if(state->mode > EDITOR_VIEWPORT_OBJECT &&
-                    object->id == project->selected) {
+            if(selected_object && state->selection != EDITOR_SELECTION_NONE &&
+                    state->selection != EDITOR_SELECTION_OBJECT) {
                 Color vertex_color = object->hitbox.vertices[i].position_locked
                     ? (Color){245, 165, 70, 255}
                     : (Color){235, 240, 248, 255};
 
-                if(state->mode == EDITOR_VIEWPORT_VERTEX &&
+                if(state->selection == EDITOR_SELECTION_VERTEX &&
                         state->selected_vertex == i) {
                     vertex_color = (Color){255, 215, 70, 255};
                 }

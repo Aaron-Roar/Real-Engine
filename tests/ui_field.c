@@ -57,5 +57,30 @@ int main(void) {
         return 1;
     }
     rohr_ui_frame_end();
+
+    rohr_ui_frame_begin((UIInput){
+        .pointer = {10.0f, 10.0f},
+        .primary_button = MOUSE_BUTTON_STATE_PRESSED
+    });
+    (void)rohr_ui_button("double-click", NULL, bounds, NULL);
+    rohr_ui_frame_end();
+    rohr_ui_frame_begin((UIInput){
+        .pointer = {10.0f, 10.0f},
+        .primary_button = MOUSE_BUTTON_STATE_RELEASED
+    });
+    if(!rohr_ui_button("double-click", NULL, bounds, NULL).clicked) return 1;
+    rohr_ui_frame_end();
+    rohr_ui_frame_begin((UIInput){
+        .pointer = {10.0f, 10.0f},
+        .primary_button = MOUSE_BUTTON_STATE_PRESSED
+    });
+    (void)rohr_ui_button("double-click", NULL, bounds, NULL);
+    rohr_ui_frame_end();
+    rohr_ui_frame_begin((UIInput){
+        .pointer = {10.0f, 10.0f},
+        .primary_button = MOUSE_BUTTON_STATE_RELEASED
+    });
+    if(!rohr_ui_button("double-click", NULL, bounds, NULL).double_clicked) return 1;
+    rohr_ui_frame_end();
     return 0;
 }

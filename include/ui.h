@@ -38,6 +38,7 @@ typedef struct UIButtonResult {
     bool hovered;
     bool pressed;
     bool clicked;
+    bool double_clicked;
 } UIButtonResult;
 
 typedef enum UIFieldKind {

@@ -9,6 +9,8 @@
 typedef struct UIContext {
     UIInput input;
     uint64_t active_id;
+    uint64_t last_clicked_id;
+    Uint64 last_clicked_at;
     bool active_seen;
     bool pointer_claimed;
     bool pointer_consumed;
@@ -303,6 +305,13 @@ UIButtonResult ui_button(
 
         if(ui_context.input.primary_button == MOUSE_BUTTON_STATE_RELEASED) {
             result.clicked = result.hovered;
+            if(result.clicked) {
+                Uint64 now = SDL_GetTicks();
+                result.double_clicked = ui_context.last_clicked_id == button_id &&
+                    now - ui_context.last_clicked_at <= 400;
+                ui_context.last_clicked_id = button_id;
+                ui_context.last_clicked_at = now;
+            }
             ui_context.active_id = 0;
         }
     }
