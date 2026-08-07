@@ -1846,7 +1846,7 @@ int main(void) {
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 166.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 32.0f}, NULL).clicked) {
                     EditorJoint *joint = editor_project_joint_add(
-                        &project, selected, EDITOR_JOINT_REVOLUTE);
+                        &project, selected, EDITOR_JOINT_SPRING);
                     if(joint != NULL) {
                         viewport_state.selection = EDITOR_SELECTION_JOINT;
                         viewport_state.selected_joint = joint->id;
