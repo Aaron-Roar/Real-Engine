@@ -41,6 +41,15 @@ typedef struct UIButtonResult {
     bool double_clicked;
 } UIButtonResult;
 
+typedef struct UIDropdownResult {
+    bool hovered;
+    bool button_hovered;
+    bool open;
+    bool changed;
+    size_t selected_index;
+    int hovered_index;
+} UIDropdownResult;
+
 typedef enum UIFieldKind {
     UI_FIELD_STRING,
     UI_FIELD_FLOAT
@@ -175,6 +184,11 @@ UIButtonResult ui_button(
     UIRect bounds,
     const UIButtonStyle *style
 );
+
+/** Draw a caller-owned dropdown. Options and text assets remain caller-owned. */
+UIDropdownResult ui_dropdown(const char *id, const TextAsset *const *options,
+    size_t option_count, size_t selected_index, UIRect bounds,
+    const UIButtonStyle *style);
 
 /** Draw reusable text centered inside logical screen-space bounds. */
 void ui_label(const TextAsset *text, UIRect bounds);

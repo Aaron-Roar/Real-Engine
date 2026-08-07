@@ -16,6 +16,7 @@ int main(void) {
     UIRect bounds = {0.0f, 0.0f, 100.0f, 30.0f};
     float number = 0.0f;
     char string[32] = "a";
+    const TextAsset *dropdown_options[2] = {NULL, NULL};
 
     rohr_ui_frame_begin((UIInput){
         .pointer = {10.0f, 10.0f},
@@ -81,6 +82,35 @@ int main(void) {
         .primary_button = MOUSE_BUTTON_STATE_RELEASED
     });
     if(!rohr_ui_button("double-click", NULL, bounds, NULL).double_clicked) return 1;
+    rohr_ui_frame_end();
+
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f},
+        .primary_button = MOUSE_BUTTON_STATE_PRESSED});
+    (void)rohr_ui_dropdown("dropdown", dropdown_options, 2, 0, bounds, NULL);
+    rohr_ui_frame_end();
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f},
+        .primary_button = MOUSE_BUTTON_STATE_RELEASED});
+    if(!rohr_ui_dropdown("dropdown", dropdown_options, 2, 0, bounds, NULL).open) return 1;
+    rohr_ui_frame_end();
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 70.0f},
+        .primary_button = MOUSE_BUTTON_STATE_UP});
+    {
+        UIDropdownResult result = rohr_ui_dropdown(
+            "dropdown", dropdown_options, 2, 0, bounds, NULL);
+        if(!result.open || result.hovered_index != 1) return 1;
+    }
+    rohr_ui_frame_end();
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 70.0f},
+        .primary_button = MOUSE_BUTTON_STATE_PRESSED});
+    (void)rohr_ui_dropdown("dropdown", dropdown_options, 2, 0, bounds, NULL);
+    rohr_ui_frame_end();
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 70.0f},
+        .primary_button = MOUSE_BUTTON_STATE_RELEASED});
+    {
+        UIDropdownResult result = rohr_ui_dropdown(
+            "dropdown", dropdown_options, 2, 0, bounds, NULL);
+        if(!result.changed || result.selected_index != 1 || result.open) return 1;
+    }
     rohr_ui_frame_end();
     return 0;
 }

@@ -1930,6 +1930,11 @@ UIButtonResult rohr_ui_button(
     const UIButtonStyle *style
 );
 
+/** @brief Draws a dropdown and returns selection and hover-preview state. */
+UIDropdownResult rohr_ui_dropdown(const char *id, const TextAsset *const *options,
+    size_t option_count, size_t selected_index, UIRect bounds,
+    const UIButtonStyle *style);
+
 /** @brief Draws reusable text centered inside bounds. */
 void rohr_ui_label(const TextAsset *text, UIRect bounds);
 EngineResult rohr_ui_physics_debug_panel_init(UIPhysicsDebugPanel *panel, FontDescriptor font);

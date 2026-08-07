@@ -170,26 +170,14 @@ static EditorHitbox *editor_selected_hitbox_get(EditorObject *object,
     return body == NULL ? NULL : editor_project_hitbox_get(body, state->selected_hitbox);
 }
 
-static EditorRigidBodyId editor_body_id_next_get(const EditorObject *object,
-    EditorRigidBodyId current) {
-    if(object == NULL || object->rigid_body_count == 0) return 0;
-    if(current == 0) return object->rigid_bodies[0].id;
-    for(size_t i = 0; i < object->rigid_body_count; i += 1) {
-        if(object->rigid_bodies[i].id != current) continue;
-        return i + 1 < object->rigid_body_count ? object->rigid_bodies[i + 1].id : 0;
-    }
-    return object->rigid_bodies[0].id;
-}
-
-static EditorAnchorId editor_anchor_id_next_get(const EditorObject *object,
-    EditorAnchorId current) {
-    if(object == NULL || object->anchor_count == 0) return 0;
-    if(current == 0) return object->anchors[0].id;
-    for(size_t i = 0; i < object->anchor_count; i += 1) {
-        if(object->anchors[i].id != current) continue;
-        return i + 1 < object->anchor_count ? object->anchors[i + 1].id : 0;
-    }
-    return object->anchors[0].id;
+static void editor_anchor_preview_set(EditorViewportState *state,
+    EditorObject *object, EditorAnchorId id) {
+    EditorAnchor *anchor;
+    if(state == NULL || object == NULL || id == 0) return;
+    anchor = editor_project_anchor_get(object, id);
+    if(anchor == NULL) return;
+    state->preview_anchor = anchor->id;
+    state->preview_rigid_body = anchor->rigid_body;
 }
 
 static EditorJoint *editor_selected_joint_get(EditorObject *object,
@@ -230,17 +218,6 @@ static EditorSoftBeam *editor_selected_soft_beam_get(EditorSoftBody *body,
         if(body->beams[i].id == state->selected_soft_beam) return &body->beams[i];
     }
     return NULL;
-}
-
-static EditorSoftNodeId editor_soft_node_id_next_get(const EditorSoftBody *body,
-    EditorSoftNodeId current) {
-    if(body == NULL || body->node_count == 0) return 0;
-    if(current == 0) return body->nodes[0].id;
-    for(size_t i = 0; i < body->node_count; i += 1) {
-        if(body->nodes[i].id != current) continue;
-        return i + 1 < body->node_count ? body->nodes[i + 1].id : 0;
-    }
-    return body->nodes[0].id;
 }
 
 static bool editor_selected_delete(
@@ -436,6 +413,7 @@ int main(void) {
     FontAsset font = {0};
     TextAsset hitbox_editor_label = {0};
     TextAsset add_object_label = {0};
+    TextAsset none_label = {0};
     TextAsset add_hitbox_label = {0};
     TextAsset hitbox_label = {0};
     TextAsset add_rigid_body_label = {0};
@@ -460,11 +438,6 @@ int main(void) {
     TextAsset position_global_label = {0};
     TextAsset rotation_body_label = {0};
     TextAsset rotation_global_label = {0};
-    TextAsset joint_body_a_display = {0};
-    TextAsset joint_body_b_display = {0};
-    TextAsset beam_node_a_display = {0};
-    TextAsset beam_node_b_display = {0};
-    TextAsset anchor_body_display = {0};
     TextAsset rigid_body_labels[EDITOR_RIGID_BODY_MAX] = {0};
     TextAsset body_hitbox_labels[EDITOR_BODY_HITBOX_MAX] = {0};
     TextAsset joint_labels[EDITOR_JOINT_MAX] = {0};
@@ -543,6 +516,7 @@ int main(void) {
     }
     if(!editor_text_create(&font, "Hitbox Editor", &hitbox_editor_label) ||
             !editor_text_create(&font, "Add Object", &add_object_label) ||
+            !editor_text_create(&font, "None", &none_label) ||
             !editor_text_create(&font, "Add Hitbox", &add_hitbox_label) ||
             !editor_text_create(&font, "Hitbox", &hitbox_label) ||
             !editor_text_create(&font, "Add Rigid Body", &add_rigid_body_label) ||
@@ -567,11 +541,6 @@ int main(void) {
             !editor_text_create(&font, "Position: Global", &position_global_label) ||
             !editor_text_create(&font, "Orientation: Body", &rotation_body_label) ||
             !editor_text_create(&font, "Orientation: Global", &rotation_global_label) ||
-            !editor_text_create(&font, "", &joint_body_a_display) ||
-            !editor_text_create(&font, "", &joint_body_b_display) ||
-            !editor_text_create(&font, "", &beam_node_a_display) ||
-            !editor_text_create(&font, "", &beam_node_b_display) ||
-            !editor_text_create(&font, "", &anchor_body_display) ||
             !editor_text_create(&font, "Vertices", &vertices_label) ||
             !editor_text_create(&font, "Lines", &lines_label) ||
             !editor_text_create(&font, "Lock Position", &lock_label) ||
@@ -670,6 +639,9 @@ int main(void) {
             .pointer = rohr_graphics_mouse_screen_position_get(),
             .primary_button = mouse.button_states[MOUSE_BUTTON_LEFT]
         });
+        viewport_state.preview_rigid_body = 0;
+        viewport_state.preview_anchor = 0;
+        viewport_state.preview_soft_node = 0;
         field_editing = false;
         if(viewport_state.mode == EDITOR_VIEWPORT_RIGID_BODY) {
             EditorObject *selected = editor_project_selected_get(&project);
@@ -951,11 +923,9 @@ int main(void) {
             EditorJoint *joint = editor_selected_joint_get(selected, &viewport_state);
             if(joint != NULL) {
                 size_t index = (size_t)(joint - selected->joint_items);
-                const TextAsset *kind_label = joint->kind == EDITOR_JOINT_WELD ?
-                    &weld_label : (joint->kind == EDITOR_JOINT_SPRING ?
-                        &spring_label : &revolute_label);
-                EditorAnchor *body_a = editor_project_anchor_get(selected, joint->anchor_a);
-                EditorAnchor *body_b = editor_project_anchor_get(selected, joint->anchor_b);
+                const TextAsset *kind_options[] = {
+                    &revolute_label, &weld_label, &spring_label
+                };
                 UIButtonStyle delete_style = editor_delete_button_style_get();
                 if(!editor_named_text_sync(&font, joint->name, &joint_labels[index],
                         joint_cache[index], EDITOR_OBJECT_NAME_MAX)) goto fail;
@@ -964,32 +934,58 @@ int main(void) {
                 (void)editor_visibility_toggle("editor.joint.visibility",
                     &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         44.0f, 26.0f, 26.0f}, &joint->visible);
-                if(rohr_ui_button("editor.joint.kind", kind_label,
+                {
+                    UIDropdownResult result = rohr_ui_dropdown("editor.joint.kind",
+                        kind_options, 3, (size_t)joint->kind,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 118.0f,
-                            EDITOR_TOOLS_WIDTH - 20.0f, 30.0f}, NULL).clicked) {
-                    joint->kind = (EditorJointKind)((joint->kind + 1) % 3);
+                            EDITOR_TOOLS_WIDTH - 20.0f, 30.0f}, NULL);
+                    if(result.changed) joint->kind = (EditorJointKind)result.selected_index;
                 }
-                (void)rohr_graphics_text_value_set(&joint_body_a_display,
-                    body_a == NULL ? "None" : body_a->name);
-                (void)rohr_graphics_text_value_set(&joint_body_b_display,
-                    body_b == NULL ? "None" : body_b->name);
+                {
+                    const TextAsset *anchor_options[EDITOR_ANCHOR_MAX + 1];
+                    size_t selected_a = 0;
+                    size_t selected_b = 0;
+                    anchor_options[0] = &none_label;
+                    for(size_t i = 0; i < selected->anchor_count; i += 1) {
+                        if(!editor_named_text_sync(&font, selected->anchors[i].name,
+                                &anchor_labels[i], anchor_cache[i],
+                                EDITOR_OBJECT_NAME_MAX)) goto fail;
+                        anchor_options[i + 1] = &anchor_labels[i];
+                        if(selected->anchors[i].id == joint->anchor_a) selected_a = i + 1;
+                        if(selected->anchors[i].id == joint->anchor_b) selected_b = i + 1;
+                    }
                 rohr_ui_label(&body_a_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     158.0f, 55.0f, 28.0f});
                 rohr_ui_label(&body_b_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     194.0f, 55.0f, 28.0f});
-                if(rohr_ui_button("editor.joint.body_a", &joint_body_a_display,
+                {
+                    UIDropdownResult result = rohr_ui_dropdown("editor.joint.anchor_a",
+                        anchor_options, selected->anchor_count + 1, selected_a,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 63.0f, 158.0f,
-                            EDITOR_TOOLS_WIDTH - 73.0f, 28.0f}, NULL).clicked) {
-                    (void)editor_project_joint_anchor_set(selected, joint, 0,
-                        editor_anchor_id_next_get(selected, joint->anchor_a));
-                    viewport_state.selected_anchor = joint->anchor_a;
+                            EDITOR_TOOLS_WIDTH - 73.0f, 28.0f}, NULL);
+                    EditorAnchorId preview = result.hovered_index > 0 ?
+                        selected->anchors[result.hovered_index - 1].id : joint->anchor_a;
+                    if(result.button_hovered || result.hovered_index >= 0) {
+                        editor_anchor_preview_set(&viewport_state, selected, preview);
+                    }
+                    if(result.changed) (void)editor_project_joint_anchor_set(selected, joint, 0,
+                        result.selected_index == 0 ? 0 :
+                            selected->anchors[result.selected_index - 1].id);
                 }
-                if(rohr_ui_button("editor.joint.body_b", &joint_body_b_display,
+                {
+                    UIDropdownResult result = rohr_ui_dropdown("editor.joint.anchor_b",
+                        anchor_options, selected->anchor_count + 1, selected_b,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 63.0f, 194.0f,
-                            EDITOR_TOOLS_WIDTH - 73.0f, 28.0f}, NULL).clicked) {
-                    (void)editor_project_joint_anchor_set(selected, joint, 1,
-                        editor_anchor_id_next_get(selected, joint->anchor_b));
-                    viewport_state.selected_anchor = joint->anchor_b;
+                            EDITOR_TOOLS_WIDTH - 73.0f, 28.0f}, NULL);
+                    EditorAnchorId preview = result.hovered_index > 0 ?
+                        selected->anchors[result.hovered_index - 1].id : joint->anchor_b;
+                    if(result.button_hovered || result.hovered_index >= 0) {
+                        editor_anchor_preview_set(&viewport_state, selected, preview);
+                    }
+                    if(result.changed) (void)editor_project_joint_anchor_set(selected, joint, 1,
+                        result.selected_index == 0 ? 0 :
+                            selected->anchors[result.selected_index - 1].id);
+                }
                 }
                 if(rohr_ui_button("editor.joint.add_anchor", &add_anchor_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 232.0f,
@@ -1035,13 +1031,9 @@ int main(void) {
                     EditorAnchor *anchor = editor_project_anchor_get(
                         selected, viewport_state.selected_anchor);
                     if(anchor != NULL) {
-                        EditorRigidBody *anchor_body = editor_project_rigid_body_get(
-                            selected, anchor->rigid_body);
                         UIFieldResult x_result;
                         UIFieldResult y_result;
                         UIFieldResult rotation_result;
-                        (void)rohr_graphics_text_value_set(&anchor_body_display,
-                            anchor_body == NULL ? "None" : anchor_body->name);
                         rohr_ui_label(&x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                             442.0f, 24.0f, 26.0f});
                         x_result = rohr_ui_field("editor.anchor.x",
@@ -1060,11 +1052,33 @@ int main(void) {
                         rohr_ui_label(&rigid_body_label,
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 510.0f,
                                 90.0f, 28.0f});
-                        if(rohr_ui_button("editor.anchor.rigid_body", &anchor_body_display,
+                        {
+                            const TextAsset *body_options[EDITOR_RIGID_BODY_MAX + 1];
+                            size_t selected_body = 0;
+                            body_options[0] = &none_label;
+                            for(size_t i = 0; i < selected->rigid_body_count; i += 1) {
+                                if(!editor_named_text_sync(&font, selected->rigid_bodies[i].name,
+                                        &rigid_body_labels[i], rigid_body_cache[i],
+                                        EDITOR_OBJECT_NAME_MAX)) goto fail;
+                                body_options[i + 1] = &rigid_body_labels[i];
+                                if(selected->rigid_bodies[i].id == anchor->rigid_body) {
+                                    selected_body = i + 1;
+                                }
+                            }
+                            UIDropdownResult result = rohr_ui_dropdown(
+                                "editor.anchor.rigid_body", body_options,
+                                selected->rigid_body_count + 1, selected_body,
                                 (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 510.0f,
-                                    EDITOR_TOOLS_WIDTH - 110.0f, 28.0f}, NULL).clicked) {
-                            (void)editor_project_anchor_rigid_body_set(selected, anchor,
-                                editor_body_id_next_get(selected, anchor->rigid_body));
+                                    EDITOR_TOOLS_WIDTH - 110.0f, 28.0f}, NULL);
+                            if(result.button_hovered) {
+                                viewport_state.preview_rigid_body = anchor->rigid_body;
+                            } else if(result.hovered_index > 0) {
+                                viewport_state.preview_rigid_body =
+                                    selected->rigid_bodies[result.hovered_index - 1].id;
+                            }
+                            if(result.changed) (void)editor_project_anchor_rigid_body_set(
+                                selected, anchor, result.selected_index == 0 ? 0 :
+                                    selected->rigid_bodies[result.selected_index - 1].id);
                         }
                         rohr_ui_label(&rotation_label,
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 544.0f,
@@ -1075,21 +1089,31 @@ int main(void) {
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 86.0f, 544.0f,
                                 EDITOR_TOOLS_WIDTH - 96.0f, 26.0f}, NULL);
                         field_editing = field_editing || rotation_result.active;
-                        if(rohr_ui_button("editor.anchor.position_lock",
-                                anchor->position_follows_body ? &position_body_label :
-                                    &position_global_label,
+                        {
+                            const TextAsset *position_options[] = {
+                                &position_global_label, &position_body_label
+                            };
+                            const TextAsset *rotation_options[] = {
+                                &rotation_global_label, &rotation_body_label
+                            };
+                            UIDropdownResult position_result = rohr_ui_dropdown(
+                                "editor.anchor.position_lock", position_options, 2,
+                                anchor->position_follows_body ? 1 : 0,
                                 (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 578.0f,
-                                    EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, NULL).clicked) {
-                            (void)editor_project_anchor_position_lock_set(selected, anchor,
-                                !anchor->position_follows_body);
-                        }
-                        if(rohr_ui_button("editor.anchor.rotation_lock",
-                                anchor->rotation_follows_body ? &rotation_body_label :
-                                    &rotation_global_label,
+                                    EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, NULL);
+                            UIDropdownResult rotation_result = rohr_ui_dropdown(
+                                "editor.anchor.rotation_lock", rotation_options, 2,
+                                anchor->rotation_follows_body ? 1 : 0,
                                 (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 610.0f,
-                                    EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, NULL).clicked) {
-                            (void)editor_project_anchor_rotation_lock_set(selected, anchor,
-                                !anchor->rotation_follows_body);
+                                    EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, NULL);
+                            if(position_result.changed) {
+                                (void)editor_project_anchor_position_lock_set(
+                                    selected, anchor, position_result.selected_index == 1);
+                            }
+                            if(rotation_result.changed) {
+                                (void)editor_project_anchor_rotation_lock_set(
+                                    selected, anchor, rotation_result.selected_index == 1);
+                            }
                         }
                     }
                 }
@@ -1250,34 +1274,46 @@ int main(void) {
                 size_t index = (size_t)(beam - body->beams);
                 UIButtonStyle delete_style = editor_delete_button_style_get();
                 UIFieldResult stiffness_result;
-                EditorSoftNode *node_a = NULL;
-                EditorSoftNode *node_b = NULL;
-                for(size_t i = 0; i < body->node_count; i += 1) {
-                    if(body->nodes[i].id == beam->node_a) node_a = &body->nodes[i];
-                    if(body->nodes[i].id == beam->node_b) node_b = &body->nodes[i];
-                }
                 if(!editor_named_text_sync(&font, beam->name, &soft_beam_labels[index],
-                        soft_beam_cache[index], EDITOR_OBJECT_NAME_MAX) ||
-                        !rohr_graphics_text_value_set(&beam_node_a_display,
-                            node_a == NULL ? "None" : node_a->name) ||
-                        !rohr_graphics_text_value_set(&beam_node_b_display,
-                            node_b == NULL ? "None" : node_b->name)) goto fail;
+                        soft_beam_cache[index], EDITOR_OBJECT_NAME_MAX)) goto fail;
                 rohr_ui_label(&soft_beam_labels[index], (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f,
                     40.0f, EDITOR_TOOLS_WIDTH - 48.0f, 30.0f});
                 (void)editor_visibility_toggle("editor.soft_beam.visibility",
                     &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         44.0f, 26.0f, 26.0f}, &beam->visible);
                 rohr_ui_label(&node_a_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 122.0f, 70.0f, 28.0f});
-                if(rohr_ui_button("editor.soft_beam.node_a", &beam_node_a_display,
-                        (UIRect){EDITOR_VIEWPORT_WIDTH + 80.0f, 122.0f,
-                            EDITOR_TOOLS_WIDTH - 90.0f, 28.0f}, NULL).clicked) {
-                    beam->node_a = editor_soft_node_id_next_get(body, beam->node_a);
-                }
                 rohr_ui_label(&node_b_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 158.0f, 70.0f, 28.0f});
-                if(rohr_ui_button("editor.soft_beam.node_b", &beam_node_b_display,
+                {
+                    const TextAsset *node_options[EDITOR_SOFT_NODE_MAX + 1];
+                    size_t selected_a = 0;
+                    size_t selected_b = 0;
+                    node_options[0] = &none_label;
+                    for(size_t i = 0; i < body->node_count; i += 1) {
+                        if(!editor_named_text_sync(&font, body->nodes[i].name,
+                                &soft_node_labels[i], soft_node_cache[i],
+                                EDITOR_OBJECT_NAME_MAX)) goto fail;
+                        node_options[i + 1] = &soft_node_labels[i];
+                        if(body->nodes[i].id == beam->node_a) selected_a = i + 1;
+                        if(body->nodes[i].id == beam->node_b) selected_b = i + 1;
+                    }
+                    UIDropdownResult a_result = rohr_ui_dropdown("editor.soft_beam.node_a",
+                        node_options, body->node_count + 1, selected_a,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 80.0f, 122.0f,
+                            EDITOR_TOOLS_WIDTH - 90.0f, 28.0f}, NULL);
+                    UIDropdownResult b_result = rohr_ui_dropdown("editor.soft_beam.node_b",
+                        node_options, body->node_count + 1, selected_b,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 80.0f, 158.0f,
-                            EDITOR_TOOLS_WIDTH - 90.0f, 28.0f}, NULL).clicked) {
-                    beam->node_b = editor_soft_node_id_next_get(body, beam->node_b);
+                            EDITOR_TOOLS_WIDTH - 90.0f, 28.0f}, NULL);
+                    if(a_result.button_hovered) viewport_state.preview_soft_node = beam->node_a;
+                    else if(a_result.hovered_index > 0) viewport_state.preview_soft_node =
+                        body->nodes[a_result.hovered_index - 1].id;
+                    if(b_result.button_hovered) viewport_state.preview_soft_node = beam->node_b;
+                    else if(b_result.hovered_index > 0) viewport_state.preview_soft_node =
+                        body->nodes[b_result.hovered_index - 1].id;
+                    if(a_result.changed) beam->node_a = a_result.selected_index == 0 ? 0 :
+                        body->nodes[a_result.selected_index - 1].id;
+                    if(b_result.changed) beam->node_b = b_result.selected_index == 0 ? 0 :
+                        body->nodes[b_result.selected_index - 1].id;
                 }
                 rohr_ui_label(&stiffness_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     196.0f, 90.0f, 26.0f});
@@ -1529,11 +1565,6 @@ int main(void) {
         rohr_graphics_show();
     }
 
-    rohr_graphics_text_destroy(&anchor_body_display);
-    rohr_graphics_text_destroy(&beam_node_b_display);
-    rohr_graphics_text_destroy(&beam_node_a_display);
-    rohr_graphics_text_destroy(&joint_body_b_display);
-    rohr_graphics_text_destroy(&joint_body_a_display);
     rohr_graphics_text_destroy(&stiffness_label);
     rohr_graphics_text_destroy(&rotation_global_label);
     rohr_graphics_text_destroy(&rotation_body_label);
@@ -1609,6 +1640,7 @@ int main(void) {
     }
     rohr_graphics_text_destroy(&add_hitbox_label);
     rohr_graphics_text_destroy(&add_object_label);
+    rohr_graphics_text_destroy(&none_label);
     rohr_graphics_text_destroy(&hitbox_editor_label);
     rohr_graphics_font_destroy(&font);
     if(viewport != 0) (void)rohr_viewport_destroy(viewport);
@@ -1617,11 +1649,6 @@ int main(void) {
     return 0;
 
 fail:
-    rohr_graphics_text_destroy(&anchor_body_display);
-    rohr_graphics_text_destroy(&beam_node_b_display);
-    rohr_graphics_text_destroy(&beam_node_a_display);
-    rohr_graphics_text_destroy(&joint_body_b_display);
-    rohr_graphics_text_destroy(&joint_body_a_display);
     rohr_graphics_text_destroy(&stiffness_label);
     rohr_graphics_text_destroy(&rotation_global_label);
     rohr_graphics_text_destroy(&rotation_body_label);
@@ -1697,6 +1724,7 @@ fail:
     }
     rohr_graphics_text_destroy(&add_hitbox_label);
     rohr_graphics_text_destroy(&add_object_label);
+    rohr_graphics_text_destroy(&none_label);
     rohr_graphics_text_destroy(&hitbox_editor_label);
     rohr_graphics_font_destroy(&font);
     if(viewport != 0) (void)rohr_viewport_destroy(viewport);

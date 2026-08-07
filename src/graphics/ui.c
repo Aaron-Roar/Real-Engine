@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define UI_DROPDOWN_OPTION_MAX 128
+
 typedef struct UIContext {
     UIInput input;
     uint64_t active_id;
@@ -21,6 +23,13 @@ typedef struct UIContext {
     SDL_Keycode field_keys[UI_FIELD_KEY_EVENT_MAX];
     size_t field_key_count;
     bool field_replace_pending;
+    uint64_t dropdown_id;
+    bool dropdown_seen;
+    uint64_t dropdown_render_id;
+    const TextAsset *dropdown_options[UI_DROPDOWN_OPTION_MAX];
+    size_t dropdown_option_count;
+    UIRect dropdown_bounds;
+    UIButtonStyle dropdown_style;
 } UIContext;
 
 static UIContext ui_context = {0};
@@ -45,6 +54,16 @@ static bool ui_point_in_rect(Position point, UIRect rect) {
     }
     return point.x >= rect.x && point.x < rect.x + rect.width &&
         point.y >= rect.y && point.y < rect.y + rect.height;
+}
+
+static void ui_rect_border_draw(UIRect bounds, float thickness, Color color) {
+    if(bounds.width <= 0.0f || bounds.height <= 0.0f || thickness <= 0.0f) return;
+    (void)graphics_screen_rect_draw(bounds.x, bounds.y, bounds.width, thickness, color);
+    (void)graphics_screen_rect_draw(bounds.x, bounds.y + bounds.height - thickness,
+        bounds.width, thickness, color);
+    (void)graphics_screen_rect_draw(bounds.x, bounds.y, thickness, bounds.height, color);
+    (void)graphics_screen_rect_draw(bounds.x + bounds.width - thickness, bounds.y,
+        thickness, bounds.height, color);
 }
 
 UIButtonStyle ui_button_style_default_get(void) {
@@ -141,6 +160,7 @@ void ui_frame_begin(UIInput input) {
     ui_context.input = input;
     ui_context.active_seen = false;
     ui_context.field_seen = false;
+    ui_context.dropdown_seen = false;
     ui_context.pointer_claimed = false;
     ui_context.pointer_consumed = false;
     ui_context.frame_active = true;
@@ -337,6 +357,62 @@ UIButtonResult ui_button(
             (result.hovered ? resolved_style.hovered : resolved_style.idle)
     );
     ui_label(label, bounds);
+    return result;
+}
+
+UIDropdownResult ui_dropdown(const char *id, const TextAsset *const *options,
+    size_t option_count, size_t selected_index, UIRect bounds,
+    const UIButtonStyle *style) {
+    UIDropdownResult result = {.selected_index = selected_index, .hovered_index = -1};
+    uint64_t dropdown_id = ui_hash_id(id);
+    UIButtonResult button;
+
+    if(!ui_context.frame_active || dropdown_id == 0 || options == NULL ||
+            option_count == 0 || option_count > UI_DROPDOWN_OPTION_MAX ||
+            selected_index >= option_count ||
+            bounds.width <= 0.0f || bounds.height <= 0.0f) return result;
+    button = ui_button(id, options[selected_index], bounds, style);
+    ui_rect_border_draw(bounds, 2.0f, (Color){0, 0, 0, 255});
+    result.button_hovered = button.hovered;
+    result.hovered = button.hovered;
+    if(button.clicked) {
+        ui_context.dropdown_id = ui_context.dropdown_id == dropdown_id ? 0 : dropdown_id;
+    }
+    result.open = ui_context.dropdown_id == dropdown_id;
+    if(!result.open) return result;
+    ui_context.dropdown_seen = true;
+    ui_context.dropdown_render_id = dropdown_id;
+    ui_context.dropdown_option_count = option_count;
+    ui_context.dropdown_bounds = bounds;
+    ui_context.dropdown_style = style == NULL ? ui_button_style_default_get() : *style;
+    for(size_t i = 0; i < ui_context.dropdown_option_count; i += 1) {
+        ui_context.dropdown_options[i] = options[i];
+    }
+    for(size_t i = 0; i < option_count; i += 1) {
+        char option_id[160];
+        UIRect option_bounds = {bounds.x, bounds.y + bounds.height * (float)(i + 1),
+            bounds.width, bounds.height};
+        UIButtonResult option_result;
+        snprintf(option_id, sizeof(option_id), "%s.option.%zu", id, i);
+        option_result = ui_button(option_id, options[i], option_bounds, style);
+        ui_rect_border_draw(option_bounds, 2.0f, (Color){0, 0, 0, 255});
+        if(option_result.hovered) {
+            result.hovered = true;
+            result.hovered_index = (int)i;
+        }
+        if(option_result.clicked) {
+            result.selected_index = i;
+            result.changed = i != selected_index;
+            result.open = false;
+            ui_context.dropdown_id = 0;
+        }
+    }
+    if(ui_context.input.primary_button == MOUSE_BUTTON_STATE_PRESSED &&
+            !ui_point_in_rect(ui_context.input.pointer, (UIRect){bounds.x, bounds.y,
+                bounds.width, bounds.height * (float)(option_count + 1)})) {
+        ui_context.dropdown_id = 0;
+        result.open = false;
+    }
     return result;
 }
 
@@ -653,12 +729,36 @@ void ui_frame_end(void) {
     if(!ui_context.frame_active) {
         return;
     }
+    if(ui_context.dropdown_id != 0 &&
+            ui_context.dropdown_render_id == ui_context.dropdown_id) {
+        for(size_t i = 0; i < ui_context.dropdown_option_count; i += 1) {
+            char option_id[160];
+            UIRect bounds = {ui_context.dropdown_bounds.x,
+                ui_context.dropdown_bounds.y + ui_context.dropdown_bounds.height *
+                    (float)(i + 1), ui_context.dropdown_bounds.width,
+                ui_context.dropdown_bounds.height};
+            bool hovered = ui_point_in_rect(ui_context.input.pointer, bounds);
+            uint64_t option_hash;
+            snprintf(option_id, sizeof(option_id), "dropdown.option.%llu.%zu",
+                (unsigned long long)ui_context.dropdown_id, i);
+            option_hash = ui_hash_id(option_id);
+            (void)graphics_screen_rect_draw(bounds.x, bounds.y, bounds.width, bounds.height,
+                ui_context.active_id == option_hash ? ui_context.dropdown_style.pressed :
+                    (hovered ? ui_context.dropdown_style.hovered :
+                        ui_context.dropdown_style.idle));
+            ui_label(ui_context.dropdown_options[i], bounds);
+            ui_rect_border_draw(bounds, 2.0f, (Color){0, 0, 0, 255});
+        }
+    }
     if(ui_context.input.primary_button == MOUSE_BUTTON_STATE_RELEASED ||
             (ui_context.active_id != 0 && !ui_context.active_seen)) {
         ui_context.active_id = 0;
     }
     if(ui_context.field_id != 0 && !ui_context.field_seen) {
         ui_context.field_id = 0;
+    }
+    if(ui_context.dropdown_id != 0 && !ui_context.dropdown_seen) {
+        ui_context.dropdown_id = 0;
     }
     ui_context.field_key_count = 0;
     ui_context.frame_active = false;

@@ -52,6 +52,9 @@ typedef struct EditorViewportState {
     EditorSoftBodyId selected_soft_body;
     EditorSoftNodeId selected_soft_node;
     EditorSoftBeamId selected_soft_beam;
+    EditorRigidBodyId preview_rigid_body;
+    EditorAnchorId preview_anchor;
+    EditorSoftNodeId preview_soft_node;
 } EditorViewportState;
 
 void editor_viewport_state_init(EditorViewportState *state);

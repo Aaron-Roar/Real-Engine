@@ -481,6 +481,7 @@ void editor_viewport_draw(const EditorProject *project, const EditorViewportStat
             bool selected_body = state->selected_rigid_body == body->id;
             bool selected_hitbox = selected_body && state->selected_hitbox == hitbox->id;
             Color base = state->selection == EDITOR_SELECTION_OBJECT ||
+                    state->preview_rigid_body == body->id ||
                     (state->selection == EDITOR_SELECTION_RIGID_BODY && selected_body) ||
                     (state->selection == EDITOR_SELECTION_HITBOX && selected_hitbox) ?
                 (Color){255, 215, 70, 255} : (Color){90, 105, 125, 255};
@@ -554,7 +555,8 @@ void editor_viewport_draw(const EditorProject *project, const EditorViewportStat
             (void)rohr_graphics_screen_quad_draw(
                 editor_soft_node_world_get(object, body, node), 8.0f, 8.0f, 0.0f,
                 state->selection == EDITOR_SELECTION_SOFT_NODE &&
-                    state->selected_soft_node == node->id ?
+                    state->selected_soft_node == node->id ||
+                    state->preview_soft_node == node->id ?
                     (Color){255, 215, 70, 255} : (Color){150, 220, 255, 255});
         }
     }
@@ -589,7 +591,7 @@ void editor_viewport_draw(const EditorProject *project, const EditorViewportStat
         }
         (void)rohr_graphics_screen_quad_draw(editor_anchor_world_get(object, anchor),
             9.0f, 9.0f, rotation + 0.78539816339f,
-            state->selected_anchor == anchor->id ?
+            state->selected_anchor == anchor->id || state->preview_anchor == anchor->id ?
                 (Color){255, 215, 70, 255} : (Color){235, 150, 215, 255});
     }
 }
