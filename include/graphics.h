@@ -439,6 +439,8 @@ Position graphics_screen_to_world_get(Position screen);
 
 /** Convert SDL window coordinates to logical screen coordinates. */
 Position graphics_window_to_screen_get(Position window);
+Scale graphics_render_output_size_get(void);
+bool graphics_logical_size_set(int width, int height);
 
 /** Get the mouse position in logical screen coordinates. */
 Position graphics_mouse_screen_position_get(void);

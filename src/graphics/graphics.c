@@ -1307,6 +1307,23 @@ Position graphics_window_to_screen_get(Position window) {
     };
 }
 
+Scale graphics_render_output_size_get(void) {
+    int width;
+    int height;
+
+    if(sdl_renderer == NULL ||
+            !SDL_GetCurrentRenderOutputSize(sdl_renderer, &width, &height)) {
+        return (Scale){0};
+    }
+    return (Scale){(float)width, (float)height};
+}
+
+bool graphics_logical_size_set(int width, int height) {
+    if(sdl_renderer == NULL || width <= 0 || height <= 0) return false;
+    return SDL_SetRenderLogicalPresentation(sdl_renderer, width, height,
+        SDL_LOGICAL_PRESENTATION_LETTERBOX);
+}
+
 Position graphics_mouse_screen_position_get(void) {
     float window_x;
     float window_y;

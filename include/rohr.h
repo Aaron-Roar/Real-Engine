@@ -1174,6 +1174,10 @@ void rohr_graphics_background_draw(Color color);
  * @return true when SDL accepted the draw command.
  */
 bool rohr_graphics_screen_rect_draw(float x, float y, float width, float height, Color color);
+/** Returns the renderer output size in physical pixels. */
+Scale rohr_graphics_render_output_size_get(void);
+/** Changes the logical screen size while preserving aspect-correct presentation. */
+bool rohr_graphics_logical_size_set(int width, int height);
 /** Clips subsequent screen-space drawing until the clip is cleared. */
 bool rohr_graphics_screen_clip_set(float x, float y, float width, float height);
 /** Clears the active screen-space drawing clip. */

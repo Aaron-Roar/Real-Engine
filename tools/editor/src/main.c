@@ -20,6 +20,23 @@
 #define EDITOR_DIVIDER_GRAB_WIDTH 6.0f
 
 float editor_viewport_width = WINDOW_WIDTH * 0.8f;
+float editor_window_width = WINDOW_WIDTH;
+
+static void editor_window_layout_sync(void) {
+    Scale output = rohr_graphics_render_output_size_get();
+    float logical_width;
+
+    if(output.x <= 0.0f || output.y <= 0.0f) return;
+    logical_width = roundf(WINDOW_HEIGHT * output.x / output.y);
+    if(logical_width < EDITOR_VIEWPORT_MIN_WIDTH + EDITOR_TOOLS_MIN_WIDTH) {
+        logical_width = EDITOR_VIEWPORT_MIN_WIDTH + EDITOR_TOOLS_MIN_WIDTH;
+    }
+    if(logical_width == editor_window_width) return;
+    if(!rohr_graphics_logical_size_set((int)logical_width, WINDOW_HEIGHT)) return;
+    editor_window_width = logical_width;
+    editor_viewport_width = fminf(editor_viewport_width,
+        editor_window_width - EDITOR_TOOLS_MIN_WIDTH);
+}
 
 static bool editor_result_ok(EngineResult result) {
     if(!rohr_error_check(result)) return true;
@@ -109,26 +126,6 @@ static bool editor_selected_delete(
     return false;
 }
 
-static bool editor_object_name_key_apply(EditorObject *object, SDL_Keycode key) {
-    size_t length;
-
-    if(object == NULL) return false;
-    length = strlen(object->name);
-    if(key == SDLK_BACKSPACE) {
-        if(length > 0) object->name[length - 1] = '\0';
-        return true;
-    }
-    if((key >= 'a' && key <= 'z') || (key >= '0' && key <= '9') ||
-            key == '_' || key == '-' || key == ' ') {
-        if(length + 1 < sizeof(object->name)) {
-            object->name[length] = (char)key;
-            object->name[length + 1] = '\0';
-        }
-        return true;
-    }
-    return false;
-}
-
 int main(void) {
     KeyboardState keyboard = {0};
     MouseState mouse = {0};
@@ -152,6 +149,7 @@ int main(void) {
     TextAsset x_label = {0};
     TextAsset y_label = {0};
     TextAsset length_label = {0};
+    TextAsset object_name_label = {0};
     TextAsset x_field = {0};
     TextAsset y_field = {0};
     TextAsset length_field = {0};
@@ -161,7 +159,6 @@ int main(void) {
     EditorProject project;
     EditorViewportState viewport_state;
     bool running = true;
-    bool name_editing = false;
     bool field_editing = false;
     bool panel_resizing = false;
 
@@ -171,6 +168,7 @@ int main(void) {
     if(!editor_use_executable_directory() ||
             !editor_result_ok(rohr_engine_init()) ||
             !editor_result_ok(rohr_graphics_start())) goto fail;
+    editor_window_layout_sync();
     {
         ViewportConfig config = rohr_viewport_config_default_get();
         ViewportIdResult result;
@@ -210,6 +208,7 @@ int main(void) {
             !editor_text_create(&font, "X", &x_label) ||
             !editor_text_create(&font, "Y", &y_label) ||
             !editor_text_create(&font, "Length", &length_label) ||
+            !editor_text_create(&font, "Object Name", &object_name_label) ||
             !editor_text_create(&font, "", &x_field) ||
             !editor_text_create(&font, "", &y_field) ||
             !editor_text_create(&font, "", &length_field)) goto fail;
@@ -223,23 +222,10 @@ int main(void) {
 
     while(running) {
         SDL_Event event;
-        bool escape_name_edit_consumed = false;
-
         rohr_controller_key_states_update(&keyboard);
         rohr_controller_mouse_states_update(&mouse);
         while((event = rohr_engine_event_poll()).type != 0) {
             rohr_ui_field_event_add(&event);
-            if(name_editing && event.type == SDL_EVENT_KEY_DOWN) {
-                EditorObject *selected = editor_project_selected_get(&project);
-                if(event.key.key == SDLK_RETURN || event.key.key == SDLK_KP_ENTER) {
-                    name_editing = false;
-                } else if(event.key.key == SDLK_ESCAPE) {
-                    name_editing = false;
-                    escape_name_edit_consumed = true;
-                } else {
-                    (void)editor_object_name_key_apply(selected, event.key.key);
-                }
-            }
             rohr_controller_key_event_add(
                 &keyboard,
                 rohr_controller_keyboard_event_capture(&event));
@@ -248,7 +234,7 @@ int main(void) {
                 rohr_controller_mouse_event_capture(&event));
             if(event.type == SDL_EVENT_QUIT) running = false;
         }
-        if(!escape_name_edit_consumed && !field_editing &&
+        if(!field_editing &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             if(editor_viewport_hitbox_editor_active_get(&viewport_state)) {
                 editor_viewport_back(&viewport_state);
@@ -256,11 +242,12 @@ int main(void) {
                 running = false;
             }
         }
-        if(viewport_state.mode != EDITOR_VIEWPORT_HIERARCHY &&
+        if(!field_editing && viewport_state.mode != EDITOR_VIEWPORT_HIERARCHY &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_DELETE)) {
-            if(editor_selected_delete(&project, &viewport_state)) name_editing = false;
+            (void)editor_selected_delete(&project, &viewport_state);
         }
         if(!running) break;
+        editor_window_layout_sync();
 
         {
             Position pointer = rohr_graphics_mouse_screen_position_get();
@@ -274,7 +261,7 @@ int main(void) {
             if(panel_resizing && (primary == MOUSE_BUTTON_STATE_PRESSED ||
                     primary == MOUSE_BUTTON_STATE_DOWN)) {
                 EDITOR_VIEWPORT_WIDTH = fmaxf(EDITOR_VIEWPORT_MIN_WIDTH,
-                    fminf(pointer.x, WINDOW_WIDTH - EDITOR_TOOLS_MIN_WIDTH));
+                    fminf(pointer.x, editor_window_width - EDITOR_TOOLS_MIN_WIDTH));
             }
             if(primary == MOUSE_BUTTON_STATE_RELEASED ||
                     primary == MOUSE_BUTTON_STATE_UP) {
@@ -422,11 +409,11 @@ int main(void) {
                 }
                 if(!vertex_inserted) {
                     rohr_ui_label(&length_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
-                        126.0f, EDITOR_TOOLS_WIDTH - 16.0f, 22.0f});
+                        150.0f, 52.0f, 26.0f});
                     if(constrained) {
                         editor_numeric_field_disabled_draw(&length_field, length,
-                            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
-                                150.0f, EDITOR_TOOLS_WIDTH - 20.0f, 26.0f});
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 60.0f,
+                                150.0f, EDITOR_TOOLS_WIDTH - 70.0f, 26.0f});
                         rohr_ui_label(&constrained_label,
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 5.0f,
                                 190.0f, EDITOR_TOOLS_WIDTH - 10.0f, 38.0f});
@@ -435,8 +422,8 @@ int main(void) {
                             "editor.line.length.field",
                             (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &length},
                             &length_field,
-                            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 150.0f,
-                                EDITOR_TOOLS_WIDTH - 20.0f, 26.0f}, NULL);
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 60.0f, 150.0f,
+                                EDITOR_TOOLS_WIDTH - 70.0f, 26.0f}, NULL);
                         field_editing = length_result.active;
                         if(length_result.changed) {
                             (void)editor_project_hitbox_line_length_set(
@@ -476,11 +463,21 @@ int main(void) {
                     snprintf(object_name_cache[selected_index], EDITOR_OBJECT_NAME_MAX,
                         "%s", selected->name);
                 }
-                if(rohr_ui_button("editor.object.name",
-                        &object_name_labels[selected_index],
-                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 52.0f,
-                            EDITOR_TOOLS_WIDTH - 20.0f, 34.0f}, NULL).clicked) {
-                    name_editing = true;
+                rohr_ui_label(&object_name_label,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 52.0f, 90.0f, 34.0f});
+                {
+                    UIFieldResult name_result = rohr_ui_field("editor.object.name",
+                    (UIFieldBinding){.kind = UI_FIELD_STRING,
+                        .string = selected->name,
+                        .string_capacity = sizeof(selected->name)},
+                    &object_name_labels[selected_index],
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 98.0f, 52.0f,
+                        EDITOR_TOOLS_WIDTH - 108.0f, 34.0f}, NULL);
+                    field_editing = name_result.active;
+                    if(name_result.changed) {
+                        snprintf(object_name_cache[selected_index],
+                            EDITOR_OBJECT_NAME_MAX, "%s", selected->name);
+                    }
                 }
                 if(!selected->has_hitbox) {
                     if(rohr_ui_button("editor.add_hitbox", &add_hitbox_label,
@@ -500,9 +497,7 @@ int main(void) {
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 146.0f,
                                 EDITOR_TOOLS_WIDTH - 20.0f, 34.0f},
                             &delete_style).clicked) {
-                        if(editor_selected_delete(&project, &viewport_state)) {
-                            name_editing = false;
-                        }
+                        (void)editor_selected_delete(&project, &viewport_state);
                     }
                 }
             }
@@ -570,6 +565,7 @@ int main(void) {
     rohr_graphics_text_destroy(&y_field);
     rohr_graphics_text_destroy(&x_field);
     rohr_graphics_text_destroy(&length_label);
+    rohr_graphics_text_destroy(&object_name_label);
     rohr_graphics_text_destroy(&y_label);
     rohr_graphics_text_destroy(&x_label);
     rohr_graphics_text_destroy(&constrained_label);
@@ -604,6 +600,7 @@ fail:
     rohr_graphics_text_destroy(&y_field);
     rohr_graphics_text_destroy(&x_field);
     rohr_graphics_text_destroy(&length_label);
+    rohr_graphics_text_destroy(&object_name_label);
     rohr_graphics_text_destroy(&y_label);
     rohr_graphics_text_destroy(&x_label);
     rohr_graphics_text_destroy(&constrained_label);
