@@ -291,6 +291,7 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
         state->dragged_body = false;
         state->rotated_body = false;
         state->dragged_anchor = false;
+        state->dragged_soft_node = false;
         return false;
     }
     body = editor_selected_body_get(object, state);
@@ -303,6 +304,29 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
         if(anchor != NULL) editor_anchor_world_set(object, anchor, anchor_body,
             (Position){pointer.x - state->drag_offset.x, pointer.y - state->drag_offset.y});
         if(anchor != NULL) editor_project_anchor_constraints_apply(object, anchor->id);
+        return true;
+    }
+    if(state->dragged_soft_node &&
+            (primary_button == MOUSE_BUTTON_STATE_DOWN ||
+                primary_button == MOUSE_BUTTON_STATE_PRESSED)) {
+        EditorSoftBody *soft_body = NULL;
+        for(size_t i = 0; i < object->soft_body_count; i += 1) {
+            if(object->soft_body_items[i].id == state->selected_soft_body) {
+                soft_body = &object->soft_body_items[i];
+            }
+        }
+        if(soft_body != NULL) {
+            for(size_t i = 0; i < soft_body->node_count; i += 1) {
+                if(soft_body->nodes[i].id != state->selected_soft_node) continue;
+                soft_body->nodes[i].position = (Position){
+                    pointer.x - object->position.x - soft_body->position.x -
+                        state->drag_offset.x,
+                    pointer.y - object->position.y - soft_body->position.y -
+                        state->drag_offset.y
+                };
+                break;
+            }
+        }
         return true;
     }
     if(body != NULL && state->dragged_body && (primary_button == MOUSE_BUTTON_STATE_DOWN ||
@@ -387,6 +411,8 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                 state->selected_soft_body = soft_body->id;
                 state->selected_soft_node = node->id;
                 state->mode = EDITOR_VIEWPORT_SOFT_NODE;
+                state->dragged_soft_node = true;
+                state->drag_offset = (Vec2D){pointer.x - world.x, pointer.y - world.y};
                 return true;
             }
             for(size_t i = 0; i < soft_body->beam_count; i += 1) {
@@ -646,6 +672,19 @@ bool editor_viewport_selection_nudge(EditorViewportState *state,
         editor_anchor_world_set(object, anchor, anchor_body, world);
         editor_project_anchor_constraints_apply(object, anchor->id);
         return true;
+    }
+    if(state->selection == EDITOR_SELECTION_SOFT_NODE) {
+        for(size_t body_index = 0; body_index < object->soft_body_count; body_index += 1) {
+            EditorSoftBody *soft_body = &object->soft_body_items[body_index];
+            if(soft_body->id != state->selected_soft_body) continue;
+            for(size_t node_index = 0; node_index < soft_body->node_count; node_index += 1) {
+                EditorSoftNode *node = &soft_body->nodes[node_index];
+                if(node->id != state->selected_soft_node) continue;
+                node->position.x += screen_delta.x;
+                node->position.y += screen_delta.y;
+                return true;
+            }
+        }
     }
     return false;
 }
