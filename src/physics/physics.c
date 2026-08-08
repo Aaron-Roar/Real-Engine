@@ -65,6 +65,7 @@ SoftBodyTrianglePool soft_body_triangles_pool = {0};
 static JointAnchor joint_anchors[MAX_JOINT_ANCHORS];
 static uint32_t joint_anchor_generations[MAX_JOINT_ANCHORS];
 static bool joint_anchor_used[MAX_JOINT_ANCHORS];
+static bool physics_kinematic_explicit[MAX_ENTITIES];
 
 static JointAnchorId physics_joint_anchor_id_make(uint32_t slot) {
     return ((uint64_t)joint_anchor_generations[slot] << 32) | ((uint64_t)slot + 1);
@@ -93,6 +94,7 @@ EngineResult physics_tables_init(void) {
     physics_gravity = ROHR_PHYSICS_GRAVITY_DEFAULT;
     memset(joint_anchors, 0, sizeof(joint_anchors));
     memset(joint_anchor_used, 0, sizeof(joint_anchor_used));
+    memset(physics_kinematic_explicit, 0, sizeof(physics_kinematic_explicit));
     for(uint32_t i = 0; i < MAX_JOINT_ANCHORS; i += 1) joint_anchor_generations[i] = 1;
     if(error_check(physics_interaction_set_init(&current_interactions, 64))) { goto fail; }
     if(error_check(physics_interaction_set_init(&previous_interactions, 64))) { goto fail; }
@@ -304,6 +306,7 @@ static void physics_soft_body_entity_list_remove(Entity *values, uint32_t *count
 }
 
 void physics_entity_clear(Entity entity, EntityIndex index) {
+    if(index < MAX_ENTITIES) physics_kinematic_explicit[index] = false;
     if(index < angular_velocity_maximums_pool.capacity &&
             angular_velocity_maximums_pool.used[index]) {
         (void)AngularVelocityPool_release_at(&angular_velocity_maximums_pool, index);
@@ -476,6 +479,28 @@ bool physics_entity_movable_get(EntityIndex index) {
         && !physics_entity_held_get(index);
 }
 
+bool physics_entity_simulated_get(EntityIndex index) {
+    return physics_entity_movable_get(index) &&
+        !entity_index_components_check(index, ROHR_KINEMATIC_DRIVEN) &&
+        entity_index_components_check(index, ROHR_MASS) && mass[index] > 0.0f;
+}
+
+static void physics_body_state_sync(EntityIndex index) {
+    bool dynamic;
+    bool positive_mass;
+
+    if(!entity_index_alive_check(index)) return;
+    dynamic = entity_index_components_check(index, ROHR_DYNAMIC) &&
+        !entity_index_components_check(index, ROHR_STATIC);
+    positive_mass = entity_index_components_check(index, ROHR_MASS) &&
+        mass[index] > 0.0f;
+    if(dynamic && (physics_kinematic_explicit[index] || !positive_mass)) {
+        entity_mask[index] |= ROHR_KINEMATIC_DRIVEN;
+    } else {
+        entity_mask[index] &= ~ROHR_KINEMATIC_DRIVEN;
+    }
+}
+
 static Vec2D physics_direction_between_positions(Position from, Position to) {
     Vec2D delta = {
         .x = to.x - from.x,
@@ -635,6 +660,9 @@ EngineResult physics_impulse_apply(Entity entity, Vec2D impulse) {
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
+    if(!physics_entity_simulated_get(index)) {
+        return error_result_value(true);
+    }
     if(!entity_index_components_check(index, ROHR_MASS)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
     }
@@ -695,8 +723,54 @@ EngineResult physics_mass_set(Entity entity, Mass m) {
     }
     entity_mask[index] |= ROHR_MASS;
     (void)MassPool_store_at(&mass_pool, index, m);
+    physics_body_state_sync(index);
     console_debug_write(LOG_ENGINE, "Set Entity: %d Mass: %f\n", entity, m);
     return error_result_value(true);
+}
+
+EngineResult physics_mass_remove(Entity entity) {
+    EntityIndex index;
+    EngineResult result = physics_live_index_get(entity, &index);
+
+    if(result.kind == ERROR_RESULT_ERROR) return result;
+    if(index < mass_pool.capacity && mass_pool.used[index]) {
+        (void)MassPool_release_at(&mass_pool, index);
+    }
+    result = entity_components_delete(entity, ROHR_MASS);
+    if(result.kind == ERROR_RESULT_VALUE) physics_body_state_sync(index);
+    return result;
+}
+
+bool physics_mass_check(Entity entity) {
+    return entity_components_check(entity, ROHR_MASS);
+}
+
+EngineResult physics_kinematic_driven_set(Entity entity) {
+    EntityIndex index;
+    EngineResult result = physics_live_index_get(entity, &index);
+
+    if(result.kind == ERROR_RESULT_ERROR) return result;
+    physics_kinematic_explicit[index] = true;
+    physics_body_state_sync(index);
+    return error_result_value(true);
+}
+
+EngineResult physics_kinematic_driven_remove(Entity entity) {
+    EntityIndex index;
+    EngineResult result = physics_live_index_get(entity, &index);
+
+    if(result.kind == ERROR_RESULT_ERROR) return result;
+    if(entity_index_components_check(index, ROHR_DYNAMIC) &&
+            (!entity_index_components_check(index, ROHR_MASS) || mass[index] <= 0.0f)) {
+        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
+    physics_kinematic_explicit[index] = false;
+    physics_body_state_sync(index);
+    return error_result_value(true);
+}
+
+bool physics_kinematic_driven_check(Entity entity) {
+    return entity_components_check(entity, ROHR_KINEMATIC_DRIVEN);
 }
 EntityResult physics_force_create(Entity entity, Force f) {
     EntityIndex index;
@@ -1097,6 +1171,7 @@ EngineResult physics_dynamic_set(Entity entity) {
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
+    physics_body_state_sync(index);
     console_debug_write(LOG_ENGINE, "Set Entity: %d to ROHR_DYNAMIC\n", entity);
     return error_result_value(true);
 }
@@ -1115,6 +1190,7 @@ EngineResult physics_static_set(Entity entity) {
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
+    physics_body_state_sync(index);
     console_debug_write(LOG_ENGINE, "Set Entity: %d to ROHR_STATIC\n", entity);
     return error_result_value(true);
 }

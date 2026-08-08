@@ -458,6 +458,8 @@ Vec1D physics_circle_moment_of_inertia(Shape circle, Mass mass_value);
 bool physics_entity_held_get(EntityIndex index);
 /** Check whether an entity index can be moved by physics update stages. */
 bool physics_entity_movable_get(EntityIndex index);
+/** Check whether forces and constraints may alter an entity's motion. */
+bool physics_entity_simulated_get(EntityIndex index);
 
 /** Set an entity's base linear acceleration. */
 EngineResult physics_acceleration_set(Entity entity, Acceleration a);
@@ -504,6 +506,11 @@ PositionResult physics_position_get(Entity entity);
 /** Set an entity's mass and add the ROHR_MASS component. */
 /** Set finite, non-negative mass. Zero represents an explicitly massless entity. */
 EngineResult physics_mass_set(Entity entity, Mass m);
+EngineResult physics_mass_remove(Entity entity);
+bool physics_mass_check(Entity entity);
+EngineResult physics_kinematic_driven_set(Entity entity);
+EngineResult physics_kinematic_driven_remove(Entity entity);
+bool physics_kinematic_driven_check(Entity entity);
 /** Create a force entity targeting the given entity. */
 EntityResult physics_force_create(Entity entity, Force f);
 /** Set force component data directly on an existing entity. */

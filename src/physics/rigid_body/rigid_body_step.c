@@ -137,7 +137,7 @@ void system_forces_apply(void) {
         if( entity_index_components_check(i, filter) ) { //Check if this entity is a targetable force
             EntityIndex target_index;
             if(entity_index_get(targets[i], &target_index) && entity_index_alive_check(target_index)) { //Check if the target to the force exists
-                if(physics_entity_movable_get(target_index) && entity_index_components_check(target_index, target_filter)) { //Check if the target is moveable
+                if(physics_entity_simulated_get(target_index) && entity_index_components_check(target_index, target_filter)) { //Check if the target is moveable
                     if(mass[target_index] != 0) {
                         force_accelerations[target_index].x += forces[i].x/mass[target_index];
                         force_accelerations[target_index].y += forces[i].y/mass[target_index];
@@ -173,7 +173,7 @@ void system_torques_apply(void) {
         if( entity_index_components_check(i, filter) ) { //Check if this entity is a targetable force
             EntityIndex target_index;
             if(entity_index_get(targets[i], &target_index) && entity_index_alive_check(target_index)) { //Check if the target to the force exists
-                if(physics_entity_movable_get(target_index) && entity_index_components_check(target_index, target_filter)) { //Check if the target is moveable
+                if(physics_entity_simulated_get(target_index) && entity_index_components_check(target_index, target_filter)) { //Check if the target is moveable
                     if(mass[target_index] != 0) {
                         torque_angular_accelerations[target_index] += torques[i]/physics_polygon_moment_of_inertia(hit_boxes[target_index], mass[target_index]);
                     } else {
@@ -214,9 +214,8 @@ void physics_rigid_gravity_apply(Acceleration gravity) {
         EntityIndex index;
 
         if(!physics_step_alive_index_at(alive_position, &index) ||
-                !physics_entity_movable_get(index) ||
-                !entity_index_components_check(index, ROHR_GRAVITY | ROHR_MASS) ||
-                mass[index] <= 0.0f) continue;
+                !physics_entity_simulated_get(index) ||
+                !entity_index_components_check(index, ROHR_GRAVITY)) continue;
         force_accelerations[index].x += gravity.x;
         force_accelerations[index].y += gravity.y;
     }
@@ -236,8 +235,8 @@ void system_separate_entities_tuned(
     Entity entity_2,
     OverlapInfo collision
 ) {
-    bool dynamic_1 = physics_entity_movable_get(entity_1);
-    bool dynamic_2 = physics_entity_movable_get(entity_2);
+    bool dynamic_1 = physics_entity_simulated_get(entity_1);
+    bool dynamic_2 = physics_entity_simulated_get(entity_2);
 
     float inv_mass_1 =
         dynamic_1 && entity_index_components_check(entity_1, ROHR_MASS) &&
@@ -417,21 +416,23 @@ Vec2D system_friction_impulse_apply(
     float inv_inertia_1,
     float inv_inertia_2
 ) {
-    Vec2D angular_v1 = entity_index_components_check(entity_1, ROHR_PARTICLE)
+    bool moving_1 = physics_entity_movable_get(entity_1);
+    bool moving_2 = physics_entity_movable_get(entity_2);
+    Vec2D angular_v1 = !moving_1 || entity_index_components_check(entity_1, ROHR_PARTICLE)
         ? (Vec2D){0}
         : math_angular_velocity_cross_vec(angular_velocities[entity_1], r1);
-    Vec2D angular_v2 = entity_index_components_check(entity_2, ROHR_PARTICLE)
+    Vec2D angular_v2 = !moving_2 || entity_index_components_check(entity_2, ROHR_PARTICLE)
         ? (Vec2D){0}
         : math_angular_velocity_cross_vec(angular_velocities[entity_2], r2);
 
     Vec2D contact_v1 = {
-        .x = velocities[entity_1].x + angular_v1.x,
-        .y = velocities[entity_1].y + angular_v1.y
+        .x = (moving_1 ? velocities[entity_1].x : 0.0f) + angular_v1.x,
+        .y = (moving_1 ? velocities[entity_1].y : 0.0f) + angular_v1.y
     };
 
     Vec2D contact_v2 = {
-        .x = velocities[entity_2].x + angular_v2.x,
-        .y = velocities[entity_2].y + angular_v2.y
+        .x = (moving_2 ? velocities[entity_2].x : 0.0f) + angular_v2.x,
+        .y = (moving_2 ? velocities[entity_2].y : 0.0f) + angular_v2.y
     };
 
     Vec2D rel_v = {
@@ -511,24 +512,26 @@ static void system_contact_point_solve(
     Vec2D *normal_impulse,
     Vec2D *friction_impulse
 ) {
+    bool moving_first = physics_entity_movable_get(first);
+    bool moving_second = physics_entity_movable_get(second);
     Vec2D first_offset = math_vector_subtract(point, positions[first]);
     Vec2D second_offset = math_vector_subtract(point, positions[second]);
-    Vec2D first_angular_velocity = inverse_mass_first <= 0.0f ||
+    Vec2D first_angular_velocity = !moving_first ||
             entity_index_components_check(first, ROHR_PARTICLE)
         ? (Vec2D){0}
         : math_angular_velocity_cross_vec(angular_velocities[first], first_offset);
-    Vec2D second_angular_velocity = inverse_mass_second <= 0.0f ||
+    Vec2D second_angular_velocity = !moving_second ||
             entity_index_components_check(second, ROHR_PARTICLE)
         ? (Vec2D){0}
         : math_angular_velocity_cross_vec(angular_velocities[second], second_offset);
     Velocity current_relative_velocity = {
-        (inverse_mass_second > 0.0f ? velocities[second].x : 0.0f) +
+        (moving_second ? velocities[second].x : 0.0f) +
             second_angular_velocity.x -
-            (inverse_mass_first > 0.0f ? velocities[first].x : 0.0f) -
+            (moving_first ? velocities[first].x : 0.0f) -
             first_angular_velocity.x,
-        (inverse_mass_second > 0.0f ? velocities[second].y : 0.0f) +
+        (moving_second ? velocities[second].y : 0.0f) +
             second_angular_velocity.y -
-            (inverse_mass_first > 0.0f ? velocities[first].y : 0.0f) -
+            (moving_first ? velocities[first].y : 0.0f) -
             first_angular_velocity.y
     };
     float normal_velocity = math_dot_product(current_relative_velocity, overlap.normal);
@@ -580,11 +583,9 @@ ContactInfo system_resolve_collision(
 ) {
     bool first_particle = entity_index_components_check(first, ROHR_PARTICLE);
     bool second_particle = entity_index_components_check(second, ROHR_PARTICLE);
-    float inverse_mass_first = physics_entity_movable_get(first) &&
-            entity_index_components_check(first, ROHR_MASS) && mass[first] > 0.0f
+    float inverse_mass_first = physics_entity_simulated_get(first)
         ? 1.0f / mass[first] : 0.0f;
-    float inverse_mass_second = physics_entity_movable_get(second) &&
-            entity_index_components_check(second, ROHR_MASS) && mass[second] > 0.0f
+    float inverse_mass_second = physics_entity_simulated_get(second)
         ? 1.0f / mass[second] : 0.0f;
     float inverse_inertia_first = 0.0f;
     float inverse_inertia_second = 0.0f;

@@ -121,13 +121,13 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
     previous_contact = query->contact;
     weight_a = 1.0f - t;
     weight_b = t;
-    inverse_mass_a = physics_entity_movable_get(query->a) &&
+    inverse_mass_a = physics_entity_simulated_get(query->a) &&
             entity_index_components_check(query->a, ROHR_MASS) && mass[query->a] > 0.0f
         ? 1.0f / mass[query->a] : 0.0f;
-    inverse_mass_b = physics_entity_movable_get(query->b) &&
+    inverse_mass_b = physics_entity_simulated_get(query->b) &&
             entity_index_components_check(query->b, ROHR_MASS) && mass[query->b] > 0.0f
         ? 1.0f / mass[query->b] : 0.0f;
-    inverse_mass_rigid = physics_entity_movable_get(rigid) &&
+    inverse_mass_rigid = physics_entity_simulated_get(rigid) &&
             entity_index_components_check(rigid, ROHR_MASS) && mass[rigid] > 0.0f
         ? 1.0f / mass[rigid] : 0.0f;
     inverse_mass_edge = weight_a * weight_a * inverse_mass_a +
@@ -212,7 +212,7 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
 
         rigid_offset = math_vector_subtract(
             contact.points[0].position, positions[rigid]);
-        if(physics_entity_movable_get(rigid) &&
+        if(physics_entity_simulated_get(rigid) &&
                 !entity_index_components_check(rigid, ROHR_PARTICLE) &&
                 entity_index_components_check(rigid, ROHR_MASS | ROHR_HIT_BOX)) {
             float inertia = physics_polygon_moment_of_inertia(
@@ -439,8 +439,8 @@ static void system_soft_body_node_rigid_collisions_apply(void) {
                 contact_info,
                 PHYSICS_INTERACTION_OVERLAP | PHYSICS_INTERACTION_CONTACT
             );
-            inverse_mass_node = physics_entity_movable_get(node) && mass[node] > 0.0f ? 1.0f / mass[node] : 0.0f;
-            inverse_mass_rigid = physics_entity_movable_get(rigid) && mass[rigid] > 0.0f ? 1.0f / mass[rigid] : 0.0f;
+            inverse_mass_node = physics_entity_simulated_get(node) ? 1.0f / mass[node] : 0.0f;
+            inverse_mass_rigid = physics_entity_simulated_get(rigid) ? 1.0f / mass[rigid] : 0.0f;
             inverse_mass_sum = inverse_mass_node + inverse_mass_rigid;
             if(inverse_mass_sum <= 0.0f) continue;
             positions[node].x -= collision.normal.x * collision.depth * inverse_mass_node / inverse_mass_sum;
@@ -484,7 +484,7 @@ static void system_soft_body_node_rigid_collisions_apply(void) {
                 float maximum_friction;
                 float denominator;
 
-                if(physics_entity_movable_get(rigid) &&
+                if(physics_entity_simulated_get(rigid) &&
                         entity_index_components_check(rigid, ROHR_MASS | ROHR_HIT_BOX)) {
                     float inertia = physics_polygon_moment_of_inertia(
                         hit_boxes[rigid], mass[rigid]);

@@ -126,6 +126,8 @@ typedef enum {
     ROHR_SOFT_BODY_TRIANGLE          = 1 << 25,
     /** Entity receives acceleration from the engine gravity stage. */
     ROHR_GRAVITY                     = 1 << 26,
+    /** Entity follows authored motion but does not respond to physics forces. */
+    ROHR_KINEMATIC_DRIVEN            = 1 << 27,
 } Component;
 
 /** Fixed-size, engine-owned entity name. */

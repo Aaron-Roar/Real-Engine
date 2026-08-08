@@ -880,6 +880,45 @@ These functions expose the standard pipeline's individual operations for
 custom schedules. `rohr_physics_pipeline_substep` runs every substep stage in
 the standard order, but does not advance interaction state by itself.
 
+### Kinematic-driven bodies
+
+`ROHR_KINEMATIC_DRIVEN` identifies a dynamic body whose transform follows
+authored velocity and acceleration but does not respond to gravity, forces,
+collision impulses, or joints. It still participates in contacts and can push
+simulated bodies through its authored motion.
+
+Physics setters automatically add the effective tag to a dynamic body without
+positive mass and remove an automatically derived tag when positive mass is
+present. State is correct immediately after each setter returns, and setup
+order remains irrelevant:
+
+```c
+rohr_physics_dynamic_set(entity);
+rohr_physics_mass_set(entity, 10.0f);
+/* Fully simulated immediately after mass_set returns. */
+```
+
+Developers request persistent kinematic behavior through functions rather than
+managing the effective mask directly:
+
+```c
+EngineResult rohr_physics_kinematic_driven_set(Entity entity);
+EngineResult rohr_physics_kinematic_driven_remove(Entity entity);
+bool rohr_physics_kinematic_driven_check(Entity entity);
+```
+
+An explicit request remains effective even with positive mass. Removing it
+from a dynamic body without positive mass returns
+`ERROR_ENGINE_STATE_INVALID`, because the setter invariant requires the
+kinematic state. Explicit-request bookkeeping is private engine state.
+
+Mass can be inspected or removed explicitly:
+
+```c
+bool rohr_physics_mass_check(Entity entity);
+EngineResult rohr_physics_mass_remove(Entity entity);
+```
+
 ### `rohr_physics_update`
 
 ```c

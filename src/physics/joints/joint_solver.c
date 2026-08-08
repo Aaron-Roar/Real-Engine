@@ -29,7 +29,7 @@ static void system_joint_force_for_one_tick_add(Entity target, Force force) {
     if(!entity_index_get(target, &target_index) || !entity_index_alive_check(target_index)) {
         return;
     }
-    if(!physics_entity_movable_get(target_index)) {
+    if(!physics_entity_simulated_get(target_index)) {
         return;
     }
     if(!entity_index_components_check(target_index, ROHR_MASS) || mass[target_index] == 0.0f) {
@@ -55,7 +55,7 @@ static void system_joint_torque_for_one_tick_add(Entity target, Torque torque) {
     if(!entity_index_get(target, &target_index) || !entity_index_alive_check(target_index)) {
         return;
     }
-    if(!physics_entity_movable_get(target_index)) {
+    if(!physics_entity_simulated_get(target_index)) {
         return;
     }
     if(!entity_index_components_check(target_index, ROHR_MASS) || mass[target_index] == 0.0f) {
@@ -82,7 +82,7 @@ static void system_joint_force_at_point_for_one_tick_add(Entity target, Position
         return;
     }
 
-    if(!physics_entity_movable_get(target_index)) {
+    if(!physics_entity_simulated_get(target_index)) {
         return;
     }
 
@@ -109,7 +109,7 @@ static void system_joint_force_at_point_for_one_tick_add(Entity target, Position
 static float system_joint_inverse_inertia(EntityIndex index) {
     float inertia;
 
-    if(!physics_entity_movable_get(index) ||
+    if(!physics_entity_simulated_get(index) ||
             !entity_index_components_check(index, ROHR_MASS | ROHR_HIT_BOX) || mass[index] <= 0.0f) return 0.0f;
     inertia = physics_polygon_moment_of_inertia(hit_boxes[index], mass[index]);
     return inertia > 0.0f ? 1.0f / inertia : 0.0f;
@@ -124,8 +124,8 @@ static void system_rigid_anchor_axis_solve(
         Vec2D velocity_error,
         Vec2D axis
 ) {
-    float inverse_mass_a = physics_entity_movable_get(a) && mass[a] > 0.0f ? 1.0f / mass[a] : 0.0f;
-    float inverse_mass_b = physics_entity_movable_get(b) && mass[b] > 0.0f ? 1.0f / mass[b] : 0.0f;
+    float inverse_mass_a = physics_entity_simulated_get(a) ? 1.0f / mass[a] : 0.0f;
+    float inverse_mass_b = physics_entity_simulated_get(b) ? 1.0f / mass[b] : 0.0f;
     float inverse_inertia_a = system_joint_inverse_inertia(a);
     float inverse_inertia_b = system_joint_inverse_inertia(b);
     float lever_a = math_cross_2d(offset_a, axis);
@@ -245,11 +245,11 @@ static void system_weld_joint_apply(Entity joint_entity) {
     system_pin_joint_apply(joint_entity);
     if(!entity_index_get(joint.a, &a_index) || !entity_index_alive_check(a_index) ||
             !entity_index_get(joint.b, &b_index) || !entity_index_alive_check(b_index)) return;
-    if(physics_entity_movable_get(a_index) && entity_index_components_check(a_index, ROHR_MASS | ROHR_HIT_BOX)) {
+    if(physics_entity_simulated_get(a_index) && entity_index_components_check(a_index, ROHR_HIT_BOX)) {
         float inertia = physics_polygon_moment_of_inertia(hit_boxes[a_index], mass[a_index]);
         if(inertia > 0.0f) inverse_inertia_a = 1.0f / inertia;
     }
-    if(physics_entity_movable_get(b_index) && entity_index_components_check(b_index, ROHR_MASS | ROHR_HIT_BOX)) {
+    if(physics_entity_simulated_get(b_index) && entity_index_components_check(b_index, ROHR_HIT_BOX)) {
         float inertia = physics_polygon_moment_of_inertia(hit_boxes[b_index], mass[b_index]);
         if(inertia > 0.0f) inverse_inertia_b = 1.0f / inertia;
     }

@@ -686,6 +686,11 @@ PositionResult rohr_physics_position_get(Entity entity);
  */
 /** Sets finite, non-negative mass. Zero represents an explicitly massless entity. */
 EngineResult rohr_physics_mass_set(Entity entity, Mass m);
+EngineResult rohr_physics_mass_remove(Entity entity);
+bool rohr_physics_mass_check(Entity entity);
+EngineResult rohr_physics_kinematic_driven_set(Entity entity);
+EngineResult rohr_physics_kinematic_driven_remove(Entity entity);
+bool rohr_physics_kinematic_driven_check(Entity entity);
 
 /**
  * @brief Sets an entity force component value.

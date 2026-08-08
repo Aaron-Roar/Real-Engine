@@ -12,6 +12,7 @@ int main(void) {
     CollisionFilterConfigResult filter;
     ContactInfo contact;
     EntityResult gravity_entity;
+    EntityResult kinematic_entity;
     EngineResult result = rohr_engine_init();
     if(rohr_error_check(result)) {
         fprintf(stderr, "%s\n", rohr_error_default_message_get(result.result.error));
@@ -29,6 +30,33 @@ int main(void) {
         return 1;
     }
 
+    kinematic_entity = rohr_entity_add();
+    if(rohr_error_check(kinematic_entity) ||
+            rohr_error_check(rohr_physics_dynamic_set(kinematic_entity.result.value)) ||
+            rohr_error_check(rohr_physics_velocity_set(
+                kinematic_entity.result.value, (Velocity){10.0f, 0.0f}))) {
+        rohr_engine_shutdown();
+        return 1;
+    }
+    if(!rohr_physics_kinematic_driven_check(kinematic_entity.result.value) ||
+            rohr_error_check(rohr_physics_impulse_apply(
+                kinematic_entity.result.value, (Vec2D){0.0f, 100.0f}))) {
+        rohr_engine_shutdown();
+        return 1;
+    }
+    rohr_physics_pipeline_accelerations_clear();
+    rohr_physics_pipeline_integrate(0.1);
+    {
+        EntityIndexResult index = rohr_entity_index_get(kinematic_entity.result.value);
+        if(rohr_error_check(index) ||
+                fabsf(positions[index.result.value].x - 1.0f) > 0.0001f ||
+                fabsf(velocities[index.result.value].y) > 0.0001f ||
+                rohr_error_check(rohr_entity_delete(kinematic_entity.result.value))) {
+            rohr_engine_shutdown();
+            return 1;
+        }
+    }
+
     gravity_entity = rohr_entity_add();
     if(rohr_error_check(gravity_entity) ||
             rohr_error_check(rohr_physics_dynamic_set(gravity_entity.result.value)) ||
@@ -39,6 +67,32 @@ int main(void) {
             rohr_error_check(rohr_physics_gravity_set((Acceleration){0.0f, 10.0f})) ||
             rohr_error_check(rohr_physics_gravity_enable(gravity_entity.result.value)) ||
             !rohr_physics_gravity_check(gravity_entity.result.value)) {
+        rohr_engine_shutdown();
+        return 1;
+    }
+    if(!rohr_physics_kinematic_driven_check(gravity_entity.result.value) ||
+            rohr_error_check(rohr_physics_mass_set(
+                gravity_entity.result.value, 1.0f))) {
+        rohr_engine_shutdown();
+        return 1;
+    }
+    if(rohr_physics_kinematic_driven_check(gravity_entity.result.value) ||
+            rohr_error_check(rohr_physics_kinematic_driven_set(
+                gravity_entity.result.value))) {
+        rohr_engine_shutdown();
+        return 1;
+    }
+    if(!rohr_physics_kinematic_driven_check(gravity_entity.result.value) ||
+            rohr_error_check(rohr_physics_kinematic_driven_remove(
+                gravity_entity.result.value)) ||
+            rohr_error_check(rohr_physics_mass_remove(gravity_entity.result.value)) ||
+            rohr_physics_mass_check(gravity_entity.result.value)) {
+        rohr_engine_shutdown();
+        return 1;
+    }
+    if(!rohr_physics_kinematic_driven_check(gravity_entity.result.value) ||
+            !rohr_error_check(rohr_physics_kinematic_driven_remove(
+                gravity_entity.result.value))) {
         rohr_engine_shutdown();
         return 1;
     }

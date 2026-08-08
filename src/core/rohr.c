@@ -169,6 +169,11 @@ EngineResult rohr_physics_impulse_apply(Entity entity, Vec2D impulse) { return p
 EngineResult rohr_physics_position_set(Entity entity, Position p) { return physics_position_set(entity, p); }
 PositionResult rohr_physics_position_get(Entity entity) { return physics_position_get(entity); }
 EngineResult rohr_physics_mass_set(Entity entity, Mass m) { return physics_mass_set(entity, m); }
+EngineResult rohr_physics_mass_remove(Entity entity) { return physics_mass_remove(entity); }
+bool rohr_physics_mass_check(Entity entity) { return physics_mass_check(entity); }
+EngineResult rohr_physics_kinematic_driven_set(Entity entity) { return physics_kinematic_driven_set(entity); }
+EngineResult rohr_physics_kinematic_driven_remove(Entity entity) { return physics_kinematic_driven_remove(entity); }
+bool rohr_physics_kinematic_driven_check(Entity entity) { return physics_kinematic_driven_check(entity); }
 EntityResult rohr_physics_force_create(Entity entity, Force f) { return physics_force_create(entity, f); }
 EngineResult rohr_physics_force_component_set(Entity entity, Force force) {
     return physics_force_component_set(entity, force);
