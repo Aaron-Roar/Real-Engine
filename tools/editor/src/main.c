@@ -1032,10 +1032,10 @@ int main(void) {
                         "editor.hitbox.%u.visibility", box->id);
                     (void)editor_visibility_toggle(visibility_id, &visibility_icon_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
-                            388.0f + (float)i * 30.0f, 26.0f, 26.0f}, &box->visible);
+                            420.0f + (float)i * 30.0f, 26.0f, 26.0f}, &box->visible);
                     result = rohr_ui_button(id, &body_hitbox_labels[i],
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 42.0f,
-                            388.0f + (float)i * 30.0f,
+                            420.0f + (float)i * 30.0f,
                             EDITOR_TOOLS_WIDTH - 50.0f, 26.0f},
                         viewport_state.selection == EDITOR_SELECTION_HITBOX &&
                             viewport_state.selected_hitbox == box->id ?
