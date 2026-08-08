@@ -1,4 +1,5 @@
 add_executable(rohr_editor
+    src/editor_file_browser.c
     src/editor_project.c
     src/editor_project_json.c
     src/editor_viewport.c

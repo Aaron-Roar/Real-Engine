@@ -1,5 +1,6 @@
 #include "rohr.h"
 #include "editor_project.h"
+#include "editor_file_browser.h"
 #include "editor_viewport.h"
 #include "editor_layout.h"
 
@@ -628,6 +629,7 @@ int main(void) {
     TextAsset reset_view_label = {0};
     TextAsset grid_label = {0};
     TextAsset preferences_label = {0};
+    TextAsset file_browser_field = {0};
     TextAsset add_object_label = {0};
     TextAsset none_label = {0};
     TextAsset add_hitbox_label = {0};
@@ -709,16 +711,29 @@ int main(void) {
     static EditorProject project;
     uint64_t saved_project_hash;
     EditorViewportState viewport_state;
+    EditorFileBrowser file_browser;
+    char startup_directory[EDITOR_FILE_BROWSER_PATH_MAX] = {0};
     bool running = true;
     bool field_editing = false;
     bool panel_resizing = false;
     bool close_prompt_open = false;
+    bool close_after_browser_save = false;
     float panel_scroll_offset = 0.0f;
     EditorViewportMode panel_scroll_mode = EDITOR_VIEWPORT_HIERARCHY;
 
     editor_project_init(&project);
     saved_project_hash = editor_project_hash_get(&project);
     editor_viewport_state_init(&viewport_state);
+    editor_file_browser_init(&file_browser);
+    {
+        char *directory = SDL_GetCurrentDirectory();
+        if(directory == NULL || strlen(directory) >= sizeof(startup_directory)) {
+            if(directory != NULL) SDL_free(directory);
+            goto fail;
+        }
+        snprintf(startup_directory, sizeof(startup_directory), "%s", directory);
+        SDL_free(directory);
+    }
 
     if(!editor_use_executable_directory() ||
             !editor_result_ok(rohr_engine_init()) ||
@@ -761,6 +776,7 @@ int main(void) {
             !editor_text_create(&font, "Reset View", &reset_view_label) ||
             !editor_text_create(&font, "Toggle Grid", &grid_label) ||
             !editor_text_create(&font, "Preferences", &preferences_label) ||
+            !editor_text_create(&font, "", &file_browser_field) ||
             !editor_text_create(&font, "Add Object", &add_object_label) ||
             !editor_text_create(&font, "None", &none_label) ||
             !editor_text_create(&font, "Add Hitbox", &add_hitbox_label) ||
@@ -842,7 +858,11 @@ int main(void) {
                 rohr_controller_mouse_event_capture(&event));
             if(event.type == SDL_EVENT_QUIT) running = false;
         }
-        if(close_prompt_open &&
+        if(file_browser.active &&
+                rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
+            file_browser.active = false;
+            close_after_browser_save = false;
+        } else if(close_prompt_open &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             close_prompt_open = false;
         } else if(!field_editing &&
@@ -853,11 +873,12 @@ int main(void) {
                 running = false;
             }
         }
-        if(!field_editing && viewport_state.selection != EDITOR_SELECTION_NONE &&
+        if(!field_editing && !file_browser.active && !close_prompt_open &&
+                viewport_state.selection != EDITOR_SELECTION_NONE &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_DELETE)) {
             (void)editor_selected_delete(&project, &viewport_state);
         }
-        if(!field_editing) {
+        if(!field_editing && !file_browser.active && !close_prompt_open) {
             Position pointer = rohr_graphics_mouse_screen_position_get();
             bool pointer_in_viewport = pointer.x >= 0.0f &&
                 pointer.x < EDITOR_VIEWPORT_WIDTH && pointer.y >= EDITOR_MENU_HEIGHT;
@@ -2130,18 +2151,12 @@ int main(void) {
                 sizeof(file_options) / sizeof(file_options[0]), 0,
                 (UIRect){4.0f, 3.0f, 76.0f, 28.0f}, NULL);
             if(file_menu.changed && file_menu.selected_index == 2) {
-                if(editor_project_load(&project, "project.json")) {
-                    saved_project_hash = editor_project_hash_get(&project);
-                    editor_viewport_state_init(&viewport_state);
-                    panel_scroll_offset = 0.0f;
-                } else {
-                    fprintf(stderr, "Could not open editor project: project.json\n");
-                }
-            } else if(file_menu.changed && file_menu.selected_index == 3 &&
-                    !editor_project_save(&project, "project.json")) {
-                fprintf(stderr, "Could not save editor project: project.json\n");
+                (void)editor_file_browser_open(&file_browser,
+                    EDITOR_FILE_BROWSER_OPEN, startup_directory, &font);
             } else if(file_menu.changed && file_menu.selected_index == 3) {
-                saved_project_hash = editor_project_hash_get(&project);
+                close_after_browser_save = false;
+                (void)editor_file_browser_open(&file_browser,
+                    EDITOR_FILE_BROWSER_SAVE, startup_directory, &font);
             } else if(file_menu.changed && file_menu.selected_index == 4) {
                 if(editor_project_hash_get(&project) == saved_project_hash) {
                     editor_project_init(&project);
@@ -2173,15 +2188,10 @@ int main(void) {
             if(rohr_ui_button("editor.close.save", &save_label,
                     (UIRect){dialog.x + 18.0f, dialog.y + 102.0f,
                         120.0f, 36.0f}, NULL).clicked) {
-                if(editor_project_save(&project, "project.json")) {
-                    editor_project_init(&project);
-                    saved_project_hash = editor_project_hash_get(&project);
-                    editor_viewport_state_init(&viewport_state);
-                    panel_scroll_offset = 0.0f;
-                    close_prompt_open = false;
-                } else {
-                    fprintf(stderr, "Could not save editor project: project.json\n");
-                }
+                close_prompt_open = false;
+                close_after_browser_save = true;
+                (void)editor_file_browser_open(&file_browser,
+                    EDITOR_FILE_BROWSER_SAVE, startup_directory, &font);
             }
             if(rohr_ui_button("editor.close.dont_save", &dont_save_label,
                     (UIRect){dialog.x + 148.0f, dialog.y + 102.0f,
@@ -2198,11 +2208,45 @@ int main(void) {
                 close_prompt_open = false;
             }
         }
+        if(file_browser.active) {
+            EditorFileBrowserMode mode = file_browser.mode;
+            EditorFileBrowserResult browser_result = editor_file_browser_draw(
+                &file_browser, &file_browser_field,
+                &save_label, &open_label, &cancel_label,
+                editor_window_width, WINDOW_HEIGHT);
+            if(browser_result.submitted && mode == EDITOR_FILE_BROWSER_OPEN) {
+                if(editor_project_load(&project, browser_result.path)) {
+                    saved_project_hash = editor_project_hash_get(&project);
+                    editor_viewport_state_init(&viewport_state);
+                    panel_scroll_offset = 0.0f;
+                } else {
+                    fprintf(stderr, "Could not open editor project: %s\n",
+                        browser_result.path);
+                }
+            } else if(browser_result.submitted && mode == EDITOR_FILE_BROWSER_SAVE) {
+                if(editor_project_save(&project, browser_result.path)) {
+                    saved_project_hash = editor_project_hash_get(&project);
+                    if(close_after_browser_save) {
+                        editor_project_init(&project);
+                        saved_project_hash = editor_project_hash_get(&project);
+                        editor_viewport_state_init(&viewport_state);
+                        panel_scroll_offset = 0.0f;
+                    }
+                } else {
+                    fprintf(stderr, "Could not save editor project: %s\n",
+                        browser_result.path);
+                }
+                close_after_browser_save = false;
+            } else if(browser_result.cancelled) {
+                close_after_browser_save = false;
+            }
+        }
         (void)rohr_graphics_screen_rect_draw(0.0f, EDITOR_MENU_HEIGHT - 1.0f,
             editor_window_width, 1.0f, (Color){75, 84, 100, 255});
         {
             Position pointer = rohr_graphics_mouse_screen_position_get();
-            bool ui_consumed = close_prompt_open || rohr_ui_pointer_consumed_get() ||
+            bool ui_consumed = file_browser.active || close_prompt_open ||
+                rohr_ui_pointer_consumed_get() ||
                 pointer.y < EDITOR_MENU_HEIGHT;
             bool viewport_consumed = editor_viewport_update(
                 &viewport_state,
@@ -2325,6 +2369,8 @@ int main(void) {
     rohr_graphics_text_destroy(&settings_label);
     rohr_graphics_text_destroy(&view_label);
     rohr_graphics_text_destroy(&file_label);
+    rohr_graphics_text_destroy(&file_browser_field);
+    editor_file_browser_destroy(&file_browser);
     rohr_graphics_font_destroy(&font);
     if(viewport != 0) (void)rohr_viewport_destroy(viewport);
     rohr_graphics_end();
@@ -2433,6 +2479,8 @@ fail:
     rohr_graphics_text_destroy(&settings_label);
     rohr_graphics_text_destroy(&view_label);
     rohr_graphics_text_destroy(&file_label);
+    rohr_graphics_text_destroy(&file_browser_field);
+    editor_file_browser_destroy(&file_browser);
     rohr_graphics_font_destroy(&font);
     if(viewport != 0) (void)rohr_viewport_destroy(viewport);
     rohr_graphics_end();

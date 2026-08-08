@@ -1,0 +1,215 @@
+#include "editor_file_browser.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+static bool editor_file_browser_path_join(char *output, size_t capacity,
+    const char *directory, const char *name) {
+    size_t length;
+    if(output == NULL || capacity == 0 || directory == NULL || name == NULL) return false;
+    length = strlen(directory);
+    return snprintf(output, capacity, "%s%s%s", directory,
+        length > 0 && directory[length - 1] != '/' && directory[length - 1] != '\\' ? "/" : "",
+        name) < (int)capacity;
+}
+
+static SDL_EnumerationResult SDLCALL editor_file_browser_entry_add(void *userdata,
+    const char *dirname, const char *filename) {
+    EditorFileBrowser *browser = userdata;
+    EditorFileBrowserEntry *entry;
+    SDL_PathInfo info;
+    char path[EDITOR_FILE_BROWSER_PATH_MAX + EDITOR_FILE_BROWSER_NAME_MAX];
+    size_t length;
+    (void)dirname;
+    if(browser == NULL || filename == NULL ||
+            browser->entry_count >= EDITOR_FILE_BROWSER_ENTRY_MAX ||
+            !editor_file_browser_path_join(path, sizeof(path), browser->directory, filename) ||
+            !SDL_GetPathInfo(path, &info)) return SDL_ENUM_CONTINUE;
+    length = strlen(filename);
+    if(info.type != SDL_PATHTYPE_DIRECTORY && (length < 5 ||
+            strcmp(filename + length - 5, ".json") != 0)) return SDL_ENUM_CONTINUE;
+    if(length == 0 || length >= EDITOR_FILE_BROWSER_NAME_MAX) return SDL_ENUM_CONTINUE;
+    entry = &browser->entries[browser->entry_count++];
+    memcpy(entry->name, filename, length + 1);
+    entry->directory = info.type == SDL_PATHTYPE_DIRECTORY;
+    return SDL_ENUM_CONTINUE;
+}
+
+static int editor_file_browser_entry_compare(const void *left, const void *right) {
+    const EditorFileBrowserEntry *a = left;
+    const EditorFileBrowserEntry *b = right;
+    if(a->directory != b->directory) return a->directory ? -1 : 1;
+    return strcmp(a->name, b->name);
+}
+
+static bool editor_file_browser_text_create(FontAsset *font, const char *text,
+    TextAsset *asset) {
+    TextAssetResult result;
+    if(font == NULL || text == NULL || asset == NULL) return false;
+    result = rohr_graphics_text_create(font, text, (Color){230, 234, 242, 255});
+    if(rohr_error_check(result)) return false;
+    *asset = result.result.value;
+    return true;
+}
+
+static bool editor_file_browser_refresh(EditorFileBrowser *browser) {
+    if(browser == NULL) return false;
+    for(size_t i = 0; i < browser->entry_count; i += 1) {
+        rohr_graphics_text_destroy(&browser->entry_labels[i]);
+    }
+    browser->entry_count = 0;
+    browser->scroll_offset = 0.0f;
+    if(!SDL_EnumerateDirectory(browser->directory,
+            editor_file_browser_entry_add, browser)) return false;
+    qsort(browser->entries, browser->entry_count, sizeof(browser->entries[0]),
+        editor_file_browser_entry_compare);
+    for(size_t i = 0; i < browser->entry_count; i += 1) {
+        if(editor_file_browser_text_create(browser->font, browser->entries[i].name,
+                &browser->entry_labels[i])) continue;
+        for(size_t j = 0; j < i; j += 1) {
+            rohr_graphics_text_destroy(&browser->entry_labels[j]);
+        }
+        browser->entry_count = 0;
+        return false;
+    }
+    (void)rohr_graphics_text_value_set(&browser->directory_label, browser->directory);
+    return true;
+}
+
+static void editor_file_browser_parent(EditorFileBrowser *browser) {
+    size_t length;
+    size_t minimum;
+    if(browser == NULL) return;
+    length = strlen(browser->directory);
+    minimum = length >= 2 && browser->directory[1] == ':' ? 2 : 1;
+    while(length > minimum && (browser->directory[length - 1] == '/' ||
+            browser->directory[length - 1] == '\\')) browser->directory[--length] = '\0';
+    while(length > minimum && browser->directory[length - 1] != '/' &&
+            browser->directory[length - 1] != '\\') browser->directory[--length] = '\0';
+    while(length > minimum && (browser->directory[length - 1] == '/' ||
+            browser->directory[length - 1] == '\\')) browser->directory[--length] = '\0';
+    browser->refresh_pending = true;
+}
+
+void editor_file_browser_init(EditorFileBrowser *browser) {
+    if(browser != NULL) *browser = (EditorFileBrowser){0};
+}
+
+void editor_file_browser_destroy(EditorFileBrowser *browser) {
+    if(browser == NULL) return;
+    for(size_t i = 0; i < browser->entry_count; i += 1) {
+        rohr_graphics_text_destroy(&browser->entry_labels[i]);
+    }
+    rohr_graphics_text_destroy(&browser->directory_label);
+    rohr_graphics_text_destroy(&browser->parent_label);
+    *browser = (EditorFileBrowser){0};
+}
+
+bool editor_file_browser_open(EditorFileBrowser *browser, EditorFileBrowserMode mode,
+    const char *directory, FontAsset *font) {
+    size_t length;
+    if(browser == NULL || directory == NULL || font == NULL) return false;
+    length = strlen(directory);
+    if(length == 0 || length >= sizeof(browser->directory)) return false;
+    editor_file_browser_destroy(browser);
+    *browser = (EditorFileBrowser){.active = true, .mode = mode};
+    browser->font = font;
+    if(!editor_file_browser_text_create(font, directory, &browser->directory_label) ||
+            !editor_file_browser_text_create(font, "..", &browser->parent_label)) {
+        editor_file_browser_destroy(browser);
+        return false;
+    }
+    memcpy(browser->directory, directory, length + 1);
+    if(mode == EDITOR_FILE_BROWSER_SAVE) {
+        snprintf(browser->filename, sizeof(browser->filename), "project.json");
+    }
+    if(editor_file_browser_refresh(browser)) return true;
+    browser->active = false;
+    return false;
+}
+
+EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
+    TextAsset *field_display, const TextAsset *save_label,
+    const TextAsset *open_label, const TextAsset *cancel_label, float window_width,
+    float window_height) {
+    EditorFileBrowserResult result = {0};
+    UIRect dialog;
+    float list_height;
+    if(browser == NULL || !browser->active || field_display == NULL) return result;
+    if(browser->refresh_pending) {
+        browser->refresh_pending = false;
+        if(!editor_file_browser_refresh(browser)) {
+            browser->active = false;
+            return result;
+        }
+    }
+    dialog = (UIRect){window_width * 0.5f - 310.0f,
+        window_height * 0.5f - 270.0f, 620.0f, 540.0f};
+    rohr_ui_surface((UIRect){0.0f, 34.0f, window_width, window_height - 34.0f},
+        (Color){12, 14, 18, 225});
+    rohr_ui_surface(dialog, (Color){42, 47, 58, 255});
+    rohr_ui_border(dialog, 2.0f, (Color){8, 9, 12, 255});
+    rohr_ui_label(&browser->directory_label, (UIRect){dialog.x + 14.0f, dialog.y + 12.0f,
+        dialog.width - 28.0f, 30.0f});
+    list_height = 390.0f;
+    browser->scroll_offset = rohr_ui_scroll_region_begin("editor.file_browser.scroll",
+        (UIRect){dialog.x + 14.0f, dialog.y + 50.0f, dialog.width - 28.0f, list_height},
+        32.0f * (float)(browser->entry_count + 1), browser->scroll_offset, 38.0f).offset;
+    if(rohr_ui_button("editor.file_browser.parent", &browser->parent_label,
+            (UIRect){dialog.x + 14.0f, dialog.y + 50.0f,
+                dialog.width - 28.0f, 28.0f}, NULL).clicked) {
+        editor_file_browser_parent(browser);
+    }
+    for(size_t i = 0; !browser->refresh_pending && i < browser->entry_count; i += 1) {
+        char id[64];
+        UIButtonResult interaction;
+        snprintf(id, sizeof(id), "editor.file_browser.entry.%zu", i);
+        interaction = rohr_ui_button(id, &browser->entry_labels[i],
+            (UIRect){dialog.x + 14.0f, dialog.y + 82.0f + (float)i * 32.0f,
+                dialog.width - 28.0f, 28.0f}, NULL);
+        if(!interaction.clicked) continue;
+        if(browser->entries[i].directory) {
+            char path[EDITOR_FILE_BROWSER_PATH_MAX];
+            if(editor_file_browser_path_join(path, sizeof(path), browser->directory,
+                    browser->entries[i].name)) {
+                snprintf(browser->directory, sizeof(browser->directory), "%s", path);
+                browser->refresh_pending = true;
+                break;
+            }
+        } else {
+            snprintf(browser->filename, sizeof(browser->filename), "%s",
+                browser->entries[i].name);
+        }
+    }
+    rohr_ui_scroll_region_end();
+    if(browser->mode == EDITOR_FILE_BROWSER_SAVE) {
+        (void)rohr_ui_field("editor.file_browser.filename",
+            (UIFieldBinding){.kind = UI_FIELD_STRING, .string = browser->filename,
+                .string_capacity = sizeof(browser->filename)}, field_display,
+            (UIRect){dialog.x + 14.0f, dialog.y + 450.0f,
+                dialog.width - 28.0f, 30.0f}, NULL);
+    } else {
+        (void)rohr_graphics_text_value_set(field_display, browser->filename);
+        rohr_ui_button_disabled((UIRect){dialog.x + 14.0f, dialog.y + 450.0f,
+            dialog.width - 28.0f, 30.0f}, NULL);
+        rohr_ui_label(field_display, (UIRect){dialog.x + 14.0f, dialog.y + 450.0f,
+            dialog.width - 28.0f, 30.0f});
+    }
+    if(rohr_ui_button("editor.file_browser.submit",
+            browser->mode == EDITOR_FILE_BROWSER_SAVE ? save_label : open_label,
+            (UIRect){dialog.x + dialog.width - 274.0f, dialog.y + 490.0f,
+                120.0f, 34.0f}, NULL).clicked && browser->filename[0] != '\0' &&
+            editor_file_browser_path_join(result.path, sizeof(result.path),
+                browser->directory, browser->filename)) {
+        result.submitted = true;
+        browser->active = false;
+    }
+    if(rohr_ui_button("editor.file_browser.cancel", cancel_label,
+            (UIRect){dialog.x + dialog.width - 144.0f, dialog.y + 490.0f,
+                120.0f, 34.0f}, NULL).clicked) {
+        result.cancelled = true;
+        browser->active = false;
+    }
+    return result;
+}
