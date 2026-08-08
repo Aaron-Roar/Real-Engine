@@ -943,10 +943,10 @@ EngineResult rohr_physics_joint_component_set(Entity entity, Joint joint);
 /**
  * @brief Creates an anchor owned by an entity.
  * @param entity Entity that owns and moves the anchor.
- * @param centroid_offset Anchor offset from the hitbox centroid, or entity position without a hitbox.
+ * @param local_offset Anchor offset from the entity's stable local origin.
  * @return JointAnchorIdResult containing the stable anchor handle, or an error.
  */
-JointAnchorIdResult rohr_physics_joint_anchor_create(Entity entity, Vec2D centroid_offset);
+JointAnchorIdResult rohr_physics_joint_anchor_create(Entity entity, Vec2D local_offset);
 /**
  * @brief Returns the anchors owned by an entity.
  * @param entity Entity whose anchors should be listed.
@@ -954,11 +954,11 @@ JointAnchorIdResult rohr_physics_joint_anchor_create(Entity entity, Vec2D centro
  */
 JointAnchorListResult rohr_physics_joint_anchors_get(Entity entity);
 /**
- * @brief Returns an anchor offset relative to its owner's centroid.
+ * @brief Returns an anchor offset relative to its owner's stable local origin.
  * @param anchor Anchor to inspect.
- * @return JointAnchorPositionResult containing the centroid-relative offset, or an error.
+ * @return JointAnchorPositionResult containing the origin-relative local offset, or an error.
  */
-JointAnchorPositionResult rohr_physics_joint_anchor_position_get(JointAnchorId anchor);
+JointAnchorPositionResult rohr_physics_joint_anchor_local_position_get(JointAnchorId anchor);
 /**
  * @brief Returns the current world position of an anchor.
  * @param anchor Anchor to resolve.
@@ -966,12 +966,12 @@ JointAnchorPositionResult rohr_physics_joint_anchor_position_get(JointAnchorId a
  */
 JointAnchorPositionResult rohr_physics_joint_anchor_world_position_get(JointAnchorId anchor);
 /**
- * @brief Sets an anchor offset relative to its owner's centroid.
+ * @brief Sets an anchor offset relative to its owner's stable local origin.
  * @param anchor Anchor to modify.
- * @param centroid_offset New centroid-relative offset.
+ * @param local_offset New origin-relative local offset.
  * @return EngineResult describing success or failure.
  */
-EngineResult rohr_physics_joint_anchor_position_set(JointAnchorId anchor, Vec2D centroid_offset);
+EngineResult rohr_physics_joint_anchor_local_position_set(JointAnchorId anchor, Vec2D local_offset);
 /**
  * @brief Removes an anchor and its connected joint entities.
  * @param anchor Anchor to remove.

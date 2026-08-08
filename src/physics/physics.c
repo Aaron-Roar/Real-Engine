@@ -1431,7 +1431,7 @@ EngineResult physics_joint_component_set(Entity entity, Joint joint) {
     return error_result_value(true);
 }
 
-JointAnchorIdResult physics_joint_anchor_create(Entity entity, Vec2D centroid_offset) {
+JointAnchorIdResult physics_joint_anchor_create(Entity entity, Vec2D local_offset) {
     EntityIndex entity_index;
     uint32_t owned_count = 0;
     EngineResult result = physics_live_index_get(entity, &entity_index);
@@ -1450,7 +1450,7 @@ JointAnchorIdResult physics_joint_anchor_create(Entity entity, Vec2D centroid_of
         joint_anchor_used[slot] = true;
         joint_anchors[slot] = (JointAnchor){
             .entity = entity,
-            .centroid_offset = centroid_offset
+            .local_offset = local_offset
         };
         return ERROR_RESULT_MAKE_VALUE(JointAnchorIdResult, physics_joint_anchor_id_make(slot));
     }
@@ -1475,13 +1475,13 @@ JointAnchorListResult physics_joint_anchors_get(Entity entity) {
     return ERROR_RESULT_MAKE_VALUE(JointAnchorListResult, list);
 }
 
-JointAnchorPositionResult physics_joint_anchor_position_get(JointAnchorId anchor) {
+JointAnchorPositionResult physics_joint_anchor_local_position_get(JointAnchorId anchor) {
     uint32_t slot;
 
     if(!physics_joint_anchor_slot_get(anchor, &slot)) {
         return ERROR_RESULT_MAKE_ERROR(JointAnchorPositionResult, ERROR_ENGINE_ENTITY_NOT_FOUND);
     }
-    return ERROR_RESULT_MAKE_VALUE(JointAnchorPositionResult, joint_anchors[slot].centroid_offset);
+    return ERROR_RESULT_MAKE_VALUE(JointAnchorPositionResult, joint_anchors[slot].local_offset);
 }
 
 JointAnchorPositionResult physics_joint_anchor_world_position_get(JointAnchorId anchor) {
@@ -1495,12 +1495,7 @@ JointAnchorPositionResult physics_joint_anchor_world_position_get(JointAnchorId 
             !entity_index_alive_check(entity_index)) {
         return ERROR_RESULT_MAKE_ERROR(JointAnchorPositionResult, ERROR_ENGINE_ENTITY_NOT_FOUND);
     }
-    local_position = joint_anchors[slot].centroid_offset;
-    if(entity_index_components_check(entity_index, ROHR_HIT_BOX)) {
-        Vec2D centroid = math_polygon_centroid(hit_boxes[entity_index]);
-        local_position.x += centroid.x;
-        local_position.y += centroid.y;
-    }
+    local_position = joint_anchors[slot].local_offset;
     rotated = math_vector_rotate(local_position, orientations[entity_index]);
     return ERROR_RESULT_MAKE_VALUE(JointAnchorPositionResult, ((Position){
         .x = positions[entity_index].x + rotated.x,
@@ -1508,13 +1503,13 @@ JointAnchorPositionResult physics_joint_anchor_world_position_get(JointAnchorId 
     }));
 }
 
-EngineResult physics_joint_anchor_position_set(JointAnchorId anchor, Vec2D centroid_offset) {
+EngineResult physics_joint_anchor_local_position_set(JointAnchorId anchor, Vec2D local_offset) {
     uint32_t slot;
 
     if(!physics_joint_anchor_slot_get(anchor, &slot)) {
         return error_result_error(ERROR_ENGINE_ENTITY_NOT_FOUND);
     }
-    joint_anchors[slot].centroid_offset = centroid_offset;
+    joint_anchors[slot].local_offset = local_offset;
     return error_result_value(true);
 }
 

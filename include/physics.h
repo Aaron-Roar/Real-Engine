@@ -219,10 +219,10 @@ typedef uint64_t JointAnchorId;
 #define MAX_JOINT_ANCHORS 10000
 #define MAX_JOINT_ANCHORS_PER_ENTITY 32
 
-/** Entity-owned point stored relative to the entity's centroid. */
+/** Entity-owned point stored relative to the entity's stable local origin. */
 typedef struct JointAnchor {
     Entity entity;
-    Vec2D centroid_offset;
+    Vec2D local_offset;
 } JointAnchor;
 
 typedef struct JointAnchorList {
@@ -614,11 +614,11 @@ EngineResult physics_target_set(Entity entity, Entity target);
 /** Add or replace complete joint component data on an existing entity. */
 EngineResult physics_joint_component_set(Entity entity, Joint joint);
 
-JointAnchorIdResult physics_joint_anchor_create(Entity entity, Vec2D centroid_offset);
+JointAnchorIdResult physics_joint_anchor_create(Entity entity, Vec2D local_offset);
 JointAnchorListResult physics_joint_anchors_get(Entity entity);
-JointAnchorPositionResult physics_joint_anchor_position_get(JointAnchorId anchor);
+JointAnchorPositionResult physics_joint_anchor_local_position_get(JointAnchorId anchor);
 JointAnchorPositionResult physics_joint_anchor_world_position_get(JointAnchorId anchor);
-EngineResult physics_joint_anchor_position_set(JointAnchorId anchor, Vec2D centroid_offset);
+EngineResult physics_joint_anchor_local_position_set(JointAnchorId anchor, Vec2D local_offset);
 EngineResult physics_joint_anchor_remove(JointAnchorId anchor);
 
 EngineResult physics_joint_pin_set(Entity joint, JointAnchorId anchor_a, JointAnchorId anchor_b);

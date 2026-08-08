@@ -1802,7 +1802,7 @@ Adds or replaces complete joint data on an existing entity.
 ### `rohr_physics_joint_anchor_create`
 
 ```c
-JointAnchorIdResult rohr_physics_joint_anchor_create(Entity entity, Vec2D centroid_offset);
+JointAnchorIdResult rohr_physics_joint_anchor_create(Entity entity, Vec2D local_offset);
 ```
 
 Creates an anchor owned by an entity.
@@ -1810,7 +1810,7 @@ Creates an anchor owned by an entity.
 | Parameter | Description |
 | --- | --- |
 | `entity` | Entity that owns and moves the anchor. |
-| `centroid_offset` | Anchor offset from the hitbox centroid, or entity position without a hitbox. |
+| `local_offset` | Anchor offset from the entity's stable local origin. |
 
 **Returns:** JointAnchorIdResult containing the stable anchor handle, or an error.
 
@@ -1828,19 +1828,19 @@ Returns the anchors owned by an entity.
 
 **Returns:** JointAnchorListResult containing the anchor handles, or an error.
 
-### `rohr_physics_joint_anchor_position_get`
+### `rohr_physics_joint_anchor_local_position_get`
 
 ```c
-JointAnchorPositionResult rohr_physics_joint_anchor_position_get(JointAnchorId anchor);
+JointAnchorPositionResult rohr_physics_joint_anchor_local_position_get(JointAnchorId anchor);
 ```
 
-Returns an anchor offset relative to its owner's centroid.
+Returns an anchor offset relative to its owner's stable local origin.
 
 | Parameter | Description |
 | --- | --- |
 | `anchor` | Anchor to inspect. |
 
-**Returns:** JointAnchorPositionResult containing the centroid-relative offset, or an error.
+**Returns:** JointAnchorPositionResult containing the origin-relative local offset, or an error.
 
 ### `rohr_physics_joint_anchor_world_position_get`
 
@@ -1848,7 +1848,8 @@ Returns an anchor offset relative to its owner's centroid.
 JointAnchorPositionResult rohr_physics_joint_anchor_world_position_get(JointAnchorId anchor);
 ```
 
-Returns the current world position of an anchor.
+Returns the current world position of an anchor. This is the entity position plus
+the local offset rotated by the entity orientation; hitbox geometry does not affect it.
 
 | Parameter | Description |
 | --- | --- |
@@ -1856,18 +1857,18 @@ Returns the current world position of an anchor.
 
 **Returns:** JointAnchorPositionResult containing its world position, or an error.
 
-### `rohr_physics_joint_anchor_position_set`
+### `rohr_physics_joint_anchor_local_position_set`
 
 ```c
-EngineResult rohr_physics_joint_anchor_position_set(JointAnchorId anchor, Vec2D centroid_offset);
+EngineResult rohr_physics_joint_anchor_local_position_set(JointAnchorId anchor, Vec2D local_offset);
 ```
 
-Sets an anchor offset relative to its owner's centroid.
+Sets an anchor offset relative to its owner's stable local origin.
 
 | Parameter | Description |
 | --- | --- |
 | `anchor` | Anchor to modify. |
-| `centroid_offset` | New centroid-relative offset. |
+| `local_offset` | New origin-relative local offset. |
 
 **Returns:** EngineResult describing success or failure.
 

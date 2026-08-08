@@ -222,11 +222,11 @@ EngineResult rohr_physics_target_set(Entity entity, Entity target) {
 EngineResult rohr_physics_joint_component_set(Entity entity, Joint joint) {
     return physics_joint_component_set(entity, joint);
 }
-JointAnchorIdResult rohr_physics_joint_anchor_create(Entity entity, Vec2D centroid_offset) { return physics_joint_anchor_create(entity, centroid_offset); }
+JointAnchorIdResult rohr_physics_joint_anchor_create(Entity entity, Vec2D local_offset) { return physics_joint_anchor_create(entity, local_offset); }
 JointAnchorListResult rohr_physics_joint_anchors_get(Entity entity) { return physics_joint_anchors_get(entity); }
-JointAnchorPositionResult rohr_physics_joint_anchor_position_get(JointAnchorId anchor) { return physics_joint_anchor_position_get(anchor); }
+JointAnchorPositionResult rohr_physics_joint_anchor_local_position_get(JointAnchorId anchor) { return physics_joint_anchor_local_position_get(anchor); }
 JointAnchorPositionResult rohr_physics_joint_anchor_world_position_get(JointAnchorId anchor) { return physics_joint_anchor_world_position_get(anchor); }
-EngineResult rohr_physics_joint_anchor_position_set(JointAnchorId anchor, Vec2D centroid_offset) { return physics_joint_anchor_position_set(anchor, centroid_offset); }
+EngineResult rohr_physics_joint_anchor_local_position_set(JointAnchorId anchor, Vec2D local_offset) { return physics_joint_anchor_local_position_set(anchor, local_offset); }
 EngineResult rohr_physics_joint_anchor_remove(JointAnchorId anchor) { return physics_joint_anchor_remove(anchor); }
 EngineResult rohr_physics_joint_pin_set(Entity joint, JointAnchorId anchor_a, JointAnchorId anchor_b) { return physics_joint_pin_set(joint, anchor_a, anchor_b); }
 EngineResult rohr_physics_joint_weld_set(Entity joint, JointAnchorId anchor_a, JointAnchorId anchor_b) { return physics_joint_weld_set(joint, anchor_a, anchor_b); }
