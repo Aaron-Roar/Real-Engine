@@ -1,6 +1,8 @@
 #include "editor_project.h"
 
 #include <math.h>
+#include <stdio.h>
+#include <string.h>
 
 static bool position_equal(Position a, Position b) {
     return fabsf(a.x - b.x) < 0.001f && fabsf(a.y - b.y) < 0.001f;
@@ -149,6 +151,31 @@ int main(void) {
         body_a->rotation = 0.5f;
         editor_project_rigid_body_constraints_apply(weld_object, body_a->id);
         if(fabsf(body_b->rotation - 1.25f) > 0.001f) return 1;
+    }
+
+    {
+        static EditorProject loaded;
+        const char *path = "editor_project_round_trip.json";
+        EditorObject *loaded_object;
+
+        if(!editor_project_save(&project, path) ||
+                !editor_project_load(&loaded, path)) return 1;
+        (void)remove(path);
+        loaded_object = editor_project_selected_get(&loaded);
+        if(loaded_object == NULL || loaded.object_count != project.object_count ||
+                loaded_object->id != object->id ||
+                loaded_object->rigid_body_count != object->rigid_body_count ||
+                loaded_object->anchor_count != object->anchor_count ||
+                loaded_object->joint_count != object->joint_count ||
+                loaded_object->soft_body_count != object->soft_body_count ||
+                strcmp(loaded_object->name, object->name) != 0 ||
+                !position_equal(loaded_object->position, object->position) ||
+                loaded.next_id != project.next_id ||
+                loaded.next_vertex_id != project.next_vertex_id ||
+                loaded.next_rigid_body_id != project.next_rigid_body_id ||
+                loaded.next_anchor_id != project.next_anchor_id ||
+                loaded.next_soft_node_id != project.next_soft_node_id ||
+                loaded.next_soft_beam_id != project.next_soft_beam_id) return 1;
     }
 
     editor_project_selection_clear(&project);

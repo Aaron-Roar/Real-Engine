@@ -14,6 +14,7 @@
 #define EDITOR_SOFT_BODY_MAX 8
 #define EDITOR_SOFT_NODE_MAX 64
 #define EDITOR_SOFT_BEAM_MAX 128
+#define EDITOR_PROJECT_FORMAT_VERSION 1
 
 typedef uint32_t EditorObjectId;
 typedef uint32_t EditorVertexId;
@@ -151,6 +152,8 @@ typedef struct EditorProject {
 } EditorProject;
 
 void editor_project_init(EditorProject *project);
+bool editor_project_save(const EditorProject *project, const char *path);
+bool editor_project_load(EditorProject *project, const char *path);
 EditorObject *editor_project_object_add(EditorProject *project, Position position);
 bool editor_project_object_remove(EditorProject *project, EditorObjectId id);
 EditorObject *editor_project_selected_get(EditorProject *project);

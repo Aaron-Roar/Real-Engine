@@ -2083,6 +2083,7 @@ int main(void) {
         rohr_ui_surface((UIRect){0.0f, 0.0f, editor_window_width,
             EDITOR_MENU_HEIGHT}, (Color){32, 36, 45, 255});
         {
+            UIDropdownResult file_menu;
             const TextAsset *file_options[] = {
                 &file_label, &new_label, &open_label, &save_label
             };
@@ -2093,9 +2094,20 @@ int main(void) {
                 &settings_label, &preferences_label
             };
 
-            (void)rohr_ui_dropdown("editor.menu.file", file_options,
+            file_menu = rohr_ui_dropdown("editor.menu.file", file_options,
                 sizeof(file_options) / sizeof(file_options[0]), 0,
                 (UIRect){4.0f, 3.0f, 76.0f, 28.0f}, NULL);
+            if(file_menu.changed && file_menu.selected_index == 2) {
+                if(editor_project_load(&project, "project.json")) {
+                    editor_viewport_state_init(&viewport_state);
+                    panel_scroll_offset = 0.0f;
+                } else {
+                    fprintf(stderr, "Could not open editor project: project.json\n");
+                }
+            } else if(file_menu.changed && file_menu.selected_index == 3 &&
+                    !editor_project_save(&project, "project.json")) {
+                fprintf(stderr, "Could not save editor project: project.json\n");
+            }
             (void)rohr_ui_dropdown("editor.menu.view", view_options,
                 sizeof(view_options) / sizeof(view_options[0]), 0,
                 (UIRect){84.0f, 3.0f, 76.0f, 28.0f}, NULL);

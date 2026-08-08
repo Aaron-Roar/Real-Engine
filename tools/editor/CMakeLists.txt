@@ -1,10 +1,11 @@
 add_executable(rohr_editor
     src/editor_project.c
+    src/editor_project_json.c
     src/editor_viewport.c
     src/main.c
 )
 
-target_include_directories(rohr_editor PRIVATE src)
+target_include_directories(rohr_editor PRIVATE src ${PROJECT_SOURCE_DIR}/lib)
 
 target_link_libraries(rohr_editor PRIVATE rohr_engine)
 
@@ -25,8 +26,9 @@ if(ROHR_BUILD_TESTS)
     add_executable(editor_project_test
         tests/editor_project.c
         src/editor_project.c
+        src/editor_project_json.c
     )
-    target_include_directories(editor_project_test PRIVATE src)
+    target_include_directories(editor_project_test PRIVATE src ${PROJECT_SOURCE_DIR}/lib)
     target_link_libraries(editor_project_test PRIVATE rohr_engine)
     set_target_properties(editor_project_test PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests
