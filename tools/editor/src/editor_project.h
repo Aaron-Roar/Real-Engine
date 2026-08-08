@@ -51,6 +51,7 @@ typedef struct EditorRigidBody {
     float restitution;
     bool static_body;
     bool rotation_locked;
+    bool gravity_enabled;
     bool visible;
     EditorHitbox hitboxes[EDITOR_BODY_HITBOX_MAX];
     size_t hitbox_count;
@@ -95,6 +96,7 @@ typedef struct EditorSoftNode {
     char name[EDITOR_OBJECT_NAME_MAX];
     Position position;
     float node_mass;
+    bool gravity_enabled;
     bool visible;
 } EditorSoftNode;
 

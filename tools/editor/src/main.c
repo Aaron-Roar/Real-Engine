@@ -194,6 +194,38 @@ static bool editor_visibility_toggle(const char *id, TextAsset *empty_label,
     return result.clicked;
 }
 
+static bool editor_checkbox(const char *id, const TextAsset *label,
+    UIRect bounds, bool *checked) {
+    UIButtonResult interaction;
+    UIRect box;
+    Color background;
+
+    if(id == NULL || label == NULL || checked == NULL) return false;
+    interaction = rohr_ui_interaction(id, bounds);
+    if(interaction.clicked) *checked = !*checked;
+    background = interaction.pressed ? (Color){58, 65, 78, 255} :
+        interaction.hovered || interaction.focused ? (Color){67, 75, 90, 255} :
+        (Color){48, 54, 66, 255};
+    rohr_ui_surface(bounds, background);
+    box = (UIRect){bounds.x + 4.0f, bounds.y + 4.0f,
+        bounds.height - 8.0f, bounds.height - 8.0f};
+    rohr_ui_surface(box, (Color){22, 25, 31, 255});
+    rohr_ui_border(box, 2.0f, (Color){8, 9, 12, 255});
+    if(*checked) {
+        editor_icon_line_draw(
+            (Position){box.x + box.width * 0.22f, box.y + box.height * 0.52f},
+            (Position){box.x + box.width * 0.43f, box.y + box.height * 0.74f},
+            (Color){225, 230, 240, 255});
+        editor_icon_line_draw(
+            (Position){box.x + box.width * 0.43f, box.y + box.height * 0.74f},
+            (Position){box.x + box.width * 0.80f, box.y + box.height * 0.24f},
+            (Color){225, 230, 240, 255});
+    }
+    rohr_ui_label(label, (UIRect){box.x + box.width + 8.0f, bounds.y,
+        bounds.width - box.width - 12.0f, bounds.height});
+    return interaction.clicked;
+}
+
 static EditorRigidBody *editor_selected_body_get(EditorObject *object,
     const EditorViewportState *state) {
     return object == NULL || state == NULL ? NULL :
@@ -590,6 +622,7 @@ int main(void) {
     TextAsset node_a_label = {0};
     TextAsset node_b_label = {0};
     TextAsset mass_label = {0};
+    TextAsset gravity_label = {0};
     TextAsset friction_label = {0};
     TextAsset restitution_label = {0};
     TextAsset rest_length_label = {0};
@@ -705,6 +738,7 @@ int main(void) {
             !editor_text_create(&font, "Node A", &node_a_label) ||
             !editor_text_create(&font, "Node B", &node_b_label) ||
             !editor_text_create(&font, "Mass", &mass_label) ||
+            !editor_text_create(&font, "Gravity", &gravity_label) ||
             !editor_text_create(&font, "Friction", &friction_label) ||
             !editor_text_create(&font, "Restitution", &restitution_label) ||
             !editor_text_create(&font, "Rest Length", &rest_length_label) ||
@@ -953,10 +987,16 @@ int main(void) {
                     field_editing = field_editing || result.active;
                 }
                 {
+                    (void)editor_checkbox("editor.rigid_body.gravity", &gravity_label,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 276.0f,
+                            EDITOR_TOOLS_WIDTH - 20.0f, 28.0f},
+                        &body->gravity_enabled);
+                }
+                {
                     const TextAsset *options[] = {&dynamic_label, &static_label};
                     UIDropdownResult result = rohr_ui_dropdown("editor.rigid_body.motion",
                         options, 2, body->static_body ? 1 : 0,
-                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 276.0f,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 308.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, NULL);
                     if(result.changed) body->static_body = result.selected_index == 1;
                 }
@@ -966,12 +1006,12 @@ int main(void) {
                     };
                     UIDropdownResult result = rohr_ui_dropdown("editor.rigid_body.rotation_lock",
                         options, 2, body->rotation_locked ? 1 : 0,
-                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 308.0f,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 340.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, NULL);
                     if(result.changed) body->rotation_locked = result.selected_index == 1;
                 }
                 if(rohr_ui_button("editor.rigid_body.add_hitbox", &add_hitbox_label,
-                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 346.0f,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 378.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 32.0f}, NULL).clicked) {
                     EditorHitbox *added = editor_project_hitbox_add(&project, body);
                     if(added != NULL) {
@@ -1734,6 +1774,10 @@ int main(void) {
                     (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &node->node_mass},
                     &length_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 78.0f, 194.0f,
                         EDITOR_TOOLS_WIDTH - 88.0f, 26.0f}, NULL);
+                (void)editor_checkbox("editor.soft_node.gravity", &gravity_label,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 230.0f,
+                        EDITOR_TOOLS_WIDTH - 20.0f, 28.0f},
+                    &node->gravity_enabled);
                 field_editing = x_result.active || y_result.active || mass_result.active;
                 if(rohr_ui_button("editor.soft_node.delete", &delete_node_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 660.0f,
@@ -2048,6 +2092,7 @@ int main(void) {
     rohr_graphics_text_destroy(&position_body_label);
     rohr_graphics_text_destroy(&rotation_label);
     rohr_graphics_text_destroy(&mass_label);
+    rohr_graphics_text_destroy(&gravity_label);
     rohr_graphics_text_destroy(&friction_label);
     rohr_graphics_text_destroy(&restitution_label);
     rohr_graphics_text_destroy(&rest_length_label);
@@ -2142,6 +2187,7 @@ fail:
     rohr_graphics_text_destroy(&position_body_label);
     rohr_graphics_text_destroy(&rotation_label);
     rohr_graphics_text_destroy(&mass_label);
+    rohr_graphics_text_destroy(&gravity_label);
     rohr_graphics_text_destroy(&friction_label);
     rohr_graphics_text_destroy(&restitution_label);
     rohr_graphics_text_destroy(&rest_length_label);

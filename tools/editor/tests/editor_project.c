@@ -36,7 +36,7 @@ int main(void) {
             wheel->hitbox_count != 1 || fabsf(chassis->mass_value - 1.0f) > 0.001f ||
             fabsf(chassis->friction - 0.5f) > 0.001f ||
             fabsf(chassis->restitution) > 0.001f || chassis->static_body ||
-            chassis->rotation_locked) return 1;
+            chassis->rotation_locked || chassis->gravity_enabled) return 1;
     hitbox = &chassis->hitboxes[0];
     if(hitbox == NULL || !hitbox->visible || hitbox->vertex_count != 3) return 1;
     first = hitbox->vertices[0].position;
@@ -106,6 +106,7 @@ int main(void) {
     node_a = editor_project_soft_node_add(&project, soft_body, (Position){0});
     node_b = editor_project_soft_node_add(&project, soft_body, (Position){20.0f, 0.0f});
     if(soft_body == NULL || node_a == NULL || node_b == NULL) return 1;
+    if(node_a->gravity_enabled || node_b->gravity_enabled) return 1;
     beam = editor_project_soft_beam_add(&project, soft_body, 0, 0);
     if(beam == NULL || !beam->visible || beam->node_a != 0 || beam->node_b != 0) return 1;
     beam->node_a = node_a->id;

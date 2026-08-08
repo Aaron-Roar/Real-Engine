@@ -109,6 +109,7 @@ EditorRigidBody editor_project_rigid_body_default_get(void) {
         .mass_value = 1.0f,
         .friction = 0.5f,
         .restitution = 0.0f,
+        .gravity_enabled = false,
         .visible = true
     };
 }
@@ -653,6 +654,7 @@ EditorSoftNode *editor_project_soft_node_add(EditorProject *project, EditorSoftB
         .id = project->next_soft_node_id++,
         .position = position,
         .node_mass = 1.0f,
+        .gravity_enabled = false,
         .visible = true
     };
     snprintf(node->name, sizeof(node->name), "node_%u", node->id);
