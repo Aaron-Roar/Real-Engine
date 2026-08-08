@@ -32,6 +32,10 @@ int main(void) {
     gravity_entity = rohr_entity_add();
     if(rohr_error_check(gravity_entity) ||
             rohr_error_check(rohr_physics_dynamic_set(gravity_entity.result.value)) ||
+            !rohr_error_check(rohr_physics_mass_set(
+                gravity_entity.result.value, -1.0f)) ||
+            !rohr_error_check(rohr_physics_mass_set(
+                gravity_entity.result.value, NAN)) ||
             rohr_error_check(rohr_physics_gravity_set((Acceleration){0.0f, 10.0f})) ||
             rohr_error_check(rohr_physics_gravity_enable(gravity_entity.result.value)) ||
             !rohr_physics_gravity_check(gravity_entity.result.value)) {

@@ -684,6 +684,7 @@ PositionResult rohr_physics_position_get(Entity entity);
  * @param m Mass value.
  * @return EngineResult describing success or failure.
  */
+/** Sets finite, non-negative mass. Zero represents an explicitly massless entity. */
 EngineResult rohr_physics_mass_set(Entity entity, Mass m);
 
 /**

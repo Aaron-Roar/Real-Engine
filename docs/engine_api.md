@@ -797,6 +797,10 @@ entities without mass or with zero/negative mass are skipped. Static and held
 entities retain the component but do not move. Soft-body gravity is enabled on
 individual node entities.
 
+`rohr_physics_mass_set` accepts finite, non-negative values. Zero explicitly
+represents a massless entity; negative, infinite, and NaN values return
+`ERROR_ENGINE_STATE_INVALID` without changing its mass component.
+
 ### Modular physics pipeline
 
 Most games should call `rohr_physics_update` or

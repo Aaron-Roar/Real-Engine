@@ -502,6 +502,7 @@ EngineResult physics_impulse_apply(Entity entity, Vec2D impulse);
 EngineResult physics_position_set(Entity entity, Position p);
 PositionResult physics_position_get(Entity entity);
 /** Set an entity's mass and add the ROHR_MASS component. */
+/** Set finite, non-negative mass. Zero represents an explicitly massless entity. */
 EngineResult physics_mass_set(Entity entity, Mass m);
 /** Create a force entity targeting the given entity. */
 EntityResult physics_force_create(Entity entity, Force f);

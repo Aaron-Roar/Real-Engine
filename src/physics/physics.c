@@ -690,6 +690,9 @@ EngineResult physics_mass_set(Entity entity, Mass m) {
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
+    if(!isfinite(m) || m < 0.0f) {
+        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
     entity_mask[index] |= ROHR_MASS;
     (void)MassPool_store_at(&mass_pool, index, m);
     console_debug_write(LOG_ENGINE, "Set Entity: %d Mass: %f\n", entity, m);
