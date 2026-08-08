@@ -18,6 +18,7 @@
 #define EDITOR_VIEWPORT_MIN_WIDTH 100.0f
 #define EDITOR_TOOLS_MIN_WIDTH 40.0f
 #define EDITOR_DIVIDER_GRAB_WIDTH 6.0f
+#define EDITOR_MENU_HEIGHT 34.0f
 
 float editor_viewport_width = WINDOW_WIDTH * 0.8f;
 float editor_window_width = WINDOW_WIDTH;
@@ -602,6 +603,15 @@ int main(void) {
     MouseState mouse = {0};
     FontAsset font = {0};
     TextAsset hitbox_editor_label = {0};
+    TextAsset file_label = {0};
+    TextAsset view_label = {0};
+    TextAsset settings_label = {0};
+    TextAsset new_label = {0};
+    TextAsset open_label = {0};
+    TextAsset save_label = {0};
+    TextAsset reset_view_label = {0};
+    TextAsset grid_label = {0};
+    TextAsset preferences_label = {0};
     TextAsset add_object_label = {0};
     TextAsset none_label = {0};
     TextAsset add_hitbox_label = {0};
@@ -718,6 +728,15 @@ int main(void) {
         font = result.result.value;
     }
     if(!editor_text_create(&font, "Hitbox Editor", &hitbox_editor_label) ||
+            !editor_text_create(&font, "File", &file_label) ||
+            !editor_text_create(&font, "View", &view_label) ||
+            !editor_text_create(&font, "Settings", &settings_label) ||
+            !editor_text_create(&font, "New", &new_label) ||
+            !editor_text_create(&font, "Open", &open_label) ||
+            !editor_text_create(&font, "Save", &save_label) ||
+            !editor_text_create(&font, "Reset View", &reset_view_label) ||
+            !editor_text_create(&font, "Toggle Grid", &grid_label) ||
+            !editor_text_create(&font, "Preferences", &preferences_label) ||
             !editor_text_create(&font, "Add Object", &add_object_label) ||
             !editor_text_create(&font, "None", &none_label) ||
             !editor_text_create(&font, "Add Hitbox", &add_hitbox_label) ||
@@ -814,7 +833,7 @@ int main(void) {
         if(!field_editing) {
             Position pointer = rohr_graphics_mouse_screen_position_get();
             bool pointer_in_viewport = pointer.x >= 0.0f &&
-                pointer.x < EDITOR_VIEWPORT_WIDTH;
+                pointer.x < EDITOR_VIEWPORT_WIDTH && pointer.y >= EDITOR_MENU_HEIGHT;
             bool up = rohr_controller_key_pressed_get(&keyboard, SDLK_UP);
             bool down = rohr_controller_key_pressed_get(&keyboard, SDLK_DOWN);
             bool left = rohr_controller_key_pressed_get(&keyboard, SDLK_LEFT);
@@ -907,7 +926,8 @@ int main(void) {
             panel_scroll_offset = 0.0f;
         }
         panel_scroll_offset = rohr_ui_scroll_region_begin("editor.tools.scroll",
-            (UIRect){EDITOR_VIEWPORT_WIDTH, 0.0f, EDITOR_TOOLS_WIDTH, WINDOW_HEIGHT},
+            (UIRect){EDITOR_VIEWPORT_WIDTH, EDITOR_MENU_HEIGHT,
+                EDITOR_TOOLS_WIDTH, WINDOW_HEIGHT - EDITOR_MENU_HEIGHT},
             editor_panel_content_height_get(&project, &viewport_state),
             panel_scroll_offset, 42.0f).offset;
         viewport_state.preview_rigid_body = 0;
@@ -2004,7 +2024,7 @@ int main(void) {
         } else {
             UIButtonResult add_object = rohr_ui_button(
                 "editor.add_object", &add_object_label,
-                (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 10.0f,
+                (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 42.0f,
                     EDITOR_TOOLS_WIDTH - 20.0f, 38.0f}, NULL);
             if(add_object.clicked) {
                 EditorObject *added = editor_project_object_add(
@@ -2014,12 +2034,12 @@ int main(void) {
                 if(added != NULL) viewport_state.selection = EDITOR_SELECTION_OBJECT;
             }
             (void)rohr_graphics_screen_rect_draw(
-                EDITOR_VIEWPORT_WIDTH + 10.0f, 58.0f,
+                EDITOR_VIEWPORT_WIDTH + 10.0f, 90.0f,
                 EDITOR_TOOLS_WIDTH - 20.0f, 1.0f,
                 (Color){75, 84, 100, 255});
             for(size_t i = 0; i < project.object_count; i += 1) {
                 EditorObject *object = &project.objects[i];
-                float y = 70.0f + (float)i * 34.0f;
+                float y = 102.0f + (float)i * 34.0f;
                 char object_button_id[64];
                 char visibility_id[72];
                 UIButtonResult object_result;
@@ -2058,12 +2078,41 @@ int main(void) {
                 }
             }
         }
+        rohr_ui_scroll_region_end();
+        rohr_graphics_screen_clip_clear();
+        rohr_ui_surface((UIRect){0.0f, 0.0f, editor_window_width,
+            EDITOR_MENU_HEIGHT}, (Color){32, 36, 45, 255});
         {
-            bool ui_consumed = rohr_ui_pointer_consumed_get();
+            const TextAsset *file_options[] = {
+                &file_label, &new_label, &open_label, &save_label
+            };
+            const TextAsset *view_options[] = {
+                &view_label, &reset_view_label, &grid_label
+            };
+            const TextAsset *settings_options[] = {
+                &settings_label, &preferences_label
+            };
+
+            (void)rohr_ui_dropdown("editor.menu.file", file_options,
+                sizeof(file_options) / sizeof(file_options[0]), 0,
+                (UIRect){4.0f, 3.0f, 76.0f, 28.0f}, NULL);
+            (void)rohr_ui_dropdown("editor.menu.view", view_options,
+                sizeof(view_options) / sizeof(view_options[0]), 0,
+                (UIRect){84.0f, 3.0f, 76.0f, 28.0f}, NULL);
+            (void)rohr_ui_dropdown("editor.menu.settings", settings_options,
+                sizeof(settings_options) / sizeof(settings_options[0]), 0,
+                (UIRect){164.0f, 3.0f, 104.0f, 28.0f}, NULL);
+        }
+        (void)rohr_graphics_screen_rect_draw(0.0f, EDITOR_MENU_HEIGHT - 1.0f,
+            editor_window_width, 1.0f, (Color){75, 84, 100, 255});
+        {
+            Position pointer = rohr_graphics_mouse_screen_position_get();
+            bool ui_consumed = rohr_ui_pointer_consumed_get() ||
+                pointer.y < EDITOR_MENU_HEIGHT;
             bool viewport_consumed = editor_viewport_update(
                 &viewport_state,
                 &project,
-                rohr_graphics_mouse_screen_position_get(),
+                pointer,
                 mouse.button_states[MOUSE_BUTTON_LEFT],
                 ui_consumed);
 
@@ -2072,15 +2121,16 @@ int main(void) {
                 editor_current_selection_clear(&project, &viewport_state);
             }
         }
-        rohr_ui_scroll_region_end();
-        rohr_ui_frame_end();
         rohr_graphics_screen_clip_clear();
         (void)rohr_graphics_screen_clip_set(
-            0.0f, 0.0f, EDITOR_VIEWPORT_WIDTH, WINDOW_HEIGHT);
+            0.0f, EDITOR_MENU_HEIGHT, EDITOR_VIEWPORT_WIDTH,
+            WINDOW_HEIGHT - EDITOR_MENU_HEIGHT);
         editor_viewport_draw(&project, &viewport_state);
         rohr_graphics_screen_clip_clear();
+        rohr_ui_frame_end();
         (void)rohr_graphics_screen_rect_draw(
-            EDITOR_VIEWPORT_WIDTH - 1.0f, 0.0f, 3.0f, WINDOW_HEIGHT,
+            EDITOR_VIEWPORT_WIDTH - 1.0f, EDITOR_MENU_HEIGHT, 3.0f,
+            WINDOW_HEIGHT - EDITOR_MENU_HEIGHT,
             (Color){75, 84, 100, 255});
         rohr_graphics_show();
     }
@@ -2173,6 +2223,15 @@ int main(void) {
     rohr_graphics_text_destroy(&add_object_label);
     rohr_graphics_text_destroy(&none_label);
     rohr_graphics_text_destroy(&hitbox_editor_label);
+    rohr_graphics_text_destroy(&preferences_label);
+    rohr_graphics_text_destroy(&grid_label);
+    rohr_graphics_text_destroy(&reset_view_label);
+    rohr_graphics_text_destroy(&save_label);
+    rohr_graphics_text_destroy(&open_label);
+    rohr_graphics_text_destroy(&new_label);
+    rohr_graphics_text_destroy(&settings_label);
+    rohr_graphics_text_destroy(&view_label);
+    rohr_graphics_text_destroy(&file_label);
     rohr_graphics_font_destroy(&font);
     if(viewport != 0) (void)rohr_viewport_destroy(viewport);
     rohr_graphics_end();
@@ -2268,6 +2327,15 @@ fail:
     rohr_graphics_text_destroy(&add_object_label);
     rohr_graphics_text_destroy(&none_label);
     rohr_graphics_text_destroy(&hitbox_editor_label);
+    rohr_graphics_text_destroy(&preferences_label);
+    rohr_graphics_text_destroy(&grid_label);
+    rohr_graphics_text_destroy(&reset_view_label);
+    rohr_graphics_text_destroy(&save_label);
+    rohr_graphics_text_destroy(&open_label);
+    rohr_graphics_text_destroy(&new_label);
+    rohr_graphics_text_destroy(&settings_label);
+    rohr_graphics_text_destroy(&view_label);
+    rohr_graphics_text_destroy(&file_label);
     rohr_graphics_font_destroy(&font);
     if(viewport != 0) (void)rohr_viewport_destroy(viewport);
     rohr_graphics_end();
