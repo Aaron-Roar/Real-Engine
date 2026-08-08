@@ -215,7 +215,8 @@ void physics_rigid_gravity_apply(Acceleration gravity) {
 
         if(!physics_step_alive_index_at(alive_position, &index) ||
                 !physics_entity_movable_get(index) ||
-                !entity_index_components_check(index, ROHR_GRAVITY)) continue;
+                !entity_index_components_check(index, ROHR_GRAVITY | ROHR_MASS) ||
+                mass[index] <= 0.0f) continue;
         force_accelerations[index].x += gravity.x;
         force_accelerations[index].y += gravity.y;
     }

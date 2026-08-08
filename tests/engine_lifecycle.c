@@ -45,7 +45,25 @@ int main(void) {
     {
         EntityIndexResult gravity_index = rohr_entity_index_get(gravity_entity.result.value);
         if(rohr_error_check(gravity_index) ||
-                fabsf(velocities[gravity_index.result.value].y - 1.0f) > 0.0001f ||
+                fabsf(velocities[gravity_index.result.value].y) > 0.0001f ||
+                rohr_error_check(rohr_physics_mass_set(
+                    gravity_entity.result.value, 0.0f))) {
+            rohr_engine_shutdown();
+            return 1;
+        }
+        rohr_physics_pipeline_accelerations_clear();
+        rohr_physics_pipeline_gravity_apply();
+        rohr_physics_pipeline_integrate(0.1);
+        if(fabsf(velocities[gravity_index.result.value].y) > 0.0001f ||
+                rohr_error_check(rohr_physics_mass_set(
+                    gravity_entity.result.value, 1.0f))) {
+            rohr_engine_shutdown();
+            return 1;
+        }
+        rohr_physics_pipeline_accelerations_clear();
+        rohr_physics_pipeline_gravity_apply();
+        rohr_physics_pipeline_integrate(0.1);
+        if(fabsf(velocities[gravity_index.result.value].y - 1.0f) > 0.0001f ||
                 rohr_error_check(rohr_physics_gravity_disable(gravity_entity.result.value)) ||
                 rohr_physics_gravity_check(gravity_entity.result.value)) {
             rohr_engine_shutdown();

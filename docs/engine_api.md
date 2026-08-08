@@ -792,8 +792,10 @@ bool rohr_physics_gravity_check(Entity entity);
 
 The default acceleration is `ROHR_PHYSICS_GRAVITY_DEFAULT`, currently
 `{0.0f, 980.0f}`. Gravity is acceleration and therefore does not scale with
-mass. Static and held entities retain the component but do not move. Soft-body
-gravity is enabled on individual node entities.
+mass. The gravity stage requires `ROHR_MASS` with a value greater than zero;
+entities without mass or with zero/negative mass are skipped. Static and held
+entities retain the component but do not move. Soft-body gravity is enabled on
+individual node entities.
 
 ### Modular physics pipeline
 
