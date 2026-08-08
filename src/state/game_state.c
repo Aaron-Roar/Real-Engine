@@ -1112,13 +1112,13 @@ static bool state_variation_vec2(
 }
 
 static RohrComponentMask state_flag_mask(const char *flag) {
-    if(strcmp(flag, "static") == 0) return STATIC;
-    if(strcmp(flag, "dynamic") == 0) return DYNAMIC;
-    if(strcmp(flag, "collision") == 0) return COLLISION;
-    if(strcmp(flag, "targetable") == 0) return TARGETABLE;
-    if(strcmp(flag, "particle") == 0) return PARTICLE;
-    if(strcmp(flag, "hold") == 0) return HOLD;
-    return NONE;
+    if(strcmp(flag, "static") == 0) return ROHR_STATIC;
+    if(strcmp(flag, "dynamic") == 0) return ROHR_DYNAMIC;
+    if(strcmp(flag, "collision") == 0) return ROHR_COLLISION;
+    if(strcmp(flag, "targetable") == 0) return ROHR_TARGETABLE;
+    if(strcmp(flag, "particle") == 0) return ROHR_PARTICLE;
+    if(strcmp(flag, "hold") == 0) return ROHR_HOLD;
+    return ROHR_NONE;
 }
 
 static EngineResult state_shape_load(EntityIndex index, yyjson_val *value) {
@@ -1143,7 +1143,7 @@ static EngineResult state_shape_load(EntityIndex index, yyjson_val *value) {
     if(ShapePool_store_at(&hit_boxes_pool, index, shape).kind == ERROR_RESULT_ERROR) {
         return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
     }
-    entity_mask[index] |= HIT_BOX;
+    entity_mask[index] |= ROHR_HIT_BOX;
     return error_result_value(true);
 }
 
@@ -1180,7 +1180,7 @@ static EngineResult state_components_load(
             RohrComponentMask mask;
             if(!yyjson_is_str(flag)) return error_result_error(ERROR_ENGINE_STATE_INVALID);
             mask = state_flag_mask(yyjson_get_str(flag));
-            if(mask == NONE) return error_result_error(ERROR_ENGINE_STATE_INVALID);
+            if(mask == ROHR_NONE) return error_result_error(ERROR_ENGINE_STATE_INVALID);
             entity_mask[index] |= mask;
         }
     }
@@ -1194,9 +1194,9 @@ static EngineResult state_components_load(
         entity_mask[index] |= Bit; \
     }
 
-    LOAD_VEC2("position", PositionPool, positions_pool, NONE)
-    LOAD_VEC2("velocity", VelocityPool, velocities_pool, DYNAMIC)
-    LOAD_VEC2("acceleration", AccelerationPool, accelerations_pool, DYNAMIC)
+    LOAD_VEC2("position", PositionPool, positions_pool, ROHR_NONE)
+    LOAD_VEC2("velocity", VelocityPool, velocities_pool, ROHR_DYNAMIC)
+    LOAD_VEC2("acceleration", AccelerationPool, accelerations_pool, ROHR_DYNAMIC)
 #undef LOAD_VEC2
 
     value = yyjson_obj_get(components, "force");
@@ -1218,11 +1218,11 @@ static EngineResult state_components_load(
         entity_mask[index] |= Bit; \
     }
 
-    LOAD_SCALAR("mass", MassPool, mass, MASS)
-    LOAD_SCALAR("orientation", OrientationPool, orientations, NONE)
-    LOAD_SCALAR("angular_velocity", AngularVelocityPool, angular_velocities, DYNAMIC)
-    LOAD_SCALAR("friction", FrictionPool, frictions, NONE)
-    LOAD_SCALAR("restitution", RestitutionPool, restitutions, NONE)
+    LOAD_SCALAR("mass", MassPool, mass, ROHR_MASS)
+    LOAD_SCALAR("orientation", OrientationPool, orientations, ROHR_NONE)
+    LOAD_SCALAR("angular_velocity", AngularVelocityPool, angular_velocities, ROHR_DYNAMIC)
+    LOAD_SCALAR("friction", FrictionPool, frictions, ROHR_NONE)
+    LOAD_SCALAR("restitution", RestitutionPool, restitutions, ROHR_NONE)
 #undef LOAD_SCALAR
 
     value = yyjson_obj_get(components, "angular_acceleration");
@@ -1299,7 +1299,7 @@ static EngineResult state_components_load(
             return error_result_error(ERROR_ENGINE_STATE_INVALID);
         if(AngleLockPool_store_at(&angle_locks_pool, index, (AngleLock){(float)min, (float)max}).kind == ERROR_RESULT_ERROR)
             return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
-        entity_mask[index] |= ANGLE_LOCK;
+        entity_mask[index] |= ROHR_ANGLE_LOCK;
     }
 
     value = yyjson_obj_get(components, "axis_lock");
@@ -1311,7 +1311,7 @@ static EngineResult state_components_load(
             return error_result_error(ERROR_ENGINE_STATE_INVALID);
         if(AxisLockPool_store_at(&axis_locks_pool, index, lock).kind == ERROR_RESULT_ERROR)
             return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
-        entity_mask[index] |= AXIS_LOCK;
+        entity_mask[index] |= ROHR_AXIS_LOCK;
     }
 
     value = yyjson_obj_get(components, "transform_lock");
@@ -1329,7 +1329,7 @@ static EngineResult state_components_load(
         lock.local_angle = (float)number;
         if(TransformLockPool_store_at(&transform_locks_pool, index, lock).kind == ERROR_RESULT_ERROR)
             return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
-        entity_mask[index] |= TRANSFORM_LOCK;
+        entity_mask[index] |= ROHR_TRANSFORM_LOCK;
     }
 
     value = yyjson_obj_get(components, "joint");
@@ -2256,13 +2256,13 @@ EngineResult game_state_file_save(const char *path) {
         yyjson_mut_obj_add_strcpy(document, description, "name", name.result.value.value);
         yyjson_mut_obj_add_val(document, description, "components", components);
         yyjson_mut_arr_add_val(entity_array, description);
-        yyjson_mut_obj_add_uint(document, components, "mask", mask & ~ENTITY_NAME);
-        if(mask & STATIC) yyjson_mut_arr_add_str(document, flags, "static");
-        if(mask & DYNAMIC) yyjson_mut_arr_add_str(document, flags, "dynamic");
-        if(mask & COLLISION) yyjson_mut_arr_add_str(document, flags, "collision");
-        if(mask & TARGETABLE) yyjson_mut_arr_add_str(document, flags, "targetable");
-        if(mask & PARTICLE) yyjson_mut_arr_add_str(document, flags, "particle");
-        if(mask & HOLD) yyjson_mut_arr_add_str(document, flags, "hold");
+        yyjson_mut_obj_add_uint(document, components, "mask", mask & ~ROHR_ENTITY_NAME);
+        if(mask & ROHR_STATIC) yyjson_mut_arr_add_str(document, flags, "static");
+        if(mask & ROHR_DYNAMIC) yyjson_mut_arr_add_str(document, flags, "dynamic");
+        if(mask & ROHR_COLLISION) yyjson_mut_arr_add_str(document, flags, "collision");
+        if(mask & ROHR_TARGETABLE) yyjson_mut_arr_add_str(document, flags, "targetable");
+        if(mask & ROHR_PARTICLE) yyjson_mut_arr_add_str(document, flags, "particle");
+        if(mask & ROHR_HOLD) yyjson_mut_arr_add_str(document, flags, "hold");
         if(yyjson_mut_arr_size(flags) > 0) yyjson_mut_obj_add_val(document, components, "flags", flags);
 
         if(positions_pool.used[index]) yyjson_mut_obj_add_val(document, components, "position", state_vec2_write(document, positions[index]));
@@ -2338,7 +2338,7 @@ EngineResult game_state_file_save(const char *path) {
             }
         }
         if(state_sprite_references[index].used
-                && (entity_mask[index] & ANIMATED_SPRITE) != 0) {
+                && (entity_mask[index] & ROHR_ANIMATED_SPRITE) != 0) {
             StateSpriteReference *reference = &state_sprite_references[index];
             yyjson_mut_val *sprite = yyjson_mut_obj(document);
             yyjson_mut_obj_add_strcpy(
@@ -2381,7 +2381,7 @@ EngineResult game_state_file_save(const char *path) {
                 sprite
             );
         }
-        if((entity_mask[index] & GROUP) != 0) {
+        if((entity_mask[index] & ROHR_GROUP) != 0) {
             EntityGroupMembershipResult membership =
                 entity_groups_get(entity_result.result.value);
             if(membership.kind == ERROR_RESULT_VALUE) {

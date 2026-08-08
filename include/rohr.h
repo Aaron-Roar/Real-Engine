@@ -434,12 +434,24 @@ uint32_t rohr_physics_solver_iterations_get(void);
 EngineResult rohr_physics_substeps_set(uint32_t substeps);
 /** Returns physics substeps. Defaults to 1. */
 uint32_t rohr_physics_substeps_get(void);
+/** Sets the global acceleration applied to ROHR_GRAVITY entities. */
+EngineResult rohr_physics_gravity_set(Acceleration gravity);
+/** Returns the current global gravity acceleration. */
+Acceleration rohr_physics_gravity_get(void);
+/** Enables engine gravity for an entity. */
+EngineResult rohr_physics_gravity_enable(Entity entity);
+/** Disables engine gravity for an entity. */
+EngineResult rohr_physics_gravity_disable(Entity entity);
+/** Returns whether engine gravity is enabled for an entity. */
+bool rohr_physics_gravity_check(Entity entity);
 /** Begins a complete custom physics step and advances interaction state. */
 void rohr_physics_pipeline_step_begin(void);
 /** Clears transient constraints before one custom substep. */
 void rohr_physics_pipeline_substep_begin(void);
 /** Clears force-derived acceleration from the previous substep. */
 void rohr_physics_pipeline_accelerations_clear(void);
+/** Applies global gravity to opted-in movable entities. */
+void rohr_physics_pipeline_gravity_apply(void);
 /** Applies spring-joint and soft-body-beam forces. */
 void rohr_physics_pipeline_forces_apply(void);
 /** Integrates rigid-body state by dt seconds. */
@@ -493,7 +505,7 @@ OverlapInfo rohr_physics_sat_overlap_get(Shape shape_1, Shape shape_2);
 Vec1D rohr_physics_circle_moment_of_inertia(Shape circle, Mass mass_value);
 
 /**
- * @brief Checks whether an entity index has HOLD.
+ * @brief Checks whether an entity index has ROHR_HOLD.
  * @param index Entity table index to inspect.
  * @return true when index is live and held, false otherwise.
  */
@@ -808,28 +820,28 @@ EngineResult rohr_physics_dynamic_set(Entity entity);
 EngineResult rohr_physics_static_set(Entity entity);
 
 /**
- * @brief Adds HOLD so physics update stages preserve current values.
+ * @brief Adds ROHR_HOLD so physics update stages preserve current values.
  * @param entity Entity to modify.
  * @return EngineResult describing success or failure.
  */
 EngineResult rohr_physics_entity_hold(Entity entity);
 
 /**
- * @brief Removes HOLD without changing STATIC or DYNAMIC state.
+ * @brief Removes ROHR_HOLD without changing ROHR_STATIC or ROHR_DYNAMIC state.
  * @param entity Entity to modify.
  * @return EngineResult describing success or failure.
  */
 EngineResult rohr_physics_entity_unhold(Entity entity);
 
 /**
- * @brief Adds HOLD to every live entity in a group.
+ * @brief Adds ROHR_HOLD to every live entity in a group.
  * @param group Group id to update.
  * @return EngineResult describing success or failure.
  */
 EngineResult rohr_physics_group_entities_hold(GroupId group);
 
 /**
- * @brief Removes HOLD from every live entity in a group.
+ * @brief Removes ROHR_HOLD from every live entity in a group.
  * @param group Group id to update.
  * @return EngineResult describing success or failure.
  */

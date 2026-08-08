@@ -765,6 +765,36 @@ void rohr_physics_engine_time_per_tick_use(void);
 
  Restores the engine time-per-tick default.
 
+### Engine gravity
+
+Gravity is an optional engine component. Existing and custom physics behavior
+is unchanged until an entity receives `ROHR_GRAVITY`.
+
+```c
+rohr_physics_gravity_set((Acceleration){0.0f, 980.0f});
+rohr_physics_gravity_enable(entity);
+```
+
+The component can also be managed directly:
+
+```c
+rohr_entity_components_add(entity, ROHR_GRAVITY);
+rohr_entity_components_delete(entity, ROHR_GRAVITY);
+```
+
+```c
+EngineResult rohr_physics_gravity_set(Acceleration gravity);
+Acceleration rohr_physics_gravity_get(void);
+EngineResult rohr_physics_gravity_enable(Entity entity);
+EngineResult rohr_physics_gravity_disable(Entity entity);
+bool rohr_physics_gravity_check(Entity entity);
+```
+
+The default acceleration is `ROHR_PHYSICS_GRAVITY_DEFAULT`, currently
+`{0.0f, 980.0f}`. Gravity is acceleration and therefore does not scale with
+mass. Static and held entities retain the component but do not move. Soft-body
+gravity is enabled on individual node entities.
+
 ### Modular physics pipeline
 
 Most games should call `rohr_physics_update` or
@@ -776,6 +806,7 @@ rohr_physics_pipeline_step_begin();
 
 rohr_physics_pipeline_substep_begin();
 rohr_physics_pipeline_accelerations_clear();
+rohr_physics_pipeline_gravity_apply();
 rohr_physics_pipeline_forces_apply();
 rohr_physics_pipeline_integrate(dt);
 rohr_physics_pipeline_contacts_gather();
@@ -794,6 +825,8 @@ constraint storage. They do not allocate a separate physics world.
   clears transient contact and joint constraint lists.
 - Force stages must precede integration when using spring joints or soft-body
   beams.
+- The optional gravity stage must run after acceleration clearing and before
+  integration. Omit it when implementing custom gravity.
 - Gather before solving. Contacts and rigid joints are normally gathered
   together so the iterative solver can alternate between them.
 - `rohr_physics_pipeline_constraints_solve` does nothing when passed zero
@@ -828,6 +861,7 @@ solver-iteration counts.
 void rohr_physics_pipeline_step_begin(void);
 void rohr_physics_pipeline_substep_begin(void);
 void rohr_physics_pipeline_accelerations_clear(void);
+void rohr_physics_pipeline_gravity_apply(void);
 void rohr_physics_pipeline_forces_apply(void);
 void rohr_physics_pipeline_integrate(double dt);
 void rohr_physics_pipeline_contacts_gather(void);
@@ -923,7 +957,7 @@ Calculates circle moment of inertia.
 bool rohr_physics_entity_held_get(EntityIndex index);
 ```
 
-Checks whether an entity index has HOLD.
+Checks whether an entity index has `ROHR_HOLD`.
 
 | Parameter | Description |
 | --- | --- |
@@ -1541,7 +1575,7 @@ Marks an entity as static for physics simulation.
 EngineResult rohr_physics_entity_hold(Entity entity);
 ```
 
-Adds HOLD so physics update stages preserve current values.
+Adds `ROHR_HOLD` so physics update stages preserve current values.
 
 | Parameter | Description |
 | --- | --- |
@@ -1555,7 +1589,7 @@ Adds HOLD so physics update stages preserve current values.
 EngineResult rohr_physics_entity_unhold(Entity entity);
 ```
 
-Removes HOLD without changing STATIC or DYNAMIC state.
+Removes `ROHR_HOLD` without changing `ROHR_STATIC` or `ROHR_DYNAMIC` state.
 
 | Parameter | Description |
 | --- | --- |
@@ -1569,7 +1603,7 @@ Removes HOLD without changing STATIC or DYNAMIC state.
 EngineResult rohr_physics_group_entities_hold(GroupId group);
 ```
 
-Adds HOLD to every live entity in a group.
+Adds `ROHR_HOLD` to every live entity in a group.
 
 | Parameter | Description |
 | --- | --- |
@@ -1583,7 +1617,7 @@ Adds HOLD to every live entity in a group.
 EngineResult rohr_physics_group_entities_unhold(GroupId group);
 ```
 
-Removes HOLD from every live entity in a group.
+Removes `ROHR_HOLD` from every live entity in a group.
 
 | Parameter | Description |
 | --- | --- |

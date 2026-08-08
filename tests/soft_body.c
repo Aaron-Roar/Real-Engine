@@ -25,7 +25,7 @@ int main(void) {
             rohr_physics_collision_filter_get(node_a.result.value);
         if(rohr_error_check(filter) ||
                 !rohr_entity_components_check(node_a.result.value,
-                    SOFT_BODY_NODE | PARTICLE | HIT_BOX | COLLISION) ||
+                    ROHR_SOFT_BODY_NODE | ROHR_PARTICLE | ROHR_HIT_BOX | ROHR_COLLISION) ||
                 filter.result.value.category !=
                     ROHR_COLLISION_CATEGORY_SOFT_BODY_NODE ||
                 (filter.result.value.collides_with &

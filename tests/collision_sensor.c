@@ -46,7 +46,7 @@ int main(void) {
                 sensor, sensor_category)) ||
             rohr_error_check(rohr_physics_collision_with_set(
                 sensor, body_category))) goto fail;
-    if(rohr_entity_components_check(sensor, COLLISION)) goto fail;
+    if(rohr_entity_components_check(sensor, ROHR_COLLISION)) goto fail;
 
     rohr_system_physics_update(1.0);
     body_position = rohr_physics_position_get(body);

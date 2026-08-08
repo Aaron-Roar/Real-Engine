@@ -69,61 +69,63 @@ extern EntityMaskPool entity_mask_pool;
 /** Component bits stored in RohrComponentMask values. */
 typedef enum {
     /** No components. */
-    NONE                    = 0,
+    ROHR_NONE                    = 0,
     /** Entity is static in the physics system. */
-    STATIC                  = 1 << 0,
+    ROHR_STATIC                  = 1 << 0,
     /** Entity is dynamic in the physics system. */
-    DYNAMIC                 = 1 << 1,
+    ROHR_DYNAMIC                 = 1 << 1,
     /** Entity participates in collision checks. */
-    COLLISION               = 1 << 2,
+    ROHR_COLLISION               = 1 << 2,
     /** Entity has a hit box shape. */
-    HIT_BOX                 = 1 << 3,
+    ROHR_HIT_BOX                 = 1 << 3,
     /** Entity has an axis lock constraint. */
-    AXIS_LOCK               = 1 << 4,
+    ROHR_AXIS_LOCK               = 1 << 4,
     /** Entity has an angle lock constraint. */
-    ANGLE_LOCK              = 1 << 5,
+    ROHR_ANGLE_LOCK              = 1 << 5,
 
     /** Entity represents a force source. */
-    FORCE                   = 1 << 6,
+    ROHR_FORCE                   = 1 << 6,
     /** Entity represents a torque source. */
-    TORQUE                  = 1 << 7,
+    ROHR_TORQUE                  = 1 << 7,
     /** Entity targets another entity. */
-    TARGETABLE              = 1 << 8,
+    ROHR_TARGETABLE              = 1 << 8,
 
     /** Entity has mass. */
-    MASS                    = 1 << 9,
+    ROHR_MASS                    = 1 << 9,
     /** Reserved time-window component bit. */
-    TIMEWINDOW              = 1 << 10,
+    ROHR_TIMEWINDOW              = 1 << 10,
     /** Entity has a parent entity. */
-    PARENT                      = 1 << 11,
+    ROHR_PARENT                      = 1 << 11,
     /** Entity has one or more child entities. */
-    CHILD                       = 1 << 12,
+    ROHR_CHILD                       = 1 << 12,
     /** Entity has a transform lock constraint. */
-    TRANSFORM_LOCK              = 1 << 13,
+    ROHR_TRANSFORM_LOCK              = 1 << 13,
     /** Entity represents a joint constraint. */
-    JOINT                       = 1 << 14,
+    ROHR_JOINT                       = 1 << 14,
     /** Entity has a lifetime expiry. */
-    LIFETIME                    = 1 << 15,
+    ROHR_LIFETIME                    = 1 << 15,
     /** Translation-only circular body used by collision/render helpers. */
-    PARTICLE                    = 1 << 16,
+    ROHR_PARTICLE                    = 1 << 16,
     /** Entity has an animated sprite. */
-    ANIMATED_SPRITE             = 1 << 17,
+    ROHR_ANIMATED_SPRITE             = 1 << 17,
     /** Entity keeps physics values but skips physics updates. */
-    HOLD                        = 1 << 18,
+    ROHR_HOLD                        = 1 << 18,
     /** Entity belongs to one or more groups. */
-    GROUP                       = 1 << 19,
+    ROHR_GROUP                       = 1 << 19,
     /** Entity has a human-readable name used for state-file references. */
-    ENTITY_NAME                 = 1 << 20,
+    ROHR_ENTITY_NAME                 = 1 << 20,
     /** Entity overrides the default collision category filtering. */
-    COLLISION_FILTER            = 1 << 21,
+    ROHR_COLLISION_FILTER            = 1 << 21,
     /** Entity owns soft-body topology. */
-    SOFT_BODY                   = 1 << 22,
+    ROHR_SOFT_BODY                   = 1 << 22,
     /** Entity is a lightweight soft-body collision node. */
-    SOFT_BODY_NODE              = 1 << 23,
+    ROHR_SOFT_BODY_NODE              = 1 << 23,
     /** Entity is a spring beam connecting soft-body nodes. */
-    SOFT_BODY_BEAM              = 1 << 24,
+    ROHR_SOFT_BODY_BEAM              = 1 << 24,
     /** Entity is a triangular soft-body surface. */
-    SOFT_BODY_TRIANGLE          = 1 << 25,
+    ROHR_SOFT_BODY_TRIANGLE          = 1 << 25,
+    /** Entity receives acceleration from the engine gravity stage. */
+    ROHR_GRAVITY                     = 1 << 26,
 } Component;
 
 /** Fixed-size, engine-owned entity name. */

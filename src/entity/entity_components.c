@@ -597,7 +597,7 @@ EntityResult entity_by_name_get(const char *name) {
         }
         if(index < entity_names_pool.capacity
                 && entity_names_pool.used[index] != 0
-                && (entity_mask[index] & ENTITY_NAME) != 0
+                && (entity_mask[index] & ROHR_ENTITY_NAME) != 0
                 && strcmp(entity_names[index].value, name) == 0) {
             return entity_result;
         }
@@ -629,7 +629,7 @@ EngineResult entity_name_set(Entity entity, const char *name) {
     if(EntityNamePool_store_at(&entity_names_pool, index, entity_name).kind == ERROR_RESULT_ERROR) {
         return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
     }
-    entity_mask[index] |= ENTITY_NAME;
+    entity_mask[index] |= ROHR_ENTITY_NAME;
     return error_result_value(true);
 }
 
@@ -639,7 +639,7 @@ EntityNameResult entity_name_get(Entity entity) {
     if(!entity_index_get(entity, &index)
             || index >= entity_names_pool.capacity
             || entity_names_pool.used[index] == 0
-            || (entity_mask[index] & ENTITY_NAME) == 0) {
+            || (entity_mask[index] & ROHR_ENTITY_NAME) == 0) {
         return ERROR_RESULT_MAKE_ERROR(EntityNameResult, ERROR_ENGINE_COMPONENT_MISSING);
     }
     return ERROR_RESULT_MAKE_VALUE(EntityNameResult, entity_names[index]);
@@ -990,7 +990,7 @@ static EngineResult entity_group_internal_add(GroupId group, Entity entity) {
         (void)entity_group_storage_remove(&entity_groups[group_index], entity);
         return result;
     }
-    return entity_components_add(entity, GROUP);
+    return entity_components_add(entity, ROHR_GROUP);
 }
 
 EngineResult entity_group_add(GroupId group, Entity entity) {
@@ -1021,7 +1021,7 @@ static EngineResult entity_group_internal_remove(GroupId group, Entity entity) {
         if(entity_group_memberships[entity_index].groups.count == 0) {
             entity_group_membership_destroy(&entity_group_memberships[entity_index]);
             (void)EntityGroupMembershipPool_release_at(&entity_group_memberships_pool, entity_index);
-            result = entity_components_delete(entity, GROUP);
+            result = entity_components_delete(entity, ROHR_GROUP);
             if(result.kind == ERROR_RESULT_ERROR) {
                 return result;
             }
@@ -1083,7 +1083,7 @@ static EngineResult entity_ensure_children_component(Entity parent, EntityIndex 
             return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED);
         }
     }
-    result = entity_components_add(parent, CHILD);
+    result = entity_components_add(parent, ROHR_CHILD);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
@@ -1119,7 +1119,7 @@ EngineResult entity_parent_set(Entity child, Entity parent) {
             if(result.kind == ERROR_RESULT_ERROR) {
                 return result;
             }
-            return entity_components_add(child, PARENT);
+            return entity_components_add(child, ROHR_PARENT);
         }
         result = entity_parent_remove(child);
         if(result.kind == ERROR_RESULT_ERROR) {
@@ -1139,7 +1139,7 @@ EngineResult entity_parent_set(Entity child, Entity parent) {
         (void)entity_group_internal_remove(children[parent_index], child);
         return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED);
     }
-    result = entity_components_add(child, PARENT);
+    result = entity_components_add(child, ROHR_PARENT);
     if(result.kind == ERROR_RESULT_ERROR) {
         (void)entity_group_internal_remove(children[parent_index], child);
         (void)ParentPool_release_at(&parents_pool, child_index);
@@ -1158,12 +1158,12 @@ EngineResult entity_parent_remove(Entity child) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
     if(child_index >= parents_pool.capacity || parents_pool.used[child_index] == 0) {
-        return entity_components_delete(child, PARENT);
+        return entity_components_delete(child, ROHR_PARENT);
     }
     parent = parents[child_index];
     if(!entity_index_get(parent, &parent_index) || !entity_index_alive_check(parent_index)) {
         (void)ParentPool_release_at(&parents_pool, child_index);
-        return entity_components_delete(child, PARENT);
+        return entity_components_delete(child, ROHR_PARENT);
     }
 
     if(parent_index < children_pool.capacity && children_pool.used[parent_index] != 0) {
@@ -1173,7 +1173,7 @@ EngineResult entity_parent_remove(Entity child) {
         if(entity_group_alive_check(group) && entity_groups[entity_group_index(group)].entities.count == 0) {
             (void)entity_group_internal_destroy(group);
             (void)ChildrenPool_release_at(&children_pool, parent_index);
-            result = entity_components_delete(parent, CHILD);
+            result = entity_components_delete(parent, ROHR_CHILD);
             if(result.kind == ERROR_RESULT_ERROR) {
                 return result;
             }
@@ -1184,7 +1184,7 @@ EngineResult entity_parent_remove(Entity child) {
     if(child_index < parents_pool.capacity && parents_pool.used[child_index]) {
         (void)ParentPool_release_at(&parents_pool, child_index);
     }
-    result = entity_components_delete(child, PARENT);
+    result = entity_components_delete(child, ROHR_PARENT);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
@@ -1210,7 +1210,7 @@ EngineResult entity_child_remove(Entity parent, Entity child) {
         if(entity_group_alive_check(group) && entity_groups[entity_group_index(group)].entities.count == 0) {
             (void)entity_group_internal_destroy(group);
             (void)ChildrenPool_release_at(&children_pool, parent_index);
-            result = entity_components_delete(parent, CHILD);
+            result = entity_components_delete(parent, ROHR_CHILD);
             if(result.kind == ERROR_RESULT_ERROR) {
                 return result;
             }
@@ -1220,7 +1220,7 @@ EngineResult entity_child_remove(Entity parent, Entity child) {
     //Removing the parent from the child
     if(child_index < parents_pool.capacity && parents_pool.used[child_index] && parents[child_index] == parent) {
         (void)ParentPool_release_at(&parents_pool, child_index);
-        result = entity_components_delete(child, PARENT);
+        result = entity_components_delete(child, ROHR_PARENT);
         if(result.kind == ERROR_RESULT_ERROR) {
             return result;
         }
@@ -1264,7 +1264,7 @@ EngineResult entity_life_time_set(Entity entity, Time expirey_time, Tick expirey
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
 
-    result = entity_components_add(entity, LIFETIME);
+    result = entity_components_add(entity, ROHR_LIFETIME);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
@@ -1282,7 +1282,7 @@ EngineResult entity_life_time_remove(Entity entity) {
     if(!entity_index_get(entity, &index)) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
-    result = entity_components_delete(entity, LIFETIME);
+    result = entity_components_delete(entity, ROHR_LIFETIME);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }

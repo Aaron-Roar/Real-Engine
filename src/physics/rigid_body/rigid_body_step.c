@@ -12,7 +12,7 @@ static double physics_rigid_elapsed_ms(uint64_t start) {
 }
 
 void system_generate_global_hitboxes(void) {
-    RohrComponentMask filter = HIT_BOX;
+    RohrComponentMask filter = ROHR_HIT_BOX;
 
     for(uint32_t alive_position = 0; alive_position < entity_alive_count_get(); alive_position += 1) {
         EntityIndex i;
@@ -31,7 +31,7 @@ void system_generate_global_hitboxes(void) {
 }
 
 Shape system_generate_global_hitbox(Entity entity) {
-    RohrComponentMask filter = HIT_BOX;
+    RohrComponentMask filter = ROHR_HIT_BOX;
     EntityIndex index;
 
         if(entity_index_get(entity, &index) && entity_index_alive_check(index)) {
@@ -70,7 +70,7 @@ void system_orientations_update(double dt) {
             continue;
         }
         if(physics_entity_movable_get(i) &&
-                !entity_index_components_check(i, PARTICLE)) {
+                !entity_index_components_check(i, ROHR_PARTICLE)) {
             orientations[i] = orientations[i] + angular_velocities[i]*dt;
         }
     }
@@ -85,7 +85,7 @@ void system_angular_velocities_update(double dt) {
             continue;
         }
         if(physics_entity_movable_get(i)) {
-            if(entity_index_components_check(i, PARTICLE)) {
+            if(entity_index_components_check(i, ROHR_PARTICLE)) {
                 angular_velocities[i] = 0.0f;
                 continue;
             }
@@ -126,12 +126,12 @@ void system_velocities_update(double dt) {
 }
 
 void system_forces_apply(void) {
-  RohrComponentMask filter = FORCE | TARGETABLE;
-  RohrComponentMask target_filter = MASS;
+  RohrComponentMask filter = ROHR_FORCE | ROHR_TARGETABLE;
+  RohrComponentMask target_filter = ROHR_MASS;
 
   for(int i = 0; i < MAX_ENTITIES; i++) {
     if(entity_index_alive_check(i)) { //Check if this entity exists
-        if(entity_index_components_check(i, HOLD)) {
+        if(entity_index_components_check(i, ROHR_HOLD)) {
             continue;
         }
         if( entity_index_components_check(i, filter) ) { //Check if this entity is a targetable force
@@ -162,12 +162,12 @@ void system_forces_apply(void) {
 
 void system_torques_apply(void) {
     //Apply force offset from centroid and torque applied directly
-  RohrComponentMask filter = TORQUE | TARGETABLE;
-  RohrComponentMask target_filter = MASS;
+  RohrComponentMask filter = ROHR_TORQUE | ROHR_TARGETABLE;
+  RohrComponentMask target_filter = ROHR_MASS;
 
   for(int i = 0; i < MAX_ENTITIES; i++) {
     if(entity_index_alive_check(i)) { //Check if this entity exists
-        if(entity_index_components_check(i, HOLD)) {
+        if(entity_index_components_check(i, ROHR_HOLD)) {
             continue;
         }
         if( entity_index_components_check(i, filter) ) { //Check if this entity is a targetable force
@@ -208,10 +208,23 @@ void system_force_torque_accelerations_clear(void) {
     }
 }
 
+void physics_rigid_gravity_apply(Acceleration gravity) {
+    for(uint32_t alive_position = 0; alive_position < entity_alive_count_get();
+            alive_position += 1) {
+        EntityIndex index;
+
+        if(!physics_step_alive_index_at(alive_position, &index) ||
+                !physics_entity_movable_get(index) ||
+                !entity_index_components_check(index, ROHR_GRAVITY)) continue;
+        force_accelerations[index].x += gravity.x;
+        force_accelerations[index].y += gravity.y;
+    }
+}
+
 OverlapInfo system_entity_overlap_get(Entity entity_1, Entity entity_2) {
     Shape shape1 = world_hit_boxes[entity_1];
     Shape shape2 = world_hit_boxes[entity_2];
-    if(entity_index_components_check(entity_1, PARTICLE) && entity_index_components_check(entity_2, PARTICLE)) {
+    if(entity_index_components_check(entity_1, ROHR_PARTICLE) && entity_index_components_check(entity_2, ROHR_PARTICLE)) {
         return physics_particle_overlap_get(shape1, shape2);
     }
     return physics_sat_overlap_get(shape1, shape2);
@@ -226,13 +239,13 @@ void system_separate_entities_tuned(
     bool dynamic_2 = physics_entity_movable_get(entity_2);
 
     float inv_mass_1 =
-        dynamic_1 && entity_index_components_check(entity_1, MASS) &&
+        dynamic_1 && entity_index_components_check(entity_1, ROHR_MASS) &&
             mass[entity_1] > 0.0f
         ? 1.0f / mass[entity_1]
         : 0.0f;
 
     float inv_mass_2 =
-        dynamic_2 && entity_index_components_check(entity_2, MASS) &&
+        dynamic_2 && entity_index_components_check(entity_2, ROHR_MASS) &&
             mass[entity_2] > 0.0f
         ? 1.0f / mass[entity_2]
         : 0.0f;
@@ -346,9 +359,9 @@ Position system_collision_contact_point(Entity entity_1, Entity entity_2, Overla
     Position point_1 = {0};
     Position point_2 = {0};
     bool entity_1_particle =
-        entity_index_components_check(entity_1, PARTICLE);
+        entity_index_components_check(entity_1, ROHR_PARTICLE);
     bool entity_2_particle =
-        entity_index_components_check(entity_2, PARTICLE);
+        entity_index_components_check(entity_2, ROHR_PARTICLE);
 
     if(entity_1_particle) {
         Vec1D r1 = math_circle_radius(shape_1, math_polygon_centroid(shape_1));
@@ -403,10 +416,10 @@ Vec2D system_friction_impulse_apply(
     float inv_inertia_1,
     float inv_inertia_2
 ) {
-    Vec2D angular_v1 = entity_index_components_check(entity_1, PARTICLE)
+    Vec2D angular_v1 = entity_index_components_check(entity_1, ROHR_PARTICLE)
         ? (Vec2D){0}
         : math_angular_velocity_cross_vec(angular_velocities[entity_1], r1);
-    Vec2D angular_v2 = entity_index_components_check(entity_2, PARTICLE)
+    Vec2D angular_v2 = entity_index_components_check(entity_2, ROHR_PARTICLE)
         ? (Vec2D){0}
         : math_angular_velocity_cross_vec(angular_velocities[entity_2], r2);
 
@@ -500,11 +513,11 @@ static void system_contact_point_solve(
     Vec2D first_offset = math_vector_subtract(point, positions[first]);
     Vec2D second_offset = math_vector_subtract(point, positions[second]);
     Vec2D first_angular_velocity = inverse_mass_first <= 0.0f ||
-            entity_index_components_check(first, PARTICLE)
+            entity_index_components_check(first, ROHR_PARTICLE)
         ? (Vec2D){0}
         : math_angular_velocity_cross_vec(angular_velocities[first], first_offset);
     Vec2D second_angular_velocity = inverse_mass_second <= 0.0f ||
-            entity_index_components_check(second, PARTICLE)
+            entity_index_components_check(second, ROHR_PARTICLE)
         ? (Vec2D){0}
         : math_angular_velocity_cross_vec(angular_velocities[second], second_offset);
     Velocity current_relative_velocity = {
@@ -564,13 +577,13 @@ ContactInfo system_resolve_collision(
     OverlapInfo overlap,
     bool restitution_enabled
 ) {
-    bool first_particle = entity_index_components_check(first, PARTICLE);
-    bool second_particle = entity_index_components_check(second, PARTICLE);
+    bool first_particle = entity_index_components_check(first, ROHR_PARTICLE);
+    bool second_particle = entity_index_components_check(second, ROHR_PARTICLE);
     float inverse_mass_first = physics_entity_movable_get(first) &&
-            entity_index_components_check(first, MASS) && mass[first] > 0.0f
+            entity_index_components_check(first, ROHR_MASS) && mass[first] > 0.0f
         ? 1.0f / mass[first] : 0.0f;
     float inverse_mass_second = physics_entity_movable_get(second) &&
-            entity_index_components_check(second, MASS) && mass[second] > 0.0f
+            entity_index_components_check(second, ROHR_MASS) && mass[second] > 0.0f
         ? 1.0f / mass[second] : 0.0f;
     float inverse_inertia_first = 0.0f;
     float inverse_inertia_second = 0.0f;
@@ -639,8 +652,8 @@ static bool system_broadphase_pair_apply(Entity target, void *context) {
     if(physics_step_debug_stats_enabled) physics_step_debug_stats.narrowphase_ms += physics_rigid_elapsed_ms(started);
     if(!overlap.detected) return true;
     if(physics_step_debug_stats_enabled) physics_step_debug_stats.overlap_count += 1;
-    responds = entity_index_components_check(query->source_index, COLLISION) &&
-        entity_index_components_check(target_index, COLLISION);
+    responds = entity_index_components_check(query->source_index, ROHR_COLLISION) &&
+        entity_index_components_check(target_index, ROHR_COLLISION);
     return contact_constraint_list_append(&physics_step_contact_constraints,
         (SystemContactConstraint){
         .type = SYSTEM_CONTACT_CONSTRAINT_RIGID_PAIR,
@@ -747,7 +760,7 @@ static void system_broadphase_build(void) {
         Entity entity;
 
         if(!physics_step_alive_index_at(alive_position, &index) ||
-                !entity_index_components_check(index, HIT_BOX) ||
+                !entity_index_components_check(index, ROHR_HIT_BOX) ||
                 !physics_step_entity_from_index_get(index, &entity)) continue;
         if(physics_step_debug_stats_enabled) physics_step_debug_stats.collider_count += 1;
         (void)aabb_tree_insert(
@@ -767,7 +780,7 @@ static void system_broadphase_collisions_apply(void) {
         SystemBroadphaseQuery query;
 
         if(!physics_step_alive_index_at(alive_position, &index) ||
-                !entity_index_components_check(index, HIT_BOX) ||
+                !entity_index_components_check(index, ROHR_HIT_BOX) ||
                 !physics_step_entity_from_index_get(index, &entity)) continue;
         query = (SystemBroadphaseQuery){
             .source = entity,
@@ -799,7 +812,7 @@ void system_collisions_apply(void) {
                 continue;
             }
 
-            if(!entity_index_components_check(i, HIT_BOX) || !entity_index_components_check(j, HIT_BOX)) {
+            if(!entity_index_components_check(i, ROHR_HIT_BOX) || !entity_index_components_check(j, ROHR_HIT_BOX)) {
                 continue;
             }
             if(!physics_step_entity_from_index_get(i, &entity_1) || !physics_step_entity_from_index_get(j, &entity_2)) {
@@ -812,7 +825,7 @@ void system_collisions_apply(void) {
 
 
             if(collision.detected == true) {
-                bool responds = entity_index_components_check(i, COLLISION) && entity_index_components_check(j, COLLISION);
+                bool responds = entity_index_components_check(i, ROHR_COLLISION) && entity_index_components_check(j, ROHR_COLLISION);
                 ContactInfo contact = responds
                     ? system_resolve_collision(i, j, collision, true)
                     : (ContactInfo){0};
@@ -840,7 +853,7 @@ void system_angle_locks_apply(void) {
             continue;
         }
 
-        if(!entity_index_components_check(entity, ANGLE_LOCK)) {
+        if(!entity_index_components_check(entity, ROHR_ANGLE_LOCK)) {
             continue;
         }
 
@@ -914,7 +927,7 @@ void system_axis_locks_apply(void) {
             continue;
         }
 
-        if(!entity_index_components_check(entity, AXIS_LOCK)) {
+        if(!entity_index_components_check(entity, ROHR_AXIS_LOCK)) {
             continue;
         }
 
@@ -960,7 +973,7 @@ void system_transform_locks_apply(void) {
             continue;
         }
 
-        if(!entity_index_components_check(driven, TRANSFORM_LOCK)) {
+        if(!entity_index_components_check(driven, ROHR_TRANSFORM_LOCK)) {
             continue;
         }
 

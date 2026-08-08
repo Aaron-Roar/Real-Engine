@@ -533,7 +533,7 @@ void graphics_aabb_tree_draw(void) {
 void graphics_textures_scale(Entity entity, Scale scale) {
     EntityIndex index;
 
-    if(!entity_index_get(entity, &index) || !entity_components_check(entity, ANIMATED_SPRITE)) {
+    if(!entity_index_get(entity, &index) || !entity_components_check(entity, ROHR_ANIMATED_SPRITE)) {
         return;
     }
     for(int i = 0; i < MAX_TEXTURES; i += 1) {
@@ -1890,7 +1890,7 @@ void graphics_hit_box_colored_draw(Entity entity, Fill fill_type, Color color) {
 void graphics_hit_boxes_draw(void) {
   for(int i = 0; i < MAX_ENTITIES; i += 1) {
     if(entity_index_alive_check(i)) {
-        if( entity_index_components_check(i, HIT_BOX)) {
+        if( entity_index_components_check(i, ROHR_HIT_BOX)) {
             EntityResult entity_result = entity_from_index_get(i);
             if(entity_result.kind == ERROR_RESULT_VALUE) {
                 graphics_hit_box_draw(entity_result.result.value, GRAPHICS_OUTLINE);
@@ -1924,8 +1924,8 @@ void graphics_particle_draw(Entity entity, Fill fill_type) {
 void graphics_particles_draw(void) {
   for(int i = 0; i < MAX_ENTITIES; i += 1) {
     if(entity_index_alive_check(i)) {
-        if( entity_index_components_check(i, HIT_BOX)) {
-          if( entity_index_components_check(i, PARTICLE)) {
+        if( entity_index_components_check(i, ROHR_HIT_BOX)) {
+          if( entity_index_components_check(i, ROHR_PARTICLE)) {
               EntityResult entity_result = entity_from_index_get(i);
               if(entity_result.kind == ERROR_RESULT_VALUE) {
                   graphics_particle_draw(entity_result.result.value, GRAPHICS_OUTLINE);
@@ -2127,7 +2127,7 @@ EngineResult graphics_animated_sprite_add(Entity entity, AnimatedSprite sprite) 
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
     (void)AnimatedSpritePool_store_at(&animated_sprites_pool, index, sprite);
-    result = entity_components_add(entity, ANIMATED_SPRITE);
+    result = entity_components_add(entity, ROHR_ANIMATED_SPRITE);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
@@ -2135,7 +2135,7 @@ EngineResult graphics_animated_sprite_add(Entity entity, AnimatedSprite sprite) 
 }
 
 void graphics_animated_sprites_draw(void) {
-    RohrComponentMask filter = ANIMATED_SPRITE;
+    RohrComponentMask filter = ROHR_ANIMATED_SPRITE;
     for(int i = 0; i < MAX_ENTITIES; i += 1) {
         if(entity_index_alive_check(i) && entity_index_components_check(i, filter)) {
             graphics_sprite_draw(animated_sprites[i], positions[i], orientations[i]);
@@ -2144,7 +2144,7 @@ void graphics_animated_sprites_draw(void) {
 }
 
 void graphics_sprite_frames_update(Tick current_tick, Time current_time) {
-    RohrComponentMask filter = ANIMATED_SPRITE;
+    RohrComponentMask filter = ROHR_ANIMATED_SPRITE;
     for(int i = 0; i < MAX_ENTITIES; i += 1) {
         if(entity_index_alive_check(i) && entity_index_components_check(i, filter)) {
             graphics_sprite_frame_update(&animated_sprites[i], current_tick, current_time);
@@ -2158,7 +2158,7 @@ void graphics_local_origin_draw(Entity entity) {
     if(!entity_index_get(entity, &index)) {
         return;
     }
-    if (!entity_components_check(entity, HIT_BOX)) {
+    if (!entity_components_check(entity, ROHR_HIT_BOX)) {
         return;
     }
 
@@ -2267,7 +2267,7 @@ void graphics_local_origins_draw(void) {
         if(!entity_index_alive_check(i)) {
             continue;
         }
-        if (!entity_index_components_check(i, HIT_BOX)) {
+        if (!entity_index_components_check(i, ROHR_HIT_BOX)) {
             continue;
         }
         EntityResult entity_result = entity_from_index_get(i);
@@ -2365,7 +2365,7 @@ bool graphics_joint_draw(Entity joint_entity, Color color) {
     Position center;
 
     if(sdl_renderer == NULL || !entity_index_get(joint_entity, &index) ||
-            !entity_index_alive_check(index) || !entity_index_components_check(index, JOINT) ||
+            !entity_index_alive_check(index) || !entity_index_components_check(index, ROHR_JOINT) ||
             index >= joints_pool.capacity || !joints_pool.used[index]) return false;
     joint = joints[index];
     if(!graphics_joint_world_anchors_get(joint, &world_a, &world_b)) return false;
@@ -2390,7 +2390,7 @@ void graphics_joints_draw(Color color) {
         EntityResult joint;
 
         if(!joints_pool.used[index] || !entity_index_alive_check(index) ||
-                !entity_index_components_check(index, JOINT)) continue;
+                !entity_index_components_check(index, ROHR_JOINT)) continue;
         joint = entity_from_index_get(index);
         if(joint.kind == ERROR_RESULT_VALUE) (void)graphics_joint_draw(joint.result.value, color);
     }

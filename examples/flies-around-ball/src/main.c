@@ -96,7 +96,7 @@ int main(void) {
         sprite = rohr_graphics_animated_sprite_create(animation, (Scale){size/10, size/10});
         sprite.animation.time_per_frame = rohr_tools_random_range_float(0.005, 0.5);
         rohr_graphics_animated_sprite_add(small_fly, sprite);
-        rohr_entity_components_add(small_fly, PARTICLE);
+        rohr_entity_components_add(small_fly, ROHR_PARTICLE);
     }
 
     ChildrenResult children_result = rohr_entity_children_get(ball);

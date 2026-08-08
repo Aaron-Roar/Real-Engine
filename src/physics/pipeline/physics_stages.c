@@ -19,6 +19,10 @@ void physics_pipeline_accelerations_clear(void) {
     physics_rigid_accelerations_clear();
 }
 
+void physics_pipeline_gravity_apply(void) {
+    physics_rigid_gravity_apply(physics_gravity_get());
+}
+
 void physics_pipeline_forces_apply(void) {
     physics_joint_spring_forces_apply();
     physics_soft_body_beams_apply();

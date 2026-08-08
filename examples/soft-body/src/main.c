@@ -182,7 +182,7 @@ static Entity particle_create(Position position) {
             !result_ok(rohr_physics_collision_category_set(
                 particle, particle_category)) ||
             !result_ok(rohr_physics_collision_with_all_set(particle)) ||
-            !result_ok(rohr_entity_components_add(particle, PARTICLE))) {
+            !result_ok(rohr_entity_components_add(particle, ROHR_PARTICLE))) {
         return ENTITY_INVALID;
     }
     return particle;

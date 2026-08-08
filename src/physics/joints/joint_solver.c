@@ -32,7 +32,7 @@ static void system_joint_force_for_one_tick_add(Entity target, Force force) {
     if(!physics_entity_movable_get(target_index)) {
         return;
     }
-    if(!entity_index_components_check(target_index, MASS) || mass[target_index] == 0.0f) {
+    if(!entity_index_components_check(target_index, ROHR_MASS) || mass[target_index] == 0.0f) {
         return;
     }
     //Entity force_entity = set_force(target, force);
@@ -58,7 +58,7 @@ static void system_joint_torque_for_one_tick_add(Entity target, Torque torque) {
     if(!physics_entity_movable_get(target_index)) {
         return;
     }
-    if(!entity_index_components_check(target_index, MASS) || mass[target_index] == 0.0f) {
+    if(!entity_index_components_check(target_index, ROHR_MASS) || mass[target_index] == 0.0f) {
         return;
     }
     torque_angular_accelerations[target_index] += torque/physics_polygon_moment_of_inertia(hit_boxes[target_index], mass[target_index]);
@@ -110,7 +110,7 @@ static float system_joint_inverse_inertia(EntityIndex index) {
     float inertia;
 
     if(!physics_entity_movable_get(index) ||
-            !entity_index_components_check(index, MASS | HIT_BOX) || mass[index] <= 0.0f) return 0.0f;
+            !entity_index_components_check(index, ROHR_MASS | ROHR_HIT_BOX) || mass[index] <= 0.0f) return 0.0f;
     inertia = physics_polygon_moment_of_inertia(hit_boxes[index], mass[index]);
     return inertia > 0.0f ? 1.0f / inertia : 0.0f;
 }
@@ -245,11 +245,11 @@ static void system_weld_joint_apply(Entity joint_entity) {
     system_pin_joint_apply(joint_entity);
     if(!entity_index_get(joint.a, &a_index) || !entity_index_alive_check(a_index) ||
             !entity_index_get(joint.b, &b_index) || !entity_index_alive_check(b_index)) return;
-    if(physics_entity_movable_get(a_index) && entity_index_components_check(a_index, MASS | HIT_BOX)) {
+    if(physics_entity_movable_get(a_index) && entity_index_components_check(a_index, ROHR_MASS | ROHR_HIT_BOX)) {
         float inertia = physics_polygon_moment_of_inertia(hit_boxes[a_index], mass[a_index]);
         if(inertia > 0.0f) inverse_inertia_a = 1.0f / inertia;
     }
-    if(physics_entity_movable_get(b_index) && entity_index_components_check(b_index, MASS | HIT_BOX)) {
+    if(physics_entity_movable_get(b_index) && entity_index_components_check(b_index, ROHR_MASS | ROHR_HIT_BOX)) {
         float inertia = physics_polygon_moment_of_inertia(hit_boxes[b_index], mass[b_index]);
         if(inertia > 0.0f) inverse_inertia_b = 1.0f / inertia;
     }
@@ -366,7 +366,7 @@ static void system_spring_joint_apply(Entity joint_entity) {
 static void system_joint_spring_forces_apply(void) {
     for(Entity joint_entity = 0; joint_entity < MAX_ENTITIES; joint_entity += 1) {
         if(!entity_index_alive_check(joint_entity) ||
-                !entity_index_components_check(joint_entity, JOINT) ||
+                !entity_index_components_check(joint_entity, ROHR_JOINT) ||
                 joints[joint_entity].type != JOINT_SPRING) continue;
         system_spring_joint_apply(joint_entity);
     }
@@ -379,7 +379,7 @@ static void physics_step_joint_constraints_gather(void) {
             joint_entity += 1) {
         if(!joints_pool.used[joint_entity] ||
                 !entity_index_alive_check(joint_entity) ||
-                !entity_index_components_check(joint_entity, JOINT)) continue;
+                !entity_index_components_check(joint_entity, ROHR_JOINT)) continue;
         if(joints[joint_entity].type == JOINT_PIN ||
                 joints[joint_entity].type == JOINT_WELD) {
             (void)joint_constraint_list_append(
@@ -394,7 +394,7 @@ static void physics_step_joint_constraints_apply(void) {
         EntityIndex joint_entity = physics_step_joint_constraints.values[i];
 
         if(!entity_index_alive_check(joint_entity) ||
-                !entity_index_components_check(joint_entity, JOINT)) continue;
+                !entity_index_components_check(joint_entity, ROHR_JOINT)) continue;
         if(joints[joint_entity].type == JOINT_PIN) {
             system_pin_joint_apply(joint_entity);
         } else if(joints[joint_entity].type == JOINT_WELD) {

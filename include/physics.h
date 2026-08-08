@@ -24,6 +24,7 @@ void physics_debug_stats_enabled_set(bool enabled);
 
 #define PHYSICS_SOLVER_ITERATIONS_DEFAULT 8u
 #define PHYSICS_SUBSTEPS_DEFAULT 1u
+#define ROHR_PHYSICS_GRAVITY_DEFAULT ((Acceleration){0.0f, 980.0f})
 
 EngineResult physics_solver_iterations_set(uint32_t iterations);
 uint32_t physics_solver_iterations_get(void);
@@ -36,6 +37,8 @@ void physics_pipeline_step_begin(void);
 void physics_pipeline_substep_begin(void);
 /** Clear force-derived acceleration accumulated during the previous substep. */
 void physics_pipeline_accelerations_clear(void);
+/** Apply global gravity to opted-in movable entities. */
+void physics_pipeline_gravity_apply(void);
 /** Apply spring-joint and soft-body-beam forces for the current substep. */
 void physics_pipeline_forces_apply(void);
 /** Integrate rigid-body positions and velocities for one substep. */
@@ -146,6 +149,16 @@ typedef Orientation AngularVelocity;
 typedef Orientation AngularAcceleration;
 /** Entity linear acceleration. */
 typedef Vec2D Acceleration;
+/** Set the acceleration applied to entities carrying ROHR_GRAVITY. */
+EngineResult physics_gravity_set(Acceleration gravity);
+/** Return the current global gravity acceleration. */
+Acceleration physics_gravity_get(void);
+/** Add the ROHR_GRAVITY component to an entity. */
+EngineResult physics_gravity_enable(Entity entity);
+/** Remove the ROHR_GRAVITY component from an entity. */
+EngineResult physics_gravity_disable(Entity entity);
+/** Return whether an entity carries ROHR_GRAVITY. */
+bool physics_gravity_check(Entity entity);
 /** Linear force vector. */
 typedef Vec2D Force;
 /** Entity mass value. */
@@ -441,7 +454,7 @@ OverlapInfo physics_sat_overlap_get(Shape shape_1, Shape shape_2);
  */
 Vec1D physics_circle_moment_of_inertia(Shape circle, Mass mass_value);
 
-/** Check whether an entity index has HOLD. */
+/** Check whether an entity index has ROHR_HOLD. */
 bool physics_entity_held_get(EntityIndex index);
 /** Check whether an entity index can be moved by physics update stages. */
 bool physics_entity_movable_get(EntityIndex index);
@@ -488,7 +501,7 @@ EngineResult physics_impulse_apply(Entity entity, Vec2D impulse);
 /** Set an entity's world position. */
 EngineResult physics_position_set(Entity entity, Position p);
 PositionResult physics_position_get(Entity entity);
-/** Set an entity's mass and add the MASS component. */
+/** Set an entity's mass and add the ROHR_MASS component. */
 EngineResult physics_mass_set(Entity entity, Mass m);
 /** Create a force entity targeting the given entity. */
 EntityResult physics_force_create(Entity entity, Force f);
@@ -532,17 +545,17 @@ AngularVelocityResult physics_angular_velocity_maximum_get(Entity entity);
 ShapeResult physics_global_hit_box_get(Entity entity);
 /** Set an entity's collision restitution. */
 EngineResult physics_restitution_set(Entity entity, Restitution restitution);
-/** Mark an entity dynamic and remove STATIC. */
+/** Mark an entity dynamic and remove ROHR_STATIC. */
 EngineResult physics_dynamic_set(Entity entity);
-/** Mark an entity static and remove DYNAMIC. */
+/** Mark an entity static and remove ROHR_DYNAMIC. */
 EngineResult physics_static_set(Entity entity);
-/** Add HOLD so physics update stages preserve current values. */
+/** Add ROHR_HOLD so physics update stages preserve current values. */
 EngineResult physics_entity_hold(Entity entity);
-/** Remove HOLD without changing STATIC or DYNAMIC state. */
+/** Remove ROHR_HOLD without changing ROHR_STATIC or ROHR_DYNAMIC state. */
 EngineResult physics_entity_unhold(Entity entity);
-/** Add HOLD to every live entity in a group. */
+/** Add ROHR_HOLD to every live entity in a group. */
 EngineResult physics_group_entities_hold(GroupId group);
-/** Remove HOLD from every live entity in a group. */
+/** Remove ROHR_HOLD from every live entity in a group. */
 EngineResult physics_group_entities_unhold(GroupId group);
 /** Add or update an angle lock constraint. */
 EngineResult physics_angle_lock_set(Entity entity, Orientation min, Orientation max);

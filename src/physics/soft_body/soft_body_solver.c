@@ -18,7 +18,7 @@ static void system_soft_body_beams_apply(void) {
         Vec2D force;
 
         if(!soft_body_beams_pool.used[beam_index] || !entity_index_alive_check(beam_index) ||
-                !entity_index_components_check(beam_index, SOFT_BODY_BEAM)) continue;
+                !entity_index_components_check(beam_index, ROHR_SOFT_BODY_BEAM)) continue;
         beam = soft_body_beams[beam_index];
         if(!entity_index_get(beam.node_a, &a) || !entity_index_alive_check(a) ||
                 !entity_index_get(beam.node_b, &b) || !entity_index_alive_check(b) ||
@@ -63,9 +63,9 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
     if(!query->solving) {
         if(rigid_entity == query->node_a || rigid_entity == query->node_b ||
                 !entity_index_get(rigid_entity, &rigid) || !entity_index_alive_check(rigid) ||
-                !entity_index_components_check(rigid, HIT_BOX | COLLISION) ||
-                entity_index_components_check(rigid, SOFT_BODY_NODE | SOFT_BODY_BEAM |
-                    SOFT_BODY_TRIANGLE) ||
+                !entity_index_components_check(rigid, ROHR_HIT_BOX | ROHR_COLLISION) ||
+                entity_index_components_check(rigid, ROHR_SOFT_BODY_NODE | ROHR_SOFT_BODY_BEAM |
+                    ROHR_SOFT_BODY_TRIANGLE) ||
                 (!physics_collision_between_check(query->node_a, rigid_entity) &&
                     !physics_collision_between_check(query->node_b, rigid_entity))) return true;
         overlap = physics_sat_overlap_get(query->shape, world_hit_boxes[rigid]);
@@ -99,7 +99,7 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
     if(!entity_index_alive_check(query->a) ||
             !entity_index_alive_check(query->b) ||
             !entity_index_alive_check(rigid) ||
-            !entity_index_components_check(rigid, HIT_BOX | COLLISION)) return true;
+            !entity_index_components_check(rigid, ROHR_HIT_BOX | ROHR_COLLISION)) return true;
     query->start = positions[query->a];
     query->end = positions[query->b];
     query->shape = soft_body_boundary_shape_create(
@@ -122,13 +122,13 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
     weight_a = 1.0f - t;
     weight_b = t;
     inverse_mass_a = physics_entity_movable_get(query->a) &&
-            entity_index_components_check(query->a, MASS) && mass[query->a] > 0.0f
+            entity_index_components_check(query->a, ROHR_MASS) && mass[query->a] > 0.0f
         ? 1.0f / mass[query->a] : 0.0f;
     inverse_mass_b = physics_entity_movable_get(query->b) &&
-            entity_index_components_check(query->b, MASS) && mass[query->b] > 0.0f
+            entity_index_components_check(query->b, ROHR_MASS) && mass[query->b] > 0.0f
         ? 1.0f / mass[query->b] : 0.0f;
     inverse_mass_rigid = physics_entity_movable_get(rigid) &&
-            entity_index_components_check(rigid, MASS) && mass[rigid] > 0.0f
+            entity_index_components_check(rigid, ROHR_MASS) && mass[rigid] > 0.0f
         ? 1.0f / mass[rigid] : 0.0f;
     inverse_mass_edge = weight_a * weight_a * inverse_mass_a +
         weight_b * weight_b * inverse_mass_b;
@@ -213,8 +213,8 @@ static bool system_soft_boundary_pair_apply(Entity rigid_entity, void *context) 
         rigid_offset = math_vector_subtract(
             contact.points[0].position, positions[rigid]);
         if(physics_entity_movable_get(rigid) &&
-                !entity_index_components_check(rigid, PARTICLE) &&
-                entity_index_components_check(rigid, MASS | HIT_BOX)) {
+                !entity_index_components_check(rigid, ROHR_PARTICLE) &&
+                entity_index_components_check(rigid, ROHR_MASS | ROHR_HIT_BOX)) {
             float inertia = physics_polygon_moment_of_inertia(
                 hit_boxes[rigid], mass[rigid]);
             if(inertia > 0.0f) inverse_inertia_rigid = 1.0f / inertia;
@@ -378,7 +378,7 @@ static void system_soft_body_boundary_collisions_apply(void) {
 static bool system_soft_node_rigid_filter_allows(EntityIndex node, EntityIndex rigid) {
     CollisionFilterConfig rigid_filter = physics_collision_filter_config_default_get();
 
-    if(entity_index_components_check(rigid, COLLISION_FILTER) &&
+    if(entity_index_components_check(rigid, ROHR_COLLISION_FILTER) &&
             rigid < collision_filters_pool.capacity && collision_filters_pool.used[rigid]) {
         rigid_filter = collision_filters[rigid];
     }
@@ -391,7 +391,7 @@ static void system_soft_body_node_rigid_collisions_apply(void) {
         Shape node_shape;
 
         if(!soft_body_nodes_pool.used[node] || !entity_index_alive_check(node) ||
-                !entity_index_components_check(node, SOFT_BODY_NODE)) continue;
+                !entity_index_components_check(node, ROHR_SOFT_BODY_NODE)) continue;
         node_shape = physics_shape_world_translate(
             math_circle_create(soft_body_nodes[node].radius, 8),
             positions[node],
@@ -409,8 +409,8 @@ static void system_soft_body_node_rigid_collisions_apply(void) {
             ContactInfo contact_info;
 
             if(node == rigid || !entity_index_alive_check(rigid) ||
-                    !entity_index_components_check(rigid, HIT_BOX | COLLISION) ||
-                    entity_index_components_check(rigid, SOFT_BODY_NODE) ||
+                    !entity_index_components_check(rigid, ROHR_HIT_BOX | ROHR_COLLISION) ||
+                    entity_index_components_check(rigid, ROHR_SOFT_BODY_NODE) ||
                     !system_soft_node_rigid_filter_allows(node, rigid)) continue;
             collision = physics_sat_overlap_get(node_shape, world_hit_boxes[rigid]);
             if(!collision.detected) continue;
@@ -485,7 +485,7 @@ static void system_soft_body_node_rigid_collisions_apply(void) {
                 float denominator;
 
                 if(physics_entity_movable_get(rigid) &&
-                        entity_index_components_check(rigid, MASS | HIT_BOX)) {
+                        entity_index_components_check(rigid, ROHR_MASS | ROHR_HIT_BOX)) {
                     float inertia = physics_polygon_moment_of_inertia(
                         hit_boxes[rigid], mass[rigid]);
                     if(inertia > 0.0f) inverse_inertia_rigid = 1.0f / inertia;

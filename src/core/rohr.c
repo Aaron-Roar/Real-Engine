@@ -99,9 +99,15 @@ EngineResult rohr_physics_solver_iterations_set(uint32_t iterations) { return ph
 uint32_t rohr_physics_solver_iterations_get(void) { return physics_solver_iterations_get(); }
 EngineResult rohr_physics_substeps_set(uint32_t substeps) { return physics_substeps_set(substeps); }
 uint32_t rohr_physics_substeps_get(void) { return physics_substeps_get(); }
+EngineResult rohr_physics_gravity_set(Acceleration gravity) { return physics_gravity_set(gravity); }
+Acceleration rohr_physics_gravity_get(void) { return physics_gravity_get(); }
+EngineResult rohr_physics_gravity_enable(Entity entity) { return physics_gravity_enable(entity); }
+EngineResult rohr_physics_gravity_disable(Entity entity) { return physics_gravity_disable(entity); }
+bool rohr_physics_gravity_check(Entity entity) { return physics_gravity_check(entity); }
 void rohr_physics_pipeline_step_begin(void) { physics_pipeline_step_begin(); }
 void rohr_physics_pipeline_substep_begin(void) { physics_pipeline_substep_begin(); }
 void rohr_physics_pipeline_accelerations_clear(void) { physics_pipeline_accelerations_clear(); }
+void rohr_physics_pipeline_gravity_apply(void) { physics_pipeline_gravity_apply(); }
 void rohr_physics_pipeline_forces_apply(void) { physics_pipeline_forces_apply(); }
 void rohr_physics_pipeline_integrate(double dt) { physics_pipeline_integrate(dt); }
 void rohr_physics_pipeline_contacts_gather(void) { physics_pipeline_contacts_gather(); }

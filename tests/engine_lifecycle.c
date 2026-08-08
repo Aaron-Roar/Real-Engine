@@ -1,6 +1,7 @@
 #include "rohr.h"
 #include "core/engine_internal.h"
 
+#include <math.h>
 #include <stdio.h>
 
 int main(void) {
@@ -10,6 +11,7 @@ int main(void) {
     EntityResult second;
     CollisionFilterConfigResult filter;
     ContactInfo contact;
+    EntityResult gravity_entity;
     EngineResult result = rohr_engine_init();
     if(rohr_error_check(result)) {
         fprintf(stderr, "%s\n", rohr_error_default_message_get(result.result.error));
@@ -25,6 +27,30 @@ int main(void) {
             rohr_physics_substeps_get() != 4) {
         rohr_engine_shutdown();
         return 1;
+    }
+
+    gravity_entity = rohr_entity_add();
+    if(rohr_error_check(gravity_entity) ||
+            rohr_error_check(rohr_physics_dynamic_set(gravity_entity.result.value)) ||
+            rohr_error_check(rohr_physics_gravity_set((Acceleration){0.0f, 10.0f})) ||
+            rohr_error_check(rohr_physics_gravity_enable(gravity_entity.result.value)) ||
+            !rohr_physics_gravity_check(gravity_entity.result.value)) {
+        rohr_engine_shutdown();
+        return 1;
+    }
+    rohr_physics_pipeline_substep_begin();
+    rohr_physics_pipeline_accelerations_clear();
+    rohr_physics_pipeline_gravity_apply();
+    rohr_physics_pipeline_integrate(0.1);
+    {
+        EntityIndexResult gravity_index = rohr_entity_index_get(gravity_entity.result.value);
+        if(rohr_error_check(gravity_index) ||
+                fabsf(velocities[gravity_index.result.value].y - 1.0f) > 0.0001f ||
+                rohr_error_check(rohr_physics_gravity_disable(gravity_entity.result.value)) ||
+                rohr_physics_gravity_check(gravity_entity.result.value)) {
+            rohr_engine_shutdown();
+            return 1;
+        }
     }
 
     first = rohr_entity_add();
@@ -67,8 +93,8 @@ int main(void) {
             rohr_error_check(rohr_physics_static_set(second.result.value)) ||
             rohr_error_check(rohr_physics_restitution_set(first.result.value, 0.0f)) ||
             rohr_error_check(rohr_physics_restitution_set(second.result.value, 0.0f)) ||
-            rohr_error_check(rohr_entity_components_add(first.result.value, COLLISION)) ||
-            rohr_error_check(rohr_entity_components_add(second.result.value, COLLISION))) {
+            rohr_error_check(rohr_entity_components_add(first.result.value, ROHR_COLLISION)) ||
+            rohr_error_check(rohr_entity_components_add(second.result.value, ROHR_COLLISION))) {
         rohr_engine_shutdown();
         return 1;
     }

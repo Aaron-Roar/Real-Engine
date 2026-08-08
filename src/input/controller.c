@@ -436,7 +436,7 @@ const char *mouse_button_name(MouseButton button)
 {
     switch (button) {
         case MOUSE_BUTTON_NONE:
-            return "NONE";
+            return "ROHR_NONE";
 
         case MOUSE_BUTTON_LEFT:
             return "LEFT";
@@ -456,7 +456,7 @@ const char *mouse_button_state_name(MouseButtonState state)
 {
     switch (state) {
         case MOUSE_BUTTON_STATE_NONE:
-            return "NONE";
+            return "ROHR_NONE";
 
         case MOUSE_BUTTON_STATE_UP:
             return "UP";

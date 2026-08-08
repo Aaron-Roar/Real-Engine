@@ -13,7 +13,7 @@ static void system_entity_by_index_delete(EntityIndex index) {
 void system_entities_past_lifetime_clean(void) {
     for(EntityIndex index = 0; index < MAX_ENTITIES; index += 1) {
         if(!entity_index_alive_check(index) ||
-                !entity_index_components_check(index, LIFETIME)) continue;
+                !entity_index_components_check(index, ROHR_LIFETIME)) continue;
         if((life_times[index].expirey_time != 0 &&
                     life_times[index].expirey_time <= engine_time_get()) ||
                 (life_times[index].expirey_tick != 0 &&

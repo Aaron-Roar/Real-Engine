@@ -7,6 +7,7 @@
 void physics_pipeline_substep(double dt) {
     physics_pipeline_substep_begin();
     physics_pipeline_accelerations_clear();
+    physics_pipeline_gravity_apply();
     physics_pipeline_forces_apply();
     physics_pipeline_integrate(dt);
     physics_pipeline_contacts_gather();

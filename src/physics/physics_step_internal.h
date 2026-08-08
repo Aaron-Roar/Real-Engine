@@ -41,6 +41,7 @@ void physics_pipeline_joint_constraints_solve(void *context);
 
 void physics_rigid_integrate(double dt);
 void physics_rigid_accelerations_clear(void);
+void physics_rigid_gravity_apply(Acceleration gravity);
 void physics_rigid_constraints_gather(void);
 void physics_rigid_contact_constraint_solve(
     SystemContactConstraint *constraint,

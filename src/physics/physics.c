@@ -10,6 +10,7 @@ static Time physics_dt_per_tick = 0.0;
 static bool physics_dt_overwritten = false;
 static uint32_t physics_solver_iterations = PHYSICS_SOLVER_ITERATIONS_DEFAULT;
 static uint32_t physics_substeps = PHYSICS_SUBSTEPS_DEFAULT;
+static Acceleration physics_gravity = ROHR_PHYSICS_GRAVITY_DEFAULT;
 
 MEMORY_DEFINE_OBJECT_POOL(PositionPool, Position)
 MEMORY_DEFINE_OBJECT_POOL(VelocityPool, Velocity)
@@ -89,6 +90,7 @@ EngineResult physics_tables_init(void) {
     physics_dt_overwritten = false;
     physics_solver_iterations = PHYSICS_SOLVER_ITERATIONS_DEFAULT;
     physics_substeps = PHYSICS_SUBSTEPS_DEFAULT;
+    physics_gravity = ROHR_PHYSICS_GRAVITY_DEFAULT;
     memset(joint_anchors, 0, sizeof(joint_anchors));
     memset(joint_anchor_used, 0, sizeof(joint_anchor_used));
     for(uint32_t i = 0; i < MAX_JOINT_ANCHORS; i += 1) joint_anchor_generations[i] = 1;
@@ -462,15 +464,15 @@ bool physics_entity_held_get(EntityIndex index) {
     if(!entity_index_alive_check(index)) {
         return false;
     }
-    return entity_index_components_check(index, HOLD);
+    return entity_index_components_check(index, ROHR_HOLD);
 }
 
 bool physics_entity_movable_get(EntityIndex index) {
     if(!entity_index_alive_check(index)) {
         return false;
     }
-    return entity_index_components_check(index, DYNAMIC)
-        && !entity_index_components_check(index, STATIC)
+    return entity_index_components_check(index, ROHR_DYNAMIC)
+        && !entity_index_components_check(index, ROHR_STATIC)
         && !physics_entity_held_get(index);
 }
 
@@ -633,7 +635,7 @@ EngineResult physics_impulse_apply(Entity entity, Vec2D impulse) {
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    if(!entity_index_components_check(index, MASS)) {
+    if(!entity_index_components_check(index, ROHR_MASS)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
     }
     if(mass[index] == 0.0f) {
@@ -688,7 +690,7 @@ EngineResult physics_mass_set(Entity entity, Mass m) {
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    entity_mask[index] |= MASS;
+    entity_mask[index] |= ROHR_MASS;
     (void)MassPool_store_at(&mass_pool, index, m);
     console_debug_write(LOG_ENGINE, "Set Entity: %d Mass: %f\n", entity, m);
     return error_result_value(true);
@@ -712,7 +714,7 @@ EntityResult physics_force_create(Entity entity, Force f) {
     }
     (void)ForcePool_store_at(&forces_pool, force_index, f);
     (void)TargetPool_store_at(&targets_pool, force_index, entity);
-    entity_mask[force_index] |= TARGETABLE | FORCE;
+    entity_mask[force_index] |= ROHR_TARGETABLE | ROHR_FORCE;
     console_debug_write(LOG_ENGINE, "Set Entity: %d Force: {x: %f, y: %f}\n", entity, f.x, f.y);
     return ERROR_RESULT_MAKE_VALUE(EntityResult, force_entity);
 }
@@ -728,7 +730,7 @@ EngineResult physics_force_component_set(Entity entity, Force force) {
             == ERROR_RESULT_ERROR) {
         return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
     }
-    entity_mask[index] |= FORCE;
+    entity_mask[index] |= ROHR_FORCE;
     return error_result_value(true);
 }
 
@@ -834,7 +836,7 @@ EntityResult physics_torque_create(Entity entity, Torque t) {
     }
     (void)TorquePool_store_at(&torques_pool, torque_index, t);
     (void)TargetPool_store_at(&targets_pool, torque_index, entity);
-    entity_mask[torque_index] |= TARGETABLE | TORQUE;
+    entity_mask[torque_index] |= ROHR_TARGETABLE | ROHR_TORQUE;
     console_debug_write(LOG_ENGINE, "Set Entity: %d Torque: %f\n", entity, t);
     return ERROR_RESULT_MAKE_VALUE(EntityResult, torque_entity);
 }
@@ -850,7 +852,7 @@ EngineResult physics_torque_component_set(Entity entity, Torque torque) {
             == ERROR_RESULT_ERROR) {
         return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
     }
-    entity_mask[index] |= TORQUE;
+    entity_mask[index] |= ROHR_TORQUE;
     return error_result_value(true);
 }
 
@@ -876,7 +878,7 @@ EngineResult physics_hitbox_set(Entity entity, Shape hitbox) {
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    entity_mask[index] |= HIT_BOX;
+    entity_mask[index] |= ROHR_HIT_BOX;
     (void)ShapePool_store_at(&hit_boxes_pool, index, hitbox);
     console_debug_write(LOG_ENGINE, "Set Entity: %d to have a hit box\n", entity);
     return error_result_value(true);
@@ -894,14 +896,14 @@ EngineResult physics_collision_filter_set(Entity entity, CollisionFilterConfig c
     EngineResult result = physics_live_index_get(entity, &index);
 
     if(result.kind == ERROR_RESULT_ERROR) return result;
-    if(!entity_index_components_check(index, HIT_BOX)) {
+    if(!entity_index_components_check(index, ROHR_HIT_BOX)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
     }
     if(CollisionFilterConfigPool_store_at(&collision_filters_pool, index, config).kind
             == ERROR_RESULT_ERROR) {
         return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED);
     }
-    entity_mask[index] |= COLLISION_FILTER;
+    entity_mask[index] |= ROHR_COLLISION_FILTER;
     return error_result_value(true);
 }
 
@@ -912,10 +914,10 @@ CollisionFilterConfigResult physics_collision_filter_get(Entity entity) {
     if(result.kind == ERROR_RESULT_ERROR) {
         return ERROR_RESULT_MAKE_ERROR(CollisionFilterConfigResult, result.result.error);
     }
-    if(!entity_index_components_check(index, HIT_BOX)) {
+    if(!entity_index_components_check(index, ROHR_HIT_BOX)) {
         return ERROR_RESULT_MAKE_ERROR(CollisionFilterConfigResult, ERROR_ENGINE_COMPONENT_MISSING);
     }
-    if(!entity_index_components_check(index, COLLISION_FILTER)) {
+    if(!entity_index_components_check(index, ROHR_COLLISION_FILTER)) {
         return ERROR_RESULT_MAKE_VALUE(CollisionFilterConfigResult, physics_collision_filter_config_default_get());
     }
     return ERROR_RESULT_MAKE_VALUE(CollisionFilterConfigResult, collision_filters[index]);
@@ -1045,7 +1047,7 @@ EngineResult physics_angular_acceleration_set(
     return error_result_value(true);
 }
 ShapeResult physics_global_hit_box_get(Entity entity) {
-    RohrComponentMask filter = HIT_BOX;
+    RohrComponentMask filter = ROHR_HIT_BOX;
     EntityIndex index;
 
     if((entity_index_get(entity, &index) && entity_index_alive_check(index))) {
@@ -1075,7 +1077,7 @@ EngineResult physics_restitution_set(Entity entity, Restitution restitution) {
         (void)RestitutionPool_store_at(&restitutions_pool, index, restitution);
         console_debug_write(LOG_ENGINE, "Set Entity: %d Restitution: %f\n", entity, restitution);
      }
-     return entity_components_add(entity, COLLISION);
+     return entity_components_add(entity, ROHR_COLLISION);
 }
 EngineResult physics_dynamic_set(Entity entity) {
     EntityIndex index;
@@ -1084,15 +1086,15 @@ EngineResult physics_dynamic_set(Entity entity) {
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    result = entity_components_add(entity, DYNAMIC);
+    result = entity_components_add(entity, ROHR_DYNAMIC);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    result = entity_components_delete(entity, STATIC);
+    result = entity_components_delete(entity, ROHR_STATIC);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    console_debug_write(LOG_ENGINE, "Set Entity: %d to DYNAMIC\n", entity);
+    console_debug_write(LOG_ENGINE, "Set Entity: %d to ROHR_DYNAMIC\n", entity);
     return error_result_value(true);
 }
 EngineResult physics_static_set(Entity entity) {
@@ -1102,15 +1104,15 @@ EngineResult physics_static_set(Entity entity) {
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    result = entity_components_add(entity, STATIC);
+    result = entity_components_add(entity, ROHR_STATIC);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    result = entity_components_delete(entity, DYNAMIC);
+    result = entity_components_delete(entity, ROHR_DYNAMIC);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    console_debug_write(LOG_ENGINE, "Set Entity: %d to STATIC\n", entity);
+    console_debug_write(LOG_ENGINE, "Set Entity: %d to ROHR_STATIC\n", entity);
     return error_result_value(true);
 }
 
@@ -1121,7 +1123,7 @@ EngineResult physics_entity_hold(Entity entity) {
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    result = entity_components_add(entity, HOLD);
+    result = entity_components_add(entity, ROHR_HOLD);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
@@ -1136,7 +1138,7 @@ EngineResult physics_entity_unhold(Entity entity) {
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    result = entity_components_delete(entity, HOLD);
+    result = entity_components_delete(entity, ROHR_HOLD);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
@@ -1159,7 +1161,7 @@ EngineResult physics_angle_lock_set(Entity entity, Orientation min, Orientation 
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    result = entity_components_add(entity, ANGLE_LOCK);
+    result = entity_components_add(entity, ROHR_ANGLE_LOCK);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
@@ -1176,7 +1178,7 @@ EngineResult physics_axis_lock_set(Entity entity, Axis axis, Position axis_point
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    result = entity_components_add(entity, AXIS_LOCK);
+    result = entity_components_add(entity, ROHR_AXIS_LOCK);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
@@ -1229,7 +1231,7 @@ EngineResult physics_transform_lock_set(
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    result = entity_components_add(driven, TRANSFORM_LOCK);
+    result = entity_components_add(driven, ROHR_TRANSFORM_LOCK);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
@@ -1250,7 +1252,7 @@ EngineResult physics_transform_lock_remove(Entity entity) {
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
-    result = entity_components_delete(entity, TRANSFORM_LOCK);
+    result = entity_components_delete(entity, ROHR_TRANSFORM_LOCK);
     if(result.kind == ERROR_RESULT_ERROR) {
         return result;
     }
@@ -1318,7 +1320,7 @@ EngineResult physics_target_set(Entity entity, Entity target) {
             == ERROR_RESULT_ERROR) {
         return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
     }
-    entity_mask[index] |= TARGETABLE;
+    entity_mask[index] |= ROHR_TARGETABLE;
     return error_result_value(true);
 }
 
@@ -1346,7 +1348,7 @@ EngineResult physics_joint_component_set(Entity entity, Joint joint) {
             == ERROR_RESULT_ERROR) {
         return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
     }
-    entity_mask[index] |= JOINT;
+    entity_mask[index] |= ROHR_JOINT;
     return error_result_value(true);
 }
 
@@ -1415,7 +1417,7 @@ JointAnchorPositionResult physics_joint_anchor_world_position_get(JointAnchorId 
         return ERROR_RESULT_MAKE_ERROR(JointAnchorPositionResult, ERROR_ENGINE_ENTITY_NOT_FOUND);
     }
     local_position = joint_anchors[slot].centroid_offset;
-    if(entity_index_components_check(entity_index, HIT_BOX)) {
+    if(entity_index_components_check(entity_index, ROHR_HIT_BOX)) {
         Vec2D centroid = math_polygon_centroid(hit_boxes[entity_index]);
         local_position.x += centroid.x;
         local_position.y += centroid.y;
@@ -1588,7 +1590,7 @@ EntityResult physics_soft_body_create(void) {
         (void)entity_delete(result.result.value);
         return ERROR_RESULT_MAKE_ERROR(EntityResult, ERROR_MEMORY_POOL_ALLOCATION_FAILED);
     }
-    entity_mask[index] |= SOFT_BODY;
+    entity_mask[index] |= ROHR_SOFT_BODY;
     return result;
 }
 
@@ -1597,7 +1599,7 @@ SoftBodyResult physics_soft_body_get(Entity soft_body) {
     EngineResult result = physics_live_index_get(soft_body, &index);
 
     if(result.kind == ERROR_RESULT_ERROR) return ERROR_RESULT_MAKE_ERROR(SoftBodyResult, result.result.error);
-    if(!entity_index_components_check(index, SOFT_BODY) || !soft_bodies_pool.used[index]) {
+    if(!entity_index_components_check(index, ROHR_SOFT_BODY) || !soft_bodies_pool.used[index]) {
         return ERROR_RESULT_MAKE_ERROR(SoftBodyResult, ERROR_ENGINE_COMPONENT_MISSING);
     }
     return ERROR_RESULT_MAKE_VALUE(SoftBodyResult, soft_bodies[index]);
@@ -1610,7 +1612,7 @@ EntityResult physics_soft_body_node_create(Entity soft_body, Position position,
     EntityResult node;
     EngineResult result = physics_live_index_get(soft_body, &body_index);
 
-    if(result.kind == ERROR_RESULT_ERROR || !entity_index_components_check(body_index, SOFT_BODY) ||
+    if(result.kind == ERROR_RESULT_ERROR || !entity_index_components_check(body_index, ROHR_SOFT_BODY) ||
             !soft_bodies_pool.used[body_index] || node_mass <= 0.0f || radius <= 0.0f) {
         return ERROR_RESULT_MAKE_ERROR(EntityResult, ERROR_ENGINE_STATE_INVALID);
     }
@@ -1644,7 +1646,7 @@ EntityResult physics_soft_body_node_create(Entity soft_body, Position position,
         (void)entity_delete(node.result.value);
         return ERROR_RESULT_MAKE_ERROR(EntityResult, ERROR_MEMORY_POOL_ALLOCATION_FAILED);
     }
-    entity_mask[node_index] |= SOFT_BODY_NODE | PARTICLE;
+    entity_mask[node_index] |= ROHR_SOFT_BODY_NODE | ROHR_PARTICLE;
     soft_bodies[body_index].nodes[soft_bodies[body_index].node_count++] = node.result.value;
     return node;
 }
@@ -1654,7 +1656,7 @@ SoftBodyNodeResult physics_soft_body_node_get(Entity node) {
     EngineResult result = physics_live_index_get(node, &index);
 
     if(result.kind == ERROR_RESULT_ERROR) return ERROR_RESULT_MAKE_ERROR(SoftBodyNodeResult, result.result.error);
-    if(!entity_index_components_check(index, SOFT_BODY_NODE) || !soft_body_nodes_pool.used[index]) {
+    if(!entity_index_components_check(index, ROHR_SOFT_BODY_NODE) || !soft_body_nodes_pool.used[index]) {
         return ERROR_RESULT_MAKE_ERROR(SoftBodyNodeResult, ERROR_ENGINE_COMPONENT_MISSING);
     }
     return ERROR_RESULT_MAKE_VALUE(SoftBodyNodeResult, soft_body_nodes[index]);
@@ -1666,7 +1668,7 @@ EngineResult physics_soft_body_node_collision_filter_set(Entity node,
     EngineResult result = physics_live_index_get(node, &index);
 
     if(result.kind == ERROR_RESULT_ERROR) return result;
-    if(!entity_index_components_check(index, SOFT_BODY_NODE) || !soft_body_nodes_pool.used[index]) {
+    if(!entity_index_components_check(index, ROHR_SOFT_BODY_NODE) || !soft_body_nodes_pool.used[index]) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
     }
     result = physics_collision_filter_set(node, (CollisionFilterConfig){
@@ -1684,7 +1686,7 @@ EngineResult physics_soft_body_node_force_for_one_tick_apply(Entity node, Force 
     EngineResult result = physics_live_index_get(node, &index);
 
     if(result.kind == ERROR_RESULT_ERROR) return result;
-    if(!entity_index_components_check(index, SOFT_BODY_NODE)) {
+    if(!entity_index_components_check(index, ROHR_SOFT_BODY_NODE)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
     }
     return physics_force_for_one_tick_apply(node, force);
@@ -1695,7 +1697,7 @@ EngineResult physics_soft_body_node_impulse_apply(Entity node, Vec2D impulse) {
     EngineResult result = physics_live_index_get(node, &index);
 
     if(result.kind == ERROR_RESULT_ERROR) return result;
-    if(!entity_index_components_check(index, SOFT_BODY_NODE)) {
+    if(!entity_index_components_check(index, ROHR_SOFT_BODY_NODE)) {
         return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
     }
     return physics_impulse_apply(node, impulse);
@@ -1783,7 +1785,7 @@ SoftBodyNodeAnchorPinResult physics_soft_body_node_to_anchor_pin_create(
     EngineResult pin_result;
 
     if(physics_live_index_get(node, &node_index).kind == ERROR_RESULT_ERROR ||
-            !entity_index_components_check(node_index, SOFT_BODY_NODE) ||
+            !entity_index_components_check(node_index, ROHR_SOFT_BODY_NODE) ||
             !soft_body_nodes_pool.used[node_index]) {
         return ERROR_RESULT_MAKE_ERROR(SoftBodyNodeAnchorPinResult, ERROR_ENGINE_COMPONENT_MISSING);
     }
@@ -1823,9 +1825,9 @@ EntityResult physics_soft_body_beam_create(Entity soft_body, Entity node_a, Enti
     if(physics_live_index_get(soft_body, &body_index).kind == ERROR_RESULT_ERROR ||
             physics_live_index_get(node_a, &a_index).kind == ERROR_RESULT_ERROR ||
             physics_live_index_get(node_b, &b_index).kind == ERROR_RESULT_ERROR || node_a == node_b ||
-            !entity_index_components_check(body_index, SOFT_BODY) ||
-            !entity_index_components_check(a_index, SOFT_BODY_NODE) ||
-            !entity_index_components_check(b_index, SOFT_BODY_NODE) ||
+            !entity_index_components_check(body_index, ROHR_SOFT_BODY) ||
+            !entity_index_components_check(a_index, ROHR_SOFT_BODY_NODE) ||
+            !entity_index_components_check(b_index, ROHR_SOFT_BODY_NODE) ||
             soft_body_nodes[a_index].soft_body != soft_body ||
             soft_body_nodes[b_index].soft_body != soft_body || stiffness < 0.0f || damping < 0.0f) {
         return ERROR_RESULT_MAKE_ERROR(EntityResult, ERROR_ENGINE_STATE_INVALID);
@@ -1851,7 +1853,7 @@ EntityResult physics_soft_body_beam_create(Entity soft_body, Entity node_a, Enti
         (void)entity_delete(beam.result.value);
         return ERROR_RESULT_MAKE_ERROR(EntityResult, ERROR_MEMORY_POOL_ALLOCATION_FAILED);
     }
-    entity_mask[beam_index] |= SOFT_BODY_BEAM;
+    entity_mask[beam_index] |= ROHR_SOFT_BODY_BEAM;
     soft_bodies[body_index].beams[soft_bodies[body_index].beam_count++] = beam.result.value;
     return beam;
 }
@@ -1860,7 +1862,7 @@ SoftBodyBeamResult physics_soft_body_beam_get(Entity beam) {
     EntityIndex index;
     EngineResult result = physics_live_index_get(beam, &index);
     if(result.kind == ERROR_RESULT_ERROR) return ERROR_RESULT_MAKE_ERROR(SoftBodyBeamResult, result.result.error);
-    if(!entity_index_components_check(index, SOFT_BODY_BEAM) || !soft_body_beams_pool.used[index]) {
+    if(!entity_index_components_check(index, ROHR_SOFT_BODY_BEAM) || !soft_body_beams_pool.used[index]) {
         return ERROR_RESULT_MAKE_ERROR(SoftBodyBeamResult, ERROR_ENGINE_COMPONENT_MISSING);
     }
     return ERROR_RESULT_MAKE_VALUE(SoftBodyBeamResult, soft_body_beams[index]);
@@ -1874,13 +1876,13 @@ EntityResult physics_soft_body_triangle_create(Entity soft_body, Entity node_a, 
     EntityResult triangle;
 
     if(physics_live_index_get(soft_body, &body_index).kind == ERROR_RESULT_ERROR ||
-            !entity_index_components_check(body_index, SOFT_BODY) ||
+            !entity_index_components_check(body_index, ROHR_SOFT_BODY) ||
             node_a == node_b || node_b == node_c || node_a == node_c) {
         return ERROR_RESULT_MAKE_ERROR(EntityResult, ERROR_ENGINE_STATE_INVALID);
     }
     for(uint32_t i = 0; i < 3; i += 1) {
         if(physics_live_index_get(nodes_to_check[i], &indices[i]).kind == ERROR_RESULT_ERROR ||
-                !entity_index_components_check(indices[i], SOFT_BODY_NODE) ||
+                !entity_index_components_check(indices[i], ROHR_SOFT_BODY_NODE) ||
                 soft_body_nodes[indices[i]].soft_body != soft_body) {
             return ERROR_RESULT_MAKE_ERROR(EntityResult, ERROR_ENGINE_STATE_INVALID);
         }
@@ -1900,7 +1902,7 @@ EntityResult physics_soft_body_triangle_create(Entity soft_body, Entity node_a, 
         (void)entity_delete(triangle.result.value);
         return ERROR_RESULT_MAKE_ERROR(EntityResult, ERROR_MEMORY_POOL_ALLOCATION_FAILED);
     }
-    entity_mask[triangle_index] |= SOFT_BODY_TRIANGLE;
+    entity_mask[triangle_index] |= ROHR_SOFT_BODY_TRIANGLE;
     soft_bodies[body_index].triangles[soft_bodies[body_index].triangle_count++] = triangle.result.value;
     return triangle;
 }
@@ -1909,7 +1911,7 @@ SoftBodyTriangleResult physics_soft_body_triangle_get(Entity triangle) {
     EntityIndex index;
     EngineResult result = physics_live_index_get(triangle, &index);
     if(result.kind == ERROR_RESULT_ERROR) return ERROR_RESULT_MAKE_ERROR(SoftBodyTriangleResult, result.result.error);
-    if(!entity_index_components_check(index, SOFT_BODY_TRIANGLE) || !soft_body_triangles_pool.used[index]) {
+    if(!entity_index_components_check(index, ROHR_SOFT_BODY_TRIANGLE) || !soft_body_triangles_pool.used[index]) {
         return ERROR_RESULT_MAKE_ERROR(SoftBodyTriangleResult, ERROR_ENGINE_COMPONENT_MISSING);
     }
     return ERROR_RESULT_MAKE_VALUE(SoftBodyTriangleResult, soft_body_triangles[index]);
@@ -2102,6 +2104,30 @@ EngineResult physics_substeps_set(uint32_t substeps) {
 
 uint32_t physics_substeps_get(void) {
     return physics_substeps;
+}
+
+EngineResult physics_gravity_set(Acceleration gravity) {
+    if(!isfinite(gravity.x) || !isfinite(gravity.y)) {
+        return error_result_error(ERROR_ENGINE_STATE_INVALID);
+    }
+    physics_gravity = gravity;
+    return error_result_value(true);
+}
+
+Acceleration physics_gravity_get(void) {
+    return physics_gravity;
+}
+
+EngineResult physics_gravity_enable(Entity entity) {
+    return entity_components_add(entity, ROHR_GRAVITY);
+}
+
+EngineResult physics_gravity_disable(Entity entity) {
+    return entity_components_delete(entity, ROHR_GRAVITY);
+}
+
+bool physics_gravity_check(Entity entity) {
+    return entity_components_check(entity, ROHR_GRAVITY);
 }
 
 void physics_update(Tick ticks) {
