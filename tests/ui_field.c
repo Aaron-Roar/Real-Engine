@@ -17,6 +17,15 @@ static void key_add(SDL_Keycode key) {
     key_add_mod(key, SDL_KMOD_NONE);
 }
 
+static void repeated_key_add(SDL_Keycode key) {
+    SDL_Event event = {0};
+
+    event.type = SDL_EVENT_KEY_DOWN;
+    event.key.key = key;
+    event.key.repeat = true;
+    rohr_ui_field_event_add(&event);
+}
+
 int main(void) {
     UIRect bounds = {0.0f, 0.0f, 100.0f, 30.0f};
     float number = 0.0f;
@@ -37,6 +46,43 @@ int main(void) {
     rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f},
         .primary_button = MOUSE_BUTTON_STATE_RELEASED});
     if(!rohr_ui_interaction("primitive", bounds).clicked) return 1;
+    rohr_ui_frame_end();
+
+    snprintf(string, sizeof(string), "abcd");
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f},
+        .primary_button = MOUSE_BUTTON_STATE_PRESSED});
+    (void)rohr_ui_field("repeated-delete-string", (UIFieldBinding){
+        .kind = UI_FIELD_STRING, .string = string,
+        .string_capacity = sizeof(string)
+    }, NULL, bounds, NULL);
+    rohr_ui_frame_end();
+    repeated_key_add(SDLK_BACKSPACE);
+    repeated_key_add(SDLK_BACKSPACE);
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f}});
+    if(!rohr_ui_field("repeated-delete-string", (UIFieldBinding){
+            .kind = UI_FIELD_STRING, .string = string,
+            .string_capacity = sizeof(string)
+        }, NULL, bounds, NULL).changed || strcmp(string, "ab") != 0) {
+        fprintf(stderr, "repeated backspace produced '%s' instead of 'ab'\n", string);
+        return 1;
+    }
+    rohr_ui_frame_end();
+    key_add(SDLK_HOME);
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f}});
+    (void)rohr_ui_field("repeated-delete-string", (UIFieldBinding){
+        .kind = UI_FIELD_STRING, .string = string,
+        .string_capacity = sizeof(string)
+    }, NULL, bounds, NULL);
+    rohr_ui_frame_end();
+    repeated_key_add(SDLK_DELETE);
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f}});
+    if(!rohr_ui_field("repeated-delete-string", (UIFieldBinding){
+            .kind = UI_FIELD_STRING, .string = string,
+            .string_capacity = sizeof(string)
+        }, NULL, bounds, NULL).changed || strcmp(string, "b") != 0) {
+        fprintf(stderr, "repeated delete produced '%s' instead of 'b'\n", string);
+        return 1;
+    }
     rohr_ui_frame_end();
 
     snprintf(string, sizeof(string), "a b");

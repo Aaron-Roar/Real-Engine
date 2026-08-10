@@ -407,7 +407,7 @@ void ui_event_add(const SDL_Event *event) {
         ui_context.wheel_y += event->wheel.y;
         return;
     }
-    if(event->type != SDL_EVENT_KEY_DOWN || event->key.repeat ||
+    if(event->type != SDL_EVENT_KEY_DOWN ||
             ui_context.field_key_count >= UI_FIELD_KEY_EVENT_MAX) return;
     ui_context.field_keys[ui_context.field_key_count] = event->key.key;
     ui_context.field_modifiers[ui_context.field_key_count] = event->key.mod;
