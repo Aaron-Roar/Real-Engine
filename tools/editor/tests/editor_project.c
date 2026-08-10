@@ -54,6 +54,12 @@ int main(void) {
             chassis->rotation_locked || chassis->gravity_enabled) return 1;
     hitbox = &chassis->hitboxes[0];
     if(hitbox == NULL || !hitbox->visible || hitbox->vertex_count != 3) return 1;
+    editor_project_property_name_format(hitbox->vertices[0].name,
+        sizeof(hitbox->vertices[0].name), "front Point");
+    editor_project_property_name_format(hitbox->line_names[0],
+        sizeof(hitbox->line_names[0]), "upperEdge");
+    if(strcmp(hitbox->vertices[0].name, "front_point") != 0 ||
+            strcmp(hitbox->line_names[0], "upper_edge") != 0) return 1;
     first = hitbox->vertices[0].position;
     second = hitbox->vertices[1].position;
     if(!editor_project_hitbox_vertex_insert(&project, hitbox, 0) ||
@@ -62,8 +68,11 @@ int main(void) {
             !position_equal(hitbox->vertices[1].position, (Position){
                 (first.x + second.x) * 0.5f, (first.y + second.y) * 0.5f}) ||
             !position_equal(hitbox->vertices[2].position, second) ||
+            strcmp(hitbox->line_names[0], "upper_edge") != 0 ||
+            strcmp(hitbox->vertices[1].name, "vertex_4") != 0 ||
             !editor_project_hitbox_line_remove(hitbox, 0) ||
-            hitbox->vertex_count != 3) return 1;
+            hitbox->vertex_count != 3 ||
+            strcmp(hitbox->line_names[0], "upper_edge") != 0) return 1;
 
     joint = editor_project_joint_add(&project, object, EDITOR_JOINT_SPRING);
     if(joint == NULL || object->anchor_count != 0 || joint->anchor_a != 0 ||
@@ -188,7 +197,11 @@ int main(void) {
                 loaded.next_rigid_body_id != project.next_rigid_body_id ||
                 loaded.next_anchor_id != project.next_anchor_id ||
                 loaded.next_soft_node_id != project.next_soft_node_id ||
-                loaded.next_soft_beam_id != project.next_soft_beam_id) return 1;
+                loaded.next_soft_beam_id != project.next_soft_beam_id ||
+                strcmp(loaded_object->rigid_bodies[0].hitboxes[0].vertices[0].name,
+                    "front_point") != 0 ||
+                strcmp(loaded_object->rigid_bodies[0].hitboxes[0].line_names[0],
+                    "upper_edge") != 0) return 1;
     }
 
     editor_project_selection_clear(&project);

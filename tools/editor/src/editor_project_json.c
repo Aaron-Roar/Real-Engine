@@ -2,6 +2,7 @@
 
 #include "yyjson.h"
 
+#include <stdio.h>
 #include <string.h>
 
 static yyjson_mut_val *editor_json_position_write(yyjson_mut_doc *document,
@@ -60,19 +61,23 @@ static yyjson_mut_val *editor_json_hitbox_write(yyjson_mut_doc *document,
     const EditorHitbox *hitbox) {
     yyjson_mut_val *value = yyjson_mut_obj(document);
     yyjson_mut_val *vertices = yyjson_mut_arr(document);
+    yyjson_mut_val *lines = yyjson_mut_arr(document);
     yyjson_mut_obj_add_uint(document, value, "id", hitbox->id);
     yyjson_mut_obj_add_strcpy(document, value, "name", hitbox->name);
     yyjson_mut_obj_add_bool(document, value, "visible", hitbox->visible);
     for(size_t i = 0; i < hitbox->vertex_count; i += 1) {
         yyjson_mut_val *vertex = yyjson_mut_obj(document);
         yyjson_mut_obj_add_uint(document, vertex, "id", hitbox->vertices[i].id);
+        yyjson_mut_obj_add_strcpy(document, vertex, "name", hitbox->vertices[i].name);
         yyjson_mut_obj_add_val(document, vertex, "position",
             editor_json_position_write(document, hitbox->vertices[i].position));
         yyjson_mut_obj_add_bool(document, vertex, "position_locked",
             hitbox->vertices[i].position_locked);
         yyjson_mut_arr_add_val(vertices, vertex);
+        yyjson_mut_arr_add_strcpy(document, lines, hitbox->line_names[i]);
     }
     yyjson_mut_obj_add_val(document, value, "vertices", vertices);
+    yyjson_mut_obj_add_val(document, value, "lines", lines);
     return value;
 }
 
@@ -233,22 +238,43 @@ bool editor_project_save(const EditorProject *project, const char *path) {
 static bool editor_json_hitbox_read(yyjson_val *value, EditorHitbox *hitbox,
     EditorProject *project) {
     yyjson_val *vertices = yyjson_obj_get(value, "vertices");
+    yyjson_val *lines = yyjson_obj_get(value, "lines");
     size_t count;
     if(!yyjson_is_obj(value) || !editor_json_uint(value, "id", &hitbox->id) ||
             hitbox->id == 0 || !editor_json_name(value, hitbox->name) ||
             !editor_json_bool(value, "visible", &hitbox->visible) ||
-            !yyjson_is_arr(vertices)) return false;
+            !yyjson_is_arr(vertices) || (lines != NULL && !yyjson_is_arr(lines))) return false;
     editor_project_property_name_format(hitbox->name, sizeof(hitbox->name), hitbox->name);
     count = yyjson_arr_size(vertices);
-    if(count < EDITOR_HITBOX_VERTEX_MIN || count > EDITOR_HITBOX_VERTEX_MAX) return false;
+    if(count < EDITOR_HITBOX_VERTEX_MIN || count > EDITOR_HITBOX_VERTEX_MAX ||
+            (lines != NULL && yyjson_arr_size(lines) != count)) return false;
     hitbox->vertex_count = (uint32_t)count;
     for(size_t i = 0; i < count; i += 1) {
         yyjson_val *item = yyjson_arr_get(vertices, i);
+        yyjson_val *line = lines == NULL ? NULL : yyjson_arr_get(lines, i);
+        yyjson_val *name = yyjson_obj_get(item, "name");
         if(!yyjson_is_obj(item) || !editor_json_uint(item, "id", &hitbox->vertices[i].id) ||
                 hitbox->vertices[i].id == 0 || !editor_json_position_read(
                     yyjson_obj_get(item, "position"), &hitbox->vertices[i].position) ||
                 !editor_json_bool(item, "position_locked",
-                    &hitbox->vertices[i].position_locked)) return false;
+                    &hitbox->vertices[i].position_locked) ||
+                (name != NULL && (!yyjson_is_str(name) || yyjson_get_len(name) == 0 ||
+                    yyjson_get_len(name) >= EDITOR_OBJECT_NAME_MAX)) ||
+                (line != NULL && (!yyjson_is_str(line) || yyjson_get_len(line) == 0 ||
+                    yyjson_get_len(line) >= EDITOR_OBJECT_NAME_MAX))) {
+            return false;
+        }
+        if(name == NULL) snprintf(hitbox->vertices[i].name,
+            sizeof(hitbox->vertices[i].name), "vertex_%zu", i + 1);
+        else memcpy(hitbox->vertices[i].name, yyjson_get_str(name),
+            yyjson_get_len(name) + 1);
+        if(line == NULL) snprintf(hitbox->line_names[i],
+            sizeof(hitbox->line_names[i]), "line_%zu", i + 1);
+        else memcpy(hitbox->line_names[i], yyjson_get_str(line), yyjson_get_len(line) + 1);
+        editor_project_property_name_format(hitbox->vertices[i].name,
+            sizeof(hitbox->vertices[i].name), hitbox->vertices[i].name);
+        editor_project_property_name_format(hitbox->line_names[i],
+            sizeof(hitbox->line_names[i]), hitbox->line_names[i]);
         if(project->next_vertex_id <= hitbox->vertices[i].id)
             project->next_vertex_id = hitbox->vertices[i].id + 1;
     }
@@ -402,7 +428,7 @@ bool editor_project_load(EditorProject *project, const char *path) {
     objects = yyjson_obj_get(root, "objects");
     editor_project_init(&loaded);
     if(!yyjson_is_obj(root) || !editor_json_uint(root, "format_version", &version) ||
-            version != EDITOR_PROJECT_FORMAT_VERSION ||
+            (version == 0 || version > EDITOR_PROJECT_FORMAT_VERSION) ||
             !editor_json_uint(root, "selected", &loaded.selected) || !yyjson_is_arr(objects) ||
             yyjson_arr_size(objects) > EDITOR_OBJECT_MAX ||
             !editor_json_uint(root, "next_object_id", &loaded.next_id) ||

@@ -117,6 +117,10 @@ static void editor_hitbox_regular_set(EditorProject *project, EditorHitbox *hitb
                 sinf(angle) * radius
             }
         };
+        snprintf(hitbox->vertices[i].name, sizeof(hitbox->vertices[i].name),
+            "vertex_%u", i + 1);
+        snprintf(hitbox->line_names[i], sizeof(hitbox->line_names[i]),
+            "line_%u", i + 1);
     }
 }
 
@@ -413,9 +417,12 @@ bool editor_project_hitbox_vertex_remove(EditorHitbox *hitbox, uint32_t vertex_i
             vertex_index >= hitbox->vertex_count) return false;
     for(uint32_t i = vertex_index + 1; i < hitbox->vertex_count; i += 1) {
         hitbox->vertices[i - 1] = hitbox->vertices[i];
+        snprintf(hitbox->line_names[i - 1], sizeof(hitbox->line_names[i - 1]),
+            "%s", hitbox->line_names[i]);
     }
     hitbox->vertex_count -= 1;
     hitbox->vertices[hitbox->vertex_count] = (EditorVertex){0};
+    hitbox->line_names[hitbox->vertex_count][0] = '\0';
     return true;
 }
 
@@ -443,13 +450,22 @@ bool editor_project_hitbox_vertex_insert(EditorProject *project, EditorHitbox *h
                 hitbox->vertices[second].position.y) * 0.5f
         }
     };
+    snprintf(inserted.name, sizeof(inserted.name), "vertex_%u",
+        hitbox->vertex_count + 1);
     if(second == 0) {
         hitbox->vertices[hitbox->vertex_count] = inserted;
+        snprintf(hitbox->line_names[hitbox->vertex_count],
+            sizeof(hitbox->line_names[hitbox->vertex_count]), "line_%u",
+            hitbox->vertex_count + 1);
     } else {
         for(uint32_t i = hitbox->vertex_count; i > second; i -= 1) {
             hitbox->vertices[i] = hitbox->vertices[i - 1];
+            snprintf(hitbox->line_names[i], sizeof(hitbox->line_names[i]),
+                "%s", hitbox->line_names[i - 1]);
         }
         hitbox->vertices[second] = inserted;
+        snprintf(hitbox->line_names[second], sizeof(hitbox->line_names[second]),
+            "line_%u", hitbox->vertex_count + 1);
     }
     hitbox->vertex_count += 1;
     return true;

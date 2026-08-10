@@ -14,7 +14,7 @@
 #define EDITOR_SOFT_BODY_MAX 8
 #define EDITOR_SOFT_NODE_MAX 64
 #define EDITOR_SOFT_BEAM_MAX 128
-#define EDITOR_PROJECT_FORMAT_VERSION 1
+#define EDITOR_PROJECT_FORMAT_VERSION 2
 
 typedef uint32_t EditorObjectId;
 typedef uint32_t EditorVertexId;
@@ -30,6 +30,7 @@ typedef uint32_t EditorSoftBeamId;
 
 typedef struct EditorVertex {
     EditorVertexId id;
+    char name[EDITOR_OBJECT_NAME_MAX];
     Position position;
     bool position_locked;
 } EditorVertex;
@@ -39,6 +40,7 @@ typedef struct EditorHitbox {
     char name[EDITOR_OBJECT_NAME_MAX];
     bool visible;
     EditorVertex vertices[EDITOR_HITBOX_VERTEX_MAX];
+    char line_names[EDITOR_HITBOX_VERTEX_MAX][EDITOR_OBJECT_NAME_MAX];
     uint32_t vertex_count;
 } EditorHitbox;
 
