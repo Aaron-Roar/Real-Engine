@@ -4,12 +4,17 @@
 #include <stdio.h>
 #include <string.h>
 
-static void key_add(SDL_Keycode key) {
+static void key_add_mod(SDL_Keycode key, SDL_Keymod modifiers) {
     SDL_Event event = {0};
 
     event.type = SDL_EVENT_KEY_DOWN;
     event.key.key = key;
+    event.key.mod = modifiers;
     rohr_ui_field_event_add(&event);
+}
+
+static void key_add(SDL_Keycode key) {
+    key_add_mod(key, SDL_KMOD_NONE);
 }
 
 int main(void) {
@@ -34,6 +39,29 @@ int main(void) {
     if(!rohr_ui_interaction("primitive", bounds).clicked) return 1;
     rohr_ui_frame_end();
 
+    snprintf(string, sizeof(string), "a b");
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f},
+        .primary_button = MOUSE_BUTTON_STATE_PRESSED});
+    (void)rohr_ui_field("whitespace-cursor-string", (UIFieldBinding){
+        .kind = UI_FIELD_STRING, .string = string,
+        .string_capacity = sizeof(string)
+    }, NULL, bounds, NULL);
+    rohr_ui_frame_end();
+    key_add(SDLK_HOME);
+    key_add(SDLK_RIGHT);
+    key_add(SDLK_RIGHT);
+    key_add('X');
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f}});
+    if(!rohr_ui_field("whitespace-cursor-string", (UIFieldBinding){
+            .kind = UI_FIELD_STRING, .string = string,
+            .string_capacity = sizeof(string)
+        }, NULL, bounds, NULL).changed || strcmp(string, "a Xb") != 0) {
+        fprintf(stderr, "whitespace cursor produced '%s' instead of 'a Xb'\n", string);
+        return 1;
+    }
+    rohr_ui_frame_end();
+
+    snprintf(string, sizeof(string), "a");
     rohr_ui_frame_begin((UIInput){
         .pointer = {10.0f, 10.0f},
         .primary_button = MOUSE_BUTTON_STATE_PRESSED
@@ -75,6 +103,59 @@ int main(void) {
     }
     rohr_ui_frame_end();
 
+    key_add_mod(SDLK_A, SDL_KMOD_CTRL);
+    key_add('z');
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f}});
+    if(!rohr_ui_field("string", (UIFieldBinding){
+            .kind = UI_FIELD_STRING, .string = string,
+            .string_capacity = sizeof(string)
+        }, NULL, bounds, NULL).changed || strcmp(string, "z") != 0) {
+        fprintf(stderr, "Ctrl+A replacement produced '%s' instead of 'z'\n", string);
+        return 1;
+    }
+    rohr_ui_frame_end();
+
+    key_add_mod(SDLK_A, SDL_KMOD_CTRL);
+    key_add(SDLK_DELETE);
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f}});
+    if(!rohr_ui_field("string", (UIFieldBinding){
+            .kind = UI_FIELD_STRING, .string = string,
+            .string_capacity = sizeof(string)
+        }, NULL, bounds, NULL).changed || string[0] != '\0') {
+        fprintf(stderr, "Ctrl+A delete produced '%s' instead of empty text\n", string);
+        return 1;
+    }
+    rohr_ui_frame_end();
+
+    snprintf(string, sizeof(string), "abcd");
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f},
+        .primary_button = MOUSE_BUTTON_STATE_PRESSED});
+    (void)rohr_ui_field("cursor-string", (UIFieldBinding){
+        .kind = UI_FIELD_STRING, .string = string,
+        .string_capacity = sizeof(string)
+    }, NULL, bounds, NULL);
+    rohr_ui_frame_end();
+    key_add(SDLK_LEFT);
+    key_add(SDLK_LEFT);
+    key_add('X');
+    key_add(SDLK_DELETE);
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f}});
+    if(!rohr_ui_field("cursor-string", (UIFieldBinding){
+            .kind = UI_FIELD_STRING, .string = string,
+            .string_capacity = sizeof(string)
+        }, NULL, bounds, NULL).changed || strcmp(string, "abXd") != 0) {
+        fprintf(stderr, "cursor editing produced '%s' instead of 'abXd'\n", string);
+        return 1;
+    }
+    rohr_ui_frame_end();
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f},
+        .primary_button = MOUSE_BUTTON_STATE_RELEASED});
+    (void)rohr_ui_field("cursor-string", (UIFieldBinding){
+        .kind = UI_FIELD_STRING, .string = string,
+        .string_capacity = sizeof(string)
+    }, NULL, bounds, NULL);
+    rohr_ui_frame_end();
+
     rohr_ui_frame_begin((UIInput){
         .pointer = {10.0f, 10.0f},
         .primary_button = MOUSE_BUTTON_STATE_PRESSED
@@ -85,7 +166,10 @@ int main(void) {
         .pointer = {10.0f, 10.0f},
         .primary_button = MOUSE_BUTTON_STATE_RELEASED
     });
-    if(!rohr_ui_button("double-click", NULL, bounds, NULL).clicked) return 1;
+    if(!rohr_ui_button("double-click", NULL, bounds, NULL).clicked) {
+        fprintf(stderr, "first button click failed\n");
+        return 1;
+    }
     rohr_ui_frame_end();
     rohr_ui_frame_begin((UIInput){
         .pointer = {10.0f, 10.0f},
@@ -97,7 +181,10 @@ int main(void) {
         .pointer = {10.0f, 10.0f},
         .primary_button = MOUSE_BUTTON_STATE_RELEASED
     });
-    if(!rohr_ui_button("double-click", NULL, bounds, NULL).double_clicked) return 1;
+    if(!rohr_ui_button("double-click", NULL, bounds, NULL).double_clicked) {
+        fprintf(stderr, "double button click failed\n");
+        return 1;
+    }
     rohr_ui_frame_end();
 
     rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f},

@@ -31,8 +31,10 @@ typedef struct UIContext {
     bool field_seen;
     char field_edit[UI_FIELD_EDIT_MAX];
     SDL_Keycode field_keys[UI_FIELD_KEY_EVENT_MAX];
+    SDL_Keymod field_modifiers[UI_FIELD_KEY_EVENT_MAX];
     size_t field_key_count;
-    bool field_replace_pending;
+    size_t field_cursor;
+    bool field_select_all;
     uint64_t dropdown_id;
     bool dropdown_seen;
     uint64_t dropdown_render_id;
@@ -407,7 +409,9 @@ void ui_event_add(const SDL_Event *event) {
     }
     if(event->type != SDL_EVENT_KEY_DOWN || event->key.repeat ||
             ui_context.field_key_count >= UI_FIELD_KEY_EVENT_MAX) return;
-    ui_context.field_keys[ui_context.field_key_count++] = event->key.key;
+    ui_context.field_keys[ui_context.field_key_count] = event->key.key;
+    ui_context.field_modifiers[ui_context.field_key_count] = event->key.mod;
+    ui_context.field_key_count += 1;
 }
 
 void ui_field_event_add(const SDL_Event *event) {
@@ -423,35 +427,79 @@ static void ui_field_binding_display_set(UIFieldBinding binding, TextAsset *disp
         snprintf(value, sizeof(value), "%s", binding.string);
     }
     snprintf(ui_context.field_edit, sizeof(ui_context.field_edit), "%s", value);
+    ui_context.field_cursor = strlen(ui_context.field_edit);
     if(display != NULL) (void)graphics_text_value_set(display, value);
 }
 
-static bool ui_field_character_add(UIFieldBinding binding, char character) {
-    size_t length = strlen(ui_context.field_edit);
-
-    if(binding.kind == UI_FIELD_FLOAT) {
-        char *decimal;
-
-        if(character == ',') return false;
-        if(character != '-' && character != '.' &&
-                (character < '0' || character > '9')) return false;
-        if(ui_context.field_replace_pending) {
-            ui_context.field_edit[0] = '\0';
-            length = 0;
+static bool ui_field_value_valid(UIFieldBinding binding, const char *value) {
+    bool decimal = false;
+    size_t decimal_digits = 0;
+    if(binding.kind != UI_FIELD_FLOAT) return true;
+    for(size_t i = 0; value[i] != '\0'; i += 1) {
+        char character = value[i];
+        if(character == '-' && i == 0) continue;
+        if(character == '.' && !decimal) {
+            decimal = true;
+            continue;
         }
-        decimal = strchr(ui_context.field_edit, '.');
-        if(character == '-' && length != 0) return false;
-        if(character == '.' && decimal != NULL) return false;
-        if(decimal != NULL && character >= '0' && character <= '9' &&
-                strlen(decimal + 1) >= 1) return false;
-    } else if(character < 32 || character > 126) {
-        return false;
+        if(character < '0' || character > '9') return false;
+        if(decimal && ++decimal_digits > 1) return false;
     }
-    ui_context.field_replace_pending = false;
-    if(length + 1 >= sizeof(ui_context.field_edit)) return false;
-    ui_context.field_edit[length] = character;
-    ui_context.field_edit[length + 1] = '\0';
     return true;
+}
+
+static bool ui_field_character_add(UIFieldBinding binding, char character) {
+    char candidate[UI_FIELD_EDIT_MAX];
+    size_t length = strlen(ui_context.field_edit);
+    size_t cursor = ui_context.field_cursor;
+
+    if(character < 32 || character > 126 || character == ',') return false;
+    if(ui_context.field_select_all) length = cursor = 0;
+    if(length + 1 >= sizeof(ui_context.field_edit)) return false;
+    if(ui_context.field_select_all) candidate[0] = '\0';
+    else memcpy(candidate, ui_context.field_edit, length + 1);
+    memmove(candidate + cursor + 1, candidate + cursor, length - cursor + 1);
+    candidate[cursor] = character;
+    if(!ui_field_value_valid(binding, candidate)) return false;
+    memcpy(ui_context.field_edit, candidate, length + 2);
+    ui_context.field_cursor = cursor + 1;
+    ui_context.field_select_all = false;
+    return true;
+}
+
+static float ui_field_text_width_get(const TextAsset *display, size_t length) {
+    TTF_Font *font;
+    int width = 0;
+    int height = 0;
+
+    if(display == NULL || display->text == NULL || length == 0) return 0.0f;
+    font = TTF_GetTextFont(display->text);
+    if(font == NULL || !TTF_GetStringSize(font, ui_context.field_edit, length,
+            &width, &height)) return 0.0f;
+    return (float)width;
+}
+
+static void ui_field_cursor_from_pointer(const TextAsset *display, UIRect bounds) {
+    size_t length = strlen(ui_context.field_edit);
+    if(display == NULL || display->text == NULL || length == 0) {
+        ui_context.field_cursor = length;
+        return;
+    }
+    {
+        float text_width = ui_field_text_width_get(display, length);
+        float left = bounds.x + (bounds.width - text_width) * 0.5f;
+        float pointer_x = ui_context.input.pointer.x - left;
+        float closest_distance = fabsf(pointer_x);
+        ui_context.field_cursor = 0;
+        for(size_t cursor = 1; cursor <= length; cursor += 1) {
+            float cursor_x = ui_field_text_width_get(display, cursor);
+            float distance = fabsf(pointer_x - cursor_x);
+            if(distance < closest_distance) {
+                closest_distance = distance;
+                ui_context.field_cursor = cursor;
+            }
+        }
+    }
 }
 
 static bool ui_field_binding_store(UIFieldBinding binding) {
@@ -481,41 +529,89 @@ UIFieldResult ui_field(const char *id, UIFieldBinding binding,
     if(!ui_context.frame_active || field_id == 0 || bounds.width <= 0.0f ||
             bounds.height <= 0.0f) return result;
     interaction = ui_interaction(id, bounds);
+    resolved_bounds = ui_bounds_resolve(bounds);
     result.hovered = interaction.hovered;
-    if((result.hovered && ui_context.input.primary_button == MOUSE_BUTTON_STATE_PRESSED) ||
-            interaction.keyboard_activated) {
+    if(result.hovered && ui_context.input.primary_button == MOUSE_BUTTON_STATE_PRESSED) {
+        bool newly_active = ui_context.field_id != field_id;
+        if(newly_active) ui_field_binding_display_set(binding, display);
         ui_context.field_id = field_id;
-        ui_context.field_replace_pending = binding.kind == UI_FIELD_FLOAT;
+        ui_context.field_select_all = newly_active && binding.kind == UI_FIELD_FLOAT;
+        if(!ui_context.field_select_all) {
+            ui_field_cursor_from_pointer(display, resolved_bounds);
+        }
+    } else if(interaction.keyboard_activated) {
+        ui_context.field_id = field_id;
+        ui_context.field_select_all = false;
         ui_field_binding_display_set(binding, display);
     } else if(ui_context.input.primary_button == MOUSE_BUTTON_STATE_PRESSED &&
             ui_context.field_id == field_id && !result.hovered) {
         ui_context.field_id = 0;
+        ui_context.field_select_all = false;
     }
     result.active = ui_context.field_id == field_id;
     if(result.active) ui_context.field_seen = true;
     if(result.active) {
         for(size_t i = 0; i < ui_context.field_key_count; i += 1) {
             SDL_Keycode key = ui_context.field_keys[i];
+            SDL_Keymod modifiers = ui_context.field_modifiers[i];
             bool edited = false;
 
-            if(key == SDLK_RETURN || key == SDLK_KP_ENTER) {
+            if((modifiers & SDL_KMOD_CTRL) && key == SDLK_A) {
+                ui_context.field_select_all = true;
+                ui_context.field_cursor = strlen(ui_context.field_edit);
+            } else if(key == SDLK_RETURN || key == SDLK_KP_ENTER) {
                 if(interaction.keyboard_activated) continue;
                 result.submitted = true;
                 ui_context.field_id = 0;
             } else if(key == SDLK_ESCAPE) {
                 ui_field_binding_display_set(binding, display);
                 ui_context.field_id = 0;
+                ui_context.field_select_all = false;
+            } else if(key == SDLK_LEFT || key == SDLK_RIGHT ||
+                    key == SDLK_UP || key == SDLK_DOWN || key == SDLK_HOME ||
+                    key == SDLK_END) {
+                size_t length = strlen(ui_context.field_edit);
+                if(ui_context.field_select_all) {
+                    ui_context.field_cursor = key == SDLK_LEFT || key == SDLK_UP ||
+                        key == SDLK_HOME ? 0 : length;
+                    ui_context.field_select_all = false;
+                } else if((key == SDLK_LEFT && ui_context.field_cursor > 0)) {
+                    ui_context.field_cursor -= 1;
+                } else if(key == SDLK_RIGHT && ui_context.field_cursor < length) {
+                    ui_context.field_cursor += 1;
+                } else if(key == SDLK_UP || key == SDLK_HOME) {
+                    ui_context.field_cursor = 0;
+                } else if(key == SDLK_DOWN || key == SDLK_END) {
+                    ui_context.field_cursor = length;
+                }
             } else if(key == SDLK_BACKSPACE) {
                 size_t length = strlen(ui_context.field_edit);
-                if(ui_context.field_replace_pending) {
+                if(ui_context.field_select_all) {
                     ui_context.field_edit[0] = '\0';
-                    ui_context.field_replace_pending = false;
+                    ui_context.field_cursor = 0;
+                    ui_context.field_select_all = false;
                     edited = true;
-                } else if(length > 0) {
-                    ui_context.field_edit[length - 1] = '\0';
+                } else if(ui_context.field_cursor > 0) {
+                    memmove(ui_context.field_edit + ui_context.field_cursor - 1,
+                        ui_context.field_edit + ui_context.field_cursor,
+                        length - ui_context.field_cursor + 1);
+                    ui_context.field_cursor -= 1;
                     edited = true;
                 }
-            } else if(key >= 0 && key <= 127) {
+            } else if(key == SDLK_DELETE) {
+                size_t length = strlen(ui_context.field_edit);
+                if(ui_context.field_select_all) {
+                    ui_context.field_edit[0] = '\0';
+                    ui_context.field_cursor = 0;
+                    ui_context.field_select_all = false;
+                    edited = true;
+                } else if(ui_context.field_cursor < length) {
+                    memmove(ui_context.field_edit + ui_context.field_cursor,
+                        ui_context.field_edit + ui_context.field_cursor + 1,
+                        length - ui_context.field_cursor);
+                    edited = true;
+                }
+            } else if(!(modifiers & SDL_KMOD_CTRL) && key >= 0 && key <= 127) {
                 edited = ui_field_character_add(binding, (char)key);
             }
             if(edited && ui_field_binding_store(binding)) result.changed = true;
@@ -532,12 +628,30 @@ UIFieldResult ui_field(const char *id, UIFieldBinding binding,
             (void)graphics_text_value_set(display, binding.string);
         }
     }
-    resolved_bounds = ui_bounds_resolve(bounds);
     ui_surface_raw(resolved_bounds,
         result.active ? resolved.hovered :
             ((result.hovered || interaction.focused) ? resolved.hovered : resolved.idle));
     if(result.active) {
         ui_border_raw(resolved_bounds, 2.0f, (Color){165, 195, 245, 255});
+        if(display != NULL && display->text != NULL) {
+            bool clipped = ui_clip_raw_begin(resolved_bounds);
+            float text_width = ui_field_text_width_get(display,
+                strlen(ui_context.field_edit));
+            float text_left = resolved_bounds.x +
+                (resolved_bounds.width - text_width) * 0.5f;
+            float text_top = resolved_bounds.y +
+                (resolved_bounds.height - display->size.y) * 0.5f;
+            if(ui_context.field_select_all && text_width > 0.0f) {
+                ui_surface_raw((UIRect){text_left, text_top, text_width,
+                    display->size.y}, (Color){80, 120, 185, 210});
+            } else {
+                float cursor_x = text_left +
+                    ui_field_text_width_get(display, ui_context.field_cursor);
+                ui_surface_raw((UIRect){cursor_x, text_top, 1.0f,
+                    display->size.y}, (Color){245, 248, 252, 255});
+            }
+            if(clipped) ui_clip_end();
+        }
     }
     ui_label_raw(display, resolved_bounds);
     return result;
