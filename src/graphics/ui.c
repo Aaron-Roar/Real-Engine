@@ -476,6 +476,7 @@ UIFieldResult ui_field(const char *id, UIFieldBinding binding,
     UIButtonStyle resolved = style == NULL ? ui_button_style_default_get() : *style;
     uint64_t field_id = ui_hash_id(id);
     UIButtonResult interaction;
+    UIRect resolved_bounds;
 
     if(!ui_context.frame_active || field_id == 0 || bounds.width <= 0.0f ||
             bounds.height <= 0.0f) return result;
@@ -531,10 +532,14 @@ UIFieldResult ui_field(const char *id, UIFieldBinding binding,
             (void)graphics_text_value_set(display, binding.string);
         }
     }
-    ui_surface(bounds,
-        result.active ? resolved.pressed :
+    resolved_bounds = ui_bounds_resolve(bounds);
+    ui_surface_raw(resolved_bounds,
+        result.active ? resolved.hovered :
             ((result.hovered || interaction.focused) ? resolved.hovered : resolved.idle));
-    ui_content(display, bounds);
+    if(result.active) {
+        ui_border_raw(resolved_bounds, 2.0f, (Color){165, 195, 245, 255});
+    }
+    ui_label_raw(display, resolved_bounds);
     return result;
 }
 
