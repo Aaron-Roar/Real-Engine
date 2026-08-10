@@ -1942,6 +1942,8 @@ int main(void) {
                         EDITOR_TOOLS_WIDTH - 140.0f, 34.0f}, NULL);
                     field_editing = name_result.active;
                     if(name_result.changed) {
+                        editor_project_object_name_format(selected->name,
+                            sizeof(selected->name), selected->name);
                         snprintf(object_name_cache[selected_index],
                             EDITOR_OBJECT_NAME_MAX, "%s", selected->name);
                     }

@@ -27,10 +27,23 @@ int main(void) {
     EditorSoftBeam *beam;
     Position first;
     Position second;
+    char formatted[EDITOR_OBJECT_NAME_MAX];
+
+    editor_project_object_name_format(formatted, sizeof(formatted), "fast car");
+    if(strcmp(formatted, "FastCar") != 0) return 1;
+    editor_project_object_name_format(formatted, sizeof(formatted), "3d box");
+    if(strcmp(formatted, "Object3dBox") != 0) return 1;
+    editor_project_property_name_format(formatted, sizeof(formatted), "carBody");
+    if(strcmp(formatted, "car_body") != 0) return 1;
+    editor_project_property_name_format(formatted, sizeof(formatted), "HTTPServer");
+    if(strcmp(formatted, "http_server") != 0) return 1;
+    editor_project_property_name_format(formatted, sizeof(formatted), "struct");
+    if(strcmp(formatted, "item_struct") != 0) return 1;
 
     editor_project_init(&project);
     object = editor_project_object_add(&project, (Position){10.0f, 20.0f});
-    if(object == NULL || !object->visible || project.selected != object->id) return 1;
+    if(object == NULL || strcmp(object->name, "Object1") != 0 ||
+            !object->visible || project.selected != object->id) return 1;
     chassis = editor_project_rigid_body_add(&project, object);
     wheel = editor_project_rigid_body_add(&project, object);
     if(chassis == NULL || wheel == NULL || chassis->id == wheel->id ||

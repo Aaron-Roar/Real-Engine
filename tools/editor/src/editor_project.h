@@ -152,6 +152,10 @@ typedef struct EditorProject {
 } EditorProject;
 
 void editor_project_init(EditorProject *project);
+void editor_project_object_name_format(char *output, size_t capacity,
+    const char *input);
+void editor_project_property_name_format(char *output, size_t capacity,
+    const char *input);
 bool editor_project_save(const EditorProject *project, const char *path);
 bool editor_project_load(EditorProject *project, const char *path);
 EditorObject *editor_project_object_add(EditorProject *project, Position position);

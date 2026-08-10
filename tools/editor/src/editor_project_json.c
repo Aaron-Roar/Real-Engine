@@ -238,6 +238,7 @@ static bool editor_json_hitbox_read(yyjson_val *value, EditorHitbox *hitbox,
             hitbox->id == 0 || !editor_json_name(value, hitbox->name) ||
             !editor_json_bool(value, "visible", &hitbox->visible) ||
             !yyjson_is_arr(vertices)) return false;
+    editor_project_property_name_format(hitbox->name, sizeof(hitbox->name), hitbox->name);
     count = yyjson_arr_size(vertices);
     if(count < EDITOR_HITBOX_VERTEX_MIN || count > EDITOR_HITBOX_VERTEX_MAX) return false;
     hitbox->vertex_count = (uint32_t)count;
@@ -272,6 +273,7 @@ static bool editor_json_body_read(yyjson_val *value, EditorRigidBody *body,
             !editor_json_bool(value, "visible", &body->visible) || !yyjson_is_arr(hitboxes)) {
         return false;
     }
+    editor_project_property_name_format(body->name, sizeof(body->name), body->name);
     count = (uint32_t)yyjson_arr_size(hitboxes);
     if(count > EDITOR_BODY_HITBOX_MAX) return false;
     body->hitbox_count = count;
@@ -292,6 +294,7 @@ static bool editor_json_anchor_read(yyjson_val *value, EditorAnchor *anchor,
             !editor_json_bool(value, "position_follows_body", &anchor->position_follows_body) ||
             !editor_json_bool(value, "rotation_follows_body", &anchor->rotation_follows_body) ||
             !editor_json_bool(value, "visible", &anchor->visible)) return false;
+    editor_project_property_name_format(anchor->name, sizeof(anchor->name), anchor->name);
     if(project->next_anchor_id <= anchor->id) project->next_anchor_id = anchor->id + 1;
     return true;
 }
@@ -310,6 +313,7 @@ static bool editor_json_joint_read(yyjson_val *value, EditorJoint *joint,
             !editor_json_real(value, "rest_angle", &joint->rest_angle) ||
             !editor_json_real(value, "visual_size", &joint->visual_size) ||
             !editor_json_bool(value, "visible", &joint->visible)) return false;
+    editor_project_property_name_format(joint->name, sizeof(joint->name), joint->name);
     joint->kind = (EditorJointKind)kind;
     if(project->next_joint_id <= joint->id) project->next_joint_id = joint->id + 1;
     return true;
@@ -325,6 +329,7 @@ static bool editor_json_soft_body_read(yyjson_val *value, EditorSoftBody *body,
             !editor_json_bool(value, "visible", &body->visible) || !yyjson_is_arr(nodes) ||
             !yyjson_is_arr(beams) || yyjson_arr_size(nodes) > EDITOR_SOFT_NODE_MAX ||
             yyjson_arr_size(beams) > EDITOR_SOFT_BEAM_MAX) return false;
+    editor_project_property_name_format(body->name, sizeof(body->name), body->name);
     body->node_count = yyjson_arr_size(nodes);
     body->beam_count = yyjson_arr_size(beams);
     for(size_t i = 0; i < body->node_count; i += 1) {
@@ -336,6 +341,7 @@ static bool editor_json_soft_body_read(yyjson_val *value, EditorSoftBody *body,
                 !editor_json_real(item, "mass", &node->node_mass) ||
                 !editor_json_bool(item, "gravity_enabled", &node->gravity_enabled) ||
                 !editor_json_bool(item, "visible", &node->visible)) return false;
+        editor_project_property_name_format(node->name, sizeof(node->name), node->name);
         if(project->next_soft_node_id <= node->id) project->next_soft_node_id = node->id + 1;
     }
     for(size_t i = 0; i < body->beam_count; i += 1) {
@@ -347,6 +353,7 @@ static bool editor_json_soft_body_read(yyjson_val *value, EditorSoftBody *body,
                 !editor_json_uint(item, "node_b", &beam->node_b) ||
                 !editor_json_real(item, "stiffness", &beam->stiffness) ||
                 !editor_json_bool(item, "visible", &beam->visible)) return false;
+        editor_project_property_name_format(beam->name, sizeof(beam->name), beam->name);
         if(project->next_soft_beam_id <= beam->id) project->next_soft_beam_id = beam->id + 1;
     }
     if(project->next_soft_body_id <= body->id) project->next_soft_body_id = body->id + 1;
@@ -430,6 +437,7 @@ bool editor_project_load(EditorProject *project, const char *path) {
                     yyjson_arr_size(joint_values) > EDITOR_JOINT_MAX ||
                 !yyjson_is_arr(soft_body_values) ||
                     yyjson_arr_size(soft_body_values) > EDITOR_SOFT_BODY_MAX) goto done;
+        editor_project_object_name_format(object->name, sizeof(object->name), object->name);
         object->rigid_body_count = yyjson_arr_size(bodies);
         object->anchor_count = yyjson_arr_size(anchors);
         object->joint_count = yyjson_arr_size(joint_values);

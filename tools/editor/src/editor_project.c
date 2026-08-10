@@ -1,7 +1,93 @@
 #include "editor_project.h"
 
 #include <math.h>
+#include <ctype.h>
 #include <stdio.h>
+#include <string.h>
+
+static bool editor_name_c_keyword(const char *name) {
+    static const char *keywords[] = {
+        "auto", "break", "case", "char", "const", "continue", "default",
+        "do", "double", "else", "enum", "extern", "float", "for", "goto",
+        "if", "inline", "int", "long", "register", "restrict", "return",
+        "short", "signed", "sizeof", "static", "struct", "switch", "typedef",
+        "union", "unsigned", "void", "volatile", "while", "_alignas",
+        "_alignof", "_atomic", "_bool", "_complex", "_generic", "_imaginary",
+        "_noreturn", "_static_assert", "_thread_local"
+    };
+    for(size_t i = 0; i < sizeof(keywords) / sizeof(keywords[0]); i += 1) {
+        if(strcmp(name, keywords[i]) == 0) return true;
+    }
+    return false;
+}
+
+static bool editor_name_word_start(const char *input, size_t index) {
+    unsigned char current = (unsigned char)input[index];
+    unsigned char previous = index == 0 ? 0 : (unsigned char)input[index - 1];
+    unsigned char next = (unsigned char)input[index + 1];
+    if(!isalnum(current)) return false;
+    if(index == 0 || !isalnum(previous)) return true;
+    if(isupper(current) && (islower(previous) || isdigit(previous))) return true;
+    return isupper(current) && isupper(previous) && islower(next);
+}
+
+void editor_project_object_name_format(char *output, size_t capacity,
+    const char *input) {
+    char formatted[EDITOR_OBJECT_NAME_MAX] = {0};
+    size_t written = 0;
+    bool word = false;
+    if(output == NULL || capacity == 0) return;
+    if(input != NULL) {
+        for(size_t i = 0; input[i] != '\0' && written + 1 < sizeof(formatted); i += 1) {
+            unsigned char character = (unsigned char)input[i];
+            bool start = editor_name_word_start(input, i);
+            if(!isalnum(character)) {
+                word = false;
+                continue;
+            }
+            if(start || !word) {
+                formatted[written++] = (char)toupper(character);
+                word = true;
+            } else {
+                formatted[written++] = (char)tolower(character);
+            }
+        }
+    }
+    if(written == 0) snprintf(formatted, sizeof(formatted), "Object");
+    if(isdigit((unsigned char)formatted[0])) {
+        char prefixed[EDITOR_OBJECT_NAME_MAX];
+        snprintf(prefixed, sizeof(prefixed), "Object%s", formatted);
+        snprintf(formatted, sizeof(formatted), "%s", prefixed);
+    }
+    snprintf(output, capacity, "%s", formatted);
+}
+
+void editor_project_property_name_format(char *output, size_t capacity,
+    const char *input) {
+    char formatted[EDITOR_OBJECT_NAME_MAX] = {0};
+    size_t written = 0;
+    bool have_word = false;
+    if(output == NULL || capacity == 0) return;
+    if(input != NULL) {
+        for(size_t i = 0; input[i] != '\0' && written + 1 < sizeof(formatted); i += 1) {
+            unsigned char character = (unsigned char)input[i];
+            bool start = editor_name_word_start(input, i);
+            if(!isalnum(character)) continue;
+            if(start && have_word && written + 2 < sizeof(formatted)) {
+                formatted[written++] = '_';
+            }
+            formatted[written++] = (char)tolower(character);
+            have_word = true;
+        }
+    }
+    if(written == 0) snprintf(formatted, sizeof(formatted), "item");
+    if(isdigit((unsigned char)formatted[0]) || editor_name_c_keyword(formatted)) {
+        char prefixed[EDITOR_OBJECT_NAME_MAX];
+        snprintf(prefixed, sizeof(prefixed), "item_%s", formatted);
+        snprintf(formatted, sizeof(formatted), "%s", prefixed);
+    }
+    snprintf(output, capacity, "%s", formatted);
+}
 
 static uint32_t editor_vertex_count_clamp(uint32_t vertex_count) {
     if(vertex_count < EDITOR_HITBOX_VERTEX_MIN) {
@@ -59,7 +145,7 @@ EditorObject *editor_project_object_add(EditorProject *project, Position positio
         .position = position,
         .visible = true
     };
-    snprintf(object->name, sizeof(object->name), "object_%u", object->id);
+    snprintf(object->name, sizeof(object->name), "Object%u", object->id);
     project->selected = object->id;
     return object;
 }
