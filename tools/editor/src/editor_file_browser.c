@@ -1,5 +1,6 @@
 #include "editor_file_browser.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -328,11 +329,60 @@ EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
     }
     rohr_ui_scroll_region_end();
     if(directory_mode) {
+        float tree_inset = 24.0f;
+        float tree_spine_x = right_x + 10.0f;
+        float selected_y = 0.0f;
+        bool selected_y_found = false;
+        char parent_path[EDITOR_FILE_BROWSER_PATH_MAX];
+        Color tree_color = {235, 238, 244, 255};
+
+        if(editor_file_browser_parent_path_get(browser, parent_path,
+                sizeof(parent_path)) &&
+                strcmp(parent_path, browser->selected_directory) == 0) {
+            selected_y = dialog.y + 64.0f - browser->scroll_offset;
+            selected_y_found = true;
+        }
+        for(size_t i = 0; !selected_y_found && i < browser->entry_count; i += 1) {
+            char path[EDITOR_FILE_BROWSER_PATH_MAX];
+            if(browser->entries[i].directory &&
+                    editor_file_browser_path_join(path, sizeof(path), browser->directory,
+                        browser->entries[i].name) &&
+                    strcmp(path, browser->selected_directory) == 0) {
+                selected_y = dialog.y + 96.0f + (float)i * 32.0f -
+                    browser->scroll_offset;
+                selected_y_found = true;
+            }
+        }
+        if(selected_y_found) {
+            bool clipped = rohr_ui_clip_begin((UIRect){dialog.x + 14.0f,
+                dialog.y + 50.0f, dialog.width - 28.0f, list_height});
+            float left_edge = dialog.x + 14.0f + left_width;
+            rohr_ui_surface((UIRect){left_edge, selected_y - 1.0f,
+                tree_spine_x - left_edge, 2.0f}, tree_color);
+            if(browser->preview_count > 0) {
+                float first_y = dialog.y + 96.0f - browser->preview_scroll_offset;
+                float last_y = first_y +
+                    (float)(browser->preview_count - 1) * 32.0f;
+                float vertical_top = fminf(selected_y, first_y);
+                float vertical_bottom = fmaxf(selected_y, last_y);
+                rohr_ui_surface((UIRect){tree_spine_x - 1.0f, vertical_top,
+                    2.0f, vertical_bottom - vertical_top + 1.0f}, tree_color);
+                for(size_t i = 0; i < browser->preview_count; i += 1) {
+                    float branch_y = dialog.y + 96.0f + (float)i * 32.0f -
+                        browser->preview_scroll_offset;
+                    rohr_ui_surface((UIRect){tree_spine_x, branch_y - 1.0f,
+                        tree_inset - 10.0f, 2.0f}, tree_color);
+                }
+            }
+            if(clipped) rohr_ui_clip_end();
+        }
         rohr_ui_label(&browser->selected_directory_label,
-            (UIRect){right_x, dialog.y + 50.0f, left_width, 28.0f});
+            (UIRect){right_x + tree_inset, dialog.y + 50.0f,
+                left_width - tree_inset, 28.0f});
         browser->preview_scroll_offset = rohr_ui_scroll_region_begin(
             "editor.file_browser.preview_scroll",
-            (UIRect){right_x, dialog.y + 82.0f, left_width, list_height - 32.0f},
+            (UIRect){right_x + tree_inset, dialog.y + 82.0f,
+                left_width - tree_inset, list_height - 32.0f},
             32.0f * (float)browser->preview_count,
             browser->preview_scroll_offset, 38.0f).offset;
         for(size_t i = 0; i < browser->preview_count; i += 1) {
@@ -347,8 +397,10 @@ EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
 
             snprintf(id, sizeof(id), "editor.file_browser.preview.%zu", i);
             interaction = rohr_ui_button(id, &browser->preview_labels[i],
-                (UIRect){right_x, dialog.y + 82.0f + (float)i * 32.0f,
-                    left_width, 28.0f}, selected ? &selected_style : NULL);
+                (UIRect){right_x + tree_inset,
+                    dialog.y + 82.0f + (float)i * 32.0f,
+                    left_width - tree_inset, 28.0f},
+                selected ? &selected_style : NULL);
             if(!interaction.clicked || !have_path) continue;
             if(interaction.double_clicked && browser->preview_entries[i].directory) {
                 editor_file_browser_preview_clear(browser);
