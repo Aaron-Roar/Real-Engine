@@ -168,6 +168,8 @@ void editor_project_object_name_format(char *output, size_t capacity,
     const char *input);
 void editor_project_property_name_format(char *output, size_t capacity,
     const char *input);
+bool editor_project_collision_mask_add(EditorProject *project, const char *name,
+    size_t *index);
 bool editor_project_save(const EditorProject *project, const char *path);
 bool editor_project_load(EditorProject *project, const char *path);
 EditorObject *editor_project_object_add(EditorProject *project, Position position);

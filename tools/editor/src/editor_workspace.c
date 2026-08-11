@@ -275,11 +275,11 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
         "    GENERATED_APPLY(rohr_physics_position_set(*output, position));\n"
         "    GENERATED_APPLY(rohr_physics_orientation_set(*output, rotation));\n"
         "    GENERATED_APPLY(rohr_physics_hitbox_set(*output, hitbox));\n"
+        "    GENERATED_APPLY(rohr_physics_collision_category_set(*output,\n"
+        "        collision_enabled ? collision_category : ROHR_COLLISION_CATEGORY_NONE));\n"
+        "    GENERATED_APPLY(rohr_physics_collision_with_set(*output,\n"
+        "        collision_enabled ? collision_with : ROHR_COLLISION_CATEGORY_NONE));\n"
         "    if(collision_enabled) {\n"
-        "        GENERATED_APPLY(rohr_physics_collision_category_set(*output, "
-        "collision_category));\n"
-        "        GENERATED_APPLY(rohr_physics_collision_with_set(*output, "
-        "collision_with));\n"
         "        GENERATED_APPLY(rohr_entity_components_add(*output, ROHR_COLLISION));\n"
         "    }\n"
         "    GENERATED_APPLY(rohr_physics_friction_set(*output, friction));\n"
@@ -350,7 +350,7 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 body->rotation_locked ? "true" : "false",
                 body->gravity_enabled ? "true" : "false",
                 body->collision_enabled ? "true" : "false",
-                (unsigned long long)body->collision_category,
+                (unsigned long long)body->collision_with,
                 (unsigned long long)body->collision_with);
         }
         fprintf(source,

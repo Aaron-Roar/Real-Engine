@@ -327,6 +327,7 @@ static bool editor_json_body_read(yyjson_val *value, EditorRigidBody *body,
             !editor_json_uint64(value, "collision_with", &body->collision_with))) return false;
     if(collision_enabled == NULL &&
             (collision_category != NULL || collision_with != NULL)) return false;
+    body->collision_category = body->collision_with;
     editor_project_property_name_format(body->name, sizeof(body->name), body->name);
     count = (uint32_t)yyjson_arr_size(hitboxes);
     if(count > EDITOR_BODY_HITBOX_MAX) return false;

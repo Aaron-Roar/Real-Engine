@@ -141,6 +141,27 @@ void editor_project_init(EditorProject *project) {
     };
 }
 
+bool editor_project_collision_mask_add(EditorProject *project, const char *name,
+    size_t *index) {
+    char formatted[EDITOR_OBJECT_NAME_MAX];
+
+    if(project == NULL || name == NULL || name[0] == '\0' ||
+            project->collision_mask_count >= EDITOR_COLLISION_MASK_MAX) return false;
+    editor_project_property_name_format(formatted, sizeof(formatted), name);
+    if(formatted[0] == '\0') return false;
+    for(size_t i = 0; i < project->collision_mask_count; i += 1) {
+        if(strcmp(project->collision_masks[i].name, formatted) != 0) continue;
+        if(index != NULL) *index = i;
+        return false;
+    }
+    if(index != NULL) *index = project->collision_mask_count;
+    snprintf(project->collision_masks[project->collision_mask_count].name,
+        sizeof(project->collision_masks[project->collision_mask_count].name),
+        "%s", formatted);
+    project->collision_mask_count += 1;
+    return true;
+}
+
 EditorObject *editor_project_object_add(EditorProject *project, Position position) {
     EditorObject *object;
 

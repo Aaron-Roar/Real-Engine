@@ -126,6 +126,7 @@ int main(void) {
                 !file_contains(path,
                     "}}, 5.00000000f, 0.500000000f, 0.00000000f, false") ||
                 !file_contains(path, "rohr_physics_collision_category_set") ||
+                !file_contains(path, "ROHR_COLLISION_CATEGORY_NONE") ||
                 !file_contains(path,
                     "rohr_entity_components_add(*output, ROHR_COLLISION)")) {
             workspace_fixture_remove(fixture);
@@ -180,10 +181,16 @@ int main(void) {
             strcmp(project.collision_masks[0].name, "default") != 0 ||
             !chassis->collision_enabled || chassis->collision_category != UINT64_C(1) ||
             chassis->collision_with != UINT64_C(1)) return 1;
-    project.collision_mask_count = 2;
-    snprintf(project.collision_masks[1].name,
-        sizeof(project.collision_masks[1].name), "enemy");
+    {
+        size_t mask_index = SIZE_MAX;
+        if(!editor_project_collision_mask_add(&project, "Enemy", &mask_index) ||
+                mask_index != 1 || project.collision_mask_count != 2 ||
+                strcmp(project.collision_masks[1].name, "enemy") != 0 ||
+                editor_project_collision_mask_add(&project, "enemy", &mask_index) ||
+                mask_index != 1 || project.collision_mask_count != 2) return 1;
+    }
     chassis->collision_with |= UINT64_C(1) << 1;
+    chassis->collision_category = chassis->collision_with;
     hitbox = &chassis->hitboxes[0];
     if(hitbox == NULL || !hitbox->visible || hitbox->vertex_count != 3) return 1;
     editor_project_property_name_format(hitbox->vertices[0].name,
@@ -334,6 +341,8 @@ int main(void) {
                 strcmp(loaded.collision_masks[1].name, "enemy") != 0 ||
                 loaded_object->rigid_bodies[0].collision_with !=
                     (UINT64_C(1) | (UINT64_C(1) << 1)) ||
+                loaded_object->rigid_bodies[0].collision_category !=
+                    loaded_object->rigid_bodies[0].collision_with ||
                 strcmp(loaded_object->rigid_bodies[0].hitboxes[0].vertices[0].name,
                     "front_point") != 0 ||
                 strcmp(loaded_object->rigid_bodies[0].hitboxes[0].line_names[0],
