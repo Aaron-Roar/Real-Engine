@@ -93,8 +93,9 @@ static float editor_panel_content_height_get(const EditorProject *project,
     if(state->mode == EDITOR_VIEWPORT_RIGID_BODY) {
         for(size_t i = 0; i < object->rigid_body_count; i += 1) {
             if(object->rigid_bodies[i].id == state->selected_rigid_body) {
-                return fmaxf(height, 438.0f +
-                    (float)object->rigid_bodies[i].hitbox_count * 30.0f);
+                return fmaxf(height, 490.0f +
+                    (float)(object->rigid_bodies[i].hitbox_count +
+                        project->collision_mask_count) * 30.0f);
             }
         }
     }
@@ -645,6 +646,12 @@ int main(void) {
     TextAsset generate_c_label = {0};
     TextAsset world_view_label = {0};
     TextAsset local_view_label = {0};
+    TextAsset collision_label = {0};
+    TextAsset collision_masks_label = {0};
+    TextAsset add_collision_mask_label = {0};
+    TextAsset remove_label = {0};
+    TextAsset collision_mask_labels[EDITOR_COLLISION_MASK_MAX] = {0};
+    char collision_mask_cache[EDITOR_COLLISION_MASK_MAX][EDITOR_OBJECT_NAME_MAX] = {{0}};
     TextAsset view_label = {0};
     TextAsset settings_label = {0};
     TextAsset new_label = {0};
@@ -752,6 +759,8 @@ int main(void) {
     bool running = true;
     bool field_editing = false;
     bool panel_resizing = false;
+    bool collision_masks_open = false;
+    bool collision_masks_add_open = false;
     EditorCloseAction close_action = EDITOR_CLOSE_NONE;
     float panel_scroll_offset = 0.0f;
     EditorViewportMode panel_scroll_mode = EDITOR_VIEWPORT_HIERARCHY;
@@ -802,6 +811,10 @@ int main(void) {
             !editor_text_create(&font, "Generate C", &generate_c_label) ||
             !editor_text_create(&font, "World", &world_view_label) ||
             !editor_text_create(&font, "Local", &local_view_label) ||
+            !editor_text_create(&font, "Collision", &collision_label) ||
+            !editor_text_create(&font, "Collision Masks", &collision_masks_label) ||
+            !editor_text_create(&font, "Add Collision Mask", &add_collision_mask_label) ||
+            !editor_text_create(&font, "Remove", &remove_label) ||
             !editor_text_create(&font, "View", &view_label) ||
             !editor_text_create(&font, "Settings", &settings_label) ||
             !editor_text_create(&font, "New Project", &new_label) ||
@@ -916,6 +929,10 @@ int main(void) {
         } else if(close_action != EDITOR_CLOSE_NONE &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             close_action = EDITOR_CLOSE_NONE;
+        } else if((collision_masks_open || collision_masks_add_open) &&
+                rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
+            collision_masks_open = false;
+            collision_masks_add_open = false;
         } else if(!field_editing &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             if(editor_viewport_hitbox_editor_active_get(&viewport_state)) {
@@ -1025,6 +1042,8 @@ int main(void) {
         if(panel_scroll_mode != viewport_state.mode) {
             panel_scroll_mode = viewport_state.mode;
             panel_scroll_offset = 0.0f;
+            collision_masks_open = false;
+            collision_masks_add_open = false;
         }
         panel_scroll_offset = rohr_ui_scroll_region_begin("editor.tools.scroll",
             (UIRect){EDITOR_VIEWPORT_WIDTH, EDITOR_MENU_HEIGHT,
@@ -1135,47 +1154,162 @@ int main(void) {
                             EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, NULL);
                     if(result.changed) body->rotation_locked = result.selected_index == 1;
                 }
-                if(rohr_ui_button("editor.rigid_body.add_hitbox", &add_hitbox_label,
-                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 378.0f,
-                            EDITOR_TOOLS_WIDTH - 20.0f, 32.0f}, NULL).clicked) {
-                    EditorHitbox *added = editor_project_hitbox_add(&project, body);
-                    if(added != NULL) {
-                        viewport_state.selection = EDITOR_SELECTION_HITBOX;
-                        viewport_state.selected_hitbox = added->id;
+                {
+                    float row_x = EDITOR_VIEWPORT_WIDTH + 10.0f;
+                    float row_width = EDITOR_TOOLS_WIDTH - 20.0f;
+                    float active_menu_y = 436.0f;
+                    float add_button_y;
+                    float add_menu_y;
+                    size_t active_rows = 0;
+                    size_t add_rows = 0;
+
+                    if(editor_checkbox("editor.rigid_body.collision", &collision_label,
+                            (UIRect){row_x, 372.0f, row_width, 28.0f},
+                            &body->collision_enabled) && !body->collision_enabled) {
+                        collision_masks_open = false;
+                        collision_masks_add_open = false;
                     }
-                }
-                for(size_t i = 0; i < body->hitbox_count; i += 1) {
-                    EditorHitbox *box = &body->hitboxes[i];
-                    UIButtonStyle selected_style = editor_selected_button_style_get();
-                    UIButtonResult result;
-                    char id[64];
-                    char visibility_id[72];
-                    if(!editor_named_text_sync(&font, box->name, &body_hitbox_labels[i],
-                            body_hitbox_cache[i], EDITOR_OBJECT_NAME_MAX)) goto fail;
-                    snprintf(id, sizeof(id), "editor.hitbox.%u", box->id);
-                    snprintf(visibility_id, sizeof(visibility_id),
-                        "editor.hitbox.%u.visibility", box->id);
-                    (void)editor_visibility_toggle(visibility_id, &visibility_icon_label,
-                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
-                            420.0f + (float)i * 30.0f, 26.0f, 26.0f}, &box->visible);
-                    result = rohr_ui_button(id, &body_hitbox_labels[i],
-                        (UIRect){EDITOR_VIEWPORT_WIDTH + 42.0f,
-                            420.0f + (float)i * 30.0f,
-                            EDITOR_TOOLS_WIDTH - 50.0f, 26.0f},
-                        viewport_state.selection == EDITOR_SELECTION_HITBOX &&
-                            viewport_state.selected_hitbox == box->id ?
-                            &selected_style : NULL);
-                    if(result.clicked || result.focus_changed) {
-                        viewport_state.selection = EDITOR_SELECTION_HITBOX;
-                        viewport_state.selected_hitbox = box->id;
-                        if(result.double_clicked) (void)editor_selected_open(
-                            &project, &viewport_state);
+                    if(body->collision_enabled && rohr_ui_button(
+                            "editor.rigid_body.collision_masks", &collision_masks_label,
+                            (UIRect){row_x, 404.0f, row_width, 28.0f}, NULL).clicked) {
+                        collision_masks_open = !collision_masks_open;
+                        collision_masks_add_open = false;
+                    }
+                    if(body->collision_enabled) {
+                        rohr_ui_border((UIRect){row_x, 404.0f, row_width, 28.0f}, 2.0f,
+                            (Color){0, 0, 0, 255});
+                    }
+                    if(body->collision_enabled && collision_masks_open) {
+                        for(size_t mask = 0; mask < project.collision_mask_count; mask += 1) {
+                            char remove_id[96];
+                            uint64_t bit = UINT64_C(1) << mask;
+                            if((body->collision_with & bit) == 0) continue;
+                            if(!editor_named_text_sync(&font,
+                                    project.collision_masks[mask].name,
+                                    &collision_mask_labels[mask],
+                                    collision_mask_cache[mask],
+                                    EDITOR_OBJECT_NAME_MAX)) goto fail;
+                            rohr_ui_label(&collision_mask_labels[mask],
+                                (UIRect){row_x,
+                                    active_menu_y + (float)active_rows * 30.0f,
+                                    row_width * 0.66f, 28.0f});
+                            snprintf(remove_id, sizeof(remove_id),
+                                "editor.rigid_body.collision_mask.remove.%zu", mask);
+                            if(rohr_ui_button(remove_id, &remove_label,
+                                    (UIRect){row_x + row_width * 0.66f,
+                                        active_menu_y + (float)active_rows * 30.0f,
+                                        row_width * 0.34f, 28.0f}, NULL).clicked) {
+                                body->collision_with &= ~bit;
+                            }
+                            active_rows += 1;
+                        }
+                    }
+                    if(active_rows > 0) {
+                        rohr_ui_border((UIRect){row_x, active_menu_y, row_width,
+                            (float)active_rows * 30.0f - 2.0f}, 2.0f,
+                            (Color){0, 0, 0, 255});
+                    }
+                    add_button_y = active_menu_y + (float)active_rows * 30.0f;
+                    if(body->collision_enabled && rohr_ui_button(
+                            "editor.rigid_body.collision_masks_add",
+                            &add_collision_mask_label,
+                            (UIRect){row_x, add_button_y, row_width, 28.0f}, NULL).clicked) {
+                        collision_masks_add_open = !collision_masks_add_open;
+                        collision_masks_open = false;
+                    }
+                    if(body->collision_enabled) {
+                        rohr_ui_border((UIRect){row_x, add_button_y, row_width, 28.0f},
+                            2.0f, (Color){0, 0, 0, 255});
+                    }
+                    add_menu_y = add_button_y + 32.0f;
+                    if(body->collision_enabled && collision_masks_add_open) {
+                        add_rows = project.collision_mask_count;
+                        for(size_t mask = 0; mask < project.collision_mask_count; mask += 1) {
+                            char mask_id[96];
+                            uint64_t bit = UINT64_C(1) << mask;
+                            bool enabled = (body->collision_with & bit) != 0;
+                            if(!editor_named_text_sync(&font,
+                                    project.collision_masks[mask].name,
+                                    &collision_mask_labels[mask],
+                                    collision_mask_cache[mask],
+                                    EDITOR_OBJECT_NAME_MAX)) goto fail;
+                            snprintf(mask_id, sizeof(mask_id),
+                                "editor.rigid_body.collision_mask.add.%zu", mask);
+                            if(editor_checkbox(mask_id, &collision_mask_labels[mask],
+                                    (UIRect){row_x, add_menu_y + (float)mask * 30.0f,
+                                        row_width, 28.0f}, &enabled)) {
+                                if(enabled) body->collision_with |= bit;
+                                else body->collision_with &= ~bit;
+                            }
+                        }
+                    }
+                    if(add_rows > 0) {
+                        rohr_ui_border((UIRect){row_x, add_menu_y, row_width,
+                            (float)add_rows * 30.0f - 2.0f}, 2.0f,
+                            (Color){0, 0, 0, 255});
+                    }
+                    if((collision_masks_open || collision_masks_add_open) &&
+                            mouse.button_states[MOUSE_BUTTON_LEFT] ==
+                                MOUSE_BUTTON_STATE_PRESSED) {
+                        Position pointer = rohr_graphics_mouse_screen_position_get();
+                        float controls_bottom = add_menu_y + (float)add_rows * 30.0f;
+                        bool in_controls = pointer.x >= row_x &&
+                            pointer.x <= row_x + row_width && pointer.y >= 372.0f &&
+                            pointer.y <= controls_bottom;
+                        if(!in_controls) {
+                            collision_masks_open = false;
+                            collision_masks_add_open = false;
+                            active_rows = 0;
+                            add_rows = 0;
+                        }
+                    }
+                    {
+                        float hitbox_button_y = body->collision_enabled ? add_menu_y +
+                            (float)add_rows * 30.0f + 6.0f : 404.0f;
+                        if(rohr_ui_button("editor.rigid_body.add_hitbox", &add_hitbox_label,
+                                (UIRect){row_x, hitbox_button_y, row_width, 32.0f},
+                                NULL).clicked) {
+                            EditorHitbox *added = editor_project_hitbox_add(&project, body);
+                            if(added != NULL) {
+                                viewport_state.selection = EDITOR_SELECTION_HITBOX;
+                                viewport_state.selected_hitbox = added->id;
+                            }
+                        }
+                        for(size_t i = 0; i < body->hitbox_count; i += 1) {
+                            EditorHitbox *box = &body->hitboxes[i];
+                            UIButtonStyle selected_style = editor_selected_button_style_get();
+                            UIButtonResult result;
+                            char id[64];
+                            char visibility_id[72];
+                            float y = hitbox_button_y + 42.0f + (float)i * 30.0f;
+                            if(!editor_named_text_sync(&font, box->name,
+                                    &body_hitbox_labels[i], body_hitbox_cache[i],
+                                    EDITOR_OBJECT_NAME_MAX)) goto fail;
+                            snprintf(id, sizeof(id), "editor.hitbox.%u", box->id);
+                            snprintf(visibility_id, sizeof(visibility_id),
+                                "editor.hitbox.%u.visibility", box->id);
+                            (void)editor_visibility_toggle(visibility_id,
+                                &visibility_icon_label,
+                                (UIRect){row_x, y, 26.0f, 26.0f}, &box->visible);
+                            result = rohr_ui_button(id, &body_hitbox_labels[i],
+                                (UIRect){row_x + 32.0f, y, row_width - 32.0f, 26.0f},
+                                viewport_state.selection == EDITOR_SELECTION_HITBOX &&
+                                    viewport_state.selected_hitbox == box->id ?
+                                    &selected_style : NULL);
+                            if(result.clicked || result.focus_changed) {
+                                viewport_state.selection = EDITOR_SELECTION_HITBOX;
+                                viewport_state.selected_hitbox = box->id;
+                                if(result.double_clicked) (void)editor_selected_open(
+                                    &project, &viewport_state);
+                            }
+                        }
                     }
                 }
                 {
                     UIButtonStyle style = editor_delete_button_style_get();
                     if(rohr_ui_button("editor.rigid_body.delete", &delete_rigid_body_label,
-                            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 660.0f,
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
+                                660.0f + (float)project.collision_mask_count * 30.0f,
                                 EDITOR_TOOLS_WIDTH - 20.0f, 34.0f}, &style).clicked) {
                         (void)editor_open_item_delete(&project, &viewport_state);
                     }
@@ -2554,6 +2688,13 @@ int main(void) {
     rohr_graphics_text_destroy(&build_label);
     rohr_graphics_text_destroy(&local_view_label);
     rohr_graphics_text_destroy(&world_view_label);
+    rohr_graphics_text_destroy(&remove_label);
+    rohr_graphics_text_destroy(&add_collision_mask_label);
+    rohr_graphics_text_destroy(&collision_masks_label);
+    rohr_graphics_text_destroy(&collision_label);
+    for(size_t i = 0; i < EDITOR_COLLISION_MASK_MAX; i += 1) {
+        rohr_graphics_text_destroy(&collision_mask_labels[i]);
+    }
     rohr_graphics_text_destroy(&file_label);
     rohr_graphics_text_destroy(&file_browser_field);
     editor_file_browser_destroy(&file_browser);
@@ -2671,6 +2812,13 @@ fail:
     rohr_graphics_text_destroy(&build_label);
     rohr_graphics_text_destroy(&local_view_label);
     rohr_graphics_text_destroy(&world_view_label);
+    rohr_graphics_text_destroy(&remove_label);
+    rohr_graphics_text_destroy(&add_collision_mask_label);
+    rohr_graphics_text_destroy(&collision_masks_label);
+    rohr_graphics_text_destroy(&collision_label);
+    for(size_t i = 0; i < EDITOR_COLLISION_MASK_MAX; i += 1) {
+        rohr_graphics_text_destroy(&collision_mask_labels[i]);
+    }
     rohr_graphics_text_destroy(&file_label);
     rohr_graphics_text_destroy(&file_browser_field);
     editor_file_browser_destroy(&file_browser);

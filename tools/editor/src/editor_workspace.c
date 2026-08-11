@@ -263,7 +263,9 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
         "static EngineResult generated_body_create(Entity *output, Position position,\n"
         "    float rotation, Shape hitbox, float mass_value, float friction,\n"
         "    float restitution, bool static_body, bool rotation_locked,\n"
-        "    bool gravity_enabled) {\n"
+        "    bool gravity_enabled, bool collision_enabled,\n"
+        "    RohrCollisionCategoryMask collision_category,\n"
+        "    RohrCollisionCategoryMask collision_with) {\n"
         "    EntityResult added = rohr_entity_add();\n"
         "    EngineResult result;\n"
         "    if(rohr_error_check(added)) return rohr_error_result_error(added.result.error);\n"
@@ -273,9 +275,13 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
         "    GENERATED_APPLY(rohr_physics_position_set(*output, position));\n"
         "    GENERATED_APPLY(rohr_physics_orientation_set(*output, rotation));\n"
         "    GENERATED_APPLY(rohr_physics_hitbox_set(*output, hitbox));\n"
-        "    GENERATED_APPLY(rohr_physics_collision_category_set(*output, UINT64_C(1)));\n"
-        "    GENERATED_APPLY(rohr_physics_collision_with_set(*output, UINT64_C(1)));\n"
-        "    GENERATED_APPLY(rohr_entity_components_add(*output, ROHR_COLLISION));\n"
+        "    if(collision_enabled) {\n"
+        "        GENERATED_APPLY(rohr_physics_collision_category_set(*output, "
+        "collision_category));\n"
+        "        GENERATED_APPLY(rohr_physics_collision_with_set(*output, "
+        "collision_with));\n"
+        "        GENERATED_APPLY(rohr_entity_components_add(*output, ROHR_COLLISION));\n"
+        "    }\n"
         "    GENERATED_APPLY(rohr_physics_friction_set(*output, friction));\n"
         "    GENERATED_APPLY(rohr_physics_restitution_set(*output, restitution));\n"
         "    if(static_body) GENERATED_APPLY(rohr_physics_static_set(*output));\n"
@@ -336,12 +342,16 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 }
             }
             fprintf(source,
-                "}}, %#.9gf, %#.9gf, %#.9gf, %s, %s, %s);\n"
+                "}}, %#.9gf, %#.9gf, %#.9gf, %s, %s, %s, %s, "
+                "UINT64_C(%llu), UINT64_C(%llu));\n"
                 "    if(rohr_error_check(result)) goto fail;\n",
                 body->mass_value, body->friction, body->restitution,
                 body->static_body ? "true" : "false",
                 body->rotation_locked ? "true" : "false",
-                body->gravity_enabled ? "true" : "false");
+                body->gravity_enabled ? "true" : "false",
+                body->collision_enabled ? "true" : "false",
+                (unsigned long long)body->collision_category,
+                (unsigned long long)body->collision_with);
         }
         fprintf(source,
             "    return rohr_error_result_value(true);\n"

@@ -127,6 +127,8 @@ static void editor_hitbox_regular_set(EditorProject *project, EditorHitbox *hitb
 void editor_project_init(EditorProject *project) {
     if(project == NULL) return;
     *project = (EditorProject){
+        .collision_masks = {{.name = "default"}},
+        .collision_mask_count = 1,
         .next_id = 1,
         .next_vertex_id = 1,
         .next_rigid_body_id = 1,
@@ -200,6 +202,9 @@ EditorRigidBody editor_project_rigid_body_default_get(void) {
         .friction = 0.5f,
         .restitution = 0.0f,
         .gravity_enabled = false,
+        .collision_enabled = true,
+        .collision_category = UINT64_C(1),
+        .collision_with = UINT64_C(1),
         .visible = true
     };
 }

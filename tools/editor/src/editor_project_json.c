@@ -33,6 +33,13 @@ static bool editor_json_uint(yyjson_val *object, const char *key, uint32_t *valu
     return true;
 }
 
+static bool editor_json_uint64(yyjson_val *object, const char *key, uint64_t *value) {
+    yyjson_val *item = yyjson_obj_get(object, key);
+    if(!yyjson_is_uint(item) || value == NULL) return false;
+    *value = yyjson_get_uint(item);
+    return true;
+}
+
 static bool editor_json_real(yyjson_val *object, const char *key, float *value) {
     yyjson_val *item = yyjson_obj_get(object, key);
     if(!yyjson_is_num(item) || value == NULL) return false;
@@ -96,6 +103,10 @@ static yyjson_mut_val *editor_json_body_write(yyjson_mut_doc *document,
     yyjson_mut_obj_add_bool(document, value, "static", body->static_body);
     yyjson_mut_obj_add_bool(document, value, "rotation_locked", body->rotation_locked);
     yyjson_mut_obj_add_bool(document, value, "gravity_enabled", body->gravity_enabled);
+    yyjson_mut_obj_add_bool(document, value, "collision_enabled", body->collision_enabled);
+    yyjson_mut_obj_add_uint(document, value, "collision_category",
+        body->collision_category);
+    yyjson_mut_obj_add_uint(document, value, "collision_with", body->collision_with);
     yyjson_mut_obj_add_bool(document, value, "visible", body->visible);
     for(size_t i = 0; i < body->hitbox_count; i += 1) {
         yyjson_mut_arr_add_val(hitboxes, editor_json_hitbox_write(document,
@@ -181,12 +192,14 @@ bool editor_project_save(const EditorProject *project, const char *path) {
     yyjson_mut_doc *document;
     yyjson_mut_val *root;
     yyjson_mut_val *objects;
+    yyjson_mut_val *collision_masks;
     bool success;
     if(project == NULL || path == NULL || path[0] == '\0') return false;
     document = yyjson_mut_doc_new(NULL);
     if(document == NULL) return false;
     root = yyjson_mut_obj(document);
     objects = yyjson_mut_arr(document);
+    collision_masks = yyjson_mut_arr(document);
     yyjson_mut_doc_set_root(document, root);
     yyjson_mut_obj_add_uint(document, root, "format_version", EDITOR_PROJECT_FORMAT_VERSION);
     yyjson_mut_obj_add_uint(document, root, "selected", project->selected);
@@ -199,6 +212,11 @@ bool editor_project_save(const EditorProject *project, const char *path) {
     yyjson_mut_obj_add_uint(document, root, "next_soft_body_id", project->next_soft_body_id);
     yyjson_mut_obj_add_uint(document, root, "next_soft_node_id", project->next_soft_node_id);
     yyjson_mut_obj_add_uint(document, root, "next_soft_beam_id", project->next_soft_beam_id);
+    for(size_t i = 0; i < project->collision_mask_count; i += 1) {
+        yyjson_mut_arr_add_strcpy(document, collision_masks,
+            project->collision_masks[i].name);
+    }
+    yyjson_mut_obj_add_val(document, root, "collision_masks", collision_masks);
     for(size_t i = 0; i < project->object_count; i += 1) {
         const EditorObject *object = &project->objects[i];
         yyjson_mut_val *value = yyjson_mut_obj(document);
@@ -285,7 +303,11 @@ static bool editor_json_hitbox_read(yyjson_val *value, EditorHitbox *hitbox,
 static bool editor_json_body_read(yyjson_val *value, EditorRigidBody *body,
     EditorProject *project) {
     yyjson_val *hitboxes = yyjson_obj_get(value, "hitboxes");
+    yyjson_val *collision_enabled = yyjson_obj_get(value, "collision_enabled");
+    yyjson_val *collision_category = yyjson_obj_get(value, "collision_category");
+    yyjson_val *collision_with = yyjson_obj_get(value, "collision_with");
     uint32_t count;
+    *body = editor_project_rigid_body_default_get();
     if(!yyjson_is_obj(value) || !editor_json_uint(value, "id", &body->id) || body->id == 0 ||
             !editor_json_name(value, body->name) || !editor_json_position_read(
                 yyjson_obj_get(value, "position"), &body->position) ||
@@ -299,6 +321,12 @@ static bool editor_json_body_read(yyjson_val *value, EditorRigidBody *body,
             !editor_json_bool(value, "visible", &body->visible) || !yyjson_is_arr(hitboxes)) {
         return false;
     }
+    if(collision_enabled != NULL && (!editor_json_bool(value, "collision_enabled",
+                &body->collision_enabled) ||
+            !editor_json_uint64(value, "collision_category", &body->collision_category) ||
+            !editor_json_uint64(value, "collision_with", &body->collision_with))) return false;
+    if(collision_enabled == NULL &&
+            (collision_category != NULL || collision_with != NULL)) return false;
     editor_project_property_name_format(body->name, sizeof(body->name), body->name);
     count = (uint32_t)yyjson_arr_size(hitboxes);
     if(count > EDITOR_BODY_HITBOX_MAX) return false;
@@ -387,8 +415,15 @@ static bool editor_json_soft_body_read(yyjson_val *value, EditorSoftBody *body,
 }
 
 static bool editor_json_references_valid(EditorProject *project) {
+    uint64_t valid_masks = project->collision_mask_count == 64 ? UINT64_MAX :
+        (UINT64_C(1) << project->collision_mask_count) - 1;
     for(size_t i = 0; i < project->object_count; i += 1) {
         EditorObject *object = &project->objects[i];
+        for(size_t j = 0; j < object->rigid_body_count; j += 1) {
+            EditorRigidBody *body = &object->rigid_bodies[j];
+            if((body->collision_category & ~valid_masks) != 0 ||
+                    (body->collision_with & ~valid_masks) != 0) return false;
+        }
         for(size_t j = 0; j < object->anchor_count; j += 1)
             if(object->anchors[j].rigid_body != 0 && editor_project_rigid_body_get(
                     object, object->anchors[j].rigid_body) == NULL) return false;
@@ -419,6 +454,7 @@ bool editor_project_load(EditorProject *project, const char *path) {
     yyjson_doc *document;
     yyjson_val *root;
     yyjson_val *objects;
+    yyjson_val *collision_masks;
     uint32_t version;
     bool success = false;
     if(project == NULL || path == NULL || path[0] == '\0') return false;
@@ -426,6 +462,7 @@ bool editor_project_load(EditorProject *project, const char *path) {
     if(document == NULL) return false;
     root = yyjson_doc_get_root(document);
     objects = yyjson_obj_get(root, "objects");
+    collision_masks = yyjson_obj_get(root, "collision_masks");
     editor_project_init(&loaded);
     if(!yyjson_is_obj(root) || !editor_json_uint(root, "format_version", &version) ||
             (version == 0 || version > EDITOR_PROJECT_FORMAT_VERSION) ||
@@ -445,6 +482,20 @@ bool editor_project_load(EditorProject *project, const char *path) {
             loaded.next_joint_id == 0 || loaded.next_anchor_id == 0 ||
             loaded.next_soft_body_id == 0 || loaded.next_soft_node_id == 0 ||
             loaded.next_soft_beam_id == 0) goto done;
+    if(version >= 3) {
+        if(!yyjson_is_arr(collision_masks) || yyjson_arr_size(collision_masks) == 0 ||
+                yyjson_arr_size(collision_masks) > EDITOR_COLLISION_MASK_MAX) goto done;
+        loaded.collision_mask_count = yyjson_arr_size(collision_masks);
+        for(size_t i = 0; i < loaded.collision_mask_count; i += 1) {
+            yyjson_val *name = yyjson_arr_get(collision_masks, i);
+            if(!yyjson_is_str(name) || yyjson_get_len(name) == 0 ||
+                    yyjson_get_len(name) >= EDITOR_OBJECT_NAME_MAX) goto done;
+            memcpy(loaded.collision_masks[i].name, yyjson_get_str(name),
+                yyjson_get_len(name) + 1);
+            editor_project_property_name_format(loaded.collision_masks[i].name,
+                sizeof(loaded.collision_masks[i].name), loaded.collision_masks[i].name);
+        }
+    }
     loaded.object_count = yyjson_arr_size(objects);
     for(size_t i = 0; i < loaded.object_count; i += 1) {
         yyjson_val *value = yyjson_arr_get(objects, i);

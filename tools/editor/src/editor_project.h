@@ -14,7 +14,8 @@
 #define EDITOR_SOFT_BODY_MAX 8
 #define EDITOR_SOFT_NODE_MAX 64
 #define EDITOR_SOFT_BEAM_MAX 128
-#define EDITOR_PROJECT_FORMAT_VERSION 2
+#define EDITOR_COLLISION_MASK_MAX 64
+#define EDITOR_PROJECT_FORMAT_VERSION 3
 
 typedef uint32_t EditorObjectId;
 typedef uint32_t EditorVertexId;
@@ -55,10 +56,17 @@ typedef struct EditorRigidBody {
     bool static_body;
     bool rotation_locked;
     bool gravity_enabled;
+    bool collision_enabled;
     bool visible;
+    RohrCollisionCategoryMask collision_category;
+    RohrCollisionCategoryMask collision_with;
     EditorHitbox hitboxes[EDITOR_BODY_HITBOX_MAX];
     size_t hitbox_count;
 } EditorRigidBody;
+
+typedef struct EditorCollisionMask {
+    char name[EDITOR_OBJECT_NAME_MAX];
+} EditorCollisionMask;
 
 typedef enum EditorJointKind {
     EDITOR_JOINT_REVOLUTE,
@@ -139,6 +147,8 @@ typedef struct EditorObject {
 } EditorObject;
 
 typedef struct EditorProject {
+    EditorCollisionMask collision_masks[EDITOR_COLLISION_MASK_MAX];
+    size_t collision_mask_count;
     EditorObject objects[EDITOR_OBJECT_MAX];
     size_t object_count;
     EditorObjectId next_id;
