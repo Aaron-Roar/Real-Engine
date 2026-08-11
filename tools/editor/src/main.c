@@ -903,8 +903,10 @@ int main(void) {
         }
         if(file_browser.active &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
-            file_browser.active = false;
-            workspace_browser_action = EDITOR_WORKSPACE_BROWSER_NONE;
+            if(!editor_file_browser_selection_clear(&file_browser)) {
+                file_browser.active = false;
+                workspace_browser_action = EDITOR_WORKSPACE_BROWSER_NONE;
+            }
         } else if(close_action != EDITOR_CLOSE_NONE &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             close_action = EDITOR_CLOSE_NONE;

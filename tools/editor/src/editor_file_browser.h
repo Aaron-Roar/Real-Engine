@@ -24,6 +24,8 @@ typedef struct EditorFileBrowser {
     EditorFileBrowserMode mode;
     char directory[EDITOR_FILE_BROWSER_PATH_MAX];
     char selected_directory[EDITOR_FILE_BROWSER_PATH_MAX];
+    char preview_selected_path[EDITOR_FILE_BROWSER_PATH_MAX];
+    bool preview_selected_directory;
     char filename[EDITOR_FILE_BROWSER_NAME_MAX];
     EditorFileBrowserEntry entries[EDITOR_FILE_BROWSER_ENTRY_MAX];
     TextAsset entry_labels[EDITOR_FILE_BROWSER_ENTRY_MAX];
@@ -50,6 +52,7 @@ void editor_file_browser_init(EditorFileBrowser *browser);
 void editor_file_browser_destroy(EditorFileBrowser *browser);
 bool editor_file_browser_open(EditorFileBrowser *browser, EditorFileBrowserMode mode,
     const char *directory, FontAsset *font);
+bool editor_file_browser_selection_clear(EditorFileBrowser *browser);
 EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
     TextAsset *field_display, const TextAsset *save_label,
     const TextAsset *open_label, const TextAsset *create_label,

@@ -126,7 +126,23 @@ static void editor_file_browser_preview_clear(EditorFileBrowser *browser) {
     browser->preview_count = 0;
     browser->preview_scroll_offset = 0.0f;
     browser->selected_directory[0] = '\0';
+    browser->preview_selected_path[0] = '\0';
+    browser->preview_selected_directory = false;
     (void)rohr_graphics_text_value_set(&browser->selected_directory_label, "");
+}
+
+bool editor_file_browser_selection_clear(EditorFileBrowser *browser) {
+    if(browser == NULL) return false;
+    if(browser->preview_selected_path[0] != '\0') {
+        browser->preview_selected_path[0] = '\0';
+        browser->preview_selected_directory = false;
+        return true;
+    }
+    if(browser->selected_directory[0] != '\0') {
+        editor_file_browser_preview_clear(browser);
+        return true;
+    }
+    return false;
 }
 
 static bool editor_file_browser_preview_refresh(EditorFileBrowser *browser,
@@ -320,10 +336,30 @@ EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
             32.0f * (float)browser->preview_count,
             browser->preview_scroll_offset, 38.0f).offset;
         for(size_t i = 0; i < browser->preview_count; i += 1) {
-            rohr_ui_button_disabled((UIRect){right_x,
-                dialog.y + 82.0f + (float)i * 32.0f, left_width, 28.0f}, NULL);
-            rohr_ui_label(&browser->preview_labels[i], (UIRect){right_x,
-                dialog.y + 82.0f + (float)i * 32.0f, left_width, 28.0f});
+            char id[64];
+            char path[EDITOR_FILE_BROWSER_PATH_MAX];
+            UIButtonResult interaction;
+            UIButtonStyle selected_style = editor_file_browser_selected_style_get();
+            bool have_path = editor_file_browser_path_join(path, sizeof(path),
+                browser->selected_directory, browser->preview_entries[i].name);
+            bool selected = have_path &&
+                strcmp(path, browser->preview_selected_path) == 0;
+
+            snprintf(id, sizeof(id), "editor.file_browser.preview.%zu", i);
+            interaction = rohr_ui_button(id, &browser->preview_labels[i],
+                (UIRect){right_x, dialog.y + 82.0f + (float)i * 32.0f,
+                    left_width, 28.0f}, selected ? &selected_style : NULL);
+            if(!interaction.clicked || !have_path) continue;
+            if(interaction.double_clicked && browser->preview_entries[i].directory) {
+                editor_file_browser_preview_clear(browser);
+                snprintf(browser->directory, sizeof(browser->directory), "%s", path);
+                browser->refresh_pending = true;
+                break;
+            }
+            snprintf(browser->preview_selected_path,
+                sizeof(browser->preview_selected_path), "%s", path);
+            browser->preview_selected_directory =
+                browser->preview_entries[i].directory;
         }
         rohr_ui_scroll_region_end();
     }
@@ -355,9 +391,14 @@ EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
                 (UIRect){dialog.x + dialog.width - 274.0f, dialog.y + 490.0f,
                     120.0f, 34.0f}, NULL).clicked &&
             ((browser->mode == EDITOR_FILE_BROWSER_DIRECTORY &&
-                browser->selected_directory[0] != '\0' &&
+                ((browser->preview_selected_path[0] != '\0' &&
+                    browser->preview_selected_directory) ||
+                 (browser->preview_selected_path[0] == '\0' &&
+                    browser->selected_directory[0] != '\0')) &&
                 snprintf(result.path, sizeof(result.path), "%s",
-                    browser->selected_directory) <
+                    browser->preview_selected_directory ?
+                        browser->preview_selected_path :
+                        browser->selected_directory) <
                     (int)sizeof(result.path)) ||
              (browser->mode == EDITOR_FILE_BROWSER_CREATE_DIRECTORY &&
                 editor_file_browser_directory_name_valid(browser->filename) &&
