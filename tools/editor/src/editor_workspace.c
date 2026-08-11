@@ -83,6 +83,14 @@ static const EditorAnchor *editor_workspace_anchor_get(
     return NULL;
 }
 
+static const EditorSoftNode *editor_workspace_soft_node_get(
+    const EditorSoftBody *body, EditorSoftNodeId id) {
+    if(body == NULL || id == 0) return NULL;
+    for(size_t i = 0; i < body->node_count; i += 1)
+        if(body->nodes[i].id == id) return &body->nodes[i];
+    return NULL;
+}
+
 static void editor_workspace_hitbox_rectangle_set(EditorProject *project,
     EditorHitbox *hitbox, float width, float height) {
     Position vertices[4] = {
@@ -362,6 +370,15 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
         }
         for(size_t joint_index = 0; joint_index < object->joint_count; joint_index += 1)
             fprintf(header, "    Entity joint_%s;\n", object->joint_items[joint_index].name);
+        for(size_t soft_body_index = 0; soft_body_index < object->soft_body_count;
+                soft_body_index += 1) {
+            const EditorSoftBody *body = &object->soft_body_items[soft_body_index];
+            fprintf(header, "    Entity soft_body_%s;\n", body->name);
+            for(size_t node_index = 0; node_index < body->node_count; node_index += 1)
+                fprintf(header, "    Entity soft_node_%s;\n", body->nodes[node_index].name);
+            for(size_t beam_index = 0; beam_index < body->beam_count; beam_index += 1)
+                fprintf(header, "    Entity soft_beam_%s;\n", body->beams[beam_index].name);
+        }
         fprintf(header,
             "} %s;\n\n"
             "EngineResult %s_create(%s *object, Position position);\n"
@@ -452,6 +469,60 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
             }
             fprintf(source, "    if(rohr_error_check(result)) goto fail;\n");
         }
+        for(size_t soft_body_index = 0; soft_body_index < object->soft_body_count;
+                soft_body_index += 1) {
+            const EditorSoftBody *body = &object->soft_body_items[soft_body_index];
+            fprintf(source,
+                "    { EntityResult created = rohr_physics_soft_body_create();\n"
+                "      if(rohr_error_check(created)) { result = rohr_error_result_error("
+                "created.result.error); goto fail; }\n"
+                "      object->soft_body_%s = created.result.value; }\n",
+                body->name);
+            for(size_t node_index = 0; node_index < body->node_count; node_index += 1) {
+                const EditorSoftNode *node = &body->nodes[node_index];
+                fprintf(source,
+                    "    { EntityResult created = rohr_physics_soft_body_node_create("
+                    "object->soft_body_%s, (Position){position.x + %#.9gf, "
+                    "position.y + %#.9gf}, %#.9gf, 4.00000000f);\n"
+                    "      if(rohr_error_check(created)) { result = rohr_error_result_error("
+                    "created.result.error); goto fail; }\n"
+                    "      object->soft_node_%s = created.result.value; }\n",
+                    body->name, body->position.x + node->position.x,
+                    body->position.y + node->position.y, node->node_mass, node->name);
+                if(node->gravity_enabled) {
+                    fprintf(source,
+                        "    result = rohr_physics_gravity_enable(object->soft_node_%s);\n"
+                        "    if(rohr_error_check(result)) goto fail;\n",
+                        node->name);
+                }
+                fprintf(source,
+                    "    result = rohr_physics_soft_body_node_collision_filter_set("
+                    "object->soft_node_%s, UINT64_C(%llu), UINT64_C(%llu));\n"
+                    "    if(rohr_error_check(result)) goto fail;\n",
+                    node->name,
+                    (unsigned long long)(node->collision_enabled ?
+                        node->collision_category : ROHR_COLLISION_CATEGORY_NONE),
+                    (unsigned long long)(node->collision_enabled ?
+                        node->collision_with : ROHR_COLLISION_CATEGORY_NONE));
+            }
+            for(size_t beam_index = 0; beam_index < body->beam_count; beam_index += 1) {
+                const EditorSoftBeam *beam = &body->beams[beam_index];
+                const EditorSoftNode *node_a = editor_workspace_soft_node_get(
+                    body, beam->node_a);
+                const EditorSoftNode *node_b = editor_workspace_soft_node_get(
+                    body, beam->node_b);
+                if(node_a == NULL || node_b == NULL) continue;
+                fprintf(source,
+                    "    { EntityResult created = rohr_physics_soft_body_beam_create("
+                    "object->soft_body_%s, object->soft_node_%s, "
+                    "object->soft_node_%s, %#.9gf, 0.00000000f);\n"
+                    "      if(rohr_error_check(created)) { result = rohr_error_result_error("
+                    "created.result.error); goto fail; }\n"
+                    "      object->soft_beam_%s = created.result.value; }\n",
+                    body->name, node_a->name, node_b->name, beam->stiffness,
+                    beam->name);
+            }
+        }
         fprintf(source,
             "    return rohr_error_result_value(true);\n"
             "fail:\n"
@@ -467,6 +538,14 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 "    if(object->joint_%s != ENTITY_INVALID) "
                 "(void)rohr_entity_delete(object->joint_%s);\n",
                 joint->name, joint->name);
+        }
+        for(size_t soft_body_index = 0; soft_body_index < object->soft_body_count;
+                soft_body_index += 1) {
+            const EditorSoftBody *body = &object->soft_body_items[soft_body_index];
+            fprintf(source,
+                "    if(object->soft_body_%s != ENTITY_INVALID) "
+                "(void)rohr_entity_delete(object->soft_body_%s);\n",
+                body->name, body->name);
         }
         for(size_t anchor_index = 0; anchor_index < object->anchor_count; anchor_index += 1) {
             const EditorAnchor *anchor = &object->anchors[anchor_index];

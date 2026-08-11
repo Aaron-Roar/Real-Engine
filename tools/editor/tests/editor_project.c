@@ -140,7 +140,19 @@ int main(void) {
                 generated_object, (Position){80.0f, 20.0f}, 0);
             EditorJoint *generated_joint = editor_project_joint_add(&loaded_project,
                 generated_object, EDITOR_JOINT_SPRING);
+            EditorSoftBody *generated_soft_body = editor_project_soft_body_add(
+                &loaded_project, generated_object);
+            EditorSoftNode *generated_node_a = editor_project_soft_node_add(
+                &loaded_project, generated_soft_body, (Position){0.0f, 40.0f});
+            EditorSoftNode *generated_node_b = editor_project_soft_node_add(
+                &loaded_project, generated_soft_body, (Position){20.0f, 40.0f});
+            EditorSoftBeam *generated_beam = generated_node_a == NULL ||
+                generated_node_b == NULL ? NULL : editor_project_soft_beam_add(
+                    &loaded_project, generated_soft_body, generated_node_a->id,
+                    generated_node_b->id);
             if(body_anchor == NULL || world_anchor == NULL || generated_joint == NULL ||
+                    generated_soft_body == NULL || generated_node_a == NULL ||
+                    generated_node_b == NULL || generated_beam == NULL ||
                     !editor_project_joint_anchor_set(generated_object,
                         generated_joint, 0, body_anchor->id) ||
                     !editor_project_joint_anchor_set(generated_object,
@@ -156,7 +168,12 @@ int main(void) {
                 !file_contains(path, "7.00000000f") ||
                 !file_contains(path, "generated_world_anchor_create") ||
                 !file_contains(path, "rohr_physics_joint_anchor_create") ||
-                !file_contains(path, "rohr_physics_joint_spring_set")) {
+                !file_contains(path, "rohr_physics_joint_spring_set") ||
+                !file_contains(path, "rohr_physics_soft_body_create") ||
+                !file_contains(path, "rohr_physics_soft_body_node_create") ||
+                !file_contains(path,
+                    "rohr_physics_soft_body_node_collision_filter_set") ||
+                !file_contains(path, "rohr_physics_soft_body_beam_create")) {
             workspace_fixture_remove(fixture);
             return 1;
         }
@@ -287,6 +304,8 @@ int main(void) {
     node_a = editor_project_soft_node_add(&project, soft_body, (Position){0});
     node_b = editor_project_soft_node_add(&project, soft_body, (Position){20.0f, 0.0f});
     if(soft_body == NULL || node_a == NULL || node_b == NULL) return 1;
+    node_b->collision_category = UINT64_C(1) | (UINT64_C(1) << 1);
+    node_b->collision_with = UINT64_C(1);
     if(node_a->gravity_enabled || node_b->gravity_enabled) return 1;
     beam = editor_project_soft_beam_add(&project, soft_body, 0, 0);
     if(beam == NULL || !beam->visible || beam->node_a != 0 || beam->node_b != 0) return 1;
@@ -347,6 +366,9 @@ int main(void) {
                 loaded_object->anchor_count != object->anchor_count ||
                 loaded_object->joint_count != object->joint_count ||
                 loaded_object->soft_body_count != object->soft_body_count ||
+                loaded_object->soft_body_items[0].nodes[0].collision_category !=
+                    (UINT64_C(1) | (UINT64_C(1) << 1)) ||
+                loaded_object->soft_body_items[0].nodes[0].collision_with != UINT64_C(1) ||
                 strcmp(loaded_object->name, object->name) != 0 ||
                 !position_equal(loaded_object->position, object->position) ||
                 loaded.next_id != project.next_id ||

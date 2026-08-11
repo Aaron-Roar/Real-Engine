@@ -2139,8 +2139,77 @@ int main(void) {
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 230.0f,
                         EDITOR_TOOLS_WIDTH - 20.0f, 28.0f},
                     &node->gravity_enabled);
+                {
+                    float row_x = EDITOR_VIEWPORT_WIDTH + 10.0f;
+                    float row_width = EDITOR_TOOLS_WIDTH - 20.0f;
+                    float controls_bottom = 298.0f;
+
+                    if(editor_checkbox("editor.soft_node.collision", &collision_label,
+                            (UIRect){row_x, 266.0f, row_width, 28.0f},
+                            &node->collision_enabled) && !node->collision_enabled) {
+                        collision_category_open = false;
+                        collide_with_open = false;
+                    }
+                    if(node->collision_enabled && rohr_ui_button(
+                            "editor.soft_node.collision_category",
+                            &collision_category_label,
+                            (UIRect){row_x, controls_bottom, row_width, 28.0f},
+                            NULL).clicked) {
+                        collision_category_open = !collision_category_open;
+                        collide_with_open = false;
+                    }
+                    if(node->collision_enabled) {
+                        rohr_ui_border((UIRect){row_x, controls_bottom, row_width, 28.0f},
+                            2.0f, (Color){0, 0, 0, 255});
+                        controls_bottom += 32.0f;
+                    }
+                    if(node->collision_enabled && collision_category_open) {
+                        size_t rows = 0;
+                        if(!editor_collision_mask_menu_draw(
+                                "editor.soft_node.collision_category.mask", &project,
+                                &node->collision_category, &font, collision_mask_labels,
+                                collision_mask_cache, collision_mask_name,
+                                sizeof(collision_mask_name), &collision_mask_name_field,
+                                &add_label, row_x, controls_bottom, row_width,
+                                &field_editing, &rows)) goto fail;
+                        controls_bottom += (float)rows * 30.0f;
+                    }
+                    if(node->collision_enabled && rohr_ui_button(
+                            "editor.soft_node.collide_with", &collide_with_label,
+                            (UIRect){row_x, controls_bottom, row_width, 28.0f},
+                            NULL).clicked) {
+                        collide_with_open = !collide_with_open;
+                        collision_category_open = false;
+                    }
+                    if(node->collision_enabled) {
+                        rohr_ui_border((UIRect){row_x, controls_bottom, row_width, 28.0f},
+                            2.0f, (Color){0, 0, 0, 255});
+                        controls_bottom += 32.0f;
+                    }
+                    if(node->collision_enabled && collide_with_open) {
+                        size_t rows = 0;
+                        if(!editor_collision_mask_menu_draw(
+                                "editor.soft_node.collide_with.mask", &project,
+                                &node->collision_with, &font, collision_mask_labels,
+                                collision_mask_cache, collision_mask_name,
+                                sizeof(collision_mask_name), &collision_mask_name_field,
+                                &add_label, row_x, controls_bottom, row_width,
+                                &field_editing, &rows)) goto fail;
+                        controls_bottom += (float)rows * 30.0f;
+                    }
+                    if((collision_category_open || collide_with_open) &&
+                            mouse.button_states[MOUSE_BUTTON_LEFT] ==
+                                MOUSE_BUTTON_STATE_PRESSED) {
+                        Position pointer = rohr_graphics_mouse_screen_position_get();
+                        if(pointer.x < row_x || pointer.x > row_x + row_width ||
+                                pointer.y < 266.0f || pointer.y > controls_bottom) {
+                            collision_category_open = false;
+                            collide_with_open = false;
+                        }
+                    }
+                }
                 field_editing = name_result.active || x_result.active || y_result.active ||
-                    mass_result.active;
+                    mass_result.active || field_editing;
                 if(rohr_ui_button("editor.soft_node.delete", &delete_node_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 660.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 34.0f}, &delete_style).clicked) {

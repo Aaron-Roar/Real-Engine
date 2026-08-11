@@ -108,6 +108,9 @@ typedef struct EditorSoftNode {
     Position position;
     float node_mass;
     bool gravity_enabled;
+    bool collision_enabled;
+    RohrCollisionCategoryMask collision_category;
+    RohrCollisionCategoryMask collision_with;
     bool visible;
 } EditorSoftNode;
 

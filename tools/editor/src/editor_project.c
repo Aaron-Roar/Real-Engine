@@ -783,6 +783,9 @@ EditorSoftNode *editor_project_soft_node_add(EditorProject *project, EditorSoftB
         .position = position,
         .node_mass = 1.0f,
         .gravity_enabled = false,
+        .collision_enabled = true,
+        .collision_category = UINT64_C(1),
+        .collision_with = UINT64_C(1),
         .visible = true
     };
     snprintf(node->name, sizeof(node->name), "node_%u", node->id);
