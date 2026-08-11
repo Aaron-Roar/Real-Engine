@@ -682,9 +682,9 @@ static bool editor_workspace_scaffold_write(const EditorWorkspace *workspace) {
         "set(ROHR_BUILD_EDITOR OFF CACHE BOOL \"\" FORCE)\n"
         "add_subdirectory(\"${ROHR_ENGINE_ROOT}\" rohr-engine)\n\n"
         "file(GLOB ROHR_GENERATED_SOURCES CONFIGURE_DEPENDS src/generated/*.c)\n"
-        "add_executable(mygame src/main.c ${ROHR_GENERATED_SOURCES})\n"
-        "target_include_directories(mygame PRIVATE src/generated)\n"
-        "target_link_libraries(mygame PRIVATE rohr_engine)\n",
+        "add_executable(${PROJECT_NAME} src/main.c ${ROHR_GENERATED_SOURCES})\n"
+        "target_include_directories(${PROJECT_NAME} PRIVATE src/generated)\n"
+        "target_link_libraries(${PROJECT_NAME} PRIVATE rohr_engine)\n",
         workspace->config.name, workspace->config.engine_root);
     return editor_workspace_path_join(path, sizeof(path), workspace->directory,
             "CMakeLists.txt") && editor_workspace_file_write(path, cmake) &&

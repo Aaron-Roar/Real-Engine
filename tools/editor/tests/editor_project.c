@@ -216,7 +216,10 @@ int main(void) {
             return 1;
         }
         snprintf(path, sizeof(path), "%s/CMakeLists.txt", fixture);
-        if(!file_contains(path, "add_executable(mygame ")) {
+        if(!file_contains(path,
+                "add_executable(${PROJECT_NAME} src/main.c") ||
+                !file_contains(path,
+                    "target_link_libraries(${PROJECT_NAME} PRIVATE rohr_engine)")) {
             workspace_fixture_remove(fixture);
             return 1;
         }
