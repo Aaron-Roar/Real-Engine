@@ -133,11 +133,32 @@ int main(void) {
             return 1;
         }
         loaded_project.objects[1].rigid_bodies[0].mass_value = 7.0f;
+        {
+            EditorObject *generated_object = &loaded_project.objects[1];
+            EditorRigidBody *generated_body = &generated_object->rigid_bodies[0];
+            EditorAnchor *body_anchor = editor_project_anchor_add(&loaded_project,
+                generated_object, (Position){12.0f, 0.0f}, generated_body->id);
+            EditorAnchor *world_anchor = editor_project_anchor_add(&loaded_project,
+                generated_object, (Position){80.0f, 20.0f}, 0);
+            EditorJoint *generated_joint = editor_project_joint_add(&loaded_project,
+                generated_object, EDITOR_JOINT_SPRING);
+            if(body_anchor == NULL || world_anchor == NULL || generated_joint == NULL ||
+                    !editor_project_joint_anchor_set(generated_object,
+                        generated_joint, 0, body_anchor->id) ||
+                    !editor_project_joint_anchor_set(generated_object,
+                        generated_joint, 1, world_anchor->id)) {
+                workspace_fixture_remove(fixture);
+                return 1;
+            }
+        }
         if(!editor_workspace_save(&loaded_workspace, &loaded_project) ||
                 !file_contains(path, "5.00000000f") ||
                 file_contains(path, "7.00000000f") ||
                 !editor_workspace_c_generate(&loaded_workspace, &loaded_project) ||
-                !file_contains(path, "7.00000000f")) {
+                !file_contains(path, "7.00000000f") ||
+                !file_contains(path, "generated_world_anchor_create") ||
+                !file_contains(path, "rohr_physics_joint_anchor_create") ||
+                !file_contains(path, "rohr_physics_joint_spring_set")) {
             workspace_fixture_remove(fixture);
             return 1;
         }

@@ -67,6 +67,22 @@ static bool editor_workspace_directory_empty(const char *directory) {
         SDL_EnumerateDirectory(directory, editor_workspace_not_empty, &empty) && empty;
 }
 
+static const EditorRigidBody *editor_workspace_body_get(
+    const EditorObject *object, EditorRigidBodyId id) {
+    if(object == NULL || id == 0) return NULL;
+    for(size_t i = 0; i < object->rigid_body_count; i += 1)
+        if(object->rigid_bodies[i].id == id) return &object->rigid_bodies[i];
+    return NULL;
+}
+
+static const EditorAnchor *editor_workspace_anchor_get(
+    const EditorObject *object, EditorAnchorId id) {
+    if(object == NULL || id == 0) return NULL;
+    for(size_t i = 0; i < object->anchor_count; i += 1)
+        if(object->anchors[i].id == id) return &object->anchors[i];
+    return NULL;
+}
+
 static void editor_workspace_hitbox_rectangle_set(EditorProject *project,
     EditorHitbox *hitbox, float width, float height) {
     Position vertices[4] = {
@@ -304,6 +320,31 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
         "    *output = ENTITY_INVALID;\n"
         "    return result;\n"
         "}\n\n");
+    fprintf(source,
+        "static EngineResult generated_world_anchor_create(Entity *owner,\n"
+        "    JointAnchorId *anchor, Position position) {\n"
+        "    EntityResult added = rohr_entity_add();\n"
+        "    JointAnchorIdResult created;\n"
+        "    EngineResult result;\n"
+        "    if(rohr_error_check(added)) return rohr_error_result_error(added.result.error);\n"
+        "    *owner = added.result.value;\n"
+        "    result = rohr_physics_position_set(*owner, position);\n"
+        "    if(rohr_error_check(result)) goto fail;\n"
+        "    result = rohr_physics_static_set(*owner);\n"
+        "    if(rohr_error_check(result)) goto fail;\n"
+        "    created = rohr_physics_joint_anchor_create(*owner, (Vec2D){0});\n"
+        "    if(rohr_error_check(created)) {\n"
+        "        result = rohr_error_result_error(created.result.error);\n"
+        "        goto fail;\n"
+        "    }\n"
+        "    *anchor = created.result.value;\n"
+        "    return rohr_error_result_value(true);\n"
+        "fail:\n"
+        "    (void)rohr_entity_delete(*owner);\n"
+        "    *owner = ENTITY_INVALID;\n"
+        "    *anchor = JOINT_ANCHOR_INVALID;\n"
+        "    return result;\n"
+        "}\n\n");
     for(size_t object_index = 0; object_index < project->object_count; object_index += 1) {
         const EditorObject *object = &project->objects[object_index];
         char function_name[EDITOR_OBJECT_NAME_MAX];
@@ -314,6 +355,15 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
         for(size_t body_index = 0; body_index < object->rigid_body_count; body_index += 1) {
             fprintf(header, "    Entity %s;\n", object->rigid_bodies[body_index].name);
         }
+        for(size_t anchor_index = 0; anchor_index < object->anchor_count; anchor_index += 1) {
+            const EditorAnchor *anchor = &object->anchors[anchor_index];
+            fprintf(header, "    JointAnchorId anchor_%s;\n", anchor->name);
+            if(editor_workspace_body_get(object, anchor->rigid_body) == NULL ||
+                    !anchor->position_follows_body)
+                fprintf(header, "    Entity anchor_%s_owner;\n", anchor->name);
+        }
+        for(size_t joint_index = 0; joint_index < object->joint_count; joint_index += 1)
+            fprintf(header, "    Entity joint_%s;\n", object->joint_items[joint_index].name);
         fprintf(header,
             "} %s;\n\n"
             "EngineResult %s_create(%s *object, Position position);\n"
@@ -353,6 +403,57 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 (unsigned long long)body->collision_category,
                 (unsigned long long)body->collision_with);
         }
+        for(size_t anchor_index = 0; anchor_index < object->anchor_count; anchor_index += 1) {
+            const EditorAnchor *anchor = &object->anchors[anchor_index];
+            const EditorRigidBody *body = editor_workspace_body_get(
+                object, anchor->rigid_body);
+            if(body != NULL && anchor->position_follows_body) {
+                fprintf(source,
+                    "    { JointAnchorIdResult created = rohr_physics_joint_anchor_create("
+                    "object->%s, (Vec2D){%#.9gf, %#.9gf});\n"
+                    "      if(rohr_error_check(created)) { result = rohr_error_result_error("
+                    "created.result.error); goto fail; }\n"
+                    "      object->anchor_%s = created.result.value; }\n",
+                    body->name, anchor->position.x, anchor->position.y, anchor->name);
+            } else {
+                fprintf(source,
+                    "    result = generated_world_anchor_create(&object->anchor_%s_owner, "
+                    "&object->anchor_%s, (Position){position.x + %#.9gf, "
+                    "position.y + %#.9gf});\n"
+                    "    if(rohr_error_check(result)) goto fail;\n",
+                    anchor->name, anchor->name, anchor->position.x, anchor->position.y);
+            }
+        }
+        for(size_t joint_index = 0; joint_index < object->joint_count; joint_index += 1) {
+            const EditorJoint *joint = &object->joint_items[joint_index];
+            const EditorAnchor *anchor_a = editor_workspace_anchor_get(object, joint->anchor_a);
+            const EditorAnchor *anchor_b = editor_workspace_anchor_get(object, joint->anchor_b);
+            if(anchor_a == NULL || anchor_b == NULL) continue;
+            fprintf(source,
+                "    { EntityResult added = rohr_entity_add();\n"
+                "      if(rohr_error_check(added)) { result = rohr_error_result_error("
+                "added.result.error); goto fail; }\n"
+                "      object->joint_%s = added.result.value; }\n",
+                joint->name);
+            if(joint->kind == EDITOR_JOINT_REVOLUTE) {
+                fprintf(source,
+                    "    result = rohr_physics_joint_pin_set(object->joint_%s, "
+                    "object->anchor_%s, object->anchor_%s);\n",
+                    joint->name, anchor_a->name, anchor_b->name);
+            } else if(joint->kind == EDITOR_JOINT_WELD) {
+                fprintf(source,
+                    "    result = rohr_physics_joint_weld_set(object->joint_%s, "
+                    "object->anchor_%s, object->anchor_%s);\n",
+                    joint->name, anchor_a->name, anchor_b->name);
+            } else {
+                fprintf(source,
+                    "    result = rohr_physics_joint_spring_set(object->joint_%s, "
+                    "object->anchor_%s, object->anchor_%s, %#.9gf, %#.9gf, %#.9gf);\n",
+                    joint->name, anchor_a->name, anchor_b->name,
+                    joint->rest_length, joint->stiffness, joint->damping);
+            }
+            fprintf(source, "    if(rohr_error_check(result)) goto fail;\n");
+        }
         fprintf(source,
             "    return rohr_error_result_value(true);\n"
             "fail:\n"
@@ -362,6 +463,22 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
             "void %s_destroy(%s *object) {\n"
             "    if(object == NULL) return;\n",
             function_name, function_name, object->name);
+        for(size_t joint_index = 0; joint_index < object->joint_count; joint_index += 1) {
+            const EditorJoint *joint = &object->joint_items[joint_index];
+            fprintf(source,
+                "    if(object->joint_%s != ENTITY_INVALID) "
+                "(void)rohr_entity_delete(object->joint_%s);\n",
+                joint->name, joint->name);
+        }
+        for(size_t anchor_index = 0; anchor_index < object->anchor_count; anchor_index += 1) {
+            const EditorAnchor *anchor = &object->anchors[anchor_index];
+            if(editor_workspace_body_get(object, anchor->rigid_body) == NULL ||
+                    !anchor->position_follows_body)
+                fprintf(source,
+                    "    if(object->anchor_%s_owner != ENTITY_INVALID) "
+                    "(void)rohr_entity_delete(object->anchor_%s_owner);\n",
+                    anchor->name, anchor->name);
+        }
         for(size_t body_index = 0; body_index < object->rigid_body_count; body_index += 1) {
             const EditorRigidBody *body = &object->rigid_bodies[body_index];
             fprintf(source,
