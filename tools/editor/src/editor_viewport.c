@@ -548,6 +548,10 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                 state->selection = EDITOR_SELECTION_RIGID_BODY;
                 state->selected_rigid_body = candidate_body->id;
                 state->mode = EDITOR_VIEWPORT_RIGID_BODY;
+            } else if(state->mode == EDITOR_VIEWPORT_RIGID_BODY &&
+                    state->selected_rigid_body != candidate_body->id) {
+                state->selection = EDITOR_SELECTION_RIGID_BODY;
+                state->selected_rigid_body = candidate_body->id;
             } else {
                 state->selection = EDITOR_SELECTION_HITBOX;
                 state->selected_rigid_body = candidate_body->id;
