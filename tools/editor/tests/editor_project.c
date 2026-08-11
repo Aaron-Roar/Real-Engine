@@ -92,21 +92,21 @@ int main(void) {
                 !loaded_workspace.open || strcmp(loaded_workspace.config.name,
                     "RohrEditorWorkspaceTest") != 0 ||
                 strcmp(loaded_workspace.config.engine_root, "/engine/root") != 0 ||
-                loaded_project.object_count != 2 ||
-                strcmp(loaded_project.objects[0].name, "Floor") != 0 ||
-                strcmp(loaded_project.objects[1].name, "Box") != 0 ||
+                loaded_project.object_count != 1 ||
+                strcmp(loaded_project.objects[0].name, "Starter") != 0 ||
                 !position_equal(loaded_project.objects[0].position,
+                    (Position){0.0f, 0.0f}) ||
+                loaded_project.objects[0].rigid_body_count != 2 ||
+                !position_equal(loaded_project.objects[0].rigid_bodies[0].position,
                     (Position){0.0f, -200.0f}) ||
-                !position_equal(loaded_project.objects[1].position,
+                !position_equal(loaded_project.objects[0].rigid_bodies[1].position,
                     (Position){0.0f, 120.0f}) ||
-                loaded_project.objects[0].rigid_body_count != 1 ||
-                loaded_project.objects[1].rigid_body_count != 1 ||
                 !loaded_project.objects[0].rigid_bodies[0].static_body ||
-                !loaded_project.objects[1].rigid_bodies[0].gravity_enabled ||
-                fabsf(loaded_project.objects[1].rigid_bodies[0].mass_value - 5.0f) >
+                !loaded_project.objects[0].rigid_bodies[1].gravity_enabled ||
+                fabsf(loaded_project.objects[0].rigid_bodies[1].mass_value - 5.0f) >
                     0.001f ||
                 loaded_project.objects[0].rigid_bodies[0].hitboxes[0].vertex_count != 4 ||
-                loaded_project.objects[1].rigid_bodies[0].hitboxes[0].vertex_count != 4) {
+                loaded_project.objects[0].rigid_bodies[1].hitboxes[0].vertex_count != 4) {
             workspace_fixture_remove(fixture);
             return 1;
         }
@@ -114,15 +114,13 @@ int main(void) {
         if(!SDL_GetPathInfo(path, &info) || info.type != SDL_PATHTYPE_FILE ||
                 !file_contains(path,
                     "rohr_physics_gravity_set((Acceleration){0.0f, -900.0f})") ||
-                !file_contains(path, "floor_create(&floor") ||
-                !file_contains(path, "box_create(&box")) {
+                !file_contains(path, "starter_create(&starter")) {
             workspace_fixture_remove(fixture);
             return 1;
         }
         snprintf(path, sizeof(path), "%s/src/generated/project_objects.c", fixture);
         if(!SDL_GetPathInfo(path, &info) || info.type != SDL_PATHTYPE_FILE ||
-                !file_contains(path, "EngineResult floor_create") ||
-                !file_contains(path, "EngineResult box_create") ||
+                !file_contains(path, "EngineResult starter_create") ||
                 !file_contains(path,
                     "}}, 5.00000000f, 0.500000000f, 0.00000000f, false") ||
                 !file_contains(path, "rohr_physics_collision_category_set") ||
@@ -132,10 +130,10 @@ int main(void) {
             workspace_fixture_remove(fixture);
             return 1;
         }
-        loaded_project.objects[1].rigid_bodies[0].mass_value = 7.0f;
+        loaded_project.objects[0].rigid_bodies[1].mass_value = 7.0f;
         {
-            EditorObject *generated_object = &loaded_project.objects[1];
-            EditorRigidBody *generated_body = &generated_object->rigid_bodies[0];
+            EditorObject *generated_object = &loaded_project.objects[0];
+            EditorRigidBody *generated_body = &generated_object->rigid_bodies[1];
             EditorAnchor *body_anchor = editor_project_anchor_add(&loaded_project,
                 generated_object, (Position){12.0f, 0.0f}, generated_body->id);
             EditorAnchor *world_anchor = editor_project_anchor_add(&loaded_project,

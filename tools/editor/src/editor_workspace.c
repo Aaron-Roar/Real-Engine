@@ -107,31 +107,29 @@ static void editor_workspace_hitbox_rectangle_set(EditorProject *project,
 }
 
 static bool editor_workspace_starter_project_init(EditorProject *project) {
-    EditorObject *floor;
-    EditorObject *box;
+    EditorObject *starter;
     EditorRigidBody *floor_body;
     EditorRigidBody *box_body;
 
     if(project == NULL) return false;
     editor_project_init(project);
-    floor = editor_project_object_add(project, (Position){0.0f, -200.0f});
-    if(floor == NULL) return false;
-    snprintf(floor->name, sizeof(floor->name), "Floor");
-    floor_body = editor_project_rigid_body_add(project, floor);
+    starter = editor_project_object_add(project, (Position){0});
+    if(starter == NULL) return false;
+    snprintf(starter->name, sizeof(starter->name), "Starter");
+    floor_body = editor_project_rigid_body_add(project, starter);
     if(floor_body == NULL) return false;
     snprintf(floor_body->name, sizeof(floor_body->name), "floor");
+    floor_body->position = (Position){0.0f, -200.0f};
     floor_body->static_body = true;
     floor_body->friction = 0.5f;
     floor_body->restitution = 0.0f;
     editor_workspace_hitbox_rectangle_set(project, &floor_body->hitboxes[0],
         600.0f, 40.0f);
 
-    box = editor_project_object_add(project, (Position){0.0f, 120.0f});
-    if(box == NULL) return false;
-    snprintf(box->name, sizeof(box->name), "Box");
-    box_body = editor_project_rigid_body_add(project, box);
+    box_body = editor_project_rigid_body_add(project, starter);
     if(box_body == NULL) return false;
     snprintf(box_body->name, sizeof(box_body->name), "box");
+    box_body->position = (Position){0.0f, 120.0f};
     box_body->mass_value = 5.0f;
     box_body->friction = 0.5f;
     box_body->restitution = 0.0f;
