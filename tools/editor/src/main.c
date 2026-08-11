@@ -984,7 +984,9 @@ int main(void) {
             Position pointer = rohr_graphics_mouse_screen_position_get();
             MouseButtonState primary = mouse.button_states[MOUSE_BUTTON_LEFT];
 
-            if(!panel_resizing && primary == MOUSE_BUTTON_STATE_PRESSED &&
+            if(file_browser.active) {
+                panel_resizing = false;
+            } else if(!panel_resizing && primary == MOUSE_BUTTON_STATE_PRESSED &&
                     fabsf(pointer.x - EDITOR_VIEWPORT_WIDTH) <=
                         EDITOR_DIVIDER_GRAB_WIDTH) {
                 panel_resizing = true;
@@ -2413,10 +2415,12 @@ int main(void) {
             }
         }
         rohr_ui_frame_end();
-        (void)rohr_graphics_screen_rect_draw(
-            EDITOR_VIEWPORT_WIDTH - 1.0f, EDITOR_MENU_HEIGHT, 3.0f,
-            WINDOW_HEIGHT - EDITOR_MENU_HEIGHT,
-            (Color){75, 84, 100, 255});
+        if(!file_browser.active) {
+            (void)rohr_graphics_screen_rect_draw(
+                EDITOR_VIEWPORT_WIDTH - 1.0f, EDITOR_MENU_HEIGHT, 3.0f,
+                WINDOW_HEIGHT - EDITOR_MENU_HEIGHT,
+                (Color){75, 84, 100, 255});
+        }
         rohr_graphics_show();
     }
 

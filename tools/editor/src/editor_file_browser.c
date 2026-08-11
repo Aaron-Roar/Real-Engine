@@ -269,7 +269,7 @@ EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
     left_width = directory_mode ? (dialog.width - 42.0f) * 0.5f : dialog.width - 28.0f;
     right_x = dialog.x + 28.0f + left_width;
     rohr_ui_surface((UIRect){0.0f, 34.0f, window_width, window_height - 34.0f},
-        (Color){12, 14, 18, 225});
+        (Color){12, 14, 18, 255});
     rohr_ui_surface(dialog, (Color){42, 47, 58, 255});
     rohr_ui_border(dialog, 2.0f, (Color){8, 9, 12, 255});
     rohr_ui_label(&browser->directory_label, (UIRect){dialog.x + 14.0f, dialog.y + 12.0f,
