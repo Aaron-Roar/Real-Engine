@@ -1951,6 +1951,9 @@ float rohr_tools_random_range_float(float min, float max);
 
 /** @brief Starts a UI frame with logical screen-space pointer input. */
 void rohr_ui_frame_begin(UIInput input);
+/** @brief Applies reusable sizing components to UI bounds. */
+UIRect rohr_ui_component_bounds_get(UIRect bounds, const TextAsset *const *texts,
+    size_t text_count, UIComponentConfig config);
 /** Queues keyboard and pointer events used by UI controls. */
 void rohr_ui_event_add(const SDL_Event *event);
 /** Queues a keyboard event for focused UI fields. */

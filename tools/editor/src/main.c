@@ -2424,10 +2424,44 @@ int main(void) {
             const TextAsset *settings_options[] = {
                 &preferences_label
             };
+            const TextAsset *file_texts[] = {
+                &file_label, &new_label, &open_label, &save_label, &close_label,
+                &exit_label
+            };
+            const TextAsset *build_texts[] = {&build_label, &generate_c_label};
+            const TextAsset *view_texts[] = {
+                &view_label, &reset_view_label, &grid_label
+            };
+            const TextAsset *settings_texts[] = {&settings_label, &preferences_label};
+            UIComponentConfig menu_components = {
+                .components = UI_COMPONENT_SIZE_TO_TEXT,
+                .text_padding_x = 12.0f,
+                .text_padding_y = 7.0f
+            };
+            float menu_x = 4.0f;
+            UIRect file_bounds = rohr_ui_component_bounds_get(
+                (UIRect){menu_x, 3.0f, 0.0f, 0.0f}, file_texts,
+                sizeof(file_texts) / sizeof(file_texts[0]), menu_components);
+            UIRect build_bounds;
+            UIRect view_bounds;
+            UIRect settings_bounds;
+
+            menu_x += file_bounds.width + 4.0f;
+            build_bounds = rohr_ui_component_bounds_get(
+                (UIRect){menu_x, 3.0f, 0.0f, 0.0f}, build_texts,
+                sizeof(build_texts) / sizeof(build_texts[0]), menu_components);
+            menu_x += build_bounds.width + 4.0f;
+            view_bounds = rohr_ui_component_bounds_get(
+                (UIRect){menu_x, 3.0f, 0.0f, 0.0f}, view_texts,
+                sizeof(view_texts) / sizeof(view_texts[0]), menu_components);
+            menu_x += view_bounds.width + 4.0f;
+            settings_bounds = rohr_ui_component_bounds_get(
+                (UIRect){menu_x, 3.0f, 0.0f, 0.0f}, settings_texts,
+                sizeof(settings_texts) / sizeof(settings_texts[0]), menu_components);
 
             file_menu = rohr_ui_menu("editor.menu.file", &file_label, file_options,
                 sizeof(file_options) / sizeof(file_options[0]),
-                (UIRect){4.0f, 3.0f, 76.0f, 28.0f}, NULL);
+                file_bounds, NULL);
             if(file_menu.changed && file_menu.selected_index == 0) {
                 workspace_browser_action = EDITOR_WORKSPACE_BROWSER_NEW;
                 (void)editor_file_browser_open(&file_browser,
@@ -2461,7 +2495,7 @@ int main(void) {
                 UIDropdownResult build_menu = rohr_ui_menu("editor.menu.build",
                     &build_label, build_options,
                     sizeof(build_options) / sizeof(build_options[0]),
-                    (UIRect){84.0f, 3.0f, 76.0f, 28.0f}, NULL);
+                    build_bounds, NULL);
                 if(build_menu.changed && build_menu.selected_index == 0 &&
                         workspace.open) {
                     (void)editor_workspace_c_generate(&workspace, &project);
@@ -2469,10 +2503,10 @@ int main(void) {
             }
             (void)rohr_ui_menu("editor.menu.view", &view_label, view_options,
                 sizeof(view_options) / sizeof(view_options[0]),
-                (UIRect){164.0f, 3.0f, 76.0f, 28.0f}, NULL);
+                view_bounds, NULL);
             (void)rohr_ui_menu("editor.menu.settings", &settings_label,
                 settings_options, sizeof(settings_options) / sizeof(settings_options[0]),
-                (UIRect){244.0f, 3.0f, 104.0f, 28.0f}, NULL);
+                settings_bounds, NULL);
         }
         if(close_action != EDITOR_CLOSE_NONE) {
             UIRect dialog = {

@@ -90,6 +90,24 @@ static UIRect ui_bounds_resolve(UIRect bounds) {
     return bounds;
 }
 
+UIRect ui_component_bounds_get(UIRect bounds, const TextAsset *const *texts,
+    size_t text_count, UIComponentConfig config) {
+    float width = 0.0f;
+    float height = 0.0f;
+
+    if((config.components & UI_COMPONENT_SIZE_TO_TEXT) == 0 || texts == NULL) {
+        return bounds;
+    }
+    for(size_t i = 0; i < text_count; i += 1) {
+        if(texts[i] == NULL) continue;
+        if(texts[i]->size.x > width) width = texts[i]->size.x;
+        if(texts[i]->size.y > height) height = texts[i]->size.y;
+    }
+    bounds.width = width + fmaxf(0.0f, config.text_padding_x) * 2.0f;
+    bounds.height = height + fmaxf(0.0f, config.text_padding_y) * 2.0f;
+    return bounds;
+}
+
 static bool ui_point_in_scroll_clip(Position point) {
     if(ui_context.scroll_depth == 0) return true;
     return ui_point_in_rect(point,

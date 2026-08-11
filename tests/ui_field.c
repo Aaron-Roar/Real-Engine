@@ -32,6 +32,17 @@ int main(void) {
     char string[32] = "a";
     const TextAsset *dropdown_options[2] = {NULL, NULL};
     const TextAsset *long_dropdown_options[10] = {0};
+    TextAsset sizing_text = {.size = {40.0f, 12.0f}};
+    const TextAsset *sizing_texts[] = {&sizing_text};
+    UIRect sized = rohr_ui_component_bounds_get((UIRect){2.0f, 3.0f, 1.0f, 1.0f},
+        sizing_texts, 1, (UIComponentConfig){
+            .components = UI_COMPONENT_SIZE_TO_TEXT,
+            .text_padding_x = 12.0f,
+            .text_padding_y = 7.0f
+        });
+
+    if(fabsf(sized.width - 64.0f) > 0.001f ||
+            fabsf(sized.height - 26.0f) > 0.001f) return 1;
 
     rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f},
         .primary_button = MOUSE_BUTTON_STATE_PRESSED});

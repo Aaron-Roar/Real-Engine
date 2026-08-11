@@ -473,6 +473,7 @@ int rohr_tools_random_range(int min, int max) { return tools_random_range(min, m
 float rohr_tools_random_range_float(float min, float max) { return tools_random_range_float(min, max); }
 
 void rohr_ui_frame_begin(UIInput input) { ui_frame_begin(input); }
+UIRect rohr_ui_component_bounds_get(UIRect bounds, const TextAsset *const *texts, size_t text_count, UIComponentConfig config) { return ui_component_bounds_get(bounds, texts, text_count, config); }
 void rohr_ui_event_add(const SDL_Event *event) { ui_event_add(event); }
 void rohr_ui_field_event_add(const SDL_Event *event) { ui_field_event_add(event); }
 UIFieldResult rohr_ui_field(const char *id, UIFieldBinding binding, TextAsset *display, UIRect bounds, const UIButtonStyle *style) { return ui_field(id, binding, display, bounds, style); }

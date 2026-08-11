@@ -19,6 +19,18 @@ typedef struct UIRect {
     float height;
 } UIRect;
 
+typedef enum UIComponentTag {
+    UI_COMPONENT_SIZE_TO_TEXT = 1 << 0
+} UIComponentTag;
+
+typedef uint32_t UIComponentMask;
+
+typedef struct UIComponentConfig {
+    UIComponentMask components;
+    float text_padding_x;
+    float text_padding_y;
+} UIComponentConfig;
+
 /** Pointer input consumed by the UI during one frame. */
 typedef struct UIInput {
     Position pointer;
@@ -185,6 +197,8 @@ ERROR_DECLARE_RESULT_TYPE(UISliderDefinitionResult, UISliderDefinition);
 
 /** Start a UI frame with pointer coordinates in logical screen space. */
 void ui_frame_begin(UIInput input);
+UIRect ui_component_bounds_get(UIRect bounds, const TextAsset *const *texts,
+    size_t text_count, UIComponentConfig config);
 void ui_event_add(const SDL_Event *event);
 void ui_field_event_add(const SDL_Event *event);
 UIFieldResult ui_field(const char *id, UIFieldBinding binding,
