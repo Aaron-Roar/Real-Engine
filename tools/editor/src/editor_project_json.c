@@ -186,6 +186,7 @@ static yyjson_mut_val *editor_json_soft_body_write(yyjson_mut_doc *document,
         yyjson_mut_obj_add_uint(document, item, "node_a", beam->node_a);
         yyjson_mut_obj_add_uint(document, item, "node_b", beam->node_b);
         yyjson_mut_obj_add_real(document, item, "stiffness", beam->stiffness);
+        yyjson_mut_obj_add_real(document, item, "damping", beam->damping);
         yyjson_mut_obj_add_bool(document, item, "visible", beam->visible);
         yyjson_mut_arr_add_val(beams, item);
     }
@@ -427,12 +428,17 @@ static bool editor_json_soft_body_read(yyjson_val *value, EditorSoftBody *body,
     for(size_t i = 0; i < body->beam_count; i += 1) {
         yyjson_val *item = yyjson_arr_get(beams, i);
         EditorSoftBeam *beam = &body->beams[i];
+        yyjson_val *damping = yyjson_obj_get(item, "damping");
+        *beam = (EditorSoftBeam){.damping = 0.0f};
         if(!yyjson_is_obj(item) || !editor_json_uint(item, "id", &beam->id) || beam->id == 0 ||
                 !editor_json_name(item, beam->name) ||
                 !editor_json_uint(item, "node_a", &beam->node_a) ||
                 !editor_json_uint(item, "node_b", &beam->node_b) ||
                 !editor_json_real(item, "stiffness", &beam->stiffness) ||
                 !editor_json_bool(item, "visible", &beam->visible)) return false;
+        if(damping != NULL && !editor_json_real(item, "damping", &beam->damping)) {
+            return false;
+        }
         editor_project_property_name_format(beam->name, sizeof(beam->name), beam->name);
         if(project->next_soft_beam_id <= beam->id) project->next_soft_beam_id = beam->id + 1;
     }

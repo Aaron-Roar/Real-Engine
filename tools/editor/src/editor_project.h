@@ -123,6 +123,7 @@ typedef struct EditorSoftBeam {
     EditorSoftNodeId node_a;
     EditorSoftNodeId node_b;
     float stiffness;
+    float damping;
     bool visible;
 } EditorSoftBeam;
 

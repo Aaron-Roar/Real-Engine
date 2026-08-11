@@ -172,6 +172,7 @@ int main(void) {
                 generated_node_a->friction = 0.6f;
                 generated_node_a->restitution = 0.4f;
             }
+            if(generated_beam != NULL) generated_beam->damping = 0.3f;
             if(body_anchor == NULL || world_anchor == NULL || generated_joint == NULL ||
                     generated_soft_body == NULL || generated_node_a == NULL ||
                     generated_node_b == NULL || generated_beam == NULL ||
@@ -353,6 +354,7 @@ int main(void) {
     if(!editor_project_soft_beam_remove(soft_body, beam->id) ||
             soft_body->node_count != 2) return 1;
     beam = editor_project_soft_beam_add(&project, soft_body, node_a->id, node_b->id);
+    if(beam != NULL) beam->damping = 0.45f;
     if(beam == NULL ||
             !editor_project_soft_node_remove(soft_body, node_a->id) ||
             soft_body->beam_count != 1 || beam->node_a != 0 ||
@@ -411,6 +413,8 @@ int main(void) {
                 fabsf(loaded_object->soft_body_items[0].nodes[0].friction - 0.7f) >
                     0.001f ||
                 fabsf(loaded_object->soft_body_items[0].nodes[0].restitution - 0.35f) >
+                    0.001f ||
+                fabsf(loaded_object->soft_body_items[0].beams[0].damping - 0.45f) >
                     0.001f ||
                 strcmp(loaded_object->name, object->name) != 0 ||
                 !position_equal(loaded_object->position, object->position) ||

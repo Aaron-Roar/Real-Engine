@@ -832,6 +832,7 @@ EditorSoftBeam *editor_project_soft_beam_add(EditorProject *project, EditorSoftB
         .node_a = node_a,
         .node_b = node_b,
         .stiffness = 1.0f,
+        .damping = 0.0f,
         .visible = true
     };
     snprintf(beam->name, sizeof(beam->name), "beam_%u", beam->id);

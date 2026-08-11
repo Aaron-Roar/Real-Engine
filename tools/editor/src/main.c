@@ -2283,6 +2283,7 @@ int main(void) {
                 size_t index = (size_t)(beam - body->beams);
                 UIButtonStyle delete_style = editor_delete_button_style_get();
                 UIFieldResult stiffness_result;
+                UIFieldResult damping_result;
                 UIFieldResult name_result;
                 if(!editor_named_text_sync(&font, beam->name, &soft_beam_labels[index],
                         soft_beam_cache[index], EDITOR_OBJECT_NAME_MAX)) goto fail;
@@ -2335,7 +2336,15 @@ int main(void) {
                     (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &beam->stiffness},
                     &length_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 196.0f,
                         EDITOR_TOOLS_WIDTH - 110.0f, 26.0f}, NULL);
-                field_editing = name_result.active || stiffness_result.active;
+                rohr_ui_label(&damping_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    232.0f, 90.0f, 26.0f});
+                damping_result = rohr_ui_field("editor.soft_beam.damping",
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &beam->damping},
+                    &length_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 232.0f,
+                        EDITOR_TOOLS_WIDTH - 110.0f, 26.0f}, NULL);
+                if(damping_result.changed) beam->damping = fmaxf(0.0f, beam->damping);
+                field_editing = name_result.active || stiffness_result.active ||
+                    damping_result.active;
                 if(rohr_ui_button("editor.soft_beam.delete", &delete_beam_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 660.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 34.0f}, &delete_style).clicked) {

@@ -523,12 +523,12 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 fprintf(source,
                     "    { EntityResult created = rohr_physics_soft_body_beam_create("
                     "object->%s, object->%s, "
-                    "object->%s, %#.9gf, 0.00000000f);\n"
+                    "object->%s, %#.9gf, %#.9gf);\n"
                     "      if(rohr_error_check(created)) { result = rohr_error_result_error("
                     "created.result.error); goto fail; }\n"
                     "      object->%s = created.result.value; }\n",
                     body->name, node_a->name, node_b->name, beam->stiffness,
-                    beam->name);
+                    beam->damping, beam->name);
             }
         }
         fprintf(source,
