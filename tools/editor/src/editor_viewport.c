@@ -450,6 +450,22 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
         for(size_t i = 0; i < body->hitbox_count; i += 1) {
             if(body->hitboxes[i].visible && editor_hitbox_point_contains(
                     object, body, &body->hitboxes[i], pointer)) {
+                Uint64 now = SDL_GetTicks();
+                bool double_clicked = state->last_viewport_click_selection ==
+                        EDITOR_SELECTION_RIGID_BODY &&
+                    state->last_viewport_click_object == object->id &&
+                    state->last_viewport_click_index == body->id &&
+                    now - state->last_viewport_click_at <= 400;
+                if(double_clicked) {
+                    state->selected_hitbox = body->hitboxes[i].id;
+                    editor_viewport_hitbox_editor_enter(state);
+                    state->last_viewport_click_selection = EDITOR_SELECTION_NONE;
+                    return true;
+                }
+                state->last_viewport_click_selection = EDITOR_SELECTION_RIGID_BODY;
+                state->last_viewport_click_object = object->id;
+                state->last_viewport_click_index = body->id;
+                state->last_viewport_click_at = now;
                 state->dragged_body = true;
                 state->selection = EDITOR_SELECTION_RIGID_BODY;
                 state->drag_offset = (Vec2D){pointer.x - object->position.x - body->position.x,
@@ -574,6 +590,7 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                 state->selection = EDITOR_SELECTION_RIGID_BODY;
                 state->selected_rigid_body = candidate_body->id;
                 state->mode = EDITOR_VIEWPORT_RIGID_BODY;
+                state->last_viewport_click_selection = EDITOR_SELECTION_NONE;
             } else {
                 state->selection = EDITOR_SELECTION_HITBOX;
                 state->selected_rigid_body = candidate_body->id;
