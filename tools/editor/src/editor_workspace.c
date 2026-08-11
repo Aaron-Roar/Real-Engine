@@ -350,7 +350,7 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 body->rotation_locked ? "true" : "false",
                 body->gravity_enabled ? "true" : "false",
                 body->collision_enabled ? "true" : "false",
-                (unsigned long long)body->collision_with,
+                (unsigned long long)body->collision_category,
                 (unsigned long long)body->collision_with);
         }
         fprintf(source,

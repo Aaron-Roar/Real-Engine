@@ -256,6 +256,90 @@ static bool editor_checkbox(const char *id, const TextAsset *label,
     return interaction.clicked;
 }
 
+static bool editor_collision_mask_menu_draw(const char *id_prefix,
+    EditorProject *project, RohrCollisionCategoryMask *active_masks,
+    FontAsset *font, TextAsset labels[EDITOR_COLLISION_MASK_MAX],
+    char caches[EDITOR_COLLISION_MASK_MAX][EDITOR_OBJECT_NAME_MAX],
+    char *name, size_t name_capacity, TextAsset *name_field,
+    const TextAsset *add_label, float x, float y, float width,
+    bool *field_active, size_t *row_count) {
+    size_t inactive[EDITOR_COLLISION_MASK_MAX];
+    size_t inactive_count = 0;
+    UIFieldResult field_result;
+
+    if(id_prefix == NULL || project == NULL || active_masks == NULL ||
+            font == NULL || name == NULL || name_field == NULL ||
+            add_label == NULL || field_active == NULL || row_count == NULL) return false;
+    field_result = rohr_ui_field(id_prefix,
+        (UIFieldBinding){.kind = UI_FIELD_STRING, .string = name,
+            .string_capacity = name_capacity}, name_field,
+        (UIRect){x, y, width * 0.72f, 28.0f}, NULL);
+    *field_active = *field_active || field_result.active;
+    {
+        char add_id[112];
+        snprintf(add_id, sizeof(add_id), "%s.add", id_prefix);
+        if(rohr_ui_button(add_id, add_label,
+                (UIRect){x + width * 0.72f, y, width * 0.28f, 28.0f}, NULL).clicked) {
+            size_t mask_index = SIZE_MAX;
+            (void)editor_project_collision_mask_add(project, name, &mask_index);
+            if(mask_index < project->collision_mask_count) {
+                *active_masks |= UINT64_C(1) << mask_index;
+                name[0] = '\0';
+                (void)rohr_graphics_text_value_set(name_field, "");
+            }
+        }
+    }
+    *row_count = 1;
+    for(size_t mask = 0; mask < project->collision_mask_count; mask += 1) {
+        char mask_id[112];
+        uint64_t bit = UINT64_C(1) << mask;
+        bool enabled = (*active_masks & bit) != 0;
+        if(!enabled) {
+            inactive[inactive_count++] = mask;
+            continue;
+        }
+        if(!editor_named_text_sync(font, project->collision_masks[mask].name,
+                &labels[mask], caches[mask], EDITOR_OBJECT_NAME_MAX)) return false;
+        snprintf(mask_id, sizeof(mask_id), "%s.%zu", id_prefix, mask);
+        if(editor_checkbox(mask_id, &labels[mask],
+                (UIRect){x, y + (float)*row_count * 30.0f, width, 28.0f},
+                &enabled)) {
+            if(enabled) *active_masks |= bit;
+            else *active_masks &= ~bit;
+        }
+        *row_count += 1;
+    }
+    for(size_t i = 1; i < inactive_count; i += 1) {
+        size_t value = inactive[i];
+        size_t j = i;
+        while(j > 0 && strcmp(project->collision_masks[value].name,
+                project->collision_masks[inactive[j - 1]].name) < 0) {
+            inactive[j] = inactive[j - 1];
+            j -= 1;
+        }
+        inactive[j] = value;
+    }
+    for(size_t i = 0; i < inactive_count; i += 1) {
+        size_t mask = inactive[i];
+        char mask_id[112];
+        uint64_t bit = UINT64_C(1) << mask;
+        bool enabled = false;
+        if(!editor_named_text_sync(font, project->collision_masks[mask].name,
+                &labels[mask], caches[mask], EDITOR_OBJECT_NAME_MAX)) return false;
+        snprintf(mask_id, sizeof(mask_id), "%s.%zu", id_prefix, mask);
+        if(editor_checkbox(mask_id, &labels[mask],
+                (UIRect){x, y + (float)*row_count * 30.0f, width, 28.0f},
+                &enabled)) {
+            if(enabled) *active_masks |= bit;
+            else *active_masks &= ~bit;
+        }
+        *row_count += 1;
+    }
+    rohr_ui_border((UIRect){x, y, width, (float)*row_count * 30.0f - 2.0f},
+        2.0f, (Color){0, 0, 0, 255});
+    return true;
+}
+
 static UIFieldResult editor_property_name_field(const char *id, char *name,
     size_t capacity, TextAsset *display, UIRect bounds) {
     UIFieldResult result = rohr_ui_field(id,
@@ -647,7 +731,8 @@ int main(void) {
     TextAsset world_view_label = {0};
     TextAsset local_view_label = {0};
     TextAsset collision_label = {0};
-    TextAsset collision_masks_label = {0};
+    TextAsset collision_category_label = {0};
+    TextAsset collide_with_label = {0};
     TextAsset add_label = {0};
     TextAsset collision_mask_name_field = {0};
     char collision_mask_name[EDITOR_OBJECT_NAME_MAX] = {0};
@@ -760,7 +845,8 @@ int main(void) {
     bool running = true;
     bool field_editing = false;
     bool panel_resizing = false;
-    bool collision_masks_open = false;
+    bool collision_category_open = false;
+    bool collide_with_open = false;
     EditorCloseAction close_action = EDITOR_CLOSE_NONE;
     float panel_scroll_offset = 0.0f;
     EditorViewportMode panel_scroll_mode = EDITOR_VIEWPORT_HIERARCHY;
@@ -812,7 +898,8 @@ int main(void) {
             !editor_text_create(&font, "World", &world_view_label) ||
             !editor_text_create(&font, "Local", &local_view_label) ||
             !editor_text_create(&font, "Collision", &collision_label) ||
-            !editor_text_create(&font, "Collision Masks", &collision_masks_label) ||
+            !editor_text_create(&font, "Collision Category", &collision_category_label) ||
+            !editor_text_create(&font, "Collide With", &collide_with_label) ||
             !editor_text_create(&font, "Add", &add_label) ||
             !editor_text_create(&font, "", &collision_mask_name_field) ||
             !editor_text_create(&font, "View", &view_label) ||
@@ -929,9 +1016,10 @@ int main(void) {
         } else if(close_action != EDITOR_CLOSE_NONE &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             close_action = EDITOR_CLOSE_NONE;
-        } else if(collision_masks_open &&
+        } else if((collision_category_open || collide_with_open) &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
-            collision_masks_open = false;
+            collision_category_open = false;
+            collide_with_open = false;
         } else if(!field_editing &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             if(editor_viewport_hitbox_editor_active_get(&viewport_state)) {
@@ -1041,7 +1129,8 @@ int main(void) {
         if(panel_scroll_mode != viewport_state.mode) {
             panel_scroll_mode = viewport_state.mode;
             panel_scroll_offset = 0.0f;
-            collision_masks_open = false;
+            collision_category_open = false;
+            collide_with_open = false;
         }
         panel_scroll_offset = rohr_ui_scroll_region_begin("editor.tools.scroll",
             (UIRect){EDITOR_VIEWPORT_WIDTH, EDITOR_MENU_HEIGHT,
@@ -1155,131 +1244,73 @@ int main(void) {
                 {
                     float row_x = EDITOR_VIEWPORT_WIDTH + 10.0f;
                     float row_width = EDITOR_TOOLS_WIDTH - 20.0f;
-                    float menu_y = 436.0f;
-                    size_t menu_rows = 0;
+                    float controls_bottom = 404.0f;
 
                     if(editor_checkbox("editor.rigid_body.collision", &collision_label,
                             (UIRect){row_x, 372.0f, row_width, 28.0f},
                             &body->collision_enabled) && !body->collision_enabled) {
-                        collision_masks_open = false;
+                        collision_category_open = false;
+                        collide_with_open = false;
                     }
                     if(body->collision_enabled && rohr_ui_button(
-                            "editor.rigid_body.collision_masks", &collision_masks_label,
+                            "editor.rigid_body.collision_category", &collision_category_label,
                             (UIRect){row_x, 404.0f, row_width, 28.0f}, NULL).clicked) {
-                        collision_masks_open = !collision_masks_open;
+                        collision_category_open = !collision_category_open;
+                        collide_with_open = false;
                     }
                     if(body->collision_enabled) {
                         rohr_ui_border((UIRect){row_x, 404.0f, row_width, 28.0f}, 2.0f,
                             (Color){0, 0, 0, 255});
                     }
-                    if(body->collision_enabled && collision_masks_open) {
-                        size_t inactive[EDITOR_COLLISION_MASK_MAX];
-                        size_t inactive_count = 0;
-                        UIFieldResult mask_name_result;
-
-                        mask_name_result = rohr_ui_field(
-                            "editor.rigid_body.collision_mask.name",
-                            (UIFieldBinding){.kind = UI_FIELD_STRING,
-                                .string = collision_mask_name,
-                                .string_capacity = sizeof(collision_mask_name)},
-                            &collision_mask_name_field,
-                            (UIRect){row_x, menu_y, row_width * 0.72f, 28.0f}, NULL);
-                        field_editing = field_editing || mask_name_result.active;
-                        if(rohr_ui_button("editor.rigid_body.collision_mask.create",
-                                &add_label,
-                                (UIRect){row_x + row_width * 0.72f, menu_y,
-                                    row_width * 0.28f, 28.0f}, NULL).clicked) {
-                            size_t mask_index = SIZE_MAX;
-                            (void)editor_project_collision_mask_add(&project,
-                                collision_mask_name, &mask_index);
-                            if(mask_index < project.collision_mask_count) {
-                                body->collision_with |= UINT64_C(1) << mask_index;
-                                body->collision_category = body->collision_with;
-                                collision_mask_name[0] = '\0';
-                                (void)rohr_graphics_text_value_set(
-                                    &collision_mask_name_field, "");
-                            }
-                        }
-                        menu_rows = 1;
-                        for(size_t mask = 0; mask < project.collision_mask_count; mask += 1) {
-                            char mask_id[96];
-                            uint64_t bit = UINT64_C(1) << mask;
-                            bool enabled = (body->collision_with & bit) != 0;
-                            if(!enabled) {
-                                inactive[inactive_count++] = mask;
-                                continue;
-                            }
-                            if(!editor_named_text_sync(&font,
-                                    project.collision_masks[mask].name,
-                                    &collision_mask_labels[mask],
-                                    collision_mask_cache[mask],
-                                    EDITOR_OBJECT_NAME_MAX)) goto fail;
-                            snprintf(mask_id, sizeof(mask_id),
-                                "editor.rigid_body.collision_mask.%zu", mask);
-                            if(editor_checkbox(mask_id, &collision_mask_labels[mask],
-                                    (UIRect){row_x,
-                                        menu_y + (float)menu_rows * 30.0f,
-                                        row_width, 28.0f}, &enabled)) {
-                                if(enabled) body->collision_with |= bit;
-                                else body->collision_with &= ~bit;
-                                body->collision_category = body->collision_with;
-                            }
-                            menu_rows += 1;
-                        }
-                        for(size_t i = 1; i < inactive_count; i += 1) {
-                            size_t value = inactive[i];
-                            size_t j = i;
-                            while(j > 0 && strcmp(project.collision_masks[value].name,
-                                    project.collision_masks[inactive[j - 1]].name) < 0) {
-                                inactive[j] = inactive[j - 1];
-                                j -= 1;
-                            }
-                            inactive[j] = value;
-                        }
-                        for(size_t i = 0; i < inactive_count; i += 1) {
-                            size_t mask = inactive[i];
-                            char mask_id[96];
-                            uint64_t bit = UINT64_C(1) << mask;
-                            bool enabled = false;
-                            if(!editor_named_text_sync(&font,
-                                    project.collision_masks[mask].name,
-                                    &collision_mask_labels[mask],
-                                    collision_mask_cache[mask],
-                                    EDITOR_OBJECT_NAME_MAX)) goto fail;
-                            snprintf(mask_id, sizeof(mask_id),
-                                "editor.rigid_body.collision_mask.%zu", mask);
-                            if(editor_checkbox(mask_id, &collision_mask_labels[mask],
-                                    (UIRect){row_x,
-                                        menu_y + (float)menu_rows * 30.0f,
-                                        row_width, 28.0f}, &enabled)) {
-                                if(enabled) body->collision_with |= bit;
-                                else body->collision_with &= ~bit;
-                                body->collision_category = body->collision_with;
-                            }
-                            menu_rows += 1;
-                        }
+                    controls_bottom = 436.0f;
+                    if(body->collision_enabled && collision_category_open) {
+                        size_t rows = 0;
+                        if(!editor_collision_mask_menu_draw(
+                                "editor.rigid_body.collision_category.mask",
+                                &project, &body->collision_category, &font,
+                                collision_mask_labels, collision_mask_cache,
+                                collision_mask_name, sizeof(collision_mask_name),
+                                &collision_mask_name_field, &add_label, row_x,
+                                controls_bottom, row_width, &field_editing, &rows)) goto fail;
+                        controls_bottom += (float)rows * 30.0f;
                     }
-                    if(menu_rows > 0) {
-                        rohr_ui_border((UIRect){row_x, menu_y, row_width,
-                            (float)menu_rows * 30.0f - 2.0f}, 2.0f,
-                            (Color){0, 0, 0, 255});
+                    if(body->collision_enabled && rohr_ui_button(
+                            "editor.rigid_body.collide_with", &collide_with_label,
+                            (UIRect){row_x, controls_bottom, row_width, 28.0f}, NULL).clicked) {
+                        collide_with_open = !collide_with_open;
+                        collision_category_open = false;
                     }
-                    if(collision_masks_open &&
+                    if(body->collision_enabled) {
+                        rohr_ui_border((UIRect){row_x, controls_bottom, row_width, 28.0f},
+                            2.0f, (Color){0, 0, 0, 255});
+                        controls_bottom += 32.0f;
+                    }
+                    if(body->collision_enabled && collide_with_open) {
+                        size_t rows = 0;
+                        if(!editor_collision_mask_menu_draw(
+                                "editor.rigid_body.collide_with.mask", &project,
+                                &body->collision_with, &font, collision_mask_labels,
+                                collision_mask_cache, collision_mask_name,
+                                sizeof(collision_mask_name), &collision_mask_name_field,
+                                &add_label, row_x, controls_bottom, row_width,
+                                &field_editing, &rows)) goto fail;
+                        controls_bottom += (float)rows * 30.0f;
+                    }
+                    if((collision_category_open || collide_with_open) &&
                             mouse.button_states[MOUSE_BUTTON_LEFT] ==
                                 MOUSE_BUTTON_STATE_PRESSED) {
                         Position pointer = rohr_graphics_mouse_screen_position_get();
-                        float controls_bottom = menu_y + (float)menu_rows * 30.0f;
                         bool in_controls = pointer.x >= row_x &&
                             pointer.x <= row_x + row_width && pointer.y >= 372.0f &&
                             pointer.y <= controls_bottom;
                         if(!in_controls) {
-                            collision_masks_open = false;
-                            menu_rows = 0;
+                            collision_category_open = false;
+                            collide_with_open = false;
                         }
                     }
                     {
-                        float hitbox_button_y = body->collision_enabled ? menu_y +
-                            (float)menu_rows * 30.0f + 6.0f : 404.0f;
+                        float hitbox_button_y = body->collision_enabled ?
+                            controls_bottom + 6.0f : 404.0f;
                         if(rohr_ui_button("editor.rigid_body.add_hitbox", &add_hitbox_label,
                                 (UIRect){row_x, hitbox_button_y, row_width, 32.0f},
                                 NULL).clicked) {
@@ -2738,7 +2769,8 @@ int main(void) {
     rohr_graphics_text_destroy(&world_view_label);
     rohr_graphics_text_destroy(&collision_mask_name_field);
     rohr_graphics_text_destroy(&add_label);
-    rohr_graphics_text_destroy(&collision_masks_label);
+    rohr_graphics_text_destroy(&collision_category_label);
+    rohr_graphics_text_destroy(&collide_with_label);
     rohr_graphics_text_destroy(&collision_label);
     for(size_t i = 0; i < EDITOR_COLLISION_MASK_MAX; i += 1) {
         rohr_graphics_text_destroy(&collision_mask_labels[i]);
@@ -2862,7 +2894,8 @@ fail:
     rohr_graphics_text_destroy(&world_view_label);
     rohr_graphics_text_destroy(&collision_mask_name_field);
     rohr_graphics_text_destroy(&add_label);
-    rohr_graphics_text_destroy(&collision_masks_label);
+    rohr_graphics_text_destroy(&collision_category_label);
+    rohr_graphics_text_destroy(&collide_with_label);
     rohr_graphics_text_destroy(&collision_label);
     for(size_t i = 0; i < EDITOR_COLLISION_MASK_MAX; i += 1) {
         rohr_graphics_text_destroy(&collision_mask_labels[i]);
