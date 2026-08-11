@@ -67,6 +67,65 @@ static bool editor_workspace_directory_empty(const char *directory) {
         SDL_EnumerateDirectory(directory, editor_workspace_not_empty, &empty) && empty;
 }
 
+static void editor_workspace_hitbox_rectangle_set(EditorProject *project,
+    EditorHitbox *hitbox, float width, float height) {
+    Position vertices[4] = {
+        {width * 0.5f, height * 0.5f},
+        {width * 0.5f, height * -0.5f},
+        {width * -0.5f, height * -0.5f},
+        {width * -0.5f, height * 0.5f}
+    };
+
+    if(project == NULL || hitbox == NULL) return;
+    if(hitbox->vertex_count < 4) {
+        hitbox->vertices[3].id = project->next_vertex_id++;
+    }
+    hitbox->vertex_count = 4;
+    for(uint32_t i = 0; i < 4; i += 1) {
+        hitbox->vertices[i].position = vertices[i];
+        snprintf(hitbox->vertices[i].name, sizeof(hitbox->vertices[i].name),
+            "vertex_%u", i + 1);
+        snprintf(hitbox->line_names[i], sizeof(hitbox->line_names[i]),
+            "line_%u", i + 1);
+    }
+}
+
+static bool editor_workspace_starter_project_init(EditorProject *project) {
+    EditorObject *floor;
+    EditorObject *box;
+    EditorRigidBody *floor_body;
+    EditorRigidBody *box_body;
+
+    if(project == NULL) return false;
+    editor_project_init(project);
+    floor = editor_project_object_add(project, (Position){0.0f, -200.0f});
+    if(floor == NULL) return false;
+    snprintf(floor->name, sizeof(floor->name), "Floor");
+    floor_body = editor_project_rigid_body_add(project, floor);
+    if(floor_body == NULL) return false;
+    snprintf(floor_body->name, sizeof(floor_body->name), "floor");
+    floor_body->static_body = true;
+    floor_body->friction = 0.5f;
+    floor_body->restitution = 0.0f;
+    editor_workspace_hitbox_rectangle_set(project, &floor_body->hitboxes[0],
+        600.0f, 40.0f);
+
+    box = editor_project_object_add(project, (Position){0.0f, 120.0f});
+    if(box == NULL) return false;
+    snprintf(box->name, sizeof(box->name), "Box");
+    box_body = editor_project_rigid_body_add(project, box);
+    if(box_body == NULL) return false;
+    snprintf(box_body->name, sizeof(box_body->name), "box");
+    box_body->mass_value = 5.0f;
+    box_body->friction = 0.5f;
+    box_body->restitution = 0.0f;
+    box_body->gravity_enabled = true;
+    editor_workspace_hitbox_rectangle_set(project, &box_body->hitboxes[0],
+        50.0f, 50.0f);
+    editor_project_selection_clear(project);
+    return true;
+}
+
 EditorWorkspaceConfig editor_workspace_config_default_get(void) {
     EditorWorkspaceConfig config = {
         .format_version = EDITOR_WORKSPACE_FORMAT_VERSION
@@ -176,43 +235,179 @@ done:
     return success;
 }
 
-static bool editor_workspace_scaffold_write(const EditorWorkspace *workspace) {
+static bool editor_workspace_generated_objects_write(const EditorWorkspace *workspace,
+    const EditorProject *project) {
+    char header_path[EDITOR_WORKSPACE_PATH_MAX * 2];
+    char source_path[EDITOR_WORKSPACE_PATH_MAX * 2];
+    FILE *header;
+    FILE *source;
+
+    if(workspace == NULL || project == NULL ||
+            !editor_workspace_path_join(header_path, sizeof(header_path),
+                workspace->directory, "src/generated/project_objects.h") ||
+            !editor_workspace_path_join(source_path, sizeof(source_path),
+                workspace->directory, "src/generated/project_objects.c")) return false;
+    header = fopen(header_path, "wb");
+    if(header == NULL) return false;
+    source = fopen(source_path, "wb");
+    if(source == NULL) {
+        fclose(header);
+        return false;
+    }
+    fprintf(header,
+        "#ifndef ROHR_GENERATED_PROJECT_OBJECTS_H\n"
+        "#define ROHR_GENERATED_PROJECT_OBJECTS_H\n\n"
+        "#include \"rohr.h\"\n\n");
+    fprintf(source,
+        "#include \"project_objects.h\"\n\n"
+        "static EngineResult generated_body_create(Entity *output, Position position,\n"
+        "    float rotation, Shape hitbox, float mass_value, float friction,\n"
+        "    float restitution, bool static_body, bool rotation_locked,\n"
+        "    bool gravity_enabled) {\n"
+        "    EntityResult added = rohr_entity_add();\n"
+        "    EngineResult result;\n"
+        "    if(rohr_error_check(added)) return rohr_error_result_error(added.result.error);\n"
+        "    *output = added.result.value;\n"
+        "#define GENERATED_APPLY(call) do { result = (call); if(rohr_error_check(result)) "
+        "goto fail; } while(0)\n"
+        "    GENERATED_APPLY(rohr_physics_position_set(*output, position));\n"
+        "    GENERATED_APPLY(rohr_physics_orientation_set(*output, rotation));\n"
+        "    GENERATED_APPLY(rohr_physics_hitbox_set(*output, hitbox));\n"
+        "    GENERATED_APPLY(rohr_physics_collision_category_set(*output, UINT64_C(1)));\n"
+        "    GENERATED_APPLY(rohr_physics_collision_with_set(*output, UINT64_C(1)));\n"
+        "    GENERATED_APPLY(rohr_entity_components_add(*output, ROHR_COLLISION));\n"
+        "    GENERATED_APPLY(rohr_physics_friction_set(*output, friction));\n"
+        "    GENERATED_APPLY(rohr_physics_restitution_set(*output, restitution));\n"
+        "    if(static_body) GENERATED_APPLY(rohr_physics_static_set(*output));\n"
+        "    else {\n"
+        "        GENERATED_APPLY(rohr_physics_mass_set(*output, mass_value));\n"
+        "        GENERATED_APPLY(rohr_physics_velocity_set(*output, (Velocity){0}));\n"
+        "        GENERATED_APPLY(rohr_physics_angular_velocity_set(*output, 0.0f));\n"
+        "        GENERATED_APPLY(rohr_physics_acceleration_set(*output, "
+        "(Acceleration){0}));\n"
+        "        GENERATED_APPLY(rohr_physics_dynamic_set(*output));\n"
+        "        if(rotation_locked) GENERATED_APPLY(rohr_physics_angle_lock_set(*output, "
+        "rotation, rotation));\n"
+        "        if(gravity_enabled) GENERATED_APPLY(rohr_physics_gravity_enable(*output));\n"
+        "    }\n"
+        "#undef GENERATED_APPLY\n"
+        "    return rohr_error_result_value(true);\n"
+        "fail:\n"
+        "#undef GENERATED_APPLY\n"
+        "    (void)rohr_entity_delete(*output);\n"
+        "    *output = ENTITY_INVALID;\n"
+        "    return result;\n"
+        "}\n\n");
+    for(size_t object_index = 0; object_index < project->object_count; object_index += 1) {
+        const EditorObject *object = &project->objects[object_index];
+        char function_name[EDITOR_OBJECT_NAME_MAX];
+
+        editor_project_property_name_format(function_name, sizeof(function_name),
+            object->name);
+        fprintf(header, "typedef struct %s {\n", object->name);
+        for(size_t body_index = 0; body_index < object->rigid_body_count; body_index += 1) {
+            fprintf(header, "    Entity %s;\n", object->rigid_bodies[body_index].name);
+        }
+        fprintf(header,
+            "} %s;\n\n"
+            "EngineResult %s_create(%s *object, Position position);\n"
+            "void %s_destroy(%s *object);\n\n",
+            object->name, function_name, object->name, function_name, object->name);
+        fprintf(source, "EngineResult %s_create(%s *object, Position position) {\n"
+            "    EngineResult result;\n"
+            "    if(object == NULL) return rohr_error_result_error("
+            "ERROR_MEMORY_POOL_NULL_POINTER);\n"
+            "    *object = (%s){0};\n", function_name, object->name, object->name);
+        for(size_t body_index = 0; body_index < object->rigid_body_count; body_index += 1) {
+            const EditorRigidBody *body = &object->rigid_bodies[body_index];
+            const EditorHitbox *hitbox = body->hitbox_count > 0 ? &body->hitboxes[0] : NULL;
+
+            fprintf(source,
+                "    result = generated_body_create(&object->%s, "
+                "(Position){position.x + %#.9gf, position.y + %#.9gf}, %#.9gf, "
+                "(Shape){.amount_of_vertices = %u, .vertices = {",
+                body->name, body->position.x, body->position.y, body->rotation,
+                hitbox == NULL ? 0 : hitbox->vertex_count);
+            if(hitbox != NULL) {
+                for(uint32_t vertex = 0; vertex < hitbox->vertex_count; vertex += 1) {
+                    fprintf(source, "%s{%#.9gf, %#.9gf}", vertex == 0 ? "" : ", ",
+                        hitbox->vertices[vertex].position.x,
+                        hitbox->vertices[vertex].position.y);
+                }
+            }
+            fprintf(source,
+                "}}, %#.9gf, %#.9gf, %#.9gf, %s, %s, %s);\n"
+                "    if(rohr_error_check(result)) goto fail;\n",
+                body->mass_value, body->friction, body->restitution,
+                body->static_body ? "true" : "false",
+                body->rotation_locked ? "true" : "false",
+                body->gravity_enabled ? "true" : "false");
+        }
+        fprintf(source,
+            "    return rohr_error_result_value(true);\n"
+            "fail:\n"
+            "    %s_destroy(object);\n"
+            "    return result;\n"
+            "}\n\n"
+            "void %s_destroy(%s *object) {\n"
+            "    if(object == NULL) return;\n",
+            function_name, function_name, object->name);
+        for(size_t body_index = 0; body_index < object->rigid_body_count; body_index += 1) {
+            const EditorRigidBody *body = &object->rigid_bodies[body_index];
+            fprintf(source,
+                "    if(object->%s != ENTITY_INVALID) "
+                "(void)rohr_entity_delete(object->%s);\n",
+                body->name, body->name);
+        }
+        fprintf(source, "    *object = (%s){0};\n}\n\n", object->name);
+    }
+    fprintf(header, "#endif\n");
+    {
+        bool header_closed = fclose(header) == 0;
+        bool source_closed = fclose(source) == 0;
+        return header_closed && source_closed;
+    }
+}
+
+static bool editor_workspace_main_write(const EditorWorkspace *workspace,
+    const EditorProject *project) {
     char path[EDITOR_WORKSPACE_PATH_MAX * 2];
-    char cmake[EDITOR_WORKSPACE_PATH_MAX * 2 + 1024];
-    static const char *main_source =
-        "#include \"rohr.h\"\n\n"
+    FILE *file;
+
+    if(workspace == NULL || project == NULL ||
+            !editor_workspace_path_join(path, sizeof(path), workspace->directory,
+                "src/main.c")) return false;
+    file = fopen(path, "wb");
+    if(file == NULL) return false;
+    fprintf(file,
+        "#include \"project_objects.h\"\n\n"
         "#include <stdio.h>\n\n"
         "static bool ok(EngineResult result) {\n"
         "    if(!rohr_error_check(result)) return true;\n"
         "    rohr_error_stderr_print(result.result.error);\n"
         "    return false;\n"
         "}\n\n"
-        "static Entity body_create(Position position, Vec2D size, bool dynamic) {\n"
-        "    EntityResult added = rohr_entity_add();\n"
-        "    Entity body;\n"
-        "    if(rohr_error_check(added)) return ENTITY_INVALID;\n"
-        "    body = added.result.value;\n"
-        "    if(!ok(rohr_physics_position_set(body, position)) ||\n"
-        "            !ok(rohr_physics_orientation_set(body, 0.0f)) ||\n"
-        "            !ok(rohr_physics_hitbox_set(body,\n"
-        "                rohr_math_square_create(size.x, size.y))) ||\n"
-        "            !ok(rohr_physics_collision_with_all_set(body))) return ENTITY_INVALID;\n"
-        "    if(!dynamic) return ok(rohr_physics_static_set(body)) ? body : ENTITY_INVALID;\n"
-        "    if(!ok(rohr_physics_mass_set(body, 1.0f)) ||\n"
-        "            !ok(rohr_physics_velocity_set(body, (Velocity){0})) ||\n"
-        "            !ok(rohr_physics_dynamic_set(body)) ||\n"
-        "            !ok(rohr_physics_gravity_enable(body))) return ENTITY_INVALID;\n"
-        "    return body;\n"
-        "}\n\n"
         "int main(void) {\n"
-        "    KeyboardState keyboard = {0};\n"
-        "    Entity floor;\n"
-        "    Entity box;\n"
+        "    KeyboardState keyboard = {0};\n");
+    for(size_t i = 0; i < project->object_count; i += 1) {
+        char variable[EDITOR_OBJECT_NAME_MAX];
+        editor_project_property_name_format(variable, sizeof(variable),
+            project->objects[i].name);
+        fprintf(file, "    %s %s = {0};\n", project->objects[i].name, variable);
+    }
+    fprintf(file,
         "    if(!ok(rohr_engine_init()) || !ok(rohr_graphics_start()) ||\n"
-        "            !ok(rohr_physics_gravity_set((Acceleration){0.0f, 900.0f}))) goto fail;\n"
-        "    floor = body_create((Position){0.0f, 200.0f}, (Vec2D){600.0f, 40.0f}, false);\n"
-        "    box = body_create((Position){0.0f, -120.0f}, (Vec2D){50.0f, 50.0f}, true);\n"
-        "    if(floor == ENTITY_INVALID || box == ENTITY_INVALID) goto fail;\n"
+        "            !ok(rohr_physics_gravity_set((Acceleration){0.0f, -900.0f}))) goto fail;\n"
+        );
+    for(size_t i = 0; i < project->object_count; i += 1) {
+        char variable[EDITOR_OBJECT_NAME_MAX];
+        editor_project_property_name_format(variable, sizeof(variable),
+            project->objects[i].name);
+        fprintf(file, "    if(!ok(%s_create(&%s, (Position){%#.9gf, %#.9gf}))) goto fail;\n",
+            variable, variable, project->objects[i].position.x,
+            project->objects[i].position.y);
+    }
+    fprintf(file,
         "    while(true) {\n"
         "        SDL_Event event;\n"
         "        rohr_controller_key_states_update(&keyboard);\n"
@@ -223,11 +418,20 @@ static bool editor_workspace_scaffold_write(const EditorWorkspace *workspace) {
         "        }\n"
         "        if(rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) break;\n"
         "        rohr_physics_update(rohr_system_tick_update());\n"
-        "        rohr_graphics_background_draw((Color){18, 22, 30, 255});\n"
-        "        rohr_graphics_hit_box_colored_draw(floor, GRAPHICS_FILLED,\n"
-        "            (Color){90, 100, 115, 255});\n"
-        "        rohr_graphics_hit_box_colored_draw(box, GRAPHICS_FILLED,\n"
-        "            (Color){70, 170, 255, 255});\n"
+        "        rohr_graphics_background_draw((Color){18, 22, 30, 255});\n");
+    for(size_t object_index = 0; object_index < project->object_count; object_index += 1) {
+        const EditorObject *object = &project->objects[object_index];
+        char variable[EDITOR_OBJECT_NAME_MAX];
+        editor_project_property_name_format(variable, sizeof(variable), object->name);
+        for(size_t body_index = 0; body_index < object->rigid_body_count; body_index += 1) {
+            fprintf(file,
+                "        rohr_graphics_hit_box_colored_draw(%s.%s, GRAPHICS_FILLED, "
+                "(Color){%s});\n",
+                variable, object->rigid_bodies[body_index].name,
+                object_index == 0 ? "90, 100, 115, 255" : "70, 170, 255, 255");
+        }
+    }
+    fprintf(file,
         "        rohr_graphics_show();\n"
         "    }\n"
         "done:\n"
@@ -239,7 +443,13 @@ static bool editor_workspace_scaffold_write(const EditorWorkspace *workspace) {
         "    rohr_graphics_end();\n"
         "    rohr_engine_shutdown();\n"
         "    return 1;\n"
-        "}\n";
+        "}\n");
+    return fclose(file) == 0;
+}
+
+static bool editor_workspace_scaffold_write(const EditorWorkspace *workspace) {
+    char path[EDITOR_WORKSPACE_PATH_MAX * 2];
+    char cmake[EDITOR_WORKSPACE_PATH_MAX * 2 + 1024];
     static const char *gitignore = "build/\n";
 
     snprintf(cmake, sizeof(cmake),
@@ -253,15 +463,12 @@ static bool editor_workspace_scaffold_write(const EditorWorkspace *workspace) {
         "set(ROHR_BUILD_EDITOR OFF CACHE BOOL \"\" FORCE)\n"
         "add_subdirectory(\"${ROHR_ENGINE_ROOT}\" rohr-engine)\n\n"
         "file(GLOB ROHR_GENERATED_SOURCES CONFIGURE_DEPENDS src/generated/*.c)\n"
-        "add_executable(%s src/main.c ${ROHR_GENERATED_SOURCES})\n"
-        "target_include_directories(%s PRIVATE src/generated)\n"
-        "target_link_libraries(%s PRIVATE rohr_engine)\n",
-        workspace->config.name, workspace->config.engine_root,
-        workspace->config.name, workspace->config.name, workspace->config.name);
+        "add_executable(mygame src/main.c ${ROHR_GENERATED_SOURCES})\n"
+        "target_include_directories(mygame PRIVATE src/generated)\n"
+        "target_link_libraries(mygame PRIVATE rohr_engine)\n",
+        workspace->config.name, workspace->config.engine_root);
     return editor_workspace_path_join(path, sizeof(path), workspace->directory,
             "CMakeLists.txt") && editor_workspace_file_write(path, cmake) &&
-        editor_workspace_path_join(path, sizeof(path), workspace->directory,
-            "src/main.c") && editor_workspace_file_write(path, main_source) &&
         editor_workspace_path_join(path, sizeof(path), workspace->directory,
             ".gitignore") && editor_workspace_file_write(path, gitignore);
 }
@@ -274,6 +481,13 @@ bool editor_workspace_save(const EditorWorkspace *workspace,
         editor_workspace_manifest_save(workspace) &&
         editor_workspace_path_join(path, sizeof(path), workspace->directory,
             workspace->config.editor_state_file) && editor_project_save(project, path);
+}
+
+bool editor_workspace_c_generate(const EditorWorkspace *workspace,
+    const EditorProject *project) {
+    return workspace != NULL && workspace->open && project != NULL &&
+        editor_workspace_generated_objects_write(workspace, project) &&
+        editor_workspace_main_write(workspace, project);
 }
 
 bool editor_workspace_create(EditorWorkspace *workspace, EditorProject *project,
@@ -300,9 +514,10 @@ bool editor_workspace_create(EditorWorkspace *workspace, EditorProject *project,
             !editor_workspace_directory_create(directory, created.config.object_directory)) {
         return false;
     }
-    editor_project_init(project);
-    if(!editor_workspace_save(&created, project) ||
-            !editor_workspace_scaffold_write(&created)) return false;
+    if(!editor_workspace_starter_project_init(project) ||
+            !editor_workspace_save(&created, project) ||
+            !editor_workspace_scaffold_write(&created) ||
+            !editor_workspace_c_generate(&created, project)) return false;
     *workspace = created;
     return true;
 }

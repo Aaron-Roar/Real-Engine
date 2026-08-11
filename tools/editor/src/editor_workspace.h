@@ -31,6 +31,8 @@ bool editor_workspace_load(EditorWorkspace *workspace, EditorProject *project,
     const char *directory);
 bool editor_workspace_save(const EditorWorkspace *workspace,
     const EditorProject *project);
+bool editor_workspace_c_generate(const EditorWorkspace *workspace,
+    const EditorProject *project);
 void editor_workspace_close(EditorWorkspace *workspace, EditorProject *project);
 
 #endif

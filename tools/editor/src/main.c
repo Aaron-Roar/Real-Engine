@@ -643,6 +643,8 @@ int main(void) {
     FontAsset font = {0};
     TextAsset hitbox_editor_label = {0};
     TextAsset file_label = {0};
+    TextAsset build_label = {0};
+    TextAsset generate_c_label = {0};
     TextAsset view_label = {0};
     TextAsset settings_label = {0};
     TextAsset new_label = {0};
@@ -796,6 +798,8 @@ int main(void) {
     }
     if(!editor_text_create(&font, "Hitbox Editor", &hitbox_editor_label) ||
             !editor_text_create(&font, "File", &file_label) ||
+            !editor_text_create(&font, "Build", &build_label) ||
+            !editor_text_create(&font, "Generate C", &generate_c_label) ||
             !editor_text_create(&font, "View", &view_label) ||
             !editor_text_create(&font, "Settings", &settings_label) ||
             !editor_text_create(&font, "New Project", &new_label) ||
@@ -2260,6 +2264,9 @@ int main(void) {
             const TextAsset *view_options[] = {
                 &view_label, &reset_view_label, &grid_label
             };
+            const TextAsset *build_options[] = {
+                &build_label, &generate_c_label
+            };
             const TextAsset *settings_options[] = {
                 &settings_label, &preferences_label
             };
@@ -2296,12 +2303,21 @@ int main(void) {
                     close_action = EDITOR_CLOSE_PROGRAM;
                 }
             }
+            {
+                UIDropdownResult build_menu = rohr_ui_dropdown("editor.menu.build",
+                    build_options, sizeof(build_options) / sizeof(build_options[0]), 0,
+                    (UIRect){84.0f, 3.0f, 76.0f, 28.0f}, NULL);
+                if(build_menu.changed && build_menu.selected_index == 1 &&
+                        workspace.open) {
+                    (void)editor_workspace_c_generate(&workspace, &project);
+                }
+            }
             (void)rohr_ui_dropdown("editor.menu.view", view_options,
                 sizeof(view_options) / sizeof(view_options[0]), 0,
-                (UIRect){84.0f, 3.0f, 76.0f, 28.0f}, NULL);
+                (UIRect){164.0f, 3.0f, 76.0f, 28.0f}, NULL);
             (void)rohr_ui_dropdown("editor.menu.settings", settings_options,
                 sizeof(settings_options) / sizeof(settings_options[0]), 0,
-                (UIRect){164.0f, 3.0f, 104.0f, 28.0f}, NULL);
+                (UIRect){244.0f, 3.0f, 104.0f, 28.0f}, NULL);
         }
         if(close_action != EDITOR_CLOSE_NONE) {
             UIRect dialog = {
@@ -2527,6 +2543,8 @@ int main(void) {
     rohr_graphics_text_destroy(&new_label);
     rohr_graphics_text_destroy(&settings_label);
     rohr_graphics_text_destroy(&view_label);
+    rohr_graphics_text_destroy(&generate_c_label);
+    rohr_graphics_text_destroy(&build_label);
     rohr_graphics_text_destroy(&file_label);
     rohr_graphics_text_destroy(&file_browser_field);
     editor_file_browser_destroy(&file_browser);
@@ -2640,6 +2658,8 @@ fail:
     rohr_graphics_text_destroy(&new_label);
     rohr_graphics_text_destroy(&settings_label);
     rohr_graphics_text_destroy(&view_label);
+    rohr_graphics_text_destroy(&generate_c_label);
+    rohr_graphics_text_destroy(&build_label);
     rohr_graphics_text_destroy(&file_label);
     rohr_graphics_text_destroy(&file_browser_field);
     editor_file_browser_destroy(&file_browser);

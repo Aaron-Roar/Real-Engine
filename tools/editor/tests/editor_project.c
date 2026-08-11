@@ -13,6 +13,7 @@ static void workspace_fixture_remove(const char *root) {
     char path[2048];
     static const char *files[] = {
         "project.rohr.json", "objects/project.rohr.json", "src/main.c",
+        "src/generated/project_objects.c", "src/generated/project_objects.h",
         "CMakeLists.txt", ".gitignore"
     };
     static const char *directories[] = {
@@ -28,6 +29,24 @@ static void workspace_fixture_remove(const char *root) {
         (void)SDL_RemovePath(path);
     }
     (void)SDL_RemovePath(root);
+}
+
+static bool file_contains(const char *path, const char *text) {
+    FILE *file;
+    char contents[16384];
+    size_t length;
+
+    if(path == NULL || text == NULL) return false;
+    file = fopen(path, "rb");
+    if(file == NULL) return false;
+    length = fread(contents, 1, sizeof(contents) - 1, file);
+    if(ferror(file)) {
+        fclose(file);
+        return false;
+    }
+    contents[length] = '\0';
+    fclose(file);
+    return strstr(contents, text) != NULL;
 }
 
 int main(void) {
@@ -72,12 +91,57 @@ int main(void) {
                 !editor_workspace_load(&loaded_workspace, &loaded_project, fixture) ||
                 !loaded_workspace.open || strcmp(loaded_workspace.config.name,
                     "RohrEditorWorkspaceTest") != 0 ||
-                strcmp(loaded_workspace.config.engine_root, "/engine/root") != 0) {
+                strcmp(loaded_workspace.config.engine_root, "/engine/root") != 0 ||
+                loaded_project.object_count != 2 ||
+                strcmp(loaded_project.objects[0].name, "Floor") != 0 ||
+                strcmp(loaded_project.objects[1].name, "Box") != 0 ||
+                !position_equal(loaded_project.objects[0].position,
+                    (Position){0.0f, -200.0f}) ||
+                !position_equal(loaded_project.objects[1].position,
+                    (Position){0.0f, 120.0f}) ||
+                loaded_project.objects[0].rigid_body_count != 1 ||
+                loaded_project.objects[1].rigid_body_count != 1 ||
+                !loaded_project.objects[0].rigid_bodies[0].static_body ||
+                !loaded_project.objects[1].rigid_bodies[0].gravity_enabled ||
+                fabsf(loaded_project.objects[1].rigid_bodies[0].mass_value - 5.0f) >
+                    0.001f ||
+                loaded_project.objects[0].rigid_bodies[0].hitboxes[0].vertex_count != 4 ||
+                loaded_project.objects[1].rigid_bodies[0].hitboxes[0].vertex_count != 4) {
             workspace_fixture_remove(fixture);
             return 1;
         }
         snprintf(path, sizeof(path), "%s/src/main.c", fixture);
-        if(!SDL_GetPathInfo(path, &info) || info.type != SDL_PATHTYPE_FILE) {
+        if(!SDL_GetPathInfo(path, &info) || info.type != SDL_PATHTYPE_FILE ||
+                !file_contains(path,
+                    "rohr_physics_gravity_set((Acceleration){0.0f, -900.0f})") ||
+                !file_contains(path, "floor_create(&floor") ||
+                !file_contains(path, "box_create(&box")) {
+            workspace_fixture_remove(fixture);
+            return 1;
+        }
+        snprintf(path, sizeof(path), "%s/src/generated/project_objects.c", fixture);
+        if(!SDL_GetPathInfo(path, &info) || info.type != SDL_PATHTYPE_FILE ||
+                !file_contains(path, "EngineResult floor_create") ||
+                !file_contains(path, "EngineResult box_create") ||
+                !file_contains(path,
+                    "}}, 5.00000000f, 0.500000000f, 0.00000000f, false") ||
+                !file_contains(path, "rohr_physics_collision_category_set") ||
+                !file_contains(path,
+                    "rohr_entity_components_add(*output, ROHR_COLLISION)")) {
+            workspace_fixture_remove(fixture);
+            return 1;
+        }
+        loaded_project.objects[1].rigid_bodies[0].mass_value = 7.0f;
+        if(!editor_workspace_save(&loaded_workspace, &loaded_project) ||
+                !file_contains(path, "5.00000000f") ||
+                file_contains(path, "7.00000000f") ||
+                !editor_workspace_c_generate(&loaded_workspace, &loaded_project) ||
+                !file_contains(path, "7.00000000f")) {
+            workspace_fixture_remove(fixture);
+            return 1;
+        }
+        snprintf(path, sizeof(path), "%s/CMakeLists.txt", fixture);
+        if(!file_contains(path, "add_executable(mygame ")) {
             workspace_fixture_remove(fixture);
             return 1;
         }
