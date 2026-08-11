@@ -37,6 +37,8 @@ typedef struct EditorViewportState {
     bool rotated_body;
     bool dragged_anchor;
     bool dragged_soft_node;
+    bool dragged_soft_body;
+    bool rotated_soft_body;
     bool local_view;
     Vec2D drag_offset;
     float rotation_pointer_offset;

@@ -131,6 +131,7 @@ typedef struct EditorSoftBody {
     EditorSoftBodyId id;
     char name[EDITOR_OBJECT_NAME_MAX];
     Position position;
+    float rotation;
     bool visible;
     EditorSoftNode nodes[EDITOR_SOFT_NODE_MAX];
     size_t node_count;

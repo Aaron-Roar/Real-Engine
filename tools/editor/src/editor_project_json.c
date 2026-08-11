@@ -160,6 +160,7 @@ static yyjson_mut_val *editor_json_soft_body_write(yyjson_mut_doc *document,
     yyjson_mut_obj_add_strcpy(document, value, "name", body->name);
     yyjson_mut_obj_add_val(document, value, "position",
         editor_json_position_write(document, body->position));
+    yyjson_mut_obj_add_real(document, value, "rotation", body->rotation);
     yyjson_mut_obj_add_bool(document, value, "visible", body->visible);
     for(size_t i = 0; i < body->node_count; i += 1) {
         const EditorSoftNode *node = &body->nodes[i];
@@ -387,12 +388,16 @@ static bool editor_json_soft_body_read(yyjson_val *value, EditorSoftBody *body,
     EditorProject *project) {
     yyjson_val *nodes = yyjson_obj_get(value, "nodes");
     yyjson_val *beams = yyjson_obj_get(value, "beams");
+    yyjson_val *rotation = yyjson_obj_get(value, "rotation");
     if(!yyjson_is_obj(value) || !editor_json_uint(value, "id", &body->id) || body->id == 0 ||
             !editor_json_name(value, body->name) || !editor_json_position_read(
                 yyjson_obj_get(value, "position"), &body->position) ||
             !editor_json_bool(value, "visible", &body->visible) || !yyjson_is_arr(nodes) ||
             !yyjson_is_arr(beams) || yyjson_arr_size(nodes) > EDITOR_SOFT_NODE_MAX ||
             yyjson_arr_size(beams) > EDITOR_SOFT_BEAM_MAX) return false;
+    if(rotation != NULL && !editor_json_real(value, "rotation", &body->rotation)) {
+        return false;
+    }
     editor_project_property_name_format(body->name, sizeof(body->name), body->name);
     body->node_count = yyjson_arr_size(nodes);
     body->beam_count = yyjson_arr_size(beams);

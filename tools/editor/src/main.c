@@ -1640,6 +1640,9 @@ int main(void) {
                 };
                 UIButtonStyle delete_style = editor_delete_button_style_get();
                 UIFieldResult name_result;
+                UIFieldResult x_result;
+                UIFieldResult y_result;
+                UIFieldResult rotation_result;
                 if(!editor_named_text_sync(&font, joint->name, &joint_labels[index],
                         joint_cache[index], EDITOR_OBJECT_NAME_MAX)) goto fail;
                 rohr_ui_label(&name_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f,
@@ -2040,6 +2043,9 @@ int main(void) {
                 size_t body_index = (size_t)(body - selected->soft_body_items);
                 UIButtonStyle delete_style = editor_delete_button_style_get();
                 UIFieldResult name_result;
+                UIFieldResult x_result;
+                UIFieldResult y_result;
+                UIFieldResult rotation_result;
                 if(!editor_named_text_sync(&font, body->name,
                         &soft_body_labels[body_index], soft_body_cache[body_index],
                         EDITOR_OBJECT_NAME_MAX)) goto fail;
@@ -2049,12 +2055,31 @@ int main(void) {
                     sizeof(body->name), &soft_body_labels[body_index],
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 88.0f, 42.0f,
                         EDITOR_TOOLS_WIDTH - 96.0f, 30.0f});
-                field_editing = name_result.active;
                 (void)editor_visibility_toggle("editor.soft_body.visibility",
                     &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         44.0f, 26.0f, 26.0f}, &body->visible);
+                rohr_ui_label(&x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    118.0f, 50.0f, 26.0f});
+                x_result = rohr_ui_field("editor.soft_body.x",
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &body->position.x},
+                    &x_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 60.0f, 118.0f,
+                        EDITOR_TOOLS_WIDTH - 70.0f, 26.0f}, NULL);
+                rohr_ui_label(&y_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    154.0f, 50.0f, 26.0f});
+                y_result = rohr_ui_field("editor.soft_body.y",
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &body->position.y},
+                    &y_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 60.0f, 154.0f,
+                        EDITOR_TOOLS_WIDTH - 70.0f, 26.0f}, NULL);
+                rohr_ui_label(&rotation_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    190.0f, 82.0f, 26.0f});
+                rotation_result = rohr_ui_field("editor.soft_body.rotation",
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &body->rotation},
+                    &length_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 92.0f, 190.0f,
+                        EDITOR_TOOLS_WIDTH - 102.0f, 26.0f}, NULL);
+                field_editing = name_result.active || x_result.active || y_result.active ||
+                    rotation_result.active;
                 if(rohr_ui_button("editor.soft_body.add_node", &add_node_label,
-                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 118.0f,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 230.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 30.0f}, NULL).clicked) {
                     EditorSoftNode *node = editor_project_soft_node_add(&project, body,
                         (Position){(float)body->node_count * 24.0f, 0.0f});
@@ -2064,7 +2089,7 @@ int main(void) {
                     }
                 }
                 if(rohr_ui_button("editor.soft_body.add_beam", &add_beam_label,
-                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 154.0f,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 266.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 30.0f}, NULL).clicked) {
                     EditorSoftBeam *beam = editor_project_soft_beam_add(
                         &project, body, 0, 0);
@@ -2074,7 +2099,7 @@ int main(void) {
                     }
                 }
                 {
-                    float y = 198.0f;
+                    float y = 310.0f;
                     for(size_t i = 0; i < body->node_count; i += 1, y += 28.0f) {
                         EditorSoftNode *node = &body->nodes[i];
                         UIButtonStyle selected_style = editor_selected_button_style_get();

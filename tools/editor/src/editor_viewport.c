@@ -41,8 +41,12 @@ static Position editor_hitbox_vertex_world_get(const EditorObject *object,
 
 static Position editor_soft_node_world_get(const EditorObject *object,
     const EditorSoftBody *body, const EditorSoftNode *node) {
-    return (Position){object->position.x + body->position.x + node->position.x,
-        object->position.y + body->position.y + node->position.y};
+    float cosine = cosf(body->rotation);
+    float sine = sinf(body->rotation);
+    return (Position){object->position.x + body->position.x +
+            node->position.x * cosine - node->position.y * sine,
+        object->position.y + body->position.y +
+            node->position.x * sine + node->position.y * cosine};
 }
 
 static Position editor_anchor_world_get(const EditorObject *object,
@@ -90,6 +94,24 @@ static float editor_body_radius_get(const EditorRigidBody *body) {
         }
     }
     return radius;
+}
+
+static float editor_soft_body_radius_get(const EditorSoftBody *body) {
+    float radius = 30.0f;
+    if(body == NULL) return radius;
+    for(size_t i = 0; i < body->node_count; i += 1) {
+        float distance = hypotf(body->nodes[i].position.x, body->nodes[i].position.y);
+        if(distance > radius) radius = distance;
+    }
+    return radius;
+}
+
+static Position editor_soft_body_rotation_handle_get(const EditorObject *object,
+    const EditorSoftBody *body) {
+    float distance = editor_soft_body_radius_get(body) + 28.0f;
+    return (Position){object->position.x + body->position.x +
+            sinf(body->rotation) * distance,
+        object->position.y + body->position.y - cosf(body->rotation) * distance};
 }
 
 static Position editor_body_rotation_handle_get(const EditorObject *object,
@@ -384,6 +406,8 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
         state->rotated_body = false;
         state->dragged_anchor = false;
         state->dragged_soft_node = false;
+        state->dragged_soft_body = false;
+        state->rotated_soft_body = false;
         return false;
     }
     body = editor_selected_body_get(object, state);
@@ -410,16 +434,47 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
         if(soft_body != NULL) {
             for(size_t i = 0; i < soft_body->node_count; i += 1) {
                 if(soft_body->nodes[i].id != state->selected_soft_node) continue;
-                soft_body->nodes[i].position = (Position){
+                Position local = {
                     pointer.x - object->position.x - soft_body->position.x -
                         state->drag_offset.x,
                     pointer.y - object->position.y - soft_body->position.y -
                         state->drag_offset.y
                 };
+                float cosine = cosf(-soft_body->rotation);
+                float sine = sinf(-soft_body->rotation);
+                soft_body->nodes[i].position = (Position){
+                    local.x * cosine - local.y * sine,
+                    local.x * sine + local.y * cosine
+                };
                 break;
             }
         }
         return true;
+    }
+    if(state->dragged_soft_body && (primary_button == MOUSE_BUTTON_STATE_DOWN ||
+            primary_button == MOUSE_BUTTON_STATE_PRESSED)) {
+        for(size_t i = 0; i < object->soft_body_count; i += 1) {
+            EditorSoftBody *soft_body = &object->soft_body_items[i];
+            if(soft_body->id != state->selected_soft_body) continue;
+            soft_body->position = (Position){
+                pointer.x - object->position.x - state->drag_offset.x,
+                pointer.y - object->position.y - state->drag_offset.y
+            };
+            return true;
+        }
+    }
+    if(state->rotated_soft_body && (primary_button == MOUSE_BUTTON_STATE_DOWN ||
+            primary_button == MOUSE_BUTTON_STATE_PRESSED)) {
+        for(size_t i = 0; i < object->soft_body_count; i += 1) {
+            EditorSoftBody *soft_body = &object->soft_body_items[i];
+            Position center;
+            if(soft_body->id != state->selected_soft_body) continue;
+            center = (Position){object->position.x + soft_body->position.x,
+                object->position.y + soft_body->position.y};
+            soft_body->rotation = atan2f(pointer.y - center.y, pointer.x - center.x) +
+                state->rotation_pointer_offset;
+            return true;
+        }
     }
     if(body != NULL && state->dragged_body && (primary_button == MOUSE_BUTTON_STATE_DOWN ||
             primary_button == MOUSE_BUTTON_STATE_PRESSED)) {
@@ -452,6 +507,24 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
         return true;
     }
     if(primary_button != MOUSE_BUTTON_STATE_PRESSED) return false;
+
+    if(object->visible && state->mode == EDITOR_VIEWPORT_SOFT_BODY) {
+        for(size_t i = 0; i < object->soft_body_count; i += 1) {
+            EditorSoftBody *soft_body = &object->soft_body_items[i];
+            Position handle;
+            Position center;
+            if(soft_body->id != state->selected_soft_body || !soft_body->visible) continue;
+            handle = editor_soft_body_rotation_handle_get(object, soft_body);
+            if((pointer.x - handle.x) * (pointer.x - handle.x) +
+                    (pointer.y - handle.y) * (pointer.y - handle.y) > 144.0f) break;
+            center = (Position){object->position.x + soft_body->position.x,
+                object->position.y + soft_body->position.y};
+            state->rotated_soft_body = true;
+            state->rotation_pointer_offset = soft_body->rotation -
+                atan2f(pointer.y - center.y, pointer.x - center.x);
+            return true;
+        }
+    }
 
     if(object->visible) {
         for(size_t i = 0; i < object->anchor_count; i += 1) {
@@ -541,6 +614,11 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                     } else {
                         state->selection = EDITOR_SELECTION_SOFT_BODY;
                         state->mode = EDITOR_VIEWPORT_SOFT_BODY;
+                        state->dragged_soft_body = true;
+                        state->drag_offset = (Vec2D){
+                            pointer.x - object->position.x - soft_body->position.x,
+                            pointer.y - object->position.y - soft_body->position.y
+                        };
                         state->last_viewport_click_selection = EDITOR_SELECTION_SOFT_NODE;
                         state->last_viewport_click_object = object->id;
                         state->last_viewport_click_index = node->id;
@@ -577,6 +655,11 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                     } else {
                         state->selection = EDITOR_SELECTION_SOFT_BODY;
                         state->mode = EDITOR_VIEWPORT_SOFT_BODY;
+                        state->dragged_soft_body = true;
+                        state->drag_offset = (Vec2D){
+                            pointer.x - object->position.x - soft_body->position.x,
+                            pointer.y - object->position.y - soft_body->position.y
+                        };
                         state->last_viewport_click_selection = EDITOR_SELECTION_SOFT_BEAM;
                         state->last_viewport_click_object = object->id;
                         state->last_viewport_click_index = beam->id;
@@ -589,6 +672,11 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                 state->selection = EDITOR_SELECTION_SOFT_BODY;
                 state->selected_soft_body = soft_body->id;
                 state->mode = EDITOR_VIEWPORT_SOFT_BODY;
+                state->dragged_soft_body = true;
+                state->drag_offset = (Vec2D){
+                    pointer.x - object->position.x - soft_body->position.x,
+                    pointer.y - object->position.y - soft_body->position.y
+                };
                 state->last_viewport_click_selection = EDITOR_SELECTION_NONE;
                 return true;
             }
@@ -761,6 +849,27 @@ static void editor_viewport_object_draw(const EditorObject *object,
                     state->selected_soft_node == node->id) ||
                     state->preview_soft_node == node->id ?
                     (Color){255, 215, 70, 255} : (Color){150, 220, 255, 255});
+        }
+    }
+
+    if(state->mode == EDITOR_VIEWPORT_SOFT_BODY ||
+            state->mode == EDITOR_VIEWPORT_SOFT_NODE) {
+        for(size_t i = 0; i < object->soft_body_count; i += 1) {
+            const EditorSoftBody *body = &object->soft_body_items[i];
+            Position center;
+            Position handle;
+            if(body->id != state->selected_soft_body || !body->visible) continue;
+            center = (Position){object->position.x + body->position.x,
+                object->position.y + body->position.y};
+            handle = editor_soft_body_rotation_handle_get(object, body);
+            editor_circle_draw(center, 5.0f, (Color){245, 245, 250, 255});
+            editor_quad_draw(center, 3.0f, 3.0f, 0.0f,
+                (Color){245, 245, 250, 255});
+            if(state->mode == EDITOR_VIEWPORT_SOFT_BODY) {
+                editor_line_draw(center, handle, (Color){255, 215, 70, 255});
+                editor_circle_draw(handle, 10.0f, (Color){255, 215, 70, 255});
+            }
+            break;
         }
     }
 

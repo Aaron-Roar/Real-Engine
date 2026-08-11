@@ -2,6 +2,7 @@
 
 #include "yyjson.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -482,6 +483,12 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 body->name);
             for(size_t node_index = 0; node_index < body->node_count; node_index += 1) {
                 const EditorSoftNode *node = &body->nodes[node_index];
+                float cosine = cosf(body->rotation);
+                float sine = sinf(body->rotation);
+                Position transformed = {
+                    body->position.x + node->position.x * cosine - node->position.y * sine,
+                    body->position.y + node->position.x * sine + node->position.y * cosine
+                };
                 fprintf(source,
                     "    { EntityResult created = rohr_physics_soft_body_node_create("
                     "object->%s, (Position){position.x + %#.9gf, "
@@ -489,8 +496,8 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                     "      if(rohr_error_check(created)) { result = rohr_error_result_error("
                     "created.result.error); goto fail; }\n"
                     "      object->%s = created.result.value; }\n",
-                    body->name, body->position.x + node->position.x,
-                    body->position.y + node->position.y, node->node_mass, node->name);
+                    body->name, transformed.x, transformed.y,
+                    node->node_mass, node->name);
                 if(node->gravity_enabled) {
                     fprintf(source,
                         "    result = rohr_physics_gravity_enable(object->%s);\n"

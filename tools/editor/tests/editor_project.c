@@ -160,6 +160,7 @@ int main(void) {
                 generated_object, EDITOR_JOINT_SPRING);
             EditorSoftBody *generated_soft_body = editor_project_soft_body_add(
                 &loaded_project, generated_object);
+            if(generated_soft_body != NULL) generated_soft_body->rotation = 0.5f;
             EditorSoftNode *generated_node_a = editor_project_soft_node_add(
                 &loaded_project, generated_soft_body, (Position){0.0f, 40.0f});
             EditorSoftNode *generated_node_b = editor_project_soft_node_add(
@@ -339,6 +340,10 @@ int main(void) {
             !editor_project_joint_remove(object, joint->id)) return 1;
 
     soft_body = editor_project_soft_body_add(&project, object);
+    if(soft_body != NULL) {
+        soft_body->position = (Position){3.0f, 4.0f};
+        soft_body->rotation = 0.75f;
+    }
     node_a = editor_project_soft_node_add(&project, soft_body, (Position){0});
     node_b = editor_project_soft_node_add(&project, soft_body, (Position){20.0f, 0.0f});
     if(soft_body == NULL || node_a == NULL || node_b == NULL) return 1;
@@ -407,6 +412,9 @@ int main(void) {
                 loaded_object->anchor_count != object->anchor_count ||
                 loaded_object->joint_count != object->joint_count ||
                 loaded_object->soft_body_count != object->soft_body_count ||
+                !position_equal(loaded_object->soft_body_items[0].position,
+                    (Position){3.0f, 4.0f}) ||
+                fabsf(loaded_object->soft_body_items[0].rotation - 0.75f) > 0.001f ||
                 loaded_object->soft_body_items[0].nodes[0].collision_category !=
                     (UINT64_C(1) | (UINT64_C(1) << 1)) ||
                 loaded_object->soft_body_items[0].nodes[0].collision_with != UINT64_C(1) ||
