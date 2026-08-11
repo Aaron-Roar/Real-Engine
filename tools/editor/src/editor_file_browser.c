@@ -446,11 +446,14 @@ EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
                 ((browser->preview_selected_path[0] != '\0' &&
                     browser->preview_selected_directory) ||
                  (browser->preview_selected_path[0] == '\0' &&
-                    browser->selected_directory[0] != '\0')) &&
+                    browser->selected_directory[0] != '\0') ||
+                 (browser->preview_selected_path[0] == '\0' &&
+                    browser->selected_directory[0] == '\0')) &&
                 snprintf(result.path, sizeof(result.path), "%s",
                     browser->preview_selected_directory ?
                         browser->preview_selected_path :
-                        browser->selected_directory) <
+                        (browser->selected_directory[0] != '\0' ?
+                            browser->selected_directory : browser->directory)) <
                     (int)sizeof(result.path)) ||
              (browser->mode == EDITOR_FILE_BROWSER_CREATE_DIRECTORY &&
                 editor_file_browser_directory_name_valid(browser->filename) &&
