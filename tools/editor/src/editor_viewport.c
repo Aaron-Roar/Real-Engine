@@ -468,6 +468,15 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                 Position world = editor_soft_node_world_get(object, soft_body, node);
                 if(!node->visible || (pointer.x - world.x) * (pointer.x - world.x) +
                         (pointer.y - world.y) * (pointer.y - world.y) > 100.0f) continue;
+                if(state->selected_soft_body != soft_body->id ||
+                        (state->mode != EDITOR_VIEWPORT_SOFT_BODY &&
+                        state->mode != EDITOR_VIEWPORT_SOFT_NODE &&
+                        state->mode != EDITOR_VIEWPORT_SOFT_BEAM)) {
+                    state->selection = EDITOR_SELECTION_SOFT_BODY;
+                    state->selected_soft_body = soft_body->id;
+                    state->mode = EDITOR_VIEWPORT_SOFT_BODY;
+                    return true;
+                }
                 state->selection = EDITOR_SELECTION_SOFT_NODE;
                 state->selected_soft_body = soft_body->id;
                 state->selected_soft_node = node->id;
@@ -488,6 +497,15 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                 if(a == NULL || b == NULL || editor_segment_distance_squared(pointer,
                         editor_soft_node_world_get(object, soft_body, a),
                         editor_soft_node_world_get(object, soft_body, b)) > 36.0f) continue;
+                if(state->selected_soft_body != soft_body->id ||
+                        (state->mode != EDITOR_VIEWPORT_SOFT_BODY &&
+                        state->mode != EDITOR_VIEWPORT_SOFT_NODE &&
+                        state->mode != EDITOR_VIEWPORT_SOFT_BEAM)) {
+                    state->selection = EDITOR_SELECTION_SOFT_BODY;
+                    state->selected_soft_body = soft_body->id;
+                    state->mode = EDITOR_VIEWPORT_SOFT_BODY;
+                    return true;
+                }
                 state->selection = EDITOR_SELECTION_SOFT_BEAM;
                 state->selected_soft_body = soft_body->id;
                 state->selected_soft_beam = beam->id;
@@ -548,10 +566,14 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                 state->selection = EDITOR_SELECTION_RIGID_BODY;
                 state->selected_rigid_body = candidate_body->id;
                 state->mode = EDITOR_VIEWPORT_RIGID_BODY;
-            } else if(state->mode == EDITOR_VIEWPORT_RIGID_BODY &&
-                    state->selected_rigid_body != candidate_body->id) {
+            } else if(state->selected_rigid_body != candidate_body->id ||
+                    (state->mode != EDITOR_VIEWPORT_RIGID_BODY &&
+                    state->mode != EDITOR_VIEWPORT_HITBOX &&
+                    state->mode != EDITOR_VIEWPORT_LINE &&
+                    state->mode != EDITOR_VIEWPORT_VERTEX)) {
                 state->selection = EDITOR_SELECTION_RIGID_BODY;
                 state->selected_rigid_body = candidate_body->id;
+                state->mode = EDITOR_VIEWPORT_RIGID_BODY;
             } else {
                 state->selection = EDITOR_SELECTION_HITBOX;
                 state->selected_rigid_body = candidate_body->id;
