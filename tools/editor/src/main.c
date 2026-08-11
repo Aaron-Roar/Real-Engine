@@ -760,6 +760,9 @@ static void editor_current_selection_clear(
 int main(void) {
     KeyboardState keyboard = {0};
     MouseState mouse = {0};
+    float viewport_wheel_y = 0.0f;
+    bool viewport_context_open = false;
+    Position viewport_context_position = {0};
     FontAsset font = {0};
     TextAsset hitbox_editor_label = {0};
     TextAsset file_label = {0};
@@ -769,6 +772,9 @@ int main(void) {
     TextAsset local_view_label = {0};
     TextAsset collision_label = {0};
     TextAsset particle_label = {0};
+    TextAsset context_action_one_label = {0};
+    TextAsset context_action_two_label = {0};
+    TextAsset context_action_three_label = {0};
     TextAsset collision_category_label = {0};
     TextAsset collide_with_label = {0};
     TextAsset add_label = {0};
@@ -938,6 +944,9 @@ int main(void) {
             !editor_text_create(&font, "Local", &local_view_label) ||
             !editor_text_create(&font, "Collision", &collision_label) ||
             !editor_text_create(&font, "Particle", &particle_label) ||
+            !editor_text_create(&font, "Action 1", &context_action_one_label) ||
+            !editor_text_create(&font, "Action 2", &context_action_two_label) ||
+            !editor_text_create(&font, "Action 3", &context_action_three_label) ||
             !editor_text_create(&font, "Collision Category", &collision_category_label) ||
             !editor_text_create(&font, "Collide With", &collide_with_label) ||
             !editor_text_create(&font, "Add", &add_label) ||
@@ -1029,9 +1038,11 @@ int main(void) {
 
     while(running) {
         SDL_Event event;
+        viewport_wheel_y = 0.0f;
         rohr_controller_key_states_update(&keyboard);
         rohr_controller_mouse_states_update(&mouse);
         while((event = rohr_engine_event_poll()).type != 0) {
+            if(event.type == SDL_EVENT_MOUSE_WHEEL) viewport_wheel_y += event.wheel.y;
             rohr_ui_event_add(&event);
             rohr_controller_key_event_add(
                 &keyboard,
@@ -2679,6 +2690,46 @@ int main(void) {
             WINDOW_HEIGHT - EDITOR_MENU_HEIGHT);
         editor_viewport_draw(&project, &viewport_state);
         rohr_graphics_screen_clip_clear();
+        {
+            Position pointer = rohr_graphics_mouse_screen_position_get();
+            UIRect context_bounds;
+            if(mouse.button_states[MOUSE_BUTTON_RIGHT] == MOUSE_BUTTON_STATE_PRESSED &&
+                    pointer.x >= 0.0f && pointer.x < EDITOR_VIEWPORT_WIDTH &&
+                    pointer.y >= EDITOR_MENU_HEIGHT && pointer.y < WINDOW_HEIGHT) {
+                viewport_context_open = true;
+                viewport_context_position = (Position){
+                    fminf(pointer.x, EDITOR_VIEWPORT_WIDTH - 150.0f),
+                    fminf(pointer.y, WINDOW_HEIGHT - 104.0f)
+                };
+            }
+            context_bounds = (UIRect){viewport_context_position.x,
+                viewport_context_position.y, 144.0f, 100.0f};
+            if(viewport_context_open) {
+                bool close_context = false;
+                rohr_ui_surface(context_bounds, (Color){24, 27, 34, 255});
+                rohr_ui_border(context_bounds, 2.0f, (Color){0, 0, 0, 255});
+                close_context = rohr_ui_button("editor.viewport.context.action_1",
+                    &context_action_one_label,
+                    (UIRect){context_bounds.x + 4.0f, context_bounds.y + 4.0f,
+                        context_bounds.width - 8.0f, 28.0f}, NULL).clicked;
+                close_context = rohr_ui_button("editor.viewport.context.action_2",
+                    &context_action_two_label,
+                    (UIRect){context_bounds.x + 4.0f, context_bounds.y + 36.0f,
+                        context_bounds.width - 8.0f, 28.0f}, NULL).clicked || close_context;
+                close_context = rohr_ui_button("editor.viewport.context.action_3",
+                    &context_action_three_label,
+                    (UIRect){context_bounds.x + 4.0f, context_bounds.y + 68.0f,
+                        context_bounds.width - 8.0f, 28.0f}, NULL).clicked || close_context;
+                if(mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_PRESSED &&
+                        (pointer.x < context_bounds.x ||
+                        pointer.x > context_bounds.x + context_bounds.width ||
+                        pointer.y < context_bounds.y ||
+                        pointer.y > context_bounds.y + context_bounds.height)) {
+                    close_context = true;
+                }
+                if(close_context) viewport_context_open = false;
+            }
+        }
         if(viewport_state.mode != EDITOR_VIEWPORT_HIERARCHY &&
                 rohr_ui_button("editor.viewport.coordinates",
                     viewport_state.local_view ? &local_view_label : &world_view_label,
@@ -2883,6 +2934,7 @@ int main(void) {
             Position pointer = rohr_graphics_mouse_screen_position_get();
             bool ui_consumed = !workspace.open || file_browser.active ||
                 close_action != EDITOR_CLOSE_NONE ||
+                viewport_context_open ||
                 rohr_ui_pointer_consumed_get() ||
                 pointer.y < EDITOR_MENU_HEIGHT;
             bool viewport_consumed = editor_viewport_update(
@@ -2890,7 +2942,10 @@ int main(void) {
                 &project,
                 pointer,
                 mouse.button_states[MOUSE_BUTTON_LEFT],
-                mouse.button_states[MOUSE_BUTTON_RIGHT],
+                mouse.button_states[MOUSE_BUTTON_MIDDLE],
+                rohr_controller_key_down_get(&keyboard, SDLK_LCTRL) ||
+                    rohr_controller_key_down_get(&keyboard, SDLK_RCTRL),
+                viewport_wheel_y,
                 ui_consumed);
 
             if(mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_PRESSED &&
@@ -3022,6 +3077,9 @@ int main(void) {
     rohr_graphics_text_destroy(&collide_with_label);
     rohr_graphics_text_destroy(&collision_label);
     rohr_graphics_text_destroy(&particle_label);
+    rohr_graphics_text_destroy(&context_action_one_label);
+    rohr_graphics_text_destroy(&context_action_two_label);
+    rohr_graphics_text_destroy(&context_action_three_label);
     for(size_t i = 0; i < EDITOR_COLLISION_MASK_MAX; i += 1) {
         rohr_graphics_text_destroy(&collision_mask_labels[i]);
     }
@@ -3149,6 +3207,9 @@ fail:
     rohr_graphics_text_destroy(&collide_with_label);
     rohr_graphics_text_destroy(&collision_label);
     rohr_graphics_text_destroy(&particle_label);
+    rohr_graphics_text_destroy(&context_action_one_label);
+    rohr_graphics_text_destroy(&context_action_two_label);
+    rohr_graphics_text_destroy(&context_action_three_label);
     for(size_t i = 0; i < EDITOR_COLLISION_MASK_MAX; i += 1) {
         rohr_graphics_text_destroy(&collision_mask_labels[i]);
     }

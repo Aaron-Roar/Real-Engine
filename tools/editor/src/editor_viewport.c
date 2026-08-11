@@ -4,6 +4,7 @@
 #include <math.h>
 
 static Position editor_view_origin;
+static float editor_view_scale = 1.0f;
 
 static void editor_view_transform_set(const EditorViewportState *state,
     const EditorObject *object) {
@@ -11,25 +12,27 @@ static void editor_view_transform_set(const EditorViewportState *state,
         EDITOR_MENU_HEIGHT + (WINDOW_HEIGHT - EDITOR_MENU_HEIGHT) * 0.5f};
 
     editor_view_origin = center;
+    editor_view_scale = state != NULL && state->camera_zoom > 0.0f ?
+        state->camera_zoom : 1.0f;
     if(state != NULL) {
         editor_view_origin.x += state->camera_offset.x;
         editor_view_origin.y += state->camera_offset.y;
     }
     if(state != NULL && state->local_view && object != NULL &&
             state->mode != EDITOR_VIEWPORT_HIERARCHY) {
-        editor_view_origin.x -= object->position.x;
-        editor_view_origin.y += object->position.y;
+        editor_view_origin.x -= object->position.x * editor_view_scale;
+        editor_view_origin.y += object->position.y * editor_view_scale;
     }
 }
 
 static Position editor_view_world_to_screen(Position world) {
-    return (Position){editor_view_origin.x + world.x,
-        editor_view_origin.y - world.y};
+    return (Position){editor_view_origin.x + world.x * editor_view_scale,
+        editor_view_origin.y - world.y * editor_view_scale};
 }
 
 static Position editor_view_screen_to_world(Position screen) {
-    return (Position){screen.x - editor_view_origin.x,
-        editor_view_origin.y - screen.y};
+    return (Position){(screen.x - editor_view_origin.x) / editor_view_scale,
+        (editor_view_origin.y - screen.y) / editor_view_scale};
 }
 
 static Position editor_hitbox_vertex_world_get(const EditorObject *object,
@@ -295,7 +298,7 @@ static EditorHitbox *editor_selected_hitbox_get(EditorObject *object,
 
 void editor_viewport_state_init(EditorViewportState *state) {
     if(state == NULL) return;
-    *state = (EditorViewportState){.dragged_vertex = -1};
+    *state = (EditorViewportState){.dragged_vertex = -1, .camera_zoom = 1.0f};
 }
 
 void editor_viewport_hitbox_editor_enter(EditorViewportState *state) {
@@ -373,30 +376,55 @@ void editor_viewport_back(EditorViewportState *state) {
 
 bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
     Position pointer, MouseButtonState primary_button,
-    MouseButtonState secondary_button, bool pointer_consumed) {
+    MouseButtonState pan_button, bool pan_modifier, float wheel_y,
+    bool pointer_consumed) {
     EditorObject *object;
     EditorRigidBody *body;
     EditorHitbox *hitbox;
 
     if(state == NULL || project == NULL) return false;
     object = editor_project_selected_get(project);
-    if(secondary_button == MOUSE_BUTTON_STATE_RELEASED) {
+    if(pan_button == MOUSE_BUTTON_STATE_RELEASED ||
+            (state->camera_pan_with_primary &&
+                primary_button == MOUSE_BUTTON_STATE_RELEASED)) {
         state->camera_panning = false;
+        state->camera_pan_with_primary = false;
     }
     if(pointer_consumed || pointer.x < 0.0f ||
             pointer.x >= EDITOR_VIEWPORT_WIDTH) return false;
-    if(secondary_button == MOUSE_BUTTON_STATE_PRESSED) {
+    editor_view_transform_set(state, object);
+    if(wheel_y != 0.0f) {
+        Position world = editor_view_screen_to_world(pointer);
+        Position desired_origin;
+        Position candidate_origin;
+        float factor = powf(1.1f, wheel_y);
+        state->camera_zoom = fminf(8.0f, fmaxf(0.1f,
+            state->camera_zoom * factor));
+        editor_view_transform_set(state, object);
+        candidate_origin = editor_view_origin;
+        desired_origin = (Position){pointer.x - world.x * editor_view_scale,
+            pointer.y + world.y * editor_view_scale};
+        state->camera_offset.x += desired_origin.x - candidate_origin.x;
+        state->camera_offset.y += desired_origin.y - candidate_origin.y;
+        editor_view_transform_set(state, object);
+        return true;
+    }
+    if(pan_button == MOUSE_BUTTON_STATE_PRESSED ||
+            (pan_modifier && primary_button == MOUSE_BUTTON_STATE_PRESSED)) {
         state->camera_panning = true;
+        state->camera_pan_with_primary = pan_modifier &&
+            primary_button == MOUSE_BUTTON_STATE_PRESSED;
         state->camera_pointer = pointer;
         return true;
     }
-    if(state->camera_panning && secondary_button == MOUSE_BUTTON_STATE_DOWN) {
+    if(state->camera_panning &&
+            ((!state->camera_pan_with_primary && pan_button == MOUSE_BUTTON_STATE_DOWN) ||
+            (state->camera_pan_with_primary && primary_button == MOUSE_BUTTON_STATE_DOWN))) {
         state->camera_offset.x += pointer.x - state->camera_pointer.x;
         state->camera_offset.y += pointer.y - state->camera_pointer.y;
         state->camera_pointer = pointer;
         return true;
     }
-    editor_view_transform_set(state, object);
     pointer = editor_view_screen_to_world(pointer);
     if(state->mode == EDITOR_VIEWPORT_HIERARCHY &&
             primary_button == MOUSE_BUTTON_STATE_PRESSED) {
