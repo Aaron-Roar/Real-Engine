@@ -1,4 +1,5 @@
 #include "editor_project.h"
+#include "editor_workspace.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -6,6 +7,27 @@
 
 static bool position_equal(Position a, Position b) {
     return fabsf(a.x - b.x) < 0.001f && fabsf(a.y - b.y) < 0.001f;
+}
+
+static void workspace_fixture_remove(const char *root) {
+    char path[2048];
+    static const char *files[] = {
+        "project.rohr.json", "objects/project.rohr.json", "src/main.c",
+        "CMakeLists.txt", ".gitignore"
+    };
+    static const char *directories[] = {
+        "src/generated", "src", "assets", "objects"
+    };
+
+    for(size_t i = 0; i < sizeof(files) / sizeof(files[0]); i += 1) {
+        snprintf(path, sizeof(path), "%s/%s", root, files[i]);
+        (void)SDL_RemovePath(path);
+    }
+    for(size_t i = 0; i < sizeof(directories) / sizeof(directories[0]); i += 1) {
+        snprintf(path, sizeof(path), "%s/%s", root, directories[i]);
+        (void)SDL_RemovePath(path);
+    }
+    (void)SDL_RemovePath(root);
 }
 
 int main(void) {
@@ -28,6 +50,44 @@ int main(void) {
     Position first;
     Position second;
     char formatted[EDITOR_OBJECT_NAME_MAX];
+
+    {
+        static EditorProject workspace_project;
+        static EditorProject loaded_project;
+        EditorWorkspace workspace = {0};
+        EditorWorkspace loaded_workspace = {0};
+        EditorWorkspaceConfig defaults = editor_workspace_config_default_get();
+        const char *fixture = "/tmp/rohr_editor_workspace_test";
+        SDL_PathInfo info;
+        char path[2048];
+
+        workspace_fixture_remove(fixture);
+        if(defaults.format_version != EDITOR_WORKSPACE_FORMAT_VERSION ||
+                strcmp(defaults.source_directory, "src") != 0 ||
+                strcmp(defaults.generated_directory, "src/generated") != 0 ||
+                strcmp(defaults.editor_state_file,
+                    "objects/project.rohr.json") != 0 ||
+                !editor_workspace_create(&workspace, &workspace_project,
+                    fixture, "/engine/root") ||
+                !editor_workspace_load(&loaded_workspace, &loaded_project, fixture) ||
+                !loaded_workspace.open || strcmp(loaded_workspace.config.name,
+                    "RohrEditorWorkspaceTest") != 0 ||
+                strcmp(loaded_workspace.config.engine_root, "/engine/root") != 0) {
+            workspace_fixture_remove(fixture);
+            return 1;
+        }
+        snprintf(path, sizeof(path), "%s/src/main.c", fixture);
+        if(!SDL_GetPathInfo(path, &info) || info.type != SDL_PATHTYPE_FILE) {
+            workspace_fixture_remove(fixture);
+            return 1;
+        }
+        editor_workspace_close(&loaded_workspace, &loaded_project);
+        if(loaded_workspace.open || loaded_project.object_count != 0) {
+            workspace_fixture_remove(fixture);
+            return 1;
+        }
+        workspace_fixture_remove(fixture);
+    }
 
     editor_project_object_name_format(formatted, sizeof(formatted), "fast car");
     if(strcmp(formatted, "FastCar") != 0) return 1;

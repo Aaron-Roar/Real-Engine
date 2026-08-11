@@ -2,11 +2,15 @@ add_executable(rohr_editor
     src/editor_file_browser.c
     src/editor_project.c
     src/editor_project_json.c
+    src/editor_workspace.c
     src/editor_viewport.c
     src/main.c
 )
 
 target_include_directories(rohr_editor PRIVATE src ${PROJECT_SOURCE_DIR}/lib)
+target_compile_definitions(rohr_editor PRIVATE
+    ROHR_ENGINE_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+)
 
 target_link_libraries(rohr_editor PRIVATE rohr_engine)
 
@@ -28,6 +32,7 @@ if(ROHR_BUILD_TESTS)
         tests/editor_project.c
         src/editor_project.c
         src/editor_project_json.c
+        src/editor_workspace.c
     )
     target_include_directories(editor_project_test PRIVATE src ${PROJECT_SOURCE_DIR}/lib)
     target_link_libraries(editor_project_test PRIVATE rohr_engine)

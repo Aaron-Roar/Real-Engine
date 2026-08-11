@@ -1,5 +1,6 @@
 #include "rohr.h"
 #include "editor_project.h"
+#include "editor_workspace.h"
 #include "editor_file_browser.h"
 #include "editor_viewport.h"
 #include "editor_layout.h"
@@ -20,6 +21,16 @@
 #define EDITOR_TOOLS_MIN_WIDTH 40.0f
 #define EDITOR_DIVIDER_GRAB_WIDTH 6.0f
 #define EDITOR_MENU_HEIGHT 34.0f
+
+#ifndef ROHR_ENGINE_SOURCE_DIR
+#define ROHR_ENGINE_SOURCE_DIR "."
+#endif
+
+typedef enum EditorWorkspaceBrowserAction {
+    EDITOR_WORKSPACE_BROWSER_NONE,
+    EDITOR_WORKSPACE_BROWSER_NEW,
+    EDITOR_WORKSPACE_BROWSER_LOAD
+} EditorWorkspaceBrowserAction;
 
 float editor_viewport_width = WINDOW_WIDTH * 0.8f;
 float editor_window_width = WINDOW_WIDTH;
@@ -630,6 +641,7 @@ int main(void) {
     TextAsset settings_label = {0};
     TextAsset new_label = {0};
     TextAsset open_label = {0};
+    TextAsset create_project_label = {0};
     TextAsset save_label = {0};
     TextAsset close_label = {0};
     TextAsset unsaved_changes_label = {0};
@@ -724,12 +736,14 @@ int main(void) {
     uint64_t saved_project_hash;
     EditorViewportState viewport_state;
     EditorFileBrowser file_browser;
+    EditorWorkspace workspace = {0};
+    EditorWorkspaceBrowserAction workspace_browser_action =
+        EDITOR_WORKSPACE_BROWSER_NONE;
     char startup_directory[EDITOR_FILE_BROWSER_PATH_MAX] = {0};
     bool running = true;
     bool field_editing = false;
     bool panel_resizing = false;
     bool close_prompt_open = false;
-    bool close_after_browser_save = false;
     float panel_scroll_offset = 0.0f;
     EditorViewportMode panel_scroll_mode = EDITOR_VIEWPORT_HIERARCHY;
 
@@ -777,8 +791,9 @@ int main(void) {
             !editor_text_create(&font, "File", &file_label) ||
             !editor_text_create(&font, "View", &view_label) ||
             !editor_text_create(&font, "Settings", &settings_label) ||
-            !editor_text_create(&font, "New", &new_label) ||
-            !editor_text_create(&font, "Open", &open_label) ||
+            !editor_text_create(&font, "New Project", &new_label) ||
+            !editor_text_create(&font, "Load Project", &open_label) ||
+            !editor_text_create(&font, "Create Project", &create_project_label) ||
             !editor_text_create(&font, "Save", &save_label) ||
             !editor_text_create(&font, "Close", &close_label) ||
             !editor_text_create(&font, "Save changes before closing?",
@@ -874,7 +889,7 @@ int main(void) {
         if(file_browser.active &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             file_browser.active = false;
-            close_after_browser_save = false;
+            workspace_browser_action = EDITOR_WORKSPACE_BROWSER_NONE;
         } else if(close_prompt_open &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             close_prompt_open = false;
@@ -886,12 +901,12 @@ int main(void) {
                 running = false;
             }
         }
-        if(!field_editing && !file_browser.active && !close_prompt_open &&
+        if(workspace.open && !field_editing && !file_browser.active && !close_prompt_open &&
                 viewport_state.selection != EDITOR_SELECTION_NONE &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_DELETE)) {
             (void)editor_selected_delete(&project, &viewport_state);
         }
-        if(!field_editing && !file_browser.active && !close_prompt_open) {
+        if(workspace.open && !field_editing && !file_browser.active && !close_prompt_open) {
             Position pointer = rohr_graphics_mouse_screen_position_get();
             bool pointer_in_viewport = pointer.x >= 0.0f &&
                 pointer.x < EDITOR_VIEWPORT_WIDTH && pointer.y >= EDITOR_MENU_HEIGHT;
@@ -2232,16 +2247,21 @@ int main(void) {
             file_menu = rohr_ui_dropdown("editor.menu.file", file_options,
                 sizeof(file_options) / sizeof(file_options[0]), 0,
                 (UIRect){4.0f, 3.0f, 76.0f, 28.0f}, NULL);
-            if(file_menu.changed && file_menu.selected_index == 2) {
+            if(file_menu.changed && file_menu.selected_index == 1) {
+                workspace_browser_action = EDITOR_WORKSPACE_BROWSER_NEW;
                 (void)editor_file_browser_open(&file_browser,
-                    EDITOR_FILE_BROWSER_OPEN, startup_directory, &font);
+                    EDITOR_FILE_BROWSER_CREATE_DIRECTORY, startup_directory, &font);
+            } else if(file_menu.changed && file_menu.selected_index == 2) {
+                workspace_browser_action = EDITOR_WORKSPACE_BROWSER_LOAD;
+                (void)editor_file_browser_open(&file_browser,
+                    EDITOR_FILE_BROWSER_DIRECTORY, startup_directory, &font);
             } else if(file_menu.changed && file_menu.selected_index == 3) {
-                close_after_browser_save = false;
-                (void)editor_file_browser_open(&file_browser,
-                    EDITOR_FILE_BROWSER_SAVE, startup_directory, &font);
+                if(workspace.open && editor_workspace_save(&workspace, &project)) {
+                    saved_project_hash = editor_project_hash_get(&project);
+                }
             } else if(file_menu.changed && file_menu.selected_index == 4) {
                 if(editor_project_hash_get(&project) == saved_project_hash) {
-                    editor_project_init(&project);
+                    editor_workspace_close(&workspace, &project);
                     saved_project_hash = editor_project_hash_get(&project);
                     editor_viewport_state_init(&viewport_state);
                     panel_scroll_offset = 0.0f;
@@ -2270,15 +2290,18 @@ int main(void) {
             if(rohr_ui_button("editor.close.save", &save_label,
                     (UIRect){dialog.x + 18.0f, dialog.y + 102.0f,
                         120.0f, 36.0f}, NULL).clicked) {
-                close_prompt_open = false;
-                close_after_browser_save = true;
-                (void)editor_file_browser_open(&file_browser,
-                    EDITOR_FILE_BROWSER_SAVE, startup_directory, &font);
+                if(editor_workspace_save(&workspace, &project)) {
+                    editor_workspace_close(&workspace, &project);
+                    saved_project_hash = editor_project_hash_get(&project);
+                    editor_viewport_state_init(&viewport_state);
+                    panel_scroll_offset = 0.0f;
+                    close_prompt_open = false;
+                }
             }
             if(rohr_ui_button("editor.close.dont_save", &dont_save_label,
                     (UIRect){dialog.x + 148.0f, dialog.y + 102.0f,
                         140.0f, 36.0f}, NULL).clicked) {
-                editor_project_init(&project);
+                editor_workspace_close(&workspace, &project);
                 saved_project_hash = editor_project_hash_get(&project);
                 editor_viewport_state_init(&viewport_state);
                 panel_scroll_offset = 0.0f;
@@ -2290,44 +2313,57 @@ int main(void) {
                 close_prompt_open = false;
             }
         }
+        if(!workspace.open && !file_browser.active) {
+            UIRect dialog = {editor_window_width * 0.5f - 230.0f,
+                WINDOW_HEIGHT * 0.5f - 90.0f, 460.0f, 180.0f};
+            rohr_ui_surface((UIRect){0.0f, EDITOR_MENU_HEIGHT, editor_window_width,
+                WINDOW_HEIGHT - EDITOR_MENU_HEIGHT}, (Color){12, 14, 18, 238});
+            rohr_ui_surface(dialog, (Color){42, 47, 58, 255});
+            rohr_ui_border(dialog, 2.0f, (Color){8, 9, 12, 255});
+            if(rohr_ui_button("editor.start.new", &new_label,
+                    (UIRect){dialog.x + 30.0f, dialog.y + 58.0f,
+                        190.0f, 58.0f}, NULL).clicked) {
+                workspace_browser_action = EDITOR_WORKSPACE_BROWSER_NEW;
+                (void)editor_file_browser_open(&file_browser,
+                    EDITOR_FILE_BROWSER_CREATE_DIRECTORY, startup_directory, &font);
+            }
+            if(rohr_ui_button("editor.start.load", &open_label,
+                    (UIRect){dialog.x + 240.0f, dialog.y + 58.0f,
+                        190.0f, 58.0f}, NULL).clicked) {
+                workspace_browser_action = EDITOR_WORKSPACE_BROWSER_LOAD;
+                (void)editor_file_browser_open(&file_browser,
+                    EDITOR_FILE_BROWSER_DIRECTORY, startup_directory, &font);
+            }
+        }
         if(file_browser.active) {
-            EditorFileBrowserMode mode = file_browser.mode;
             EditorFileBrowserResult browser_result = editor_file_browser_draw(
                 &file_browser, &file_browser_field,
-                &save_label, &open_label, &cancel_label,
+                &save_label, &open_label, &create_project_label, &cancel_label,
                 editor_window_width, WINDOW_HEIGHT);
-            if(browser_result.submitted && mode == EDITOR_FILE_BROWSER_OPEN) {
-                if(editor_project_load(&project, browser_result.path)) {
+            if(browser_result.submitted) {
+                bool opened = workspace_browser_action == EDITOR_WORKSPACE_BROWSER_NEW ?
+                    editor_workspace_create(&workspace, &project,
+                        browser_result.path, ROHR_ENGINE_SOURCE_DIR) :
+                    editor_workspace_load(&workspace, &project, browser_result.path);
+                if(opened) {
                     saved_project_hash = editor_project_hash_get(&project);
                     editor_viewport_state_init(&viewport_state);
                     panel_scroll_offset = 0.0f;
                 } else {
-                    fprintf(stderr, "Could not open editor project: %s\n",
-                        browser_result.path);
+                    fprintf(stderr, "Could not %s project directory: %s\n",
+                        workspace_browser_action == EDITOR_WORKSPACE_BROWSER_NEW ?
+                            "create" : "load", browser_result.path);
                 }
-            } else if(browser_result.submitted && mode == EDITOR_FILE_BROWSER_SAVE) {
-                if(editor_project_save(&project, browser_result.path)) {
-                    saved_project_hash = editor_project_hash_get(&project);
-                    if(close_after_browser_save) {
-                        editor_project_init(&project);
-                        saved_project_hash = editor_project_hash_get(&project);
-                        editor_viewport_state_init(&viewport_state);
-                        panel_scroll_offset = 0.0f;
-                    }
-                } else {
-                    fprintf(stderr, "Could not save editor project: %s\n",
-                        browser_result.path);
-                }
-                close_after_browser_save = false;
+                workspace_browser_action = EDITOR_WORKSPACE_BROWSER_NONE;
             } else if(browser_result.cancelled) {
-                close_after_browser_save = false;
+                workspace_browser_action = EDITOR_WORKSPACE_BROWSER_NONE;
             }
         }
         (void)rohr_graphics_screen_rect_draw(0.0f, EDITOR_MENU_HEIGHT - 1.0f,
             editor_window_width, 1.0f, (Color){75, 84, 100, 255});
         {
             Position pointer = rohr_graphics_mouse_screen_position_get();
-            bool ui_consumed = file_browser.active || close_prompt_open ||
+            bool ui_consumed = !workspace.open || file_browser.active || close_prompt_open ||
                 rohr_ui_pointer_consumed_get() ||
                 pointer.y < EDITOR_MENU_HEIGHT;
             bool viewport_consumed = editor_viewport_update(
@@ -2448,6 +2484,7 @@ int main(void) {
     rohr_graphics_text_destroy(&unsaved_changes_label);
     rohr_graphics_text_destroy(&close_label);
     rohr_graphics_text_destroy(&open_label);
+    rohr_graphics_text_destroy(&create_project_label);
     rohr_graphics_text_destroy(&new_label);
     rohr_graphics_text_destroy(&settings_label);
     rohr_graphics_text_destroy(&view_label);
@@ -2559,6 +2596,7 @@ fail:
     rohr_graphics_text_destroy(&unsaved_changes_label);
     rohr_graphics_text_destroy(&close_label);
     rohr_graphics_text_destroy(&open_label);
+    rohr_graphics_text_destroy(&create_project_label);
     rohr_graphics_text_destroy(&new_label);
     rohr_graphics_text_destroy(&settings_label);
     rohr_graphics_text_destroy(&view_label);

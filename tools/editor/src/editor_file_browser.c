@@ -14,6 +14,12 @@ static bool editor_file_browser_path_join(char *output, size_t capacity,
         name) < (int)capacity;
 }
 
+static bool editor_file_browser_directory_name_valid(const char *name) {
+    if(name == NULL || name[0] == '\0' || strcmp(name, ".") == 0 ||
+            strcmp(name, "..") == 0) return false;
+    return strchr(name, '/') == NULL && strchr(name, '\\') == NULL;
+}
+
 static SDL_EnumerationResult SDLCALL editor_file_browser_entry_add(void *userdata,
     const char *dirname, const char *filename) {
     EditorFileBrowser *browser = userdata;
@@ -27,7 +33,12 @@ static SDL_EnumerationResult SDLCALL editor_file_browser_entry_add(void *userdat
             !editor_file_browser_path_join(path, sizeof(path), browser->directory, filename) ||
             !SDL_GetPathInfo(path, &info)) return SDL_ENUM_CONTINUE;
     length = strlen(filename);
-    if(info.type != SDL_PATHTYPE_DIRECTORY && (length < 5 ||
+    if((browser->mode == EDITOR_FILE_BROWSER_DIRECTORY ||
+            browser->mode == EDITOR_FILE_BROWSER_CREATE_DIRECTORY) &&
+            info.type != SDL_PATHTYPE_DIRECTORY) return SDL_ENUM_CONTINUE;
+    if(browser->mode != EDITOR_FILE_BROWSER_DIRECTORY &&
+            browser->mode != EDITOR_FILE_BROWSER_CREATE_DIRECTORY &&
+            info.type != SDL_PATHTYPE_DIRECTORY && (length < 5 ||
             strcmp(filename + length - 5, ".json") != 0)) return SDL_ENUM_CONTINUE;
     if(length == 0 || length >= EDITOR_FILE_BROWSER_NAME_MAX) return SDL_ENUM_CONTINUE;
     entry = &browser->entries[browser->entry_count++];
@@ -123,6 +134,8 @@ bool editor_file_browser_open(EditorFileBrowser *browser, EditorFileBrowserMode 
     memcpy(browser->directory, directory, length + 1);
     if(mode == EDITOR_FILE_BROWSER_SAVE) {
         snprintf(browser->filename, sizeof(browser->filename), "project.json");
+    } else if(mode == EDITOR_FILE_BROWSER_CREATE_DIRECTORY) {
+        snprintf(browser->filename, sizeof(browser->filename), "project-dir");
     }
     if(editor_file_browser_refresh(browser)) return true;
     browser->active = false;
@@ -131,8 +144,8 @@ bool editor_file_browser_open(EditorFileBrowser *browser, EditorFileBrowserMode 
 
 EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
     TextAsset *field_display, const TextAsset *save_label,
-    const TextAsset *open_label, const TextAsset *cancel_label, float window_width,
-    float window_height) {
+    const TextAsset *open_label, const TextAsset *create_label,
+    const TextAsset *cancel_label, float window_width, float window_height) {
     EditorFileBrowserResult result = {0};
     UIRect dialog;
     float list_height;
@@ -189,7 +202,13 @@ EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
                 .string_capacity = sizeof(browser->filename)}, field_display,
             (UIRect){dialog.x + 14.0f, dialog.y + 450.0f,
                 dialog.width - 28.0f, 30.0f}, NULL);
-    } else {
+    } else if(browser->mode == EDITOR_FILE_BROWSER_CREATE_DIRECTORY) {
+        (void)rohr_ui_field("editor.file_browser.directory_name",
+            (UIFieldBinding){.kind = UI_FIELD_STRING, .string = browser->filename,
+                .string_capacity = sizeof(browser->filename)}, field_display,
+            (UIRect){dialog.x + 174.0f, dialog.y + 450.0f,
+                dialog.width - 188.0f, 34.0f}, NULL);
+    } else if(browser->mode == EDITOR_FILE_BROWSER_OPEN) {
         (void)rohr_graphics_text_value_set(field_display, browser->filename);
         rohr_ui_button_disabled((UIRect){dialog.x + 14.0f, dialog.y + 450.0f,
             dialog.width - 28.0f, 30.0f}, NULL);
@@ -197,11 +216,25 @@ EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
             dialog.width - 28.0f, 30.0f});
     }
     if(rohr_ui_button("editor.file_browser.submit",
-            browser->mode == EDITOR_FILE_BROWSER_SAVE ? save_label : open_label,
-            (UIRect){dialog.x + dialog.width - 274.0f, dialog.y + 490.0f,
-                120.0f, 34.0f}, NULL).clicked && browser->filename[0] != '\0' &&
-            editor_file_browser_path_join(result.path, sizeof(result.path),
-                browser->directory, browser->filename)) {
+            browser->mode == EDITOR_FILE_BROWSER_SAVE ? save_label :
+                (browser->mode == EDITOR_FILE_BROWSER_CREATE_DIRECTORY ?
+                    create_label : open_label),
+            browser->mode == EDITOR_FILE_BROWSER_CREATE_DIRECTORY ?
+                (UIRect){dialog.x + 14.0f, dialog.y + 450.0f, 150.0f, 34.0f} :
+                (UIRect){dialog.x + dialog.width - 274.0f, dialog.y + 490.0f,
+                    120.0f, 34.0f}, NULL).clicked &&
+            ((browser->mode == EDITOR_FILE_BROWSER_DIRECTORY &&
+                snprintf(result.path, sizeof(result.path), "%s", browser->directory) <
+                    (int)sizeof(result.path)) ||
+             (browser->mode == EDITOR_FILE_BROWSER_CREATE_DIRECTORY &&
+                editor_file_browser_directory_name_valid(browser->filename) &&
+                editor_file_browser_path_join(result.path, sizeof(result.path),
+                    browser->directory, browser->filename)) ||
+             (browser->mode != EDITOR_FILE_BROWSER_DIRECTORY &&
+                browser->mode != EDITOR_FILE_BROWSER_CREATE_DIRECTORY &&
+                browser->filename[0] != '\0' &&
+                editor_file_browser_path_join(result.path, sizeof(result.path),
+                    browser->directory, browser->filename)))) {
         result.submitted = true;
         browser->active = false;
     }

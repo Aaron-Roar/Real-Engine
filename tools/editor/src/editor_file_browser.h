@@ -9,7 +9,9 @@
 
 typedef enum EditorFileBrowserMode {
     EDITOR_FILE_BROWSER_OPEN,
-    EDITOR_FILE_BROWSER_SAVE
+    EDITOR_FILE_BROWSER_SAVE,
+    EDITOR_FILE_BROWSER_DIRECTORY,
+    EDITOR_FILE_BROWSER_CREATE_DIRECTORY
 } EditorFileBrowserMode;
 
 typedef struct EditorFileBrowserEntry {
@@ -44,7 +46,7 @@ bool editor_file_browser_open(EditorFileBrowser *browser, EditorFileBrowserMode 
     const char *directory, FontAsset *font);
 EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
     TextAsset *field_display, const TextAsset *save_label,
-    const TextAsset *open_label, const TextAsset *cancel_label, float window_width,
-    float window_height);
+    const TextAsset *open_label, const TextAsset *create_label,
+    const TextAsset *cancel_label, float window_width, float window_height);
 
 #endif
