@@ -13,6 +13,7 @@ typedef enum EditorViewportMode {
     EDITOR_VIEWPORT_SOFT_BODY,
     EDITOR_VIEWPORT_SOFT_NODE,
     EDITOR_VIEWPORT_SOFT_BEAM,
+    EDITOR_VIEWPORT_ORIGIN,
     EDITOR_VIEWPORT_LINE,
     EDITOR_VIEWPORT_VERTEX
 } EditorViewportMode;
@@ -27,9 +28,16 @@ typedef enum EditorHierarchySelection {
     EDITOR_SELECTION_SOFT_BODY,
     EDITOR_SELECTION_SOFT_NODE,
     EDITOR_SELECTION_SOFT_BEAM,
+    EDITOR_SELECTION_ORIGIN,
     EDITOR_SELECTION_LINE,
     EDITOR_SELECTION_VERTEX
 } EditorHierarchySelection;
+
+typedef enum EditorOriginKind {
+    EDITOR_ORIGIN_NONE,
+    EDITOR_ORIGIN_RIGID_BODY,
+    EDITOR_ORIGIN_SOFT_BODY
+} EditorOriginKind;
 
 typedef struct EditorViewportState {
     int dragged_vertex;
@@ -39,6 +47,7 @@ typedef struct EditorViewportState {
     bool dragged_soft_node;
     bool dragged_soft_body;
     bool rotated_soft_body;
+    bool dragged_origin;
     bool local_view;
     Vec2D drag_offset;
     float rotation_pointer_offset;
@@ -57,6 +66,7 @@ typedef struct EditorViewportState {
     EditorSoftBodyId selected_soft_body;
     EditorSoftNodeId selected_soft_node;
     EditorSoftBeamId selected_soft_beam;
+    EditorOriginKind selected_origin_kind;
     EditorRigidBodyId preview_rigid_body;
     EditorAnchorId preview_anchor;
     EditorSoftNodeId preview_soft_node;

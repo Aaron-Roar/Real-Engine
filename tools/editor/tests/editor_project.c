@@ -273,6 +273,18 @@ int main(void) {
         sizeof(hitbox->line_names[0]), "upperEdge");
     if(strcmp(hitbox->vertices[0].name, "front_point") != 0 ||
             strcmp(hitbox->line_names[0], "upper_edge") != 0) return 1;
+    {
+        Position local_before = hitbox->vertices[0].position;
+        Position world_before = {chassis->position.x + local_before.x,
+            chassis->position.y + local_before.y};
+        if(!editor_project_rigid_body_origin_set(
+                    object, chassis, (Position){5.0f, 7.0f}) ||
+                !position_equal((Position){chassis->position.x +
+                        hitbox->vertices[0].position.x,
+                    chassis->position.y + hitbox->vertices[0].position.y},
+                    world_before) || !editor_project_rigid_body_origin_set(
+                        object, chassis, (Position){0.0f, 0.0f})) return 1;
+    }
     first = hitbox->vertices[0].position;
     second = hitbox->vertices[1].position;
     if(!editor_project_hitbox_vertex_insert(&project, hitbox, 0) ||
@@ -351,6 +363,22 @@ int main(void) {
     node_b->collision_with = UINT64_C(1);
     node_b->friction = 0.7f;
     node_b->restitution = 0.35f;
+    {
+        float cosine = cosf(soft_body->rotation);
+        float sine = sinf(soft_body->rotation);
+        Position world_before = {
+            soft_body->position.x + node_b->position.x * cosine -
+                node_b->position.y * sine,
+            soft_body->position.y + node_b->position.x * sine +
+                node_b->position.y * cosine
+        };
+        if(!editor_project_soft_body_origin_set(
+                    soft_body, (Position){8.0f, 9.0f})) return 1;
+        if(!position_equal((Position){soft_body->position.x +
+                    node_b->position.x * cosine - node_b->position.y * sine,
+                soft_body->position.y + node_b->position.x * sine +
+                    node_b->position.y * cosine}, world_before)) return 1;
+    }
     if(node_a->gravity_enabled || node_b->gravity_enabled) return 1;
     beam = editor_project_soft_beam_add(&project, soft_body, 0, 0);
     if(beam == NULL || !beam->visible || beam->node_a != 0 || beam->node_b != 0) return 1;
@@ -413,7 +441,7 @@ int main(void) {
                 loaded_object->joint_count != object->joint_count ||
                 loaded_object->soft_body_count != object->soft_body_count ||
                 !position_equal(loaded_object->soft_body_items[0].position,
-                    (Position){3.0f, 4.0f}) ||
+                    (Position){8.0f, 9.0f}) ||
                 fabsf(loaded_object->soft_body_items[0].rotation - 0.75f) > 0.001f ||
                 loaded_object->soft_body_items[0].nodes[0].collision_category !=
                     (UINT64_C(1) | (UINT64_C(1) << 1)) ||

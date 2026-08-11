@@ -190,6 +190,8 @@ EditorRigidBody *editor_project_rigid_body_add(EditorProject *project,
 EditorRigidBody *editor_project_rigid_body_get(EditorObject *object,
     EditorRigidBodyId id);
 bool editor_project_rigid_body_remove(EditorObject *object, EditorRigidBodyId id);
+bool editor_project_rigid_body_origin_set(EditorObject *object, EditorRigidBody *body,
+    Position position);
 EditorHitbox *editor_project_hitbox_add(EditorProject *project, EditorRigidBody *body);
 EditorHitbox *editor_project_hitbox_get(EditorRigidBody *body, EditorHitboxId id);
 bool editor_project_hitbox_remove(EditorRigidBody *body, EditorHitboxId id);
@@ -223,6 +225,7 @@ bool editor_project_anchor_rigid_body_set(EditorObject *object, EditorAnchor *an
     EditorRigidBodyId rigid_body);
 EditorSoftBody *editor_project_soft_body_add(EditorProject *project, EditorObject *object);
 bool editor_project_soft_body_remove(EditorObject *object, EditorSoftBodyId id);
+bool editor_project_soft_body_origin_set(EditorSoftBody *body, Position position);
 EditorSoftNode *editor_project_soft_node_add(EditorProject *project, EditorSoftBody *body,
     Position position);
 bool editor_project_soft_node_remove(EditorSoftBody *body, EditorSoftNodeId id);
