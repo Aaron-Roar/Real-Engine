@@ -57,6 +57,7 @@ typedef struct EditorRigidBody {
     bool rotation_locked;
     bool gravity_enabled;
     bool collision_enabled;
+    bool particle;
     bool visible;
     RohrCollisionCategoryMask collision_category;
     RohrCollisionCategoryMask collision_with;

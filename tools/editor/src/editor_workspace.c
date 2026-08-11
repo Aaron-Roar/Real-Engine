@@ -285,7 +285,7 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
         "static EngineResult generated_body_create(Entity *output, Position position,\n"
         "    float rotation, Shape hitbox, float mass_value, float friction,\n"
         "    float restitution, bool static_body, bool rotation_locked,\n"
-        "    bool gravity_enabled, bool collision_enabled,\n"
+        "    bool gravity_enabled, bool collision_enabled, bool particle,\n"
         "    RohrCollisionCategoryMask collision_category,\n"
         "    RohrCollisionCategoryMask collision_with) {\n"
         "    EntityResult added = rohr_entity_add();\n"
@@ -303,6 +303,7 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
         "        collision_enabled ? collision_with : ROHR_COLLISION_CATEGORY_NONE));\n"
         "    if(collision_enabled) {\n"
         "        GENERATED_APPLY(rohr_entity_components_add(*output, ROHR_COLLISION));\n"
+        "        if(particle) GENERATED_APPLY(rohr_entity_components_add(*output, ROHR_PARTICLE));\n"
         "    }\n"
         "    GENERATED_APPLY(rohr_physics_friction_set(*output, friction));\n"
         "    GENERATED_APPLY(rohr_physics_restitution_set(*output, restitution));\n"
@@ -373,11 +374,11 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
         for(size_t soft_body_index = 0; soft_body_index < object->soft_body_count;
                 soft_body_index += 1) {
             const EditorSoftBody *body = &object->soft_body_items[soft_body_index];
-            fprintf(header, "    Entity soft_body_%s;\n", body->name);
+            fprintf(header, "    Entity %s;\n", body->name);
             for(size_t node_index = 0; node_index < body->node_count; node_index += 1)
-                fprintf(header, "    Entity soft_node_%s;\n", body->nodes[node_index].name);
+                fprintf(header, "    Entity %s;\n", body->nodes[node_index].name);
             for(size_t beam_index = 0; beam_index < body->beam_count; beam_index += 1)
-                fprintf(header, "    Entity soft_beam_%s;\n", body->beams[beam_index].name);
+                fprintf(header, "    Entity %s;\n", body->beams[beam_index].name);
         }
         fprintf(header,
             "} %s;\n\n"
@@ -407,7 +408,7 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 }
             }
             fprintf(source,
-                "}}, %#.9gf, %#.9gf, %#.9gf, %s, %s, %s, %s, "
+                "}}, %#.9gf, %#.9gf, %#.9gf, %s, %s, %s, %s, %s, "
                 "UINT64_C(%llu), UINT64_C(%llu));\n"
                 "    if(rohr_error_check(result)) goto fail;\n",
                 body->mass_value, body->friction, body->restitution,
@@ -415,6 +416,7 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 body->rotation_locked ? "true" : "false",
                 body->gravity_enabled ? "true" : "false",
                 body->collision_enabled ? "true" : "false",
+                body->particle ? "true" : "false",
                 (unsigned long long)body->collision_category,
                 (unsigned long long)body->collision_with);
         }
@@ -476,28 +478,28 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 "    { EntityResult created = rohr_physics_soft_body_create();\n"
                 "      if(rohr_error_check(created)) { result = rohr_error_result_error("
                 "created.result.error); goto fail; }\n"
-                "      object->soft_body_%s = created.result.value; }\n",
+                "      object->%s = created.result.value; }\n",
                 body->name);
             for(size_t node_index = 0; node_index < body->node_count; node_index += 1) {
                 const EditorSoftNode *node = &body->nodes[node_index];
                 fprintf(source,
                     "    { EntityResult created = rohr_physics_soft_body_node_create("
-                    "object->soft_body_%s, (Position){position.x + %#.9gf, "
+                    "object->%s, (Position){position.x + %#.9gf, "
                     "position.y + %#.9gf}, %#.9gf, 4.00000000f);\n"
                     "      if(rohr_error_check(created)) { result = rohr_error_result_error("
                     "created.result.error); goto fail; }\n"
-                    "      object->soft_node_%s = created.result.value; }\n",
+                    "      object->%s = created.result.value; }\n",
                     body->name, body->position.x + node->position.x,
                     body->position.y + node->position.y, node->node_mass, node->name);
                 if(node->gravity_enabled) {
                     fprintf(source,
-                        "    result = rohr_physics_gravity_enable(object->soft_node_%s);\n"
+                        "    result = rohr_physics_gravity_enable(object->%s);\n"
                         "    if(rohr_error_check(result)) goto fail;\n",
                         node->name);
                 }
                 fprintf(source,
                     "    result = rohr_physics_soft_body_node_collision_filter_set("
-                    "object->soft_node_%s, UINT64_C(%llu), UINT64_C(%llu));\n"
+                    "object->%s, UINT64_C(%llu), UINT64_C(%llu));\n"
                     "    if(rohr_error_check(result)) goto fail;\n",
                     node->name,
                     (unsigned long long)(node->collision_enabled ?
@@ -514,11 +516,11 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 if(node_a == NULL || node_b == NULL) continue;
                 fprintf(source,
                     "    { EntityResult created = rohr_physics_soft_body_beam_create("
-                    "object->soft_body_%s, object->soft_node_%s, "
-                    "object->soft_node_%s, %#.9gf, 0.00000000f);\n"
+                    "object->%s, object->%s, "
+                    "object->%s, %#.9gf, 0.00000000f);\n"
                     "      if(rohr_error_check(created)) { result = rohr_error_result_error("
                     "created.result.error); goto fail; }\n"
-                    "      object->soft_beam_%s = created.result.value; }\n",
+                    "      object->%s = created.result.value; }\n",
                     body->name, node_a->name, node_b->name, beam->stiffness,
                     beam->name);
             }
@@ -543,8 +545,8 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 soft_body_index += 1) {
             const EditorSoftBody *body = &object->soft_body_items[soft_body_index];
             fprintf(source,
-                "    if(object->soft_body_%s != ENTITY_INVALID) "
-                "(void)rohr_entity_delete(object->soft_body_%s);\n",
+                "    if(object->%s != ENTITY_INVALID) "
+                "(void)rohr_entity_delete(object->%s);\n",
                 body->name, body->name);
         }
         for(size_t anchor_index = 0; anchor_index < object->anchor_count; anchor_index += 1) {
@@ -690,8 +692,7 @@ bool editor_workspace_save(const EditorWorkspace *workspace,
 bool editor_workspace_c_generate(const EditorWorkspace *workspace,
     const EditorProject *project) {
     return workspace != NULL && workspace->open && project != NULL &&
-        editor_workspace_generated_objects_write(workspace, project) &&
-        editor_workspace_main_write(workspace, project);
+        editor_workspace_generated_objects_write(workspace, project);
 }
 
 bool editor_workspace_create(EditorWorkspace *workspace, EditorProject *project,
@@ -721,7 +722,8 @@ bool editor_workspace_create(EditorWorkspace *workspace, EditorProject *project,
     if(!editor_workspace_starter_project_init(project) ||
             !editor_workspace_save(&created, project) ||
             !editor_workspace_scaffold_write(&created) ||
-            !editor_workspace_c_generate(&created, project)) return false;
+            !editor_workspace_generated_objects_write(&created, project) ||
+            !editor_workspace_main_write(&created, project)) return false;
     *workspace = created;
     return true;
 }

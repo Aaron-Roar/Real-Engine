@@ -256,6 +256,38 @@ static bool editor_checkbox(const char *id, const TextAsset *label,
     return interaction.clicked;
 }
 
+static bool editor_checkbox_label_left(const char *id, const TextAsset *label,
+    UIRect bounds, bool *checked) {
+    UIButtonResult interaction;
+    UIRect box;
+    Color background;
+
+    if(id == NULL || label == NULL || checked == NULL) return false;
+    interaction = rohr_ui_interaction(id, bounds);
+    if(interaction.clicked) *checked = !*checked;
+    background = interaction.pressed ? (Color){58, 65, 78, 255} :
+        interaction.hovered || interaction.focused ? (Color){67, 75, 90, 255} :
+        (Color){48, 54, 66, 255};
+    rohr_ui_surface(bounds, background);
+    box = (UIRect){bounds.x + bounds.width - bounds.height + 4.0f,
+        bounds.y + 4.0f, bounds.height - 8.0f, bounds.height - 8.0f};
+    rohr_ui_surface(box, (Color){22, 25, 31, 255});
+    rohr_ui_border(box, 2.0f, (Color){8, 9, 12, 255});
+    if(*checked) {
+        editor_icon_line_draw(
+            (Position){box.x + box.width * 0.22f, box.y + box.height * 0.52f},
+            (Position){box.x + box.width * 0.43f, box.y + box.height * 0.74f},
+            (Color){225, 230, 240, 255});
+        editor_icon_line_draw(
+            (Position){box.x + box.width * 0.43f, box.y + box.height * 0.74f},
+            (Position){box.x + box.width * 0.80f, box.y + box.height * 0.24f},
+            (Color){225, 230, 240, 255});
+    }
+    rohr_ui_label(label, (UIRect){bounds.x + 4.0f, bounds.y,
+        bounds.width - bounds.height - 4.0f, bounds.height});
+    return interaction.clicked;
+}
+
 static bool editor_collision_mask_menu_draw(const char *id_prefix,
     EditorProject *project, RohrCollisionCategoryMask *active_masks,
     FontAsset *font, TextAsset labels[EDITOR_COLLISION_MASK_MAX],
@@ -731,6 +763,7 @@ int main(void) {
     TextAsset world_view_label = {0};
     TextAsset local_view_label = {0};
     TextAsset collision_label = {0};
+    TextAsset particle_label = {0};
     TextAsset collision_category_label = {0};
     TextAsset collide_with_label = {0};
     TextAsset add_label = {0};
@@ -898,6 +931,7 @@ int main(void) {
             !editor_text_create(&font, "World", &world_view_label) ||
             !editor_text_create(&font, "Local", &local_view_label) ||
             !editor_text_create(&font, "Collision", &collision_label) ||
+            !editor_text_create(&font, "Particle", &particle_label) ||
             !editor_text_create(&font, "Collision Category", &collision_category_label) ||
             !editor_text_create(&font, "Collide With", &collide_with_label) ||
             !editor_text_create(&font, "Add", &add_label) ||
@@ -1247,10 +1281,17 @@ int main(void) {
                     float controls_bottom = 404.0f;
 
                     if(editor_checkbox("editor.rigid_body.collision", &collision_label,
-                            (UIRect){row_x, 372.0f, row_width, 28.0f},
+                            (UIRect){row_x, 372.0f, row_width * 0.52f, 28.0f},
                             &body->collision_enabled) && !body->collision_enabled) {
+                        body->particle = false;
                         collision_category_open = false;
                         collide_with_open = false;
+                    }
+                    if(body->collision_enabled) {
+                        (void)editor_checkbox_label_left("editor.rigid_body.particle",
+                            &particle_label,
+                            (UIRect){row_x + row_width * 0.54f, 372.0f,
+                                row_width * 0.46f, 28.0f}, &body->particle);
                     }
                     if(body->collision_enabled && rohr_ui_button(
                             "editor.rigid_body.collision_category", &collision_category_label,
@@ -2841,6 +2882,7 @@ int main(void) {
     rohr_graphics_text_destroy(&collision_category_label);
     rohr_graphics_text_destroy(&collide_with_label);
     rohr_graphics_text_destroy(&collision_label);
+    rohr_graphics_text_destroy(&particle_label);
     for(size_t i = 0; i < EDITOR_COLLISION_MASK_MAX; i += 1) {
         rohr_graphics_text_destroy(&collision_mask_labels[i]);
     }
@@ -2966,6 +3008,7 @@ fail:
     rohr_graphics_text_destroy(&collision_category_label);
     rohr_graphics_text_destroy(&collide_with_label);
     rohr_graphics_text_destroy(&collision_label);
+    rohr_graphics_text_destroy(&particle_label);
     for(size_t i = 0; i < EDITOR_COLLISION_MASK_MAX; i += 1) {
         rohr_graphics_text_destroy(&collision_mask_labels[i]);
     }

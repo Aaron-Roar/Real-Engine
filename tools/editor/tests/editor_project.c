@@ -49,6 +49,19 @@ static bool file_contains(const char *path, const char *text) {
     return strstr(contents, text) != NULL;
 }
 
+static bool file_replace(const char *path, const char *text) {
+    FILE *file;
+    size_t length;
+    bool written;
+
+    if(path == NULL || text == NULL) return false;
+    file = fopen(path, "wb");
+    if(file == NULL) return false;
+    length = strlen(text);
+    written = fwrite(text, 1, length, file) == length;
+    return fclose(file) == 0 && written;
+}
+
 int main(void) {
     static EditorProject project;
     EditorObject *object;
@@ -118,6 +131,10 @@ int main(void) {
             workspace_fixture_remove(fixture);
             return 1;
         }
+        if(!file_replace(path, "/* developer-owned main */\n")) {
+            workspace_fixture_remove(fixture);
+            return 1;
+        }
         snprintf(path, sizeof(path), "%s/src/generated/project_objects.c", fixture);
         if(!SDL_GetPathInfo(path, &info) || info.type != SDL_PATHTYPE_FILE ||
                 !file_contains(path, "EngineResult starter_create") ||
@@ -131,6 +148,7 @@ int main(void) {
             return 1;
         }
         loaded_project.objects[0].rigid_bodies[1].mass_value = 7.0f;
+        loaded_project.objects[0].rigid_bodies[1].particle = true;
         {
             EditorObject *generated_object = &loaded_project.objects[0];
             EditorRigidBody *generated_body = &generated_object->rigid_bodies[1];
@@ -166,6 +184,7 @@ int main(void) {
                 file_contains(path, "7.00000000f") ||
                 !editor_workspace_c_generate(&loaded_workspace, &loaded_project) ||
                 !file_contains(path, "7.00000000f") ||
+                !file_contains(path, "ROHR_PARTICLE") ||
                 !file_contains(path, "generated_world_anchor_create") ||
                 !file_contains(path, "rohr_physics_joint_anchor_create") ||
                 !file_contains(path, "rohr_physics_joint_spring_set") ||
@@ -174,6 +193,17 @@ int main(void) {
                 !file_contains(path,
                     "rohr_physics_soft_body_node_collision_filter_set") ||
                 !file_contains(path, "rohr_physics_soft_body_beam_create")) {
+            workspace_fixture_remove(fixture);
+            return 1;
+        }
+        snprintf(path, sizeof(path), "%s/src/generated/project_objects.h", fixture);
+        if(!file_contains(path, "Entity soft_body_1;") ||
+                file_contains(path, "Entity soft_body_soft_body_1;")) {
+            workspace_fixture_remove(fixture);
+            return 1;
+        }
+        snprintf(path, sizeof(path), "%s/src/main.c", fixture);
+        if(!file_contains(path, "/* developer-owned main */")) {
             workspace_fixture_remove(fixture);
             return 1;
         }
@@ -226,6 +256,7 @@ int main(void) {
                 mask_index != 1 || project.collision_mask_count != 2) return 1;
     }
     chassis->collision_category |= UINT64_C(1) << 1;
+    chassis->particle = true;
     hitbox = &chassis->hitboxes[0];
     if(hitbox == NULL || !hitbox->visible || hitbox->vertex_count != 3) return 1;
     editor_project_property_name_format(hitbox->vertices[0].name,
@@ -382,6 +413,7 @@ int main(void) {
                 loaded_object->rigid_bodies[0].collision_with != UINT64_C(1) ||
                 loaded_object->rigid_bodies[0].collision_category !=
                     (UINT64_C(1) | (UINT64_C(1) << 1)) ||
+                !loaded_object->rigid_bodies[0].particle ||
                 strcmp(loaded_object->rigid_bodies[0].hitboxes[0].vertices[0].name,
                     "front_point") != 0 ||
                 strcmp(loaded_object->rigid_bodies[0].hitboxes[0].line_names[0],

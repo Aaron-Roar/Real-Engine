@@ -104,6 +104,7 @@ static yyjson_mut_val *editor_json_body_write(yyjson_mut_doc *document,
     yyjson_mut_obj_add_bool(document, value, "rotation_locked", body->rotation_locked);
     yyjson_mut_obj_add_bool(document, value, "gravity_enabled", body->gravity_enabled);
     yyjson_mut_obj_add_bool(document, value, "collision_enabled", body->collision_enabled);
+    yyjson_mut_obj_add_bool(document, value, "particle", body->particle);
     yyjson_mut_obj_add_uint(document, value, "collision_category",
         body->collision_category);
     yyjson_mut_obj_add_uint(document, value, "collision_with", body->collision_with);
@@ -309,6 +310,7 @@ static bool editor_json_body_read(yyjson_val *value, EditorRigidBody *body,
     yyjson_val *collision_enabled = yyjson_obj_get(value, "collision_enabled");
     yyjson_val *collision_category = yyjson_obj_get(value, "collision_category");
     yyjson_val *collision_with = yyjson_obj_get(value, "collision_with");
+    yyjson_val *particle = yyjson_obj_get(value, "particle");
     uint32_t count;
     *body = editor_project_rigid_body_default_get();
     if(!yyjson_is_obj(value) || !editor_json_uint(value, "id", &body->id) || body->id == 0 ||
@@ -328,6 +330,8 @@ static bool editor_json_body_read(yyjson_val *value, EditorRigidBody *body,
                 &body->collision_enabled) ||
             !editor_json_uint64(value, "collision_category", &body->collision_category) ||
             !editor_json_uint64(value, "collision_with", &body->collision_with))) return false;
+    if(particle != NULL && !editor_json_bool(value, "particle", &body->particle)) return false;
+    if(!body->collision_enabled) body->particle = false;
     if(collision_enabled == NULL &&
             (collision_category != NULL || collision_with != NULL)) return false;
     editor_project_property_name_format(body->name, sizeof(body->name), body->name);
