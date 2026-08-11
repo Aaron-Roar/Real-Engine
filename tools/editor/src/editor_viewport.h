@@ -48,8 +48,11 @@ typedef struct EditorViewportState {
     bool dragged_soft_body;
     bool rotated_soft_body;
     bool dragged_origin;
+    bool camera_panning;
     bool local_view;
     Vec2D drag_offset;
+    Vec2D camera_offset;
+    Position camera_pointer;
     float rotation_pointer_offset;
     EditorViewportMode mode;
     EditorHierarchySelection selection;
@@ -85,6 +88,7 @@ bool editor_viewport_update(
     EditorProject *project,
     Position pointer,
     MouseButtonState primary_button,
+    MouseButtonState secondary_button,
     bool pointer_consumed
 );
 void editor_viewport_draw(

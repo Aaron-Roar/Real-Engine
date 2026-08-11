@@ -2890,6 +2890,7 @@ int main(void) {
                 &project,
                 pointer,
                 mouse.button_states[MOUSE_BUTTON_LEFT],
+                mouse.button_states[MOUSE_BUTTON_RIGHT],
                 ui_consumed);
 
             if(mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_PRESSED &&
