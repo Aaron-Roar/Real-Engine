@@ -23,14 +23,20 @@ typedef struct EditorFileBrowser {
     bool active;
     EditorFileBrowserMode mode;
     char directory[EDITOR_FILE_BROWSER_PATH_MAX];
+    char selected_directory[EDITOR_FILE_BROWSER_PATH_MAX];
     char filename[EDITOR_FILE_BROWSER_NAME_MAX];
     EditorFileBrowserEntry entries[EDITOR_FILE_BROWSER_ENTRY_MAX];
     TextAsset entry_labels[EDITOR_FILE_BROWSER_ENTRY_MAX];
+    EditorFileBrowserEntry preview_entries[EDITOR_FILE_BROWSER_ENTRY_MAX];
+    TextAsset preview_labels[EDITOR_FILE_BROWSER_ENTRY_MAX];
     TextAsset directory_label;
+    TextAsset selected_directory_label;
     TextAsset parent_label;
     FontAsset *font;
     size_t entry_count;
+    size_t preview_count;
     float scroll_offset;
+    float preview_scroll_offset;
     bool refresh_pending;
 } EditorFileBrowser;
 
