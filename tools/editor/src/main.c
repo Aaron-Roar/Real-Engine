@@ -20,8 +20,6 @@
 #define EDITOR_VIEWPORT_MIN_WIDTH 100.0f
 #define EDITOR_TOOLS_MIN_WIDTH 40.0f
 #define EDITOR_DIVIDER_GRAB_WIDTH 6.0f
-#define EDITOR_MENU_HEIGHT 34.0f
-
 #ifndef ROHR_ENGINE_SOURCE_DIR
 #define ROHR_ENGINE_SOURCE_DIR "."
 #endif
@@ -645,6 +643,8 @@ int main(void) {
     TextAsset file_label = {0};
     TextAsset build_label = {0};
     TextAsset generate_c_label = {0};
+    TextAsset world_view_label = {0};
+    TextAsset local_view_label = {0};
     TextAsset view_label = {0};
     TextAsset settings_label = {0};
     TextAsset new_label = {0};
@@ -800,6 +800,8 @@ int main(void) {
             !editor_text_create(&font, "File", &file_label) ||
             !editor_text_create(&font, "Build", &build_label) ||
             !editor_text_create(&font, "Generate C", &generate_c_label) ||
+            !editor_text_create(&font, "World", &world_view_label) ||
+            !editor_text_create(&font, "Local", &local_view_label) ||
             !editor_text_create(&font, "View", &view_label) ||
             !editor_text_create(&font, "Settings", &settings_label) ||
             !editor_text_create(&font, "New Project", &new_label) ||
@@ -2196,9 +2198,7 @@ int main(void) {
                     EDITOR_TOOLS_WIDTH - 20.0f, 38.0f}, NULL);
             if(add_object.clicked) {
                 EditorObject *added = editor_project_object_add(
-                    &project,
-                    (Position){EDITOR_VIEWPORT_WIDTH * 0.5f,
-                        WINDOW_HEIGHT * 0.5f});
+                    &project, (Position){0.0f, 0.0f});
                 if(added != NULL) viewport_state.selection = EDITOR_SELECTION_OBJECT;
             }
             (void)rohr_graphics_screen_rect_draw(
@@ -2253,6 +2253,13 @@ int main(void) {
             WINDOW_HEIGHT - EDITOR_MENU_HEIGHT);
         editor_viewport_draw(&project, &viewport_state);
         rohr_graphics_screen_clip_clear();
+        if(viewport_state.mode != EDITOR_VIEWPORT_HIERARCHY &&
+                rohr_ui_button("editor.viewport.coordinates",
+                    viewport_state.local_view ? &local_view_label : &world_view_label,
+                    (UIRect){10.0f, EDITOR_MENU_HEIGHT + 10.0f, 84.0f, 30.0f},
+                    NULL).clicked) {
+            viewport_state.local_view = !viewport_state.local_view;
+        }
         rohr_ui_surface((UIRect){0.0f, 0.0f, editor_window_width,
             EDITOR_MENU_HEIGHT}, (Color){32, 36, 45, 255});
         {
@@ -2545,6 +2552,8 @@ int main(void) {
     rohr_graphics_text_destroy(&view_label);
     rohr_graphics_text_destroy(&generate_c_label);
     rohr_graphics_text_destroy(&build_label);
+    rohr_graphics_text_destroy(&local_view_label);
+    rohr_graphics_text_destroy(&world_view_label);
     rohr_graphics_text_destroy(&file_label);
     rohr_graphics_text_destroy(&file_browser_field);
     editor_file_browser_destroy(&file_browser);
@@ -2660,6 +2669,8 @@ fail:
     rohr_graphics_text_destroy(&view_label);
     rohr_graphics_text_destroy(&generate_c_label);
     rohr_graphics_text_destroy(&build_label);
+    rohr_graphics_text_destroy(&local_view_label);
+    rohr_graphics_text_destroy(&world_view_label);
     rohr_graphics_text_destroy(&file_label);
     rohr_graphics_text_destroy(&file_browser_field);
     editor_file_browser_destroy(&file_browser);

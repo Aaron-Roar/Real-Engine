@@ -3,6 +3,31 @@
 
 #include <math.h>
 
+static Position editor_view_origin;
+
+static void editor_view_transform_set(const EditorViewportState *state,
+    const EditorObject *object) {
+    Position center = {EDITOR_VIEWPORT_WIDTH * 0.5f,
+        EDITOR_MENU_HEIGHT + (WINDOW_HEIGHT - EDITOR_MENU_HEIGHT) * 0.5f};
+
+    editor_view_origin = center;
+    if(state != NULL && state->local_view && object != NULL &&
+            state->mode != EDITOR_VIEWPORT_HIERARCHY) {
+        editor_view_origin.x -= object->position.x;
+        editor_view_origin.y += object->position.y;
+    }
+}
+
+static Position editor_view_world_to_screen(Position world) {
+    return (Position){editor_view_origin.x + world.x,
+        editor_view_origin.y - world.y};
+}
+
+static Position editor_view_screen_to_world(Position screen) {
+    return (Position){screen.x - editor_view_origin.x,
+        editor_view_origin.y - screen.y};
+}
+
 static Position editor_hitbox_vertex_world_get(const EditorObject *object,
     const EditorRigidBody *body, const EditorHitbox *hitbox, uint32_t vertex) {
     float cosine = cosf(body->rotation);
@@ -89,6 +114,8 @@ static float editor_segment_distance_squared(Position point, Position start, Pos
 }
 
 static void editor_line_draw(Position start, Position end, Color color) {
+    start = editor_view_world_to_screen(start);
+    end = editor_view_world_to_screen(end);
     Vec2D delta = {end.x - start.x, end.y - start.y};
     float length = sqrtf(delta.x * delta.x + delta.y * delta.y);
 
@@ -96,6 +123,12 @@ static void editor_line_draw(Position start, Position end, Color color) {
     (void)rohr_graphics_screen_quad_draw(
         (Position){(start.x + end.x) * 0.5f, (start.y + end.y) * 0.5f},
         length, 2.0f, -atan2f(delta.y, delta.x), color);
+}
+
+static void editor_quad_draw(Position center, float width, float height,
+    float rotation, Color color) {
+    (void)rohr_graphics_screen_quad_draw(editor_view_world_to_screen(center),
+        width, height, -rotation, color);
 }
 
 static void editor_circle_draw(Position center, float radius, Color color) {
@@ -116,8 +149,7 @@ static void editor_joint_symbol_draw(EditorJointKind kind, Position start,
 
     if(kind == EDITOR_JOINT_REVOLUTE) {
         editor_circle_draw(center, radius, color);
-        (void)rohr_graphics_screen_quad_draw(
-            center, 6.0f * scale, 6.0f * scale, 0.0f, color);
+        editor_quad_draw(center, 6.0f * scale, 6.0f * scale, 0.0f, color);
     } else if(kind == EDITOR_JOINT_WELD) {
         Position top_left = {center.x - radius, center.y - radius};
         Position top_right = {center.x + radius, center.y - radius};
@@ -166,8 +198,7 @@ static void editor_body_origin_draw(const EditorObject *object,
     editor_line_draw(center, x_end, (Color){235, 95, 95, 255});
     editor_line_draw(center, y_end, (Color){95, 220, 135, 255});
     editor_circle_draw(center, 5.0f, (Color){245, 245, 250, 255});
-    (void)rohr_graphics_screen_quad_draw(center, 3.0f, 3.0f, 0.0f,
-        (Color){245, 245, 250, 255});
+    editor_quad_draw(center, 3.0f, 3.0f, 0.0f, (Color){245, 245, 250, 255});
 }
 
 static bool editor_hitbox_point_contains(const EditorObject *object,
@@ -284,8 +315,36 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
 
     if(state == NULL || project == NULL) return false;
     object = editor_project_selected_get(project);
-    if(object == NULL || pointer_consumed || pointer.x < 0.0f ||
+    if(pointer_consumed || pointer.x < 0.0f ||
             pointer.x >= EDITOR_VIEWPORT_WIDTH) return false;
+    editor_view_transform_set(state, object);
+    pointer = editor_view_screen_to_world(pointer);
+    if(state->mode == EDITOR_VIEWPORT_HIERARCHY &&
+            primary_button == MOUSE_BUTTON_STATE_PRESSED) {
+        for(size_t object_index = project->object_count; object_index > 0; object_index -= 1) {
+            EditorObject *candidate_object = &project->objects[object_index - 1];
+            if(!candidate_object->visible) continue;
+            for(size_t body_index = 0; body_index < candidate_object->rigid_body_count;
+                    body_index += 1) {
+                EditorRigidBody *candidate_body =
+                    &candidate_object->rigid_bodies[body_index];
+                if(!candidate_body->visible) continue;
+                for(size_t hitbox_index = 0; hitbox_index < candidate_body->hitbox_count;
+                        hitbox_index += 1) {
+                    EditorHitbox *candidate_hitbox =
+                        &candidate_body->hitboxes[hitbox_index];
+                    if(candidate_hitbox->visible && editor_hitbox_point_contains(
+                            candidate_object, candidate_body, candidate_hitbox, pointer)) {
+                        (void)editor_project_object_select(project, candidate_object->id);
+                        editor_viewport_object_editor_enter(state);
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+    if(object == NULL) return false;
     if(primary_button == MOUSE_BUTTON_STATE_RELEASED) {
         state->dragged_vertex = -1;
         state->dragged_body = false;
@@ -502,15 +561,9 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
     return false;
 }
 
-void editor_viewport_draw(const EditorProject *project, const EditorViewportState *state) {
-    const EditorObject *object;
-
-    if(project == NULL || state == NULL || state->selection == EDITOR_SELECTION_NONE) return;
-    object = NULL;
-    for(size_t i = 0; i < project->object_count; i += 1) {
-        if(project->objects[i].id == project->selected) object = &project->objects[i];
-    }
-    if(object == NULL || !object->visible) return;
+static void editor_viewport_object_draw(const EditorObject *object,
+    const EditorViewportState *state, bool object_selected) {
+    if(object == NULL || state == NULL || !object->visible) return;
 
     for(size_t body_index = 0; body_index < object->rigid_body_count; body_index += 1) {
         const EditorRigidBody *body = &object->rigid_bodies[body_index];
@@ -519,7 +572,7 @@ void editor_viewport_draw(const EditorProject *project, const EditorViewportStat
             const EditorHitbox *hitbox = &body->hitboxes[box_index];
             bool selected_body = state->selected_rigid_body == body->id;
             bool selected_hitbox = selected_body && state->selected_hitbox == hitbox->id;
-            Color base = state->selection == EDITOR_SELECTION_OBJECT ||
+            Color base = (state->selection == EDITOR_SELECTION_OBJECT && object_selected) ||
                     state->preview_rigid_body == body->id ||
                     (state->selection == EDITOR_SELECTION_RIGID_BODY && selected_body) ||
                     (state->selection == EDITOR_SELECTION_HITBOX && selected_hitbox) ?
@@ -539,7 +592,7 @@ void editor_viewport_draw(const EditorProject *project, const EditorViewportStat
                             state->selected_vertex == i ? (Color){255, 215, 70, 255} :
                         (hitbox->vertices[i].position_locked ?
                             (Color){245, 165, 70, 255} : (Color){235, 240, 248, 255});
-                    (void)rohr_graphics_screen_quad_draw(start, 10.0f, 10.0f, 0.0f, point);
+                    editor_quad_draw(start, 10.0f, 10.0f, 0.0f, point);
                 }
             }
         }
@@ -591,8 +644,8 @@ void editor_viewport_draw(const EditorProject *project, const EditorViewportStat
         for(size_t i = 0; i < body->node_count; i += 1) {
             const EditorSoftNode *node = &body->nodes[i];
             if(!node->visible) continue;
-            (void)rohr_graphics_screen_quad_draw(
-                editor_soft_node_world_get(object, body, node), 8.0f, 8.0f, 0.0f,
+            editor_quad_draw(editor_soft_node_world_get(object, body, node),
+                8.0f, 8.0f, 0.0f,
                 state->selection == EDITOR_SELECTION_SOFT_NODE &&
                     state->selected_soft_node == node->id ||
                     state->preview_soft_node == node->id ?
@@ -629,11 +682,30 @@ void editor_viewport_draw(const EditorProject *project, const EditorViewportStat
         if(anchor_body != NULL && anchor->rotation_follows_body) {
             rotation += anchor_body->rotation;
         }
-        (void)rohr_graphics_screen_quad_draw(editor_anchor_world_get(object, anchor),
+        editor_quad_draw(editor_anchor_world_get(object, anchor),
             9.0f, 9.0f, rotation + 0.78539816339f,
             state->selected_anchor == anchor->id || state->preview_anchor == anchor->id ?
                 (Color){255, 215, 70, 255} : (Color){235, 150, 215, 255});
     }
+}
+
+void editor_viewport_draw(const EditorProject *project, const EditorViewportState *state) {
+    const EditorObject *selected;
+
+    if(project == NULL || state == NULL) return;
+    selected = NULL;
+    for(size_t i = 0; i < project->object_count; i += 1) {
+        if(project->objects[i].id == project->selected) selected = &project->objects[i];
+    }
+    editor_view_transform_set(state, selected);
+    if(state->mode == EDITOR_VIEWPORT_HIERARCHY) {
+        for(size_t i = 0; i < project->object_count; i += 1) {
+            editor_viewport_object_draw(&project->objects[i], state,
+                project->objects[i].id == project->selected);
+        }
+        return;
+    }
+    editor_viewport_object_draw(selected, state, true);
 }
 
 bool editor_viewport_selection_nudge(EditorViewportState *state,
@@ -642,6 +714,7 @@ bool editor_viewport_selection_nudge(EditorViewportState *state,
     EditorRigidBody *body;
 
     if(state == NULL || project == NULL) return false;
+    screen_delta.y = -screen_delta.y;
     object = editor_project_selected_get(project);
     if(object == NULL) return false;
     body = editor_selected_body_get(object, state);
