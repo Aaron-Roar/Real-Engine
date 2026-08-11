@@ -498,6 +498,12 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                         node->name);
                 }
                 fprintf(source,
+                    "    result = rohr_physics_friction_set(object->%s, %#.9gf);\n"
+                    "    if(rohr_error_check(result)) goto fail;\n"
+                    "    result = rohr_physics_restitution_set(object->%s, %#.9gf);\n"
+                    "    if(rohr_error_check(result)) goto fail;\n",
+                    node->name, node->friction, node->name, node->restitution);
+                fprintf(source,
                     "    result = rohr_physics_soft_body_node_collision_filter_set("
                     "object->%s, UINT64_C(%llu), UINT64_C(%llu));\n"
                     "    if(rohr_error_check(result)) goto fail;\n",

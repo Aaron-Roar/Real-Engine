@@ -168,6 +168,10 @@ int main(void) {
                 generated_node_b == NULL ? NULL : editor_project_soft_beam_add(
                     &loaded_project, generated_soft_body, generated_node_a->id,
                     generated_node_b->id);
+            if(generated_node_a != NULL) {
+                generated_node_a->friction = 0.6f;
+                generated_node_a->restitution = 0.4f;
+            }
             if(body_anchor == NULL || world_anchor == NULL || generated_joint == NULL ||
                     generated_soft_body == NULL || generated_node_a == NULL ||
                     generated_node_b == NULL || generated_beam == NULL ||
@@ -190,6 +194,8 @@ int main(void) {
                 !file_contains(path, "rohr_physics_joint_spring_set") ||
                 !file_contains(path, "rohr_physics_soft_body_create") ||
                 !file_contains(path, "rohr_physics_soft_body_node_create") ||
+                !file_contains(path, "rohr_physics_friction_set") ||
+                !file_contains(path, "rohr_physics_restitution_set") ||
                 !file_contains(path,
                     "rohr_physics_soft_body_node_collision_filter_set") ||
                 !file_contains(path, "rohr_physics_soft_body_beam_create")) {
@@ -337,6 +343,8 @@ int main(void) {
     if(soft_body == NULL || node_a == NULL || node_b == NULL) return 1;
     node_b->collision_category = UINT64_C(1) | (UINT64_C(1) << 1);
     node_b->collision_with = UINT64_C(1);
+    node_b->friction = 0.7f;
+    node_b->restitution = 0.35f;
     if(node_a->gravity_enabled || node_b->gravity_enabled) return 1;
     beam = editor_project_soft_beam_add(&project, soft_body, 0, 0);
     if(beam == NULL || !beam->visible || beam->node_a != 0 || beam->node_b != 0) return 1;
@@ -400,6 +408,10 @@ int main(void) {
                 loaded_object->soft_body_items[0].nodes[0].collision_category !=
                     (UINT64_C(1) | (UINT64_C(1) << 1)) ||
                 loaded_object->soft_body_items[0].nodes[0].collision_with != UINT64_C(1) ||
+                fabsf(loaded_object->soft_body_items[0].nodes[0].friction - 0.7f) >
+                    0.001f ||
+                fabsf(loaded_object->soft_body_items[0].nodes[0].restitution - 0.35f) >
+                    0.001f ||
                 strcmp(loaded_object->name, object->name) != 0 ||
                 !position_equal(loaded_object->position, object->position) ||
                 loaded.next_id != project.next_id ||

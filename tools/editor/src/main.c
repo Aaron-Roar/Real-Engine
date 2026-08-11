@@ -2149,6 +2149,8 @@ int main(void) {
                 UIFieldResult x_result;
                 UIFieldResult y_result;
                 UIFieldResult mass_result;
+                UIFieldResult friction_result;
+                UIFieldResult restitution_result;
                 UIFieldResult name_result;
                 if(!editor_named_text_sync(&font, node->name, &soft_node_labels[index],
                         soft_node_cache[index], EDITOR_OBJECT_NAME_MAX)) goto fail;
@@ -2176,17 +2178,32 @@ int main(void) {
                     (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &node->node_mass},
                     &length_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 78.0f, 194.0f,
                         EDITOR_TOOLS_WIDTH - 88.0f, 26.0f}, NULL);
+                rohr_ui_label(&friction_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    230.0f, 68.0f, 26.0f});
+                friction_result = rohr_ui_field("editor.soft_node.friction",
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &node->friction},
+                    &length_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 78.0f, 230.0f,
+                        EDITOR_TOOLS_WIDTH - 88.0f, 26.0f}, NULL);
+                if(friction_result.changed) node->friction = fmaxf(0.0f, node->friction);
+                rohr_ui_label(&restitution_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    266.0f, 96.0f, 26.0f});
+                restitution_result = rohr_ui_field("editor.soft_node.restitution",
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &node->restitution},
+                    &length_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 106.0f, 266.0f,
+                        EDITOR_TOOLS_WIDTH - 116.0f, 26.0f}, NULL);
+                if(restitution_result.changed) node->restitution =
+                    fminf(1.0f, fmaxf(0.0f, node->restitution));
                 (void)editor_checkbox("editor.soft_node.gravity", &gravity_label,
-                    (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 230.0f,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 302.0f,
                         EDITOR_TOOLS_WIDTH - 20.0f, 28.0f},
                     &node->gravity_enabled);
                 {
                     float row_x = EDITOR_VIEWPORT_WIDTH + 10.0f;
                     float row_width = EDITOR_TOOLS_WIDTH - 20.0f;
-                    float controls_bottom = 298.0f;
+                    float controls_bottom = 370.0f;
 
                     if(editor_checkbox("editor.soft_node.collision", &collision_label,
-                            (UIRect){row_x, 266.0f, row_width, 28.0f},
+                            (UIRect){row_x, 338.0f, row_width, 28.0f},
                             &node->collision_enabled) && !node->collision_enabled) {
                         collision_category_open = false;
                         collide_with_open = false;
@@ -2243,14 +2260,15 @@ int main(void) {
                                 MOUSE_BUTTON_STATE_PRESSED) {
                         Position pointer = rohr_graphics_mouse_screen_position_get();
                         if(pointer.x < row_x || pointer.x > row_x + row_width ||
-                                pointer.y < 266.0f || pointer.y > controls_bottom) {
+                                pointer.y < 338.0f || pointer.y > controls_bottom) {
                             collision_category_open = false;
                             collide_with_open = false;
                         }
                     }
                 }
                 field_editing = name_result.active || x_result.active || y_result.active ||
-                    mass_result.active || field_editing;
+                    mass_result.active || friction_result.active ||
+                    restitution_result.active || field_editing;
                 if(rohr_ui_button("editor.soft_node.delete", &delete_node_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 660.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 34.0f}, &delete_style).clicked) {

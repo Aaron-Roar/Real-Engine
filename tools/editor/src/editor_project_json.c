@@ -169,6 +169,8 @@ static yyjson_mut_val *editor_json_soft_body_write(yyjson_mut_doc *document,
         yyjson_mut_obj_add_val(document, item, "position",
             editor_json_position_write(document, node->position));
         yyjson_mut_obj_add_real(document, item, "mass", node->node_mass);
+        yyjson_mut_obj_add_real(document, item, "friction", node->friction);
+        yyjson_mut_obj_add_real(document, item, "restitution", node->restitution);
         yyjson_mut_obj_add_bool(document, item, "gravity_enabled", node->gravity_enabled);
         yyjson_mut_obj_add_bool(document, item, "collision_enabled", node->collision_enabled);
         yyjson_mut_obj_add_uint(document, item, "collision_category", node->collision_category);
@@ -397,7 +399,11 @@ static bool editor_json_soft_body_read(yyjson_val *value, EditorSoftBody *body,
         yyjson_val *item = yyjson_arr_get(nodes, i);
         EditorSoftNode *node = &body->nodes[i];
         yyjson_val *collision_enabled = yyjson_obj_get(item, "collision_enabled");
+        yyjson_val *friction = yyjson_obj_get(item, "friction");
+        yyjson_val *restitution = yyjson_obj_get(item, "restitution");
         *node = (EditorSoftNode){
+            .friction = 0.0f,
+            .restitution = 0.25f,
             .collision_enabled = true,
             .collision_category = UINT64_C(1),
             .collision_with = UINT64_C(1)
@@ -408,6 +414,9 @@ static bool editor_json_soft_body_read(yyjson_val *value, EditorSoftBody *body,
                 !editor_json_real(item, "mass", &node->node_mass) ||
                 !editor_json_bool(item, "gravity_enabled", &node->gravity_enabled) ||
                 !editor_json_bool(item, "visible", &node->visible)) return false;
+        if((friction != NULL && !editor_json_real(item, "friction", &node->friction)) ||
+                (restitution != NULL && !editor_json_real(
+                    item, "restitution", &node->restitution))) return false;
         if(collision_enabled != NULL &&
                 (!editor_json_bool(item, "collision_enabled", &node->collision_enabled) ||
                 !editor_json_uint64(item, "collision_category", &node->collision_category) ||
