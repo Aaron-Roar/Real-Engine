@@ -1974,6 +1974,10 @@ UIButtonResult rohr_ui_button(
 UIDropdownResult rohr_ui_dropdown(const char *id, const TextAsset *const *options,
     size_t option_count, size_t selected_index, UIRect bounds,
     const UIButtonStyle *style);
+/** @brief Draws a menu button whose label is not repeated in its action list. */
+UIDropdownResult rohr_ui_menu(const char *id, const TextAsset *label,
+    const TextAsset *const *options, size_t option_count, UIRect bounds,
+    const UIButtonStyle *style);
 /** @brief Begins a clipped vertical scroll region for subsequent UI controls. */
 UIScrollRegionResult rohr_ui_scroll_region_begin(const char *id, UIRect bounds,
     float content_height, float offset, float wheel_step);

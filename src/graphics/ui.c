@@ -674,9 +674,9 @@ UIButtonResult ui_button(
     return result;
 }
 
-UIDropdownResult ui_dropdown(const char *id, const TextAsset *const *options,
-    size_t option_count, size_t selected_index, UIRect bounds,
-    const UIButtonStyle *style) {
+static UIDropdownResult ui_dropdown_draw(const char *id, const TextAsset *label,
+    const TextAsset *const *options, size_t option_count, size_t selected_index,
+    bool always_changed, UIRect bounds, const UIButtonStyle *style) {
     UIDropdownResult result = {.selected_index = selected_index, .hovered_index = -1};
     uint64_t dropdown_id = ui_hash_id(id);
     UIButtonResult button;
@@ -686,7 +686,7 @@ UIDropdownResult ui_dropdown(const char *id, const TextAsset *const *options,
             option_count == 0 || option_count > UI_DROPDOWN_OPTION_MAX ||
             selected_index >= option_count ||
             bounds.width <= 0.0f || bounds.height <= 0.0f) return result;
-    button = ui_button(id, options[selected_index], bounds, style);
+    button = ui_button(id, label, bounds, style);
     ui_border_raw(resolved_bounds, 2.0f, (Color){0, 0, 0, 255});
     result.button_hovered = button.hovered;
     result.hovered = button.hovered;
@@ -747,7 +747,7 @@ UIDropdownResult ui_dropdown(const char *id, const TextAsset *const *options,
         }
         if(option_result.clicked) {
             result.selected_index = i;
-            result.changed = i != selected_index;
+            result.changed = always_changed || i != selected_index;
             result.open = false;
             ui_context.navigation_focus_id = dropdown_id;
             ui_context.dropdown_id = 0;
@@ -765,6 +765,20 @@ UIDropdownResult ui_dropdown(const char *id, const TextAsset *const *options,
         result.open = false;
     }
     return result;
+}
+
+UIDropdownResult ui_dropdown(const char *id, const TextAsset *const *options,
+    size_t option_count, size_t selected_index, UIRect bounds,
+    const UIButtonStyle *style) {
+    if(options == NULL || selected_index >= option_count) return (UIDropdownResult){0};
+    return ui_dropdown_draw(id, options[selected_index], options, option_count,
+        selected_index, false, bounds, style);
+}
+
+UIDropdownResult ui_menu(const char *id, const TextAsset *label,
+    const TextAsset *const *options, size_t option_count, UIRect bounds,
+    const UIButtonStyle *style) {
+    return ui_dropdown_draw(id, label, options, option_count, 0, true, bounds, style);
 }
 
 UIScrollRegionResult ui_scroll_region_begin(const char *id, UIRect bounds,
