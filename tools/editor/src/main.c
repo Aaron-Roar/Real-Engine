@@ -107,7 +107,8 @@ static float editor_panel_content_height_get(const EditorProject *project,
             if(object->rigid_bodies[i].id == state->selected_rigid_body) {
                 return fmaxf(height, 554.0f +
                     (float)(object->rigid_bodies[i].hitbox_count +
-                        project->collision_mask_count + 1) * 30.0f);
+                        project->collision_mask_count + 1 +
+                        (object->rigid_bodies[i].particle ? 1 : 0)) * 30.0f);
             }
         }
     }
@@ -898,6 +899,13 @@ static bool editor_selected_open(
         viewport_state->mode = EDITOR_VIEWPORT_RIGID_BODY;
         return true;
     }
+    if(viewport_state->selection == EDITOR_SELECTION_PARTICLE) {
+        EditorRigidBody *body = editor_selected_body_get(selected, viewport_state);
+        if(body != NULL && body->particle) {
+            viewport_state->mode = EDITOR_VIEWPORT_PARTICLE;
+            return true;
+        }
+    }
     if(viewport_state->selection == EDITOR_SELECTION_JOINT) {
         viewport_state->mode = EDITOR_VIEWPORT_JOINT;
         return true;
@@ -959,6 +967,8 @@ static bool editor_open_item_delete(
         viewport_state->selection = EDITOR_SELECTION_OBJECT;
     } else if(viewport_state->mode == EDITOR_VIEWPORT_RIGID_BODY) {
         viewport_state->selection = EDITOR_SELECTION_RIGID_BODY;
+    } else if(viewport_state->mode == EDITOR_VIEWPORT_PARTICLE) {
+        viewport_state->selection = EDITOR_SELECTION_PARTICLE;
     } else if(viewport_state->mode == EDITOR_VIEWPORT_HITBOX) {
         viewport_state->selection = EDITOR_SELECTION_HITBOX;
     } else if(viewport_state->mode == EDITOR_VIEWPORT_VERTEX) {
@@ -993,6 +1003,8 @@ static void editor_current_selection_clear(
         viewport_state->selection = EDITOR_SELECTION_NONE;
     } else if(viewport_state->mode == EDITOR_VIEWPORT_RIGID_BODY) {
         viewport_state->selection = EDITOR_SELECTION_RIGID_BODY;
+    } else if(viewport_state->mode == EDITOR_VIEWPORT_PARTICLE) {
+        viewport_state->selection = EDITOR_SELECTION_PARTICLE;
     } else if(viewport_state->mode == EDITOR_VIEWPORT_HITBOX) {
         viewport_state->selection = EDITOR_SELECTION_HITBOX;
     } else if(viewport_state->mode == EDITOR_VIEWPORT_VERTEX) {
@@ -1029,6 +1041,8 @@ int main(void) {
     TextAsset local_view_label = {0};
     TextAsset collision_label = {0};
     TextAsset particle_label = {0};
+    TextAsset particle_ring_color_label = {0};
+    TextAsset particle_fill_color_label = {0};
     TextAsset context_action_one_label = {0};
     TextAsset context_action_two_label = {0};
     TextAsset context_action_three_label = {0};
@@ -1216,6 +1230,8 @@ int main(void) {
             !editor_text_create(&font, "Local", &local_view_label) ||
             !editor_text_create(&font, "Collision", &collision_label) ||
             !editor_text_create(&font, "Particle", &particle_label) ||
+            !editor_text_create(&font, "Ring Color", &particle_ring_color_label) ||
+            !editor_text_create(&font, "Fill Color", &particle_fill_color_label) ||
             !editor_text_create(&font, "Action 1", &context_action_one_label) ||
             !editor_text_create(&font, "Action 2", &context_action_two_label) ||
             !editor_text_create(&font, "Action 3", &context_action_three_label) ||
@@ -1530,6 +1546,36 @@ int main(void) {
                 }
                 field_editing = x_result.active || y_result.active;
             }
+        } else if(viewport_state.mode == EDITOR_VIEWPORT_PARTICLE) {
+            EditorObject *selected = editor_project_selected_get(&project);
+            EditorRigidBody *body = editor_selected_body_get(selected, &viewport_state);
+            if(body != NULL && body->particle) {
+                UIFieldResult radius_result;
+                rohr_ui_label(&particle_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
+                    42.0f, EDITOR_TOOLS_WIDTH - 20.0f, 30.0f});
+                rohr_ui_label(&radius_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    84.0f, 90.0f, 26.0f});
+                radius_result = rohr_ui_field("editor.particle.radius",
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                        .number = &body->particle_radius}, &length_field,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 84.0f,
+                        EDITOR_TOOLS_WIDTH - 110.0f, 26.0f}, NULL);
+                if(radius_result.changed) body->particle_radius =
+                    fmaxf(0.0f, body->particle_radius);
+                rohr_ui_label(&particle_ring_color_label,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 120.0f, 104.0f, 26.0f});
+                (void)editor_color_swatch("editor.particle.ring_color",
+                    &body->particle_ring_color, false, &color_picker,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 114.0f, 120.0f,
+                        EDITOR_TOOLS_WIDTH - 124.0f, 26.0f});
+                rohr_ui_label(&particle_fill_color_label,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 156.0f, 104.0f, 26.0f});
+                (void)editor_color_swatch("editor.particle.fill_color",
+                    &body->particle_fill_color, false, &color_picker,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 114.0f, 156.0f,
+                        EDITOR_TOOLS_WIDTH - 124.0f, 26.0f});
+                field_editing = radius_result.active;
+            }
         } else if(viewport_state.mode == EDITOR_VIEWPORT_RIGID_BODY) {
             EditorObject *selected = editor_project_selected_get(&project);
             EditorRigidBody *body = editor_selected_body_get(selected, &viewport_state);
@@ -1661,6 +1707,10 @@ int main(void) {
                             &particle_label,
                             (UIRect){row_x + row_width * 0.54f, 436.0f,
                                 row_width * 0.46f, 28.0f}, &body->particle);
+                        if(!body->particle &&
+                                viewport_state.selection == EDITOR_SELECTION_PARTICLE) {
+                            viewport_state.selection = EDITOR_SELECTION_RIGID_BODY;
+                        }
                     }
                     if(body->collision_enabled && rohr_ui_button(
                             "editor.rigid_body.collision_category", &collision_category_label,
@@ -1735,6 +1785,20 @@ int main(void) {
                                 viewport_state.mode = EDITOR_VIEWPORT_ORIGIN;
                         }
                         hitbox_button_y += 34.0f;
+                        if(body->particle) {
+                            UIButtonStyle particle_style = editor_selected_button_style_get();
+                            UIButtonResult particle_result = rohr_ui_button(
+                                "editor.rigid_body.particle_item", &particle_label,
+                                (UIRect){row_x, hitbox_button_y, row_width, 28.0f},
+                                viewport_state.selection == EDITOR_SELECTION_PARTICLE ?
+                                    &particle_style : NULL);
+                            if(particle_result.clicked || particle_result.focus_changed) {
+                                viewport_state.selection = EDITOR_SELECTION_PARTICLE;
+                                if(particle_result.double_clicked)
+                                    viewport_state.mode = EDITOR_VIEWPORT_PARTICLE;
+                            }
+                            hitbox_button_y += 34.0f;
+                        }
                         if(rohr_ui_button("editor.rigid_body.add_hitbox", &add_hitbox_label,
                                 (UIRect){row_x, hitbox_button_y, row_width, 32.0f},
                                 NULL).clicked) {
@@ -3637,6 +3701,8 @@ int main(void) {
     rohr_graphics_text_destroy(&collide_with_label);
     rohr_graphics_text_destroy(&collision_label);
     rohr_graphics_text_destroy(&particle_label);
+    rohr_graphics_text_destroy(&particle_ring_color_label);
+    rohr_graphics_text_destroy(&particle_fill_color_label);
     rohr_graphics_text_destroy(&context_action_one_label);
     rohr_graphics_text_destroy(&context_action_two_label);
     rohr_graphics_text_destroy(&context_action_three_label);
@@ -3780,6 +3846,8 @@ fail:
     rohr_graphics_text_destroy(&collide_with_label);
     rohr_graphics_text_destroy(&collision_label);
     rohr_graphics_text_destroy(&particle_label);
+    rohr_graphics_text_destroy(&particle_ring_color_label);
+    rohr_graphics_text_destroy(&particle_fill_color_label);
     rohr_graphics_text_destroy(&context_action_one_label);
     rohr_graphics_text_destroy(&context_action_two_label);
     rohr_graphics_text_destroy(&context_action_three_label);

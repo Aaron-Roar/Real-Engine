@@ -294,6 +294,9 @@ int main(void) {
     }
     chassis->collision_category |= UINT64_C(1) << 1;
     chassis->particle = true;
+    chassis->particle_radius = 42.0f;
+    chassis->particle_ring_color = UINT32_C(0xff8800ff);
+    chassis->particle_fill_color = UINT32_C(0x22446680);
     hitbox = &chassis->hitboxes[0];
     if(hitbox == NULL || !hitbox->visible || hitbox->vertex_count != 3) return 1;
     editor_project_property_name_format(hitbox->vertices[0].name,
@@ -498,6 +501,11 @@ int main(void) {
                 loaded_object->rigid_bodies[0].collision_category !=
                     (UINT64_C(1) | (UINT64_C(1) << 1)) ||
                 !loaded_object->rigid_bodies[0].particle ||
+                fabsf(loaded_object->rigid_bodies[0].particle_radius - 42.0f) > 0.001f ||
+                loaded_object->rigid_bodies[0].particle_ring_color !=
+                    UINT32_C(0xff8800ff) ||
+                loaded_object->rigid_bodies[0].particle_fill_color !=
+                    UINT32_C(0x22446680) ||
                 strcmp(loaded_object->rigid_bodies[0].hitboxes[0].vertices[0].name,
                     "front_point") != 0 ||
                 strcmp(loaded_object->rigid_bodies[0].hitboxes[0].line_names[0],

@@ -242,6 +242,34 @@ static void editor_circle_draw(Position center, float radius, Color color) {
     }
 }
 
+static void editor_circle_filled_draw(Position center, float radius, Color color) {
+    Position screen = editor_view_world_to_screen(center);
+    float screen_radius = radius * editor_view_scale;
+    int first_row = (int)floorf(fmaxf(screen.y - screen_radius, EDITOR_MENU_HEIGHT));
+    int last_row = (int)ceilf(fminf(screen.y + screen_radius, WINDOW_HEIGHT - 1.0f));
+
+    if(screen_radius <= 0.0f) return;
+    for(int row = first_row; row <= last_row; row += 1) {
+        float y = ((float)row + 0.5f) - screen.y;
+        float half_width = sqrtf(fmaxf(0.0f, screen_radius * screen_radius - y * y));
+        float left = fmaxf(0.0f, screen.x - half_width);
+        float right = fminf(EDITOR_VIEWPORT_WIDTH, screen.x + half_width);
+        if(right > left) (void)rohr_graphics_screen_rect_draw(
+            left, (float)row, right - left, 1.0f, color);
+    }
+}
+
+static void editor_circle_dotted_draw(Position center, float radius, Color color) {
+    for(uint32_t i = 0; i < 32; i += 2) {
+        float start_angle = 6.28318530718f * (float)i / 32.0f;
+        float end_angle = 6.28318530718f * (float)(i + 1) / 32.0f;
+        editor_line_draw((Position){center.x + cosf(start_angle) * radius,
+                center.y + sinf(start_angle) * radius},
+            (Position){center.x + cosf(end_angle) * radius,
+                center.y + sinf(end_angle) * radius}, color);
+    }
+}
+
 static void editor_joint_symbol_draw(EditorJointKind kind, Position start,
     Position end, float scale, Color color) {
     Position center = {(start.x + end.x) * 0.5f, (start.y + end.y) * 0.5f};
@@ -400,7 +428,8 @@ void editor_viewport_back(EditorViewportState *state) {
     if(state->mode == EDITOR_VIEWPORT_LINE || state->mode == EDITOR_VIEWPORT_VERTEX) {
         state->mode = EDITOR_VIEWPORT_HITBOX;
         state->selection = EDITOR_SELECTION_HITBOX;
-    } else if(state->mode == EDITOR_VIEWPORT_HITBOX) {
+    } else if(state->mode == EDITOR_VIEWPORT_HITBOX ||
+            state->mode == EDITOR_VIEWPORT_PARTICLE) {
         state->mode = EDITOR_VIEWPORT_RIGID_BODY;
         state->selection = EDITOR_SELECTION_RIGID_BODY;
     } else if(state->mode == EDITOR_VIEWPORT_ANCHOR) {
@@ -839,6 +868,42 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
         }
     }
 
+    if(object->visible && primary_button == MOUSE_BUTTON_STATE_PRESSED) {
+        for(size_t i = object->rigid_body_count; i > 0; i -= 1) {
+            EditorRigidBody *particle_body = &object->rigid_bodies[i - 1];
+            Position center = {object->position.x + particle_body->position.x,
+                object->position.y + particle_body->position.y};
+            float distance = hypotf(pointer.x - center.x, pointer.y - center.y);
+            float tolerance = 7.0f / editor_view_scale;
+            Uint64 now;
+            bool double_clicked;
+            if(!particle_body->visible || !particle_body->particle ||
+                    fabsf(distance - particle_body->particle_radius) > tolerance) continue;
+            now = SDL_GetTicks();
+            double_clicked = state->last_viewport_click_selection ==
+                    EDITOR_SELECTION_PARTICLE &&
+                state->last_viewport_click_object == object->id &&
+                state->last_viewport_click_index == particle_body->id &&
+                now - state->last_viewport_click_at <= 400;
+            state->selected_rigid_body = particle_body->id;
+            state->selection = EDITOR_SELECTION_PARTICLE;
+            if(double_clicked) {
+                state->mode = EDITOR_VIEWPORT_PARTICLE;
+                state->last_viewport_click_selection = EDITOR_SELECTION_NONE;
+            } else {
+                if(state->mode != EDITOR_VIEWPORT_PARTICLE)
+                    state->mode = EDITOR_VIEWPORT_RIGID_BODY;
+                state->dragged_body = true;
+                state->drag_offset = (Vec2D){pointer.x - center.x, pointer.y - center.y};
+                state->last_viewport_click_selection = EDITOR_SELECTION_PARTICLE;
+                state->last_viewport_click_object = object->id;
+                state->last_viewport_click_index = particle_body->id;
+                state->last_viewport_click_at = now;
+            }
+            return true;
+        }
+    }
+
     if(body != NULL && body->visible && state->mode == EDITOR_VIEWPORT_RIGID_BODY) {
         Position handle = editor_body_rotation_handle_get(object, body);
         if((pointer.x - handle.x) * (pointer.x - handle.x) +
@@ -1098,6 +1163,19 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
     return false;
 }
 
+static void editor_viewport_particle_fills_draw(const EditorObject *object) {
+    if(object == NULL || !object->visible) return;
+    for(size_t body_index = 0; body_index < object->rigid_body_count; body_index += 1) {
+        const EditorRigidBody *body = &object->rigid_bodies[body_index];
+        Position center;
+        if(!body->visible || !body->particle || body->particle_radius <= 0.0f) continue;
+        center = (Position){object->position.x + body->position.x,
+            object->position.y + body->position.y};
+        editor_circle_filled_draw(center, body->particle_radius,
+            graphics_color_hex_create(body->particle_fill_color));
+    }
+}
+
 static void editor_viewport_object_draw(const EditorObject *object,
     const EditorViewportState *state, bool object_selected) {
     bool object_highlighted;
@@ -1135,6 +1213,21 @@ static void editor_viewport_object_draw(const EditorObject *object,
                 }
             }
         }
+    }
+
+    for(size_t body_index = 0; body_index < object->rigid_body_count; body_index += 1) {
+        const EditorRigidBody *body = &object->rigid_bodies[body_index];
+        Position center;
+        Color ring;
+        if(!body->visible || !body->particle || body->particle_radius <= 0.0f) continue;
+        center = (Position){object->position.x + body->position.x,
+            object->position.y + body->position.y};
+        ring = object_highlighted ||
+                (state->selection == EDITOR_SELECTION_PARTICLE &&
+                    state->selected_rigid_body == body->id) ?
+            (Color){255, 215, 70, 255} :
+            graphics_color_hex_create(body->particle_ring_color);
+        editor_circle_dotted_draw(center, body->particle_radius, ring);
     }
 
     {
@@ -1321,12 +1414,15 @@ void editor_viewport_draw(const EditorProject *project, const EditorViewportStat
     }
     editor_view_transform_set(state, selected);
     if(state->mode == EDITOR_VIEWPORT_HIERARCHY) {
+        for(size_t i = 0; i < project->object_count; i += 1)
+            editor_viewport_particle_fills_draw(&project->objects[i]);
         for(size_t i = 0; i < project->object_count; i += 1) {
             editor_viewport_object_draw(&project->objects[i], state,
                 project->objects[i].id == project->selected);
         }
         return;
     }
+    editor_viewport_particle_fills_draw(selected);
     editor_viewport_object_draw(selected, state, true);
 }
 
@@ -1340,7 +1436,8 @@ bool editor_viewport_selection_nudge(EditorViewportState *state,
     object = editor_project_selected_get(project);
     if(object == NULL) return false;
     body = editor_selected_body_get(object, state);
-    if(state->selection == EDITOR_SELECTION_RIGID_BODY && body != NULL) {
+    if((state->selection == EDITOR_SELECTION_RIGID_BODY ||
+            state->selection == EDITOR_SELECTION_PARTICLE) && body != NULL) {
         body->position.x += screen_delta.x;
         body->position.y += screen_delta.y;
         editor_project_rigid_body_constraints_apply(object, body->id);

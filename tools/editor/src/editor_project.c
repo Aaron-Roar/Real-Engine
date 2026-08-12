@@ -227,6 +227,9 @@ EditorRigidBody editor_project_rigid_body_default_get(void) {
         .collision_enabled = true,
         .collision_category = UINT64_C(1),
         .collision_with = UINT64_C(1),
+        .particle_radius = 30.0f,
+        .particle_ring_color = UINT32_C(0x4a90e2ff),
+        .particle_fill_color = UINT32_C(0x4a90e240),
         .border_color = UINT32_C(0xffffffff),
         .surface_color = UINT32_C(0x808080ff),
         .visible = true

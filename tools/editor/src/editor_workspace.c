@@ -404,8 +404,13 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 "(Position){position.x + %#.9gf, position.y + %#.9gf}, %#.9gf, "
                 "(Shape){.amount_of_vertices = %u, .vertices = {",
                 body->name, body->position.x, body->position.y, body->rotation,
-                hitbox == NULL ? 0 : hitbox->vertex_count);
-            if(hitbox != NULL) {
+                body->particle ? 4 : hitbox == NULL ? 0 : hitbox->vertex_count);
+            if(body->particle) {
+                fprintf(source, "{%#.9gf, 0.00000000f}, {0.00000000f, %#.9gf}, "
+                    "{%#.9gf, 0.00000000f}, {0.00000000f, %#.9gf}",
+                    body->particle_radius, body->particle_radius,
+                    -body->particle_radius, -body->particle_radius);
+            } else if(hitbox != NULL) {
                 for(uint32_t vertex = 0; vertex < hitbox->vertex_count; vertex += 1) {
                     fprintf(source, "%s{%#.9gf, %#.9gf}", vertex == 0 ? "" : ", ",
                         hitbox->vertices[vertex].position.x,

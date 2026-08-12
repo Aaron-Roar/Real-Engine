@@ -61,6 +61,9 @@ typedef struct EditorRigidBody {
     bool collision_enabled;
     bool particle;
     bool visible;
+    float particle_radius;
+    uint32_t particle_ring_color;
+    uint32_t particle_fill_color;
     uint32_t border_color;
     uint32_t surface_color;
     RohrCollisionCategoryMask collision_category;
