@@ -350,6 +350,21 @@ void editor_viewport_object_editor_enter(EditorViewportState *state) {
     if(state == NULL) return;
     state->mode = EDITOR_VIEWPORT_OBJECT;
     state->selection = EDITOR_SELECTION_OBJECT;
+    state->selected_rigid_body = 0;
+    state->selected_hitbox = 0;
+    state->selected_joint = 0;
+    state->selected_anchor = 0;
+    state->selected_soft_body = 0;
+    state->selected_soft_node = 0;
+    state->selected_soft_beam = 0;
+    state->selected_soft_area = 0;
+    state->selected_origin_kind = EDITOR_ORIGIN_NONE;
+    state->selected_line = 0;
+    state->selected_vertex = 0;
+    state->preview_rigid_body = 0;
+    state->preview_anchor = 0;
+    state->preview_soft_node = 0;
+    state->soft_area_candidate_count = 0;
     state->dragged_vertex = -1;
 }
 
@@ -1021,7 +1036,8 @@ static void editor_viewport_object_draw(const EditorObject *object,
             const EditorHitbox *hitbox = &body->hitboxes[box_index];
             bool selected_body = state->selected_rigid_body == body->id;
             bool selected_hitbox = selected_body && state->selected_hitbox == hitbox->id;
-            Color base = (state->selection == EDITOR_SELECTION_OBJECT && object_selected) ||
+            Color base = (state->mode == EDITOR_VIEWPORT_HIERARCHY &&
+                    state->selection == EDITOR_SELECTION_OBJECT && object_selected) ||
                     state->preview_rigid_body == body->id ||
                     (state->selection == EDITOR_SELECTION_RIGID_BODY && selected_body) ||
                     (state->selection == EDITOR_SELECTION_HITBOX && selected_hitbox) ?
@@ -1199,7 +1215,8 @@ static void editor_viewport_object_draw(const EditorObject *object,
         }
         editor_quad_draw(editor_anchor_world_get(object, anchor),
             9.0f, 9.0f, rotation + 0.78539816339f,
-            state->selected_anchor == anchor->id || state->preview_anchor == anchor->id ?
+            (state->selection == EDITOR_SELECTION_ANCHOR &&
+                state->selected_anchor == anchor->id) || state->preview_anchor == anchor->id ?
                 (Color){255, 215, 70, 255} : (Color){235, 150, 215, 255});
     }
 }
