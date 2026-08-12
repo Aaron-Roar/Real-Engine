@@ -37,6 +37,33 @@ int main(void) {
         body.result.value, node_a.result.value, node_b.result.value, node_c.result.value);
     if(rohr_error_check(beam) || rohr_error_check(triangle)) goto fail;
     {
+        Color node_color = {10, 20, 30, 255};
+        Color beam_color = {40, 50, 60, 255};
+        Color area_color = {70, 80, 90, 255};
+        SoftBodyNodeResult styled_node;
+        SoftBodyBeamResult styled_beam;
+        SoftBodyTriangleResult styled_area;
+        if(rohr_error_check(rohr_graphics_soft_body_node_color_set(
+                    body.result.value, node_a.result.value, node_color)) ||
+                rohr_error_check(rohr_graphics_soft_body_beam_color_set(
+                    body.result.value, node_b.result.value, node_a.result.value,
+                    beam_color)) ||
+                rohr_error_check(rohr_graphics_soft_body_area_color_set(
+                    body.result.value, node_c.result.value, node_a.result.value,
+                    node_b.result.value, area_color))) goto fail;
+        styled_node = rohr_physics_soft_body_node_get(node_a.result.value);
+        styled_beam = rohr_physics_soft_body_beam_get(beam.result.value);
+        styled_area = rohr_physics_soft_body_triangle_get(triangle.result.value);
+        if(rohr_error_check(styled_node) || rohr_error_check(styled_beam) ||
+                rohr_error_check(styled_area) ||
+                !styled_node.result.value.draw_color_overridden ||
+                styled_node.result.value.draw_color.red != node_color.red ||
+                !styled_beam.result.value.draw_color_overridden ||
+                styled_beam.result.value.draw_color.green != beam_color.green ||
+                !styled_area.result.value.draw_color_overridden ||
+                styled_area.result.value.draw_color.blue != area_color.blue) goto fail;
+    }
+    {
         SoftBodyResult topology = rohr_physics_soft_body_get(body.result.value);
         if(rohr_error_check(topology) || topology.result.value.node_count != 3 ||
                 topology.result.value.beam_count != 1 || topology.result.value.triangle_count != 1) goto fail;

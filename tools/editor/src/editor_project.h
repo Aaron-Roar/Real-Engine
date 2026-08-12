@@ -14,8 +14,9 @@
 #define EDITOR_SOFT_BODY_MAX 8
 #define EDITOR_SOFT_NODE_MAX 64
 #define EDITOR_SOFT_BEAM_MAX 128
+#define EDITOR_SOFT_AREA_MAX 128
 #define EDITOR_COLLISION_MASK_MAX 64
-#define EDITOR_PROJECT_FORMAT_VERSION 3
+#define EDITOR_PROJECT_FORMAT_VERSION 4
 
 typedef uint32_t EditorObjectId;
 typedef uint32_t EditorVertexId;
@@ -26,6 +27,7 @@ typedef uint32_t EditorAnchorId;
 typedef uint32_t EditorSoftBodyId;
 typedef uint32_t EditorSoftNodeId;
 typedef uint32_t EditorSoftBeamId;
+typedef uint32_t EditorSoftAreaId;
 
 #define EDITOR_OBJECT_INVALID 0
 
@@ -59,6 +61,8 @@ typedef struct EditorRigidBody {
     bool collision_enabled;
     bool particle;
     bool visible;
+    uint32_t border_color;
+    uint32_t surface_color;
     RohrCollisionCategoryMask collision_category;
     RohrCollisionCategoryMask collision_with;
     EditorHitbox hitboxes[EDITOR_BODY_HITBOX_MAX];
@@ -116,6 +120,8 @@ typedef struct EditorSoftNode {
     RohrCollisionCategoryMask collision_category;
     RohrCollisionCategoryMask collision_with;
     bool visible;
+    uint32_t color;
+    bool color_overridden;
 } EditorSoftNode;
 
 typedef struct EditorSoftBeam {
@@ -126,7 +132,20 @@ typedef struct EditorSoftBeam {
     float stiffness;
     float damping;
     bool visible;
+    uint32_t color;
+    bool color_overridden;
 } EditorSoftBeam;
+
+typedef struct EditorSoftArea {
+    EditorSoftAreaId id;
+    char name[EDITOR_OBJECT_NAME_MAX];
+    EditorSoftNodeId node_a;
+    EditorSoftNodeId node_b;
+    EditorSoftNodeId node_c;
+    uint32_t color;
+    bool color_overridden;
+    bool visible;
+} EditorSoftArea;
 
 typedef struct EditorSoftBody {
     EditorSoftBodyId id;
@@ -134,10 +153,15 @@ typedef struct EditorSoftBody {
     Position position;
     float rotation;
     bool visible;
+    uint32_t node_color;
+    uint32_t beam_color;
+    uint32_t area_color;
     EditorSoftNode nodes[EDITOR_SOFT_NODE_MAX];
     size_t node_count;
     EditorSoftBeam beams[EDITOR_SOFT_BEAM_MAX];
     size_t beam_count;
+    EditorSoftArea areas[EDITOR_SOFT_AREA_MAX];
+    size_t area_count;
 } EditorSoftBody;
 
 typedef struct EditorObject {
@@ -169,6 +193,7 @@ typedef struct EditorProject {
     EditorSoftBodyId next_soft_body_id;
     EditorSoftNodeId next_soft_node_id;
     EditorSoftBeamId next_soft_beam_id;
+    EditorSoftAreaId next_soft_area_id;
     EditorObjectId selected;
 } EditorProject;
 
@@ -229,9 +254,12 @@ bool editor_project_soft_body_remove(EditorObject *object, EditorSoftBodyId id);
 bool editor_project_soft_body_origin_set(EditorSoftBody *body, Position position);
 EditorSoftNode *editor_project_soft_node_add(EditorProject *project, EditorSoftBody *body,
     Position position);
-bool editor_project_soft_node_remove(EditorSoftBody *body, EditorSoftNodeId id);
+bool editor_project_soft_node_remove(EditorProject *project, EditorSoftBody *body,
+    EditorSoftNodeId id);
 EditorSoftBeam *editor_project_soft_beam_add(EditorProject *project, EditorSoftBody *body,
     EditorSoftNodeId node_a, EditorSoftNodeId node_b);
-bool editor_project_soft_beam_remove(EditorSoftBody *body, EditorSoftBeamId id);
+bool editor_project_soft_beam_remove(EditorProject *project, EditorSoftBody *body,
+    EditorSoftBeamId id);
+void editor_project_soft_areas_sync(EditorProject *project, EditorSoftBody *body);
 
 #endif

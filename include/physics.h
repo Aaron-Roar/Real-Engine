@@ -295,6 +295,8 @@ typedef struct SoftBodyNode {
     RohrCollisionCategoryMask category;
     /** Mirrored for source compatibility; standard collision filters are authoritative. */
     RohrCollisionCategoryMask collides_with;
+    Color draw_color;
+    bool draw_color_overridden;
 } SoftBodyNode;
 
 /** Elastic connection between two soft-body nodes. */
@@ -305,6 +307,8 @@ typedef struct SoftBodyBeam {
     float rest_length;
     float stiffness;
     float damping;
+    Color draw_color;
+    bool draw_color_overridden;
 } SoftBodyBeam;
 
 /** Deforming triangular surface referencing three soft-body nodes. */
@@ -313,6 +317,8 @@ typedef struct SoftBodyTriangle {
     Entity node_a;
     Entity node_b;
     Entity node_c;
+    Color draw_color;
+    bool draw_color_overridden;
 } SoftBodyTriangle;
 
 /** Explicit handles created when pinning a soft-body node to an anchor. */

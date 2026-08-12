@@ -242,18 +242,6 @@ typedef enum Fill {
     GRAPHICS_FILLED
 } Fill;
 
-/** RGBA color value. */
-typedef struct Color {
-  /** Red channel. */
-  uint8_t red;
-  /** Green channel. */
-  uint8_t green;
-  /** Blue channel. */
-  uint8_t blue;
-  /** Alpha channel. */
-  uint8_t alpha;
-} Color;
-
 /**
  * Create a color from a 32-bit RGBA hex value.
  */
@@ -471,4 +459,9 @@ bool graphics_joint_draw(Entity joint, Color color);
 void graphics_joints_draw(Color color);
 /** Draw a soft body's deforming surfaces, beams, and collision nodes. */
 bool graphics_soft_body_draw(Entity soft_body, Color surface, Color beam, Color node);
+EngineResult graphics_soft_body_node_color_set(Entity soft_body, Entity node, Color color);
+EngineResult graphics_soft_body_beam_color_set(
+    Entity soft_body, Entity node_a, Entity node_b, Color color);
+EngineResult graphics_soft_body_area_color_set(
+    Entity soft_body, Entity node_a, Entity node_b, Entity node_c, Color color);
 #endif

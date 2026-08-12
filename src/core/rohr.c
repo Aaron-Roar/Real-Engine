@@ -285,6 +285,9 @@ void rohr_graphics_hit_boxes_draw(void) { graphics_hit_boxes_draw(); }
 bool rohr_graphics_joint_draw(Entity joint, Color color) { return graphics_joint_draw(joint, color); }
 void rohr_graphics_joints_draw(Color color) { graphics_joints_draw(color); }
 bool rohr_graphics_soft_body_draw(Entity soft_body, Color surface, Color beam, Color node) { return graphics_soft_body_draw(soft_body, surface, beam, node); }
+EngineResult rohr_graphics_soft_body_node_color_set(Entity soft_body, Entity node, Color color) { return graphics_soft_body_node_color_set(soft_body, node, color); }
+EngineResult rohr_graphics_soft_body_beam_color_set(Entity soft_body, Entity node_a, Entity node_b, Color color) { return graphics_soft_body_beam_color_set(soft_body, node_a, node_b, color); }
+EngineResult rohr_graphics_soft_body_area_color_set(Entity soft_body, Entity node_a, Entity node_b, Entity node_c, Color color) { return graphics_soft_body_area_color_set(soft_body, node_a, node_b, node_c, color); }
 TextureAssetResult rohr_graphics_texture_load(TextureDescriptor text_desc) { return graphics_texture_load(text_desc); }
 FontAssetResult rohr_graphics_font_load(FontDescriptor descriptor) { return graphics_font_load(descriptor); }
 void rohr_graphics_font_destroy(FontAsset *font) { graphics_font_destroy(font); }

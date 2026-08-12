@@ -165,19 +165,39 @@ int main(void) {
                 &loaded_project, generated_soft_body, (Position){0.0f, 40.0f});
             EditorSoftNode *generated_node_b = editor_project_soft_node_add(
                 &loaded_project, generated_soft_body, (Position){20.0f, 40.0f});
+            EditorSoftNode *generated_node_c = editor_project_soft_node_add(
+                &loaded_project, generated_soft_body, (Position){10.0f, 60.0f});
             EditorSoftBeam *generated_beam = generated_node_a == NULL ||
                 generated_node_b == NULL ? NULL : editor_project_soft_beam_add(
                     &loaded_project, generated_soft_body, generated_node_a->id,
                     generated_node_b->id);
+            EditorSoftBeam *generated_beam_b = generated_node_b == NULL ||
+                generated_node_c == NULL ? NULL : editor_project_soft_beam_add(
+                    &loaded_project, generated_soft_body, generated_node_b->id,
+                    generated_node_c->id);
+            EditorSoftBeam *generated_beam_c = generated_node_c == NULL ||
+                generated_node_a == NULL ? NULL : editor_project_soft_beam_add(
+                    &loaded_project, generated_soft_body, generated_node_c->id,
+                    generated_node_a->id);
             if(generated_node_a != NULL) {
                 generated_node_a->radius = 6.5f;
                 generated_node_a->friction = 0.6f;
                 generated_node_a->restitution = 0.4f;
             }
             if(generated_beam != NULL) generated_beam->damping = 0.3f;
+            if(generated_node_a != NULL) {
+                generated_node_a->color = UINT32_C(0xff0000ff);
+                generated_node_a->color_overridden = true;
+            }
+            if(generated_soft_body != NULL && generated_soft_body->area_count == 1) {
+                generated_soft_body->areas[0].color = UINT32_C(0x00ff00ff);
+                generated_soft_body->areas[0].color_overridden = true;
+            }
             if(body_anchor == NULL || world_anchor == NULL || generated_joint == NULL ||
                     generated_soft_body == NULL || generated_node_a == NULL ||
-                    generated_node_b == NULL || generated_beam == NULL ||
+                    generated_node_b == NULL || generated_node_c == NULL ||
+                    generated_beam == NULL || generated_beam_b == NULL ||
+                    generated_beam_c == NULL || generated_soft_body->area_count != 1 ||
                     !editor_project_joint_anchor_set(generated_object,
                         generated_joint, 0, body_anchor->id) ||
                     !editor_project_joint_anchor_set(generated_object,
@@ -202,7 +222,11 @@ int main(void) {
                 !file_contains(path, "rohr_physics_restitution_set") ||
                 !file_contains(path,
                     "rohr_physics_soft_body_node_collision_filter_set") ||
-                !file_contains(path, "rohr_physics_soft_body_beam_create")) {
+                !file_contains(path, "rohr_physics_soft_body_beam_create") ||
+                !file_contains(path, "rohr_physics_soft_body_triangle_create") ||
+                !file_contains(path, "rohr_graphics_soft_body_node_color_set") ||
+                !file_contains(path, "rohr_graphics_soft_body_area_color_set") ||
+                !file_contains(path, "void starter_draw")) {
             workspace_fixture_remove(fixture);
             return 1;
         }
@@ -390,12 +414,12 @@ int main(void) {
     if(beam == NULL || !beam->visible || beam->node_a != 0 || beam->node_b != 0) return 1;
     beam->node_a = node_a->id;
     beam->node_b = node_b->id;
-    if(!editor_project_soft_beam_remove(soft_body, beam->id) ||
+    if(!editor_project_soft_beam_remove(&project, soft_body, beam->id) ||
             soft_body->node_count != 2) return 1;
     beam = editor_project_soft_beam_add(&project, soft_body, node_a->id, node_b->id);
     if(beam != NULL) beam->damping = 0.45f;
     if(beam == NULL ||
-            !editor_project_soft_node_remove(soft_body, node_a->id) ||
+            !editor_project_soft_node_remove(&project, soft_body, node_a->id) ||
             soft_body->beam_count != 1 || beam->node_a != 0 ||
             soft_body->node_count != 1 || beam->node_b != soft_body->nodes[0].id) return 1;
 

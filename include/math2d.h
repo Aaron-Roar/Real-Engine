@@ -8,6 +8,15 @@
 #define MIN_VERTICIES 3
 
 #define PI_F 3.14159265358979323846f
+
+/** RGBA color value shared by rendering-facing data structures. */
+typedef struct Color {
+    uint8_t red;
+    uint8_t green;
+    uint8_t blue;
+    uint8_t alpha;
+} Color;
+
 /** Scalar one-dimensional math value. */
 typedef float Vec1D;
 

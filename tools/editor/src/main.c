@@ -564,7 +564,7 @@ static bool editor_selected_delete(
         if(body == NULL || node == NULL) return false;
         index = (size_t)(node - body->nodes);
         if(body == NULL || !editor_project_soft_node_remove(
-                body, viewport_state->selected_soft_node)) return false;
+                project, body, viewport_state->selected_soft_node)) return false;
         viewport_state->mode = EDITOR_VIEWPORT_SOFT_BODY;
         if(index < body->node_count) {
             viewport_state->selection = EDITOR_SELECTION_SOFT_NODE;
@@ -589,7 +589,7 @@ static bool editor_selected_delete(
         if(body == NULL || beam == NULL) return false;
         index = (size_t)(beam - body->beams);
         if(body == NULL || !editor_project_soft_beam_remove(
-                body, viewport_state->selected_soft_beam)) return false;
+                project, body, viewport_state->selected_soft_beam)) return false;
         viewport_state->mode = EDITOR_VIEWPORT_SOFT_BODY;
         if(index < body->beam_count) {
             viewport_state->selection = EDITOR_SELECTION_SOFT_BEAM;
@@ -2460,6 +2460,9 @@ int main(void) {
                         body->nodes[a_result.selected_index - 1].id;
                     if(b_result.changed) beam->node_b = b_result.selected_index == 0 ? 0 :
                         body->nodes[b_result.selected_index - 1].id;
+                    if(a_result.changed || b_result.changed) {
+                        editor_project_soft_areas_sync(&project, body);
+                    }
                 }
                 rohr_ui_label(&stiffness_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     196.0f, 90.0f, 26.0f});

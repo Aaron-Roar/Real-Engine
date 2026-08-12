@@ -380,12 +380,16 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 fprintf(header, "    Entity %s;\n", body->nodes[node_index].name);
             for(size_t beam_index = 0; beam_index < body->beam_count; beam_index += 1)
                 fprintf(header, "    Entity %s;\n", body->beams[beam_index].name);
+            for(size_t area_index = 0; area_index < body->area_count; area_index += 1)
+                fprintf(header, "    Entity %s;\n", body->areas[area_index].name);
         }
         fprintf(header,
             "} %s;\n\n"
             "EngineResult %s_create(%s *object, Position position);\n"
+            "void %s_draw(const %s *object);\n"
             "void %s_destroy(%s *object);\n\n",
-            object->name, function_name, object->name, function_name, object->name);
+            object->name, function_name, object->name, function_name, object->name,
+            function_name, object->name);
         fprintf(source, "EngineResult %s_create(%s *object, Position position) {\n"
             "    EngineResult result;\n"
             "    if(object == NULL) return rohr_error_result_error("
@@ -536,6 +540,45 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                     "      object->%s = created.result.value; }\n",
                     body->name, node_a->name, node_b->name, beam->stiffness,
                     beam->damping, beam->name);
+                if(beam->color_overridden) {
+                    fprintf(source,
+                        "    result = rohr_graphics_soft_body_beam_color_set(object->%s, "
+                        "object->%s, object->%s, rohr_graphics_color_hex_create("
+                        "UINT32_C(0x%08x)));\n"
+                        "    if(rohr_error_check(result)) goto fail;\n",
+                        body->name, node_a->name, node_b->name, beam->color);
+                }
+            }
+            for(size_t area_index = 0; area_index < body->area_count; area_index += 1) {
+                const EditorSoftArea *area = &body->areas[area_index];
+                const EditorSoftNode *node_a = editor_workspace_soft_node_get(body, area->node_a);
+                const EditorSoftNode *node_b = editor_workspace_soft_node_get(body, area->node_b);
+                const EditorSoftNode *node_c = editor_workspace_soft_node_get(body, area->node_c);
+                if(node_a == NULL || node_b == NULL || node_c == NULL) continue;
+                fprintf(source,
+                    "    { EntityResult created = rohr_physics_soft_body_triangle_create("
+                    "object->%s, object->%s, object->%s, object->%s);\n"
+                    "      if(rohr_error_check(created)) { result = rohr_error_result_error("
+                    "created.result.error); goto fail; }\n"
+                    "      object->%s = created.result.value; }\n",
+                    body->name, node_a->name, node_b->name, node_c->name, area->name);
+                if(area->color_overridden) {
+                    fprintf(source,
+                        "    result = rohr_graphics_soft_body_area_color_set(object->%s, "
+                        "object->%s, object->%s, object->%s, "
+                        "rohr_graphics_color_hex_create(UINT32_C(0x%08x)));\n"
+                        "    if(rohr_error_check(result)) goto fail;\n",
+                        body->name, node_a->name, node_b->name, node_c->name, area->color);
+                }
+            }
+            for(size_t node_index = 0; node_index < body->node_count; node_index += 1) {
+                const EditorSoftNode *node = &body->nodes[node_index];
+                if(!node->color_overridden) continue;
+                fprintf(source,
+                    "    result = rohr_graphics_soft_body_node_color_set(object->%s, "
+                    "object->%s, rohr_graphics_color_hex_create(UINT32_C(0x%08x)));\n"
+                    "    if(rohr_error_check(result)) goto fail;\n",
+                    body->name, node->name, node->color);
             }
         }
         fprintf(source,
@@ -544,9 +587,33 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
             "    %s_destroy(object);\n"
             "    return result;\n"
             "}\n\n"
-            "void %s_destroy(%s *object) {\n"
+            "void %s_draw(const %s *object) {\n"
             "    if(object == NULL) return;\n",
             function_name, function_name, object->name);
+        for(size_t body_index = 0; body_index < object->rigid_body_count; body_index += 1) {
+            const EditorRigidBody *body = &object->rigid_bodies[body_index];
+            fprintf(source,
+                "    (void)rohr_graphics_hit_box_colored_draw(object->%s, GRAPHICS_FILLED, "
+                "rohr_graphics_color_hex_create(UINT32_C(0x%08x)));\n"
+                "    (void)rohr_graphics_hit_box_colored_draw(object->%s, GRAPHICS_OUTLINE, "
+                "rohr_graphics_color_hex_create(UINT32_C(0x%08x)));\n",
+                body->name, body->surface_color, body->name, body->border_color);
+        }
+        for(size_t soft_body_index = 0; soft_body_index < object->soft_body_count;
+                soft_body_index += 1) {
+            const EditorSoftBody *body = &object->soft_body_items[soft_body_index];
+            fprintf(source,
+                "    (void)rohr_graphics_soft_body_draw(object->%s, "
+                "rohr_graphics_color_hex_create(UINT32_C(0x%08x)), "
+                "rohr_graphics_color_hex_create(UINT32_C(0x%08x)), "
+                "rohr_graphics_color_hex_create(UINT32_C(0x%08x)));\n",
+                body->name, body->area_color, body->beam_color, body->node_color);
+        }
+        fprintf(source,
+            "}\n\n"
+            "void %s_destroy(%s *object) {\n"
+            "    if(object == NULL) return;\n",
+            function_name, object->name);
         for(size_t joint_index = 0; joint_index < object->joint_count; joint_index += 1) {
             const EditorJoint *joint = &object->joint_items[joint_index];
             fprintf(source,
@@ -642,13 +709,7 @@ static bool editor_workspace_main_write(const EditorWorkspace *workspace,
         const EditorObject *object = &project->objects[object_index];
         char variable[EDITOR_OBJECT_NAME_MAX];
         editor_project_property_name_format(variable, sizeof(variable), object->name);
-        for(size_t body_index = 0; body_index < object->rigid_body_count; body_index += 1) {
-            fprintf(file,
-                "        rohr_graphics_hit_box_colored_draw(%s.%s, GRAPHICS_FILLED, "
-                "(Color){%s});\n",
-                variable, object->rigid_bodies[body_index].name,
-                object_index == 0 ? "90, 100, 115, 255" : "70, 170, 255, 255");
-        }
+        fprintf(file, "        %s_draw(&%s);\n", variable, variable);
     }
     fprintf(file,
         "        rohr_graphics_show();\n"

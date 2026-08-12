@@ -1277,6 +1277,16 @@ void rohr_graphics_joints_draw(Color color);
  */
 bool rohr_graphics_soft_body_draw(Entity soft_body, Color surface, Color beam, Color node);
 
+/** Sets a drawing-color override for one node belonging to a soft body. */
+EngineResult rohr_graphics_soft_body_node_color_set(
+    Entity soft_body, Entity node, Color color);
+/** Sets a drawing-color override for the beam connecting two soft-body nodes. */
+EngineResult rohr_graphics_soft_body_beam_color_set(
+    Entity soft_body, Entity node_a, Entity node_b, Color color);
+/** Sets a drawing-color override for the area formed by three soft-body nodes. */
+EngineResult rohr_graphics_soft_body_area_color_set(
+    Entity soft_body, Entity node_a, Entity node_b, Entity node_c, Color color);
+
 /**
  * @brief Loads a texture asset.
  * @param text_desc Texture descriptor containing load settings.

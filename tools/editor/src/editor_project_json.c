@@ -109,6 +109,8 @@ static yyjson_mut_val *editor_json_body_write(yyjson_mut_doc *document,
         body->collision_category);
     yyjson_mut_obj_add_uint(document, value, "collision_with", body->collision_with);
     yyjson_mut_obj_add_bool(document, value, "visible", body->visible);
+    yyjson_mut_obj_add_uint(document, value, "border_color", body->border_color);
+    yyjson_mut_obj_add_uint(document, value, "surface_color", body->surface_color);
     for(size_t i = 0; i < body->hitbox_count; i += 1) {
         yyjson_mut_arr_add_val(hitboxes, editor_json_hitbox_write(document,
             &body->hitboxes[i]));
@@ -156,12 +158,16 @@ static yyjson_mut_val *editor_json_soft_body_write(yyjson_mut_doc *document,
     yyjson_mut_val *value = yyjson_mut_obj(document);
     yyjson_mut_val *nodes = yyjson_mut_arr(document);
     yyjson_mut_val *beams = yyjson_mut_arr(document);
+    yyjson_mut_val *areas = yyjson_mut_arr(document);
     yyjson_mut_obj_add_uint(document, value, "id", body->id);
     yyjson_mut_obj_add_strcpy(document, value, "name", body->name);
     yyjson_mut_obj_add_val(document, value, "position",
         editor_json_position_write(document, body->position));
     yyjson_mut_obj_add_real(document, value, "rotation", body->rotation);
     yyjson_mut_obj_add_bool(document, value, "visible", body->visible);
+    yyjson_mut_obj_add_uint(document, value, "node_color", body->node_color);
+    yyjson_mut_obj_add_uint(document, value, "beam_color", body->beam_color);
+    yyjson_mut_obj_add_uint(document, value, "area_color", body->area_color);
     for(size_t i = 0; i < body->node_count; i += 1) {
         const EditorSoftNode *node = &body->nodes[i];
         yyjson_mut_val *item = yyjson_mut_obj(document);
@@ -178,6 +184,8 @@ static yyjson_mut_val *editor_json_soft_body_write(yyjson_mut_doc *document,
         yyjson_mut_obj_add_uint(document, item, "collision_category", node->collision_category);
         yyjson_mut_obj_add_uint(document, item, "collision_with", node->collision_with);
         yyjson_mut_obj_add_bool(document, item, "visible", node->visible);
+        yyjson_mut_obj_add_uint(document, item, "color", node->color);
+        yyjson_mut_obj_add_bool(document, item, "color_overridden", node->color_overridden);
         yyjson_mut_arr_add_val(nodes, item);
     }
     for(size_t i = 0; i < body->beam_count; i += 1) {
@@ -190,10 +198,26 @@ static yyjson_mut_val *editor_json_soft_body_write(yyjson_mut_doc *document,
         yyjson_mut_obj_add_real(document, item, "stiffness", beam->stiffness);
         yyjson_mut_obj_add_real(document, item, "damping", beam->damping);
         yyjson_mut_obj_add_bool(document, item, "visible", beam->visible);
+        yyjson_mut_obj_add_uint(document, item, "color", beam->color);
+        yyjson_mut_obj_add_bool(document, item, "color_overridden", beam->color_overridden);
         yyjson_mut_arr_add_val(beams, item);
+    }
+    for(size_t i = 0; i < body->area_count; i += 1) {
+        const EditorSoftArea *area = &body->areas[i];
+        yyjson_mut_val *item = yyjson_mut_obj(document);
+        yyjson_mut_obj_add_uint(document, item, "id", area->id);
+        yyjson_mut_obj_add_strcpy(document, item, "name", area->name);
+        yyjson_mut_obj_add_uint(document, item, "node_a", area->node_a);
+        yyjson_mut_obj_add_uint(document, item, "node_b", area->node_b);
+        yyjson_mut_obj_add_uint(document, item, "node_c", area->node_c);
+        yyjson_mut_obj_add_uint(document, item, "color", area->color);
+        yyjson_mut_obj_add_bool(document, item, "color_overridden", area->color_overridden);
+        yyjson_mut_obj_add_bool(document, item, "visible", area->visible);
+        yyjson_mut_arr_add_val(areas, item);
     }
     yyjson_mut_obj_add_val(document, value, "nodes", nodes);
     yyjson_mut_obj_add_val(document, value, "beams", beams);
+    yyjson_mut_obj_add_val(document, value, "areas", areas);
     return value;
 }
 
@@ -221,6 +245,7 @@ bool editor_project_save(const EditorProject *project, const char *path) {
     yyjson_mut_obj_add_uint(document, root, "next_soft_body_id", project->next_soft_body_id);
     yyjson_mut_obj_add_uint(document, root, "next_soft_node_id", project->next_soft_node_id);
     yyjson_mut_obj_add_uint(document, root, "next_soft_beam_id", project->next_soft_beam_id);
+    yyjson_mut_obj_add_uint(document, root, "next_soft_area_id", project->next_soft_area_id);
     for(size_t i = 0; i < project->collision_mask_count; i += 1) {
         yyjson_mut_arr_add_strcpy(document, collision_masks,
             project->collision_masks[i].name);
@@ -316,6 +341,8 @@ static bool editor_json_body_read(yyjson_val *value, EditorRigidBody *body,
     yyjson_val *collision_category = yyjson_obj_get(value, "collision_category");
     yyjson_val *collision_with = yyjson_obj_get(value, "collision_with");
     yyjson_val *particle = yyjson_obj_get(value, "particle");
+    yyjson_val *border_color = yyjson_obj_get(value, "border_color");
+    yyjson_val *surface_color = yyjson_obj_get(value, "surface_color");
     uint32_t count;
     *body = editor_project_rigid_body_default_get();
     if(!yyjson_is_obj(value) || !editor_json_uint(value, "id", &body->id) || body->id == 0 ||
@@ -336,6 +363,9 @@ static bool editor_json_body_read(yyjson_val *value, EditorRigidBody *body,
             !editor_json_uint64(value, "collision_category", &body->collision_category) ||
             !editor_json_uint64(value, "collision_with", &body->collision_with))) return false;
     if(particle != NULL && !editor_json_bool(value, "particle", &body->particle)) return false;
+    if((border_color != NULL && !editor_json_uint(value, "border_color", &body->border_color)) ||
+            (surface_color != NULL && !editor_json_uint(
+                value, "surface_color", &body->surface_color))) return false;
     if(!body->collision_enabled) body->particle = false;
     if(collision_enabled == NULL &&
             (collision_category != NULL || collision_with != NULL)) return false;
@@ -389,13 +419,25 @@ static bool editor_json_soft_body_read(yyjson_val *value, EditorSoftBody *body,
     EditorProject *project) {
     yyjson_val *nodes = yyjson_obj_get(value, "nodes");
     yyjson_val *beams = yyjson_obj_get(value, "beams");
+    yyjson_val *areas = yyjson_obj_get(value, "areas");
     yyjson_val *rotation = yyjson_obj_get(value, "rotation");
+    *body = (EditorSoftBody){
+        .node_color = UINT32_C(0xffaa46ff),
+        .beam_color = UINT32_C(0xebf0f5ff),
+        .area_color = UINT32_C(0x505a78ff)
+    };
     if(!yyjson_is_obj(value) || !editor_json_uint(value, "id", &body->id) || body->id == 0 ||
             !editor_json_name(value, body->name) || !editor_json_position_read(
                 yyjson_obj_get(value, "position"), &body->position) ||
             !editor_json_bool(value, "visible", &body->visible) || !yyjson_is_arr(nodes) ||
             !yyjson_is_arr(beams) || yyjson_arr_size(nodes) > EDITOR_SOFT_NODE_MAX ||
             yyjson_arr_size(beams) > EDITOR_SOFT_BEAM_MAX) return false;
+    if(areas != NULL && (!yyjson_is_arr(areas) ||
+            yyjson_arr_size(areas) > EDITOR_SOFT_AREA_MAX)) return false;
+    if(yyjson_obj_get(value, "node_color") != NULL &&
+            (!editor_json_uint(value, "node_color", &body->node_color) ||
+            !editor_json_uint(value, "beam_color", &body->beam_color) ||
+            !editor_json_uint(value, "area_color", &body->area_color))) return false;
     if(rotation != NULL && !editor_json_real(value, "rotation", &body->rotation)) {
         return false;
     }
@@ -415,7 +457,8 @@ static bool editor_json_soft_body_read(yyjson_val *value, EditorSoftBody *body,
             .restitution = 0.25f,
             .collision_enabled = true,
             .collision_category = UINT64_C(1),
-            .collision_with = UINT64_C(1)
+            .collision_with = UINT64_C(1),
+            .color = body->node_color
         };
         if(!yyjson_is_obj(item) || !editor_json_uint(item, "id", &node->id) || node->id == 0 ||
                 !editor_json_name(item, node->name) || !editor_json_position_read(
@@ -427,6 +470,11 @@ static bool editor_json_soft_body_read(yyjson_val *value, EditorSoftBody *body,
                 (restitution != NULL && !editor_json_real(
                     item, "restitution", &node->restitution))) return false;
         if(radius != NULL && !editor_json_real(item, "radius", &node->radius)) return false;
+        if(yyjson_obj_get(item, "color") != NULL &&
+                (!editor_json_uint(item, "color", &node->color) ||
+                !editor_json_bool(item, "color_overridden", &node->color_overridden))) {
+            return false;
+        }
         if(node->radius <= 0.0f) return false;
         if(collision_enabled != NULL &&
                 (!editor_json_bool(item, "collision_enabled", &node->collision_enabled) ||
@@ -439,7 +487,7 @@ static bool editor_json_soft_body_read(yyjson_val *value, EditorSoftBody *body,
         yyjson_val *item = yyjson_arr_get(beams, i);
         EditorSoftBeam *beam = &body->beams[i];
         yyjson_val *damping = yyjson_obj_get(item, "damping");
-        *beam = (EditorSoftBeam){.damping = 0.0f};
+        *beam = (EditorSoftBeam){.damping = 0.0f, .color = body->beam_color};
         if(!yyjson_is_obj(item) || !editor_json_uint(item, "id", &beam->id) || beam->id == 0 ||
                 !editor_json_name(item, beam->name) ||
                 !editor_json_uint(item, "node_a", &beam->node_a) ||
@@ -449,8 +497,34 @@ static bool editor_json_soft_body_read(yyjson_val *value, EditorSoftBody *body,
         if(damping != NULL && !editor_json_real(item, "damping", &beam->damping)) {
             return false;
         }
+        if(yyjson_obj_get(item, "color") != NULL &&
+                (!editor_json_uint(item, "color", &beam->color) ||
+                !editor_json_bool(item, "color_overridden", &beam->color_overridden))) {
+            return false;
+        }
         editor_project_property_name_format(beam->name, sizeof(beam->name), beam->name);
         if(project->next_soft_beam_id <= beam->id) project->next_soft_beam_id = beam->id + 1;
+    }
+    if(areas != NULL) {
+        body->area_count = yyjson_arr_size(areas);
+        for(size_t i = 0; i < body->area_count; i += 1) {
+            yyjson_val *item = yyjson_arr_get(areas, i);
+            EditorSoftArea *area = &body->areas[i];
+            if(!yyjson_is_obj(item) || !editor_json_uint(item, "id", &area->id) ||
+                    area->id == 0 || !editor_json_name(item, area->name) ||
+                    !editor_json_uint(item, "node_a", &area->node_a) ||
+                    !editor_json_uint(item, "node_b", &area->node_b) ||
+                    !editor_json_uint(item, "node_c", &area->node_c) ||
+                    !editor_json_uint(item, "color", &area->color) ||
+                    !editor_json_bool(item, "color_overridden", &area->color_overridden) ||
+                    !editor_json_bool(item, "visible", &area->visible)) return false;
+            editor_project_property_name_format(area->name, sizeof(area->name), area->name);
+            if(project->next_soft_area_id <= area->id) {
+                project->next_soft_area_id = area->id + 1;
+            }
+        }
+    } else {
+        editor_project_soft_areas_sync(project, body);
     }
     if(project->next_soft_body_id <= body->id) project->next_soft_body_id = body->id + 1;
     return true;
@@ -529,6 +603,8 @@ bool editor_project_load(EditorProject *project, const char *path) {
             loaded.next_joint_id == 0 || loaded.next_anchor_id == 0 ||
             loaded.next_soft_body_id == 0 || loaded.next_soft_node_id == 0 ||
             loaded.next_soft_beam_id == 0) goto done;
+    if(version >= 4 && (!editor_json_uint(root, "next_soft_area_id",
+            &loaded.next_soft_area_id) || loaded.next_soft_area_id == 0)) goto done;
     if(version >= 3) {
         if(!yyjson_is_arr(collision_masks) || yyjson_arr_size(collision_masks) == 0 ||
                 yyjson_arr_size(collision_masks) > EDITOR_COLLISION_MASK_MAX) goto done;
