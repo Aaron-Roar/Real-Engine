@@ -18,6 +18,11 @@ smaller internal module headers and implementations.
 - [Engine API reference](engine_api.md)
 - [Tools API reference](tools_api.md)
 
+## Editor
+
+- [Using the editor](editor.md)
+- [Editor architecture](editor_architecture.md)
+
 ## Local Generation
 
 From the project root:
@@ -49,5 +54,7 @@ are generated from the Doxygen comments in the public headers under `include/`.
 - [Engine API reference](engine_api.md)
 - [Tools API reference](tools_api.md)
 - [Architecture](architecture.md)
+- [Using the editor](editor.md)
+- [Editor architecture](editor_architecture.md)
 - [Entity ids](entity_ids.md)
 - [Error handling](errors.md)

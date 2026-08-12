@@ -49,6 +49,8 @@ I look forward to releasing a game with Rohr Engine in the soon future.
 
 * [Engine API reference](docs/engine_api.md)
 * [Tools API reference](docs/tools_api.md)
+* [Editor guide](docs/editor.md)
+* [Editor architecture](docs/editor_architecture.md)
 Application code should include the public Rohr API facade:
 
 ```c
@@ -101,6 +103,7 @@ engine/
 ├── examples/
 │   ├── view-port/         # Example games and demonstrations
 │   └── ...
+├── tools/editor/          # Visual object editor and C generator
 ├── lib/                   # Vendored third-party source dependencies
 └── build/                 # Generated objects, binaries, and docs
 ```
@@ -192,6 +195,21 @@ cmake --preset linux --fresh
 
 Examples and tests can be disabled for library-only builds with
 `-DROHR_BUILD_EXAMPLES=OFF` and `-DROHR_BUILD_TESTS=OFF`.
+
+## Editor
+
+Build and run the editor from the configured engine build:
+
+```sh
+cmake --build build --target rohr_editor
+./build/editor/rohr_editor
+```
+
+The editor saves authored objects as JSON and generates replaceable C under a
+game project's `src/generated/` directory. It does not overwrite developer-owned
+game source when regenerating. See the [editor guide](docs/editor.md) for the
+workflow and [editor architecture](docs/editor_architecture.md) for its internal
+design.
 
 ### Windows 10/11
 

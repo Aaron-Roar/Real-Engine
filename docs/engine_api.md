@@ -765,92 +765,157 @@ void rohr_physics_engine_time_per_tick_use(void);
 
  Restores the engine time-per-tick default.
 
-### Engine gravity
-
-Gravity is an optional engine component. Existing and custom physics behavior
-is unchanged until an entity receives `ROHR_GRAVITY`.
+### `rohr_physics_solver_iterations_set`
 
 ```c
-rohr_physics_gravity_set((Acceleration){0.0f, 980.0f});
-rohr_physics_gravity_enable(entity);
+EngineResult rohr_physics_solver_iterations_set(uint32_t iterations);
 ```
 
-The component can also be managed directly:
+ Sets constraint-solver iterations. Must be greater than zero.
+
+### `rohr_physics_solver_iterations_get`
 
 ```c
-rohr_entity_components_add(entity, ROHR_GRAVITY);
-rohr_entity_components_delete(entity, ROHR_GRAVITY);
+uint32_t rohr_physics_solver_iterations_get(void);
 ```
+
+ Returns constraint-solver iterations. Defaults to 8.
+
+### `rohr_physics_substeps_set`
+
+```c
+EngineResult rohr_physics_substeps_set(uint32_t substeps);
+```
+
+ Sets integration and collision-detection substeps. Must be greater than zero.
+
+### `rohr_physics_substeps_get`
+
+```c
+uint32_t rohr_physics_substeps_get(void);
+```
+
+ Returns physics substeps. Defaults to 1.
+
+### `rohr_physics_gravity_set`
 
 ```c
 EngineResult rohr_physics_gravity_set(Acceleration gravity);
+```
+
+ Sets the global acceleration applied to ROHR_GRAVITY entities.
+
+### `rohr_physics_gravity_get`
+
+```c
 Acceleration rohr_physics_gravity_get(void);
+```
+
+ Returns the current global gravity acceleration.
+
+### `rohr_physics_gravity_enable`
+
+```c
 EngineResult rohr_physics_gravity_enable(Entity entity);
+```
+
+ Enables engine gravity for an entity.
+
+### `rohr_physics_gravity_disable`
+
+```c
 EngineResult rohr_physics_gravity_disable(Entity entity);
+```
+
+ Disables engine gravity for an entity.
+
+### `rohr_physics_gravity_check`
+
+```c
 bool rohr_physics_gravity_check(Entity entity);
 ```
 
-The default acceleration is `ROHR_PHYSICS_GRAVITY_DEFAULT`, currently
-`{0.0f, 980.0f}`. Gravity is acceleration and therefore does not scale with
-mass. The gravity stage requires `ROHR_MASS` with a value greater than zero;
-entities without mass or with zero/negative mass are skipped. Static and held
-entities retain the component but do not move. Soft-body gravity is enabled on
-individual node entities.
+ Returns whether engine gravity is enabled for an entity.
 
-`rohr_physics_mass_set` accepts finite, non-negative values. Zero explicitly
-represents a massless entity; negative, infinite, and NaN values return
-`ERROR_ENGINE_STATE_INVALID` without changing its mass component.
-
-### Modular physics pipeline
-
-Most games should call `rohr_physics_update` or
-`rohr_physics_pipeline_update`. The latter runs the following public stages for
-each configured substep without changing the standard simulation order:
+### `rohr_physics_pipeline_step_begin`
 
 ```c
-rohr_physics_pipeline_step_begin();
-
-rohr_physics_pipeline_substep_begin();
-rohr_physics_pipeline_accelerations_clear();
-rohr_physics_pipeline_gravity_apply();
-rohr_physics_pipeline_forces_apply();
-rohr_physics_pipeline_integrate(dt);
-rohr_physics_pipeline_contacts_gather();
-rohr_physics_pipeline_joints_gather();
-rohr_physics_pipeline_constraints_solve(
-    rohr_physics_solver_iterations_get());
+void rohr_physics_pipeline_step_begin(void);
 ```
 
-The stages operate on the engine's component pools and reusable internal
-constraint storage. They do not allocate a separate physics world.
+ Begins a complete custom physics step and advances interaction state.
 
-- Call `rohr_physics_pipeline_step_begin` once per complete logical physics
-  step. It advances entered/stayed/exited interaction state and resets debug
-  counters.
-- Call `rohr_physics_pipeline_substep_begin` before gathering constraints. It
-  clears transient contact and joint constraint lists.
-- Force stages must precede integration when using spring joints or soft-body
-  beams.
-- The optional gravity stage must run after acceleration clearing and before
-  integration. Omit it when implementing custom gravity.
-- Gather before solving. Contacts and rigid joints are normally gathered
-  together so the iterative solver can alternate between them.
-- `rohr_physics_pipeline_constraints_solve` does nothing when passed zero
-  iterations.
-
-Tools may intentionally use only part of the pipeline. For example, an editor
-can enforce pin and weld joints without gravity, velocity integration, contact
-detection, or interaction events:
+### `rohr_physics_pipeline_substep_begin`
 
 ```c
-rohr_physics_pipeline_substep_begin();
-rohr_physics_pipeline_joints_gather();
-rohr_physics_pipeline_constraints_solve(
-    rohr_physics_solver_iterations_get());
+void rohr_physics_pipeline_substep_begin(void);
 ```
 
-This partial sequence does not call `step_begin`, because it is not producing a
-new collision-interaction frame.
+ Clears transient constraints before one custom substep.
+
+### `rohr_physics_pipeline_accelerations_clear`
+
+```c
+void rohr_physics_pipeline_accelerations_clear(void);
+```
+
+ Clears force-derived acceleration from the previous substep.
+
+### `rohr_physics_pipeline_gravity_apply`
+
+```c
+void rohr_physics_pipeline_gravity_apply(void);
+```
+
+ Applies global gravity to opted-in movable entities.
+
+### `rohr_physics_pipeline_forces_apply`
+
+```c
+void rohr_physics_pipeline_forces_apply(void);
+```
+
+ Applies spring-joint and soft-body-beam forces.
+
+### `rohr_physics_pipeline_integrate`
+
+```c
+void rohr_physics_pipeline_integrate(double dt);
+```
+
+ Integrates rigid-body state by dt seconds.
+
+### `rohr_physics_pipeline_contacts_gather`
+
+```c
+void rohr_physics_pipeline_contacts_gather(void);
+```
+
+ Detects contacts and gathers contact constraints.
+
+### `rohr_physics_pipeline_joints_gather`
+
+```c
+void rohr_physics_pipeline_joints_gather(void);
+```
+
+ Gathers active pin and weld joint constraints.
+
+### `rohr_physics_pipeline_constraints_solve`
+
+```c
+void rohr_physics_pipeline_constraints_solve(uint32_t iterations);
+```
+
+ Solves currently gathered contacts and joints.
+
+### `rohr_physics_pipeline_substep`
+
+```c
+void rohr_physics_pipeline_substep(double dt);
+```
+
+ Runs one standard physics substep.
 
 ### `rohr_physics_pipeline_update`
 
@@ -858,66 +923,7 @@ new collision-interaction frame.
 void rohr_physics_pipeline_update(double dt);
 ```
 
-Runs the standard plug-and-play pipeline using the configured substep and
-solver-iteration counts.
-
-### Individual pipeline stages
-
-```c
-void rohr_physics_pipeline_step_begin(void);
-void rohr_physics_pipeline_substep_begin(void);
-void rohr_physics_pipeline_accelerations_clear(void);
-void rohr_physics_pipeline_gravity_apply(void);
-void rohr_physics_pipeline_forces_apply(void);
-void rohr_physics_pipeline_integrate(double dt);
-void rohr_physics_pipeline_contacts_gather(void);
-void rohr_physics_pipeline_joints_gather(void);
-void rohr_physics_pipeline_constraints_solve(uint32_t iterations);
-void rohr_physics_pipeline_substep(double dt);
-```
-
-These functions expose the standard pipeline's individual operations for
-custom schedules. `rohr_physics_pipeline_substep` runs every substep stage in
-the standard order, but does not advance interaction state by itself.
-
-### Kinematic-driven bodies
-
-`ROHR_KINEMATIC_DRIVEN` identifies a dynamic body whose transform follows
-authored velocity and acceleration but does not respond to gravity, forces,
-collision impulses, or joints. It still participates in contacts and can push
-simulated bodies through its authored motion.
-
-Physics setters automatically add the effective tag to a dynamic body without
-positive mass and remove an automatically derived tag when positive mass is
-present. State is correct immediately after each setter returns, and setup
-order remains irrelevant:
-
-```c
-rohr_physics_dynamic_set(entity);
-rohr_physics_mass_set(entity, 10.0f);
-/* Fully simulated immediately after mass_set returns. */
-```
-
-Developers request persistent kinematic behavior through functions rather than
-managing the effective mask directly:
-
-```c
-EngineResult rohr_physics_kinematic_driven_set(Entity entity);
-EngineResult rohr_physics_kinematic_driven_remove(Entity entity);
-bool rohr_physics_kinematic_driven_check(Entity entity);
-```
-
-An explicit request remains effective even with positive mass. Removing it
-from a dynamic body without positive mass returns
-`ERROR_ENGINE_STATE_INVALID`, because the setter invariant requires the
-kinematic state. Explicit-request bookkeeping is private engine state.
-
-Mass can be inspected or removed explicitly:
-
-```c
-bool rohr_physics_mass_check(Entity entity);
-EngineResult rohr_physics_mass_remove(Entity entity);
-```
+ Runs the standard plug-and-play physics pipeline.
 
 ### `rohr_physics_update`
 
@@ -1002,7 +1008,7 @@ Calculates circle moment of inertia.
 bool rohr_physics_entity_held_get(EntityIndex index);
 ```
 
-Checks whether an entity index has `ROHR_HOLD`.
+Checks whether an entity index has ROHR_HOLD.
 
 | Parameter | Description |
 | --- | --- |
@@ -1319,14 +1325,7 @@ PositionResult rohr_physics_position_get(Entity entity);
 EngineResult rohr_physics_mass_set(Entity entity, Mass m);
 ```
 
-Sets an entity mass component value.
-
-| Parameter | Description |
-| --- | --- |
-| `entity` | Entity to modify. |
-| `m` | Mass value. |
-
-**Returns:** EngineResult describing success or failure.
+ Sets finite, non-negative mass. Zero represents an explicitly massless entity.
 
 ### `rohr_physics_force_create`
 
@@ -1620,7 +1619,7 @@ Marks an entity as static for physics simulation.
 EngineResult rohr_physics_entity_hold(Entity entity);
 ```
 
-Adds `ROHR_HOLD` so physics update stages preserve current values.
+Adds ROHR_HOLD so physics update stages preserve current values.
 
 | Parameter | Description |
 | --- | --- |
@@ -1634,7 +1633,7 @@ Adds `ROHR_HOLD` so physics update stages preserve current values.
 EngineResult rohr_physics_entity_unhold(Entity entity);
 ```
 
-Removes `ROHR_HOLD` without changing `ROHR_STATIC` or `ROHR_DYNAMIC` state.
+Removes ROHR_HOLD without changing ROHR_STATIC or ROHR_DYNAMIC state.
 
 | Parameter | Description |
 | --- | --- |
@@ -1648,7 +1647,7 @@ Removes `ROHR_HOLD` without changing `ROHR_STATIC` or `ROHR_DYNAMIC` state.
 EngineResult rohr_physics_group_entities_hold(GroupId group);
 ```
 
-Adds `ROHR_HOLD` to every live entity in a group.
+Adds ROHR_HOLD to every live entity in a group.
 
 | Parameter | Description |
 | --- | --- |
@@ -1662,7 +1661,7 @@ Adds `ROHR_HOLD` to every live entity in a group.
 EngineResult rohr_physics_group_entities_unhold(GroupId group);
 ```
 
-Removes `ROHR_HOLD` from every live entity in a group.
+Removes ROHR_HOLD from every live entity in a group.
 
 | Parameter | Description |
 | --- | --- |
@@ -1848,8 +1847,7 @@ Returns an anchor offset relative to its owner's stable local origin.
 JointAnchorPositionResult rohr_physics_joint_anchor_world_position_get(JointAnchorId anchor);
 ```
 
-Returns the current world position of an anchor. This is the entity position plus
-the local offset rotated by the entity orientation; hitbox geometry does not affect it.
+Returns the current world position of an anchor.
 
 | Parameter | Description |
 | --- | --- |
@@ -2155,58 +2153,125 @@ Gets overlap information for two particle shapes.
 
 **Returns:** Geometric overlap information.
 
-### Entity overlap queries
+### `rohr_physics_overlap_check`
 
 ```c
 bool rohr_physics_overlap_check(Entity entity, Entity target);
-OverlapInfo rohr_physics_overlap_get(Entity entity, Entity target);
-bool rohr_physics_overlap_entered_check(Entity entity, Entity target);
-bool rohr_physics_overlap_stayed_check(Entity entity, Entity target);
-bool rohr_physics_overlap_exited_check(Entity entity, Entity target);
-size_t rohr_physics_overlap_count_get(Entity entity);
-size_t rohr_physics_overlaps_get(
-    Entity entity,
-    EntityInteraction *results,
-    size_t capacity
-);
 ```
 
-Overlap queries include sensors and physically resolved colliders. `overlap_get`
-returns geometry oriented from `entity` toward `target`; its `detected` field is
-false when no current overlap exists. Transition checks compare the current and
-previous physics steps.
+ Return whether two entities overlap during the current physics step.
 
-`overlap_count_get` returns the required caller-owned buffer size.
-`overlaps_get` writes up to `capacity` current results and returns the number
-written. Result ordering is unspecified.
+### `rohr_physics_overlap_get`
 
-### Entity contact queries
+```c
+OverlapInfo rohr_physics_overlap_get(Entity entity, Entity target);
+```
+
+ Return current overlap geometry in the requested entity order.
+
+### `rohr_physics_overlap_entered_check`
+
+```c
+bool rohr_physics_overlap_entered_check(Entity entity, Entity target);
+```
+
+ Return whether an overlap began during the current physics step.
+
+### `rohr_physics_overlap_stayed_check`
+
+```c
+bool rohr_physics_overlap_stayed_check(Entity entity, Entity target);
+```
+
+ Return whether an overlap continued from the previous physics step.
+
+### `rohr_physics_overlap_exited_check`
+
+```c
+bool rohr_physics_overlap_exited_check(Entity entity, Entity target);
+```
+
+ Return whether an overlap ended during the current physics step.
+
+### `rohr_physics_overlap_count_get`
+
+```c
+size_t rohr_physics_overlap_count_get(Entity entity);
+```
+
+ Return the number of current overlaps involving an entity.
+
+### `rohr_physics_overlaps_get`
+
+```c
+size_t rohr_physics_overlaps_get( Entity entity, EntityInteraction *results, size_t capacity );
+```
+
+ Write up to capacity current overlaps and return the number written.
+
+### `rohr_physics_contact_check`
 
 ```c
 bool rohr_physics_contact_check(Entity entity, Entity target);
-ContactInfo rohr_physics_contact_get(Entity entity, Entity target);
-Vec2D rohr_physics_contact_total_impulse_get(ContactInfo contact);
-bool rohr_physics_contact_entered_check(Entity entity, Entity target);
-bool rohr_physics_contact_stayed_check(Entity entity, Entity target);
-bool rohr_physics_contact_exited_check(Entity entity, Entity target);
-size_t rohr_physics_contact_count_get(Entity entity);
-size_t rohr_physics_contacts_get(
-    Entity entity,
-    EntityContact *results,
-    size_t capacity
-);
 ```
 
-Contact queries include only entity pairs that entered physical collision
-response. `contact_get` returns its normal, depth, approximate world-space
-point, pre-resolution relative velocity, and separate normal and friction
-impulses applied to the second requested entity. `contact_total_impulse_get`
-returns the vector sum of those impulses. `contact_get` sets `detected` to
-false when no current contact exists. Sensors do not produce contacts.
+ Return whether two entities physically contacted during the current physics step.
 
-`contact_count_get` returns the required caller-owned buffer size.
-`contacts_get` writes up to `capacity` current results and returns the number
-written. Result ordering is unspecified.
+### `rohr_physics_contact_get`
+
+```c
+ContactInfo rohr_physics_contact_get(Entity entity, Entity target);
+```
+
+ Return current contact geometry in the requested entity order.
+
+### `rohr_physics_contact_total_impulse_get`
+
+```c
+Vec2D rohr_physics_contact_total_impulse_get(ContactInfo contact);
+```
+
+ Return the sum of a contact's normal and friction impulses.
+
+### `rohr_physics_contact_entered_check`
+
+```c
+bool rohr_physics_contact_entered_check(Entity entity, Entity target);
+```
+
+ Return whether a physical contact began during the current physics step.
+
+### `rohr_physics_contact_stayed_check`
+
+```c
+bool rohr_physics_contact_stayed_check(Entity entity, Entity target);
+```
+
+ Return whether a physical contact continued from the previous physics step.
+
+### `rohr_physics_contact_exited_check`
+
+```c
+bool rohr_physics_contact_exited_check(Entity entity, Entity target);
+```
+
+ Return whether a physical contact ended during the current physics step.
+
+### `rohr_physics_contact_count_get`
+
+```c
+size_t rohr_physics_contact_count_get(Entity entity);
+```
+
+ Return the number of current physical contacts involving an entity.
+
+### `rohr_physics_contacts_get`
+
+```c
+size_t rohr_physics_contacts_get( Entity entity, EntityContact *results, size_t capacity );
+```
+
+ Write up to capacity current contacts and return the number written.
 
 ## Graphics
 
@@ -2216,11 +2281,11 @@ written. Result ordering is unspecified.
 Color rohr_graphics_color_hex_create(uint32_t hex_color_code);
 ```
 
-Creates an engine color from a hexadecimal RGB or RGBA value.
+Creates an engine color from a hexadecimal RRGGBBAA value.
 
 | Parameter | Description |
 | --- | --- |
-| `hex_color_code` | Hex color value. |
+| `hex_color_code` | RRGGBBAA hex color value. |
 
 **Returns:** Color created from hex_color_code.
 
@@ -2278,6 +2343,38 @@ Draws a filled rectangle in logical screen coordinates.
 
 **Returns:** true when SDL accepted the draw command.
 
+### `rohr_graphics_render_output_size_get`
+
+```c
+Scale rohr_graphics_render_output_size_get(void);
+```
+
+ Returns the renderer output size in physical pixels.
+
+### `rohr_graphics_logical_size_set`
+
+```c
+bool rohr_graphics_logical_size_set(int width, int height);
+```
+
+ Changes the logical screen size while preserving aspect-correct presentation.
+
+### `rohr_graphics_screen_clip_set`
+
+```c
+bool rohr_graphics_screen_clip_set(float x, float y, float width, float height);
+```
+
+ Clips subsequent screen-space drawing until the clip is cleared.
+
+### `rohr_graphics_screen_clip_clear`
+
+```c
+void rohr_graphics_screen_clip_clear(void);
+```
+
+ Clears the active screen-space drawing clip.
+
 ### `rohr_graphics_screen_quad_draw`
 
 ```c
@@ -2293,6 +2390,22 @@ void rohr_graphics_show(void);
 ```
 
 Presents the current graphics frame.
+
+### `rohr_graphics_vsync_set`
+
+```c
+EngineResult rohr_graphics_vsync_set(bool enabled);
+```
+
+ Enables or disables synchronization with the display refresh rate.
+
+### `rohr_graphics_frame_limit_set`
+
+```c
+EngineResult rohr_graphics_frame_limit_set(int frames_per_second);
+```
+
+ Sets the non-VSync frame limit; zero uses the 120 FPS fallback.
 
 ### `rohr_graphics_hit_box_draw`
 
@@ -2372,6 +2485,30 @@ Draws a soft body's current surfaces, beams, and collision nodes.
 | `node` | Collision-node color. |
 
 **Returns:** true when the soft body was drawn successfully.
+
+### `rohr_graphics_soft_body_node_color_set`
+
+```c
+EngineResult rohr_graphics_soft_body_node_color_set( Entity soft_body, Entity node, Color color);
+```
+
+ Sets a drawing-color override for one node belonging to a soft body.
+
+### `rohr_graphics_soft_body_beam_color_set`
+
+```c
+EngineResult rohr_graphics_soft_body_beam_color_set( Entity soft_body, Entity node_a, Entity node_b, Color color);
+```
+
+ Sets a drawing-color override for the beam connecting two soft-body nodes.
+
+### `rohr_graphics_soft_body_area_color_set`
+
+```c
+EngineResult rohr_graphics_soft_body_area_color_set( Entity soft_body, Entity node_a, Entity node_b, Entity node_c, Color color);
+```
+
+ Sets a drawing-color override for the area formed by three soft-body nodes.
 
 ### `rohr_graphics_texture_load`
 
@@ -2641,16 +2778,29 @@ Returns the current mouse position in screen coordinates.
 
 **Returns:** Mouse screen position.
 
-### AABB-tree debug drawing
+### `rohr_graphics_aabb_tree_debug_set`
 
 ```c
 void rohr_graphics_aabb_tree_debug_set(bool enabled);
+```
+
+ Enable or disable physics AABB-tree debug drawing.
+
+### `rohr_graphics_aabb_tree_debug_check`
+
+```c
 bool rohr_graphics_aabb_tree_debug_check(void);
+```
+
+ Return whether physics AABB-tree debug drawing is enabled.
+
+### `rohr_graphics_aabb_tree_draw`
+
+```c
 void rohr_graphics_aabb_tree_draw(void);
 ```
 
-Enables, inspects, and draws the current physics broad-phase hierarchy. Leaf
-bounds are green and internal hierarchy bounds are orange.
+ Draw the current physics AABB-tree bounds when debug drawing is enabled.
 
 ### `rohr_graphics_recording_start`
 
@@ -3040,17 +3190,6 @@ Creates an axis-aligned bounding box for a world-space shape.
 
 ## Systems
 
-### `rohr_system_tick_update`
-
-```c
-Tick rohr_system_tick_update(void);
-```
-
-Advances engine time, consumes every complete fixed tick, and deletes entities
-whose time-based or tick-based lifetimes have expired.
-
-**Returns:** Number of complete ticks consumed by this update.
-
 ### `rohr_system_physics_update`
 
 ```c
@@ -3062,6 +3201,16 @@ Runs one physics-system update.
 | Parameter | Description |
 | --- | --- |
 | `dt` | Simulation delta time in seconds. |
+
+### `rohr_system_tick_update`
+
+```c
+Tick rohr_system_tick_update(void);
+```
+
+Advances engine time and clears expired entities.
+
+**Returns:** Number of complete fixed ticks consumed by this update.
 
 ### `rohr_system_entities_past_lifetime_clean`
 
@@ -3612,6 +3761,38 @@ void rohr_ui_frame_begin(UIInput input);
 
  @brief Starts a UI frame with logical screen-space pointer input.
 
+### `rohr_ui_component_bounds_get`
+
+```c
+UIRect rohr_ui_component_bounds_get(UIRect bounds, const TextAsset *const *texts, size_t text_count, UIComponentConfig config);
+```
+
+ @brief Applies reusable sizing components to UI bounds.
+
+### `rohr_ui_event_add`
+
+```c
+void rohr_ui_event_add(const SDL_Event *event);
+```
+
+ Queues keyboard and pointer events used by UI controls.
+
+### `rohr_ui_field_event_add`
+
+```c
+void rohr_ui_field_event_add(const SDL_Event *event);
+```
+
+ Queues a keyboard event for focused UI fields.
+
+### `rohr_ui_field`
+
+```c
+UIFieldResult rohr_ui_field(const char *id, UIFieldBinding binding, TextAsset *display, UIRect bounds, const UIButtonStyle *style);
+```
+
+ Draws and edits a caller-owned string or float field.
+
 ### `rohr_ui_button`
 
 ```c
@@ -3623,6 +3804,110 @@ Draws and updates one button identified by a stable string.
 | Parameter | Description |
 | --- | --- |
 | `label` | Optional centered label; NULL or empty draws no label. |
+
+### `rohr_ui_dropdown`
+
+```c
+UIDropdownResult rohr_ui_dropdown(const char *id, const TextAsset *const *options, size_t option_count, size_t selected_index, UIRect bounds, const UIButtonStyle *style);
+```
+
+ @brief Draws a dropdown and returns selection and hover-preview state.
+
+### `rohr_ui_menu`
+
+```c
+UIDropdownResult rohr_ui_menu(const char *id, const TextAsset *label, const TextAsset *const *options, size_t option_count, UIRect bounds, const UIButtonStyle *style);
+```
+
+ @brief Draws a menu button whose label is not repeated in its action list.
+
+### `rohr_ui_scroll_region_begin`
+
+```c
+UIScrollRegionResult rohr_ui_scroll_region_begin(const char *id, UIRect bounds, float content_height, float offset, float wheel_step);
+```
+
+ @brief Begins a clipped vertical scroll region for subsequent UI controls.
+
+### `rohr_ui_scroll_region_end`
+
+```c
+void rohr_ui_scroll_region_end(void);
+```
+
+ @brief Ends the current UI scroll region.
+
+### `rohr_ui_interaction`
+
+```c
+UIButtonResult rohr_ui_interaction(const char *id, UIRect bounds);
+```
+
+ @brief Updates pointer interaction without prescribing visuals.
+
+### `rohr_ui_surface`
+
+```c
+void rohr_ui_surface(UIRect bounds, Color color);
+```
+
+ @brief Draws a filled rectangular UI primitive.
+
+### `rohr_ui_border`
+
+```c
+void rohr_ui_border(UIRect bounds, float thickness, Color color);
+```
+
+ @brief Draws a rectangular UI border primitive.
+
+### `rohr_ui_content`
+
+```c
+void rohr_ui_content(const TextAsset *text, UIRect bounds);
+```
+
+ @brief Draws centered clipped text content.
+
+### `rohr_ui_quad`
+
+```c
+void rohr_ui_quad(Position center, float width, float height, float angle, Color color);
+```
+
+ @brief Draws an oriented UI rectangle primitive.
+
+### `rohr_ui_clip_begin`
+
+```c
+bool rohr_ui_clip_begin(UIRect bounds);
+```
+
+ @brief Begins and ends a clipped UI component region.
+
+### `rohr_ui_navigation_move`
+
+```c
+bool rohr_ui_navigation_move(UINavigationDirection direction);
+```
+
+ @brief Moves UI keyboard focus in a screen-space direction.
+
+### `rohr_ui_navigation_activate`
+
+```c
+bool rohr_ui_navigation_activate(void);
+```
+
+ @brief Activates the currently focused UI control.
+
+### `rohr_ui_navigation_focus_bounds_get`
+
+```c
+bool rohr_ui_navigation_focus_bounds_get(UIRect *bounds);
+```
+
+ @brief Returns the focused control's previous-frame screen bounds.
 
 ### `rohr_ui_label`
 

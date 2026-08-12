@@ -46,3 +46,14 @@ orchestration lives in `src/physics/pipeline`:
 The standard pipeline remains the behavioral reference. Custom pipelines may
 omit stages, but their caller owns the resulting behavior and must preserve
 required ordering such as clearing transient constraints before gathering.
+
+## Editor
+
+The editor under `tools/editor` is a separate application that links the engine
+but owns a non-runtime authoring model. Editor object ids are not ECS entity
+handles. JSON persists the authoring model, and explicit generation materializes
+it as C functions that create runtime entities.
+
+This separation lets editor data retain names, hierarchy, visibility, and
+editing metadata without adding editor-only components to the engine. See the
+[editor architecture](editor_architecture.md) and [editor guide](editor.md).
