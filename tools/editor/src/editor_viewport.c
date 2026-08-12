@@ -997,6 +997,11 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                         state->mode = EDITOR_VIEWPORT_SOFT_AREA;
                         state->last_viewport_click_selection = EDITOR_SELECTION_NONE;
                     } else {
+                        state->dragged_soft_body = true;
+                        state->drag_offset = (Vec2D){
+                            pointer.x - object->position.x - soft_body->position.x,
+                            pointer.y - object->position.y - soft_body->position.y
+                        };
                         state->last_viewport_click_selection = EDITOR_SELECTION_SOFT_AREA;
                         state->last_viewport_click_object = object->id;
                         state->last_viewport_click_index = area_id;
