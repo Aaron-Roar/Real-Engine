@@ -99,7 +99,7 @@ static float editor_panel_content_height_get(const EditorProject *project,
     }
     if(object == NULL) return height;
     if(state->mode == EDITOR_VIEWPORT_OBJECT) {
-        return fmaxf(height, 290.0f + (float)(object->rigid_body_count +
+        return fmaxf(height, 350.0f + (float)(object->rigid_body_count +
             object->joint_count + object->soft_body_count) * 30.0f);
     }
     if(state->mode == EDITOR_VIEWPORT_RIGID_BODY) {
@@ -114,13 +114,30 @@ static float editor_panel_content_height_get(const EditorProject *project,
     if(state->mode == EDITOR_VIEWPORT_SOFT_BODY) {
         for(size_t i = 0; i < object->soft_body_count; i += 1) {
             if(object->soft_body_items[i].id == state->selected_soft_body) {
-                return fmaxf(height, 470.0f + (float)(object->soft_body_items[i].node_count +
+                return fmaxf(height, 540.0f + (float)(object->soft_body_items[i].node_count +
                     object->soft_body_items[i].beam_count +
                     object->soft_body_items[i].area_count) * 28.0f);
             }
         }
     }
+    if(state->mode == EDITOR_VIEWPORT_HITBOX) {
+        for(size_t body_index = 0; body_index < object->rigid_body_count; body_index += 1) {
+            const EditorRigidBody *body = &object->rigid_bodies[body_index];
+            if(body->id != state->selected_rigid_body) continue;
+            for(size_t hitbox_index = 0; hitbox_index < body->hitbox_count; hitbox_index += 1) {
+                if(body->hitboxes[hitbox_index].id == state->selected_hitbox) {
+                    return fmaxf(height, 180.0f +
+                        (float)body->hitboxes[hitbox_index].vertex_count * 27.0f);
+                }
+            }
+        }
+    }
     return height;
+}
+
+static float editor_panel_delete_y_get(const EditorProject *project,
+    const EditorViewportState *state) {
+    return editor_panel_content_height_get(project, state) - 50.0f;
 }
 
 static bool editor_use_executable_directory(void) {
@@ -411,34 +428,20 @@ static void editor_icon_line_draw(Position start, Position end, Color color) {
 static bool editor_visibility_toggle(const char *id, TextAsset *empty_label,
     UIRect bounds, bool *visible) {
     UIButtonResult result;
-    Position center;
+    UIRect eye;
     Color color = {225, 230, 240, 255};
 
     if(id == NULL || empty_label == NULL || visible == NULL) return false;
     result = rohr_ui_button(id, empty_label, bounds, NULL);
-    center = (Position){bounds.x + bounds.width * 0.5f,
-        bounds.y + bounds.height * 0.5f};
+    eye = (UIRect){bounds.x + 5.0f, bounds.y + 8.0f,
+        bounds.width - 10.0f, bounds.height - 16.0f};
     if(*visible) {
-        editor_icon_line_draw((Position){center.x - 8.0f, center.y},
-            (Position){center.x - 3.0f, center.y - 4.0f}, color);
-        editor_icon_line_draw((Position){center.x - 3.0f, center.y - 4.0f},
-            (Position){center.x + 3.0f, center.y - 4.0f}, color);
-        editor_icon_line_draw((Position){center.x + 3.0f, center.y - 4.0f},
-            (Position){center.x + 8.0f, center.y}, color);
-        editor_icon_line_draw((Position){center.x + 8.0f, center.y},
-            (Position){center.x + 3.0f, center.y + 4.0f}, color);
-        editor_icon_line_draw((Position){center.x + 3.0f, center.y + 4.0f},
-            (Position){center.x - 3.0f, center.y + 4.0f}, color);
-        editor_icon_line_draw((Position){center.x - 3.0f, center.y + 4.0f},
-            (Position){center.x - 8.0f, center.y}, color);
-        (void)rohr_graphics_screen_quad_draw(center, 4.0f, 4.0f, 0.0f, color);
+        rohr_ui_border(eye, 2.0f, color);
+        rohr_ui_surface((UIRect){eye.x + eye.width * 0.38f, eye.y + 1.0f,
+            eye.width * 0.24f, eye.height - 2.0f}, color);
     } else {
-        editor_icon_line_draw((Position){center.x - 8.0f, center.y},
-            (Position){center.x + 8.0f, center.y}, color);
-        editor_icon_line_draw((Position){center.x - 6.0f, center.y - 3.0f},
-            (Position){center.x - 3.0f, center.y}, color);
-        editor_icon_line_draw((Position){center.x + 6.0f, center.y - 3.0f},
-            (Position){center.x + 3.0f, center.y}, color);
+        rohr_ui_surface((UIRect){eye.x, eye.y + eye.height * 0.5f - 1.0f,
+            eye.width, 2.0f}, color);
     }
     if(result.clicked) *visible = !*visible;
     return result.clicked;
@@ -462,13 +465,8 @@ static bool editor_checkbox(const char *id, const TextAsset *label,
     rohr_ui_surface(box, (Color){22, 25, 31, 255});
     rohr_ui_border(box, 2.0f, (Color){8, 9, 12, 255});
     if(*checked) {
-        editor_icon_line_draw(
-            (Position){box.x + box.width * 0.22f, box.y + box.height * 0.52f},
-            (Position){box.x + box.width * 0.43f, box.y + box.height * 0.74f},
-            (Color){225, 230, 240, 255});
-        editor_icon_line_draw(
-            (Position){box.x + box.width * 0.43f, box.y + box.height * 0.74f},
-            (Position){box.x + box.width * 0.80f, box.y + box.height * 0.24f},
+        rohr_ui_surface((UIRect){box.x + 5.0f, box.y + 5.0f,
+            box.width - 10.0f, box.height - 10.0f},
             (Color){225, 230, 240, 255});
     }
     rohr_ui_label(label, (UIRect){box.x + box.width + 8.0f, bounds.y,
@@ -494,13 +492,8 @@ static bool editor_checkbox_label_left(const char *id, const TextAsset *label,
     rohr_ui_surface(box, (Color){22, 25, 31, 255});
     rohr_ui_border(box, 2.0f, (Color){8, 9, 12, 255});
     if(*checked) {
-        editor_icon_line_draw(
-            (Position){box.x + box.width * 0.22f, box.y + box.height * 0.52f},
-            (Position){box.x + box.width * 0.43f, box.y + box.height * 0.74f},
-            (Color){225, 230, 240, 255});
-        editor_icon_line_draw(
-            (Position){box.x + box.width * 0.43f, box.y + box.height * 0.74f},
-            (Position){box.x + box.width * 0.80f, box.y + box.height * 0.24f},
+        rohr_ui_surface((UIRect){box.x + 5.0f, box.y + 5.0f,
+            box.width - 10.0f, box.height - 10.0f},
             (Color){225, 230, 240, 255});
     }
     rohr_ui_label(label, (UIRect){bounds.x + 4.0f, bounds.y,
@@ -1785,7 +1778,7 @@ int main(void) {
                     UIButtonStyle style = editor_delete_button_style_get();
                     if(rohr_ui_button("editor.rigid_body.delete", &delete_rigid_body_label,
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
-                                660.0f + (float)project.collision_mask_count * 30.0f,
+                                editor_panel_delete_y_get(&project, &viewport_state),
                                 EDITOR_TOOLS_WIDTH - 20.0f, 34.0f}, &style).clicked) {
                         (void)editor_open_item_delete(&project, &viewport_state);
                     }
@@ -1869,8 +1862,8 @@ int main(void) {
                     }
                     {
                         UIButtonStyle delete_style = editor_delete_button_style_get();
-                        float delete_y = base + 40.0f +
-                            (float)hitbox->vertex_count * 27.0f;
+                        float delete_y = editor_panel_delete_y_get(
+                            &project, &viewport_state);
 
                         if(rohr_ui_button("editor.hitbox.delete", &delete_hitbox_label,
                                 (UIRect){EDITOR_VIEWPORT_WIDTH + 18.0f, delete_y,
@@ -1936,7 +1929,8 @@ int main(void) {
                 }
                 {
                     UIButtonStyle delete_style = editor_delete_button_style_get();
-                    UIRect delete_bounds = {EDITOR_VIEWPORT_WIDTH + 10.0f, 260.0f,
+                    UIRect delete_bounds = {EDITOR_VIEWPORT_WIDTH + 10.0f,
+                        editor_panel_delete_y_get(&project, &viewport_state),
                         EDITOR_TOOLS_WIDTH - 20.0f, 30.0f};
                     if(hitbox->vertex_count <= EDITOR_HITBOX_VERTEX_MIN) {
                         rohr_ui_button_disabled(delete_bounds, &delete_style);
@@ -2008,7 +2002,8 @@ int main(void) {
                     }
                     {
                         UIButtonStyle delete_style = editor_delete_button_style_get();
-                        UIRect delete_bounds = {EDITOR_VIEWPORT_WIDTH + 10.0f, 238.0f,
+                        UIRect delete_bounds = {EDITOR_VIEWPORT_WIDTH + 10.0f,
+                            editor_panel_delete_y_get(&project, &viewport_state),
                             EDITOR_TOOLS_WIDTH - 20.0f, 30.0f};
                         if(hitbox->vertex_count <= EDITOR_HITBOX_VERTEX_MIN) {
                             rohr_ui_button_disabled(delete_bounds, &delete_style);
@@ -2297,7 +2292,8 @@ int main(void) {
                     }
                 }
                 if(rohr_ui_button("editor.joint.delete", &delete_joint_label,
-                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 660.0f,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
+                            editor_panel_delete_y_get(&project, &viewport_state),
                             EDITOR_TOOLS_WIDTH - 20.0f, 34.0f},
                         &delete_style).clicked) {
                     (void)editor_open_item_delete(&project, &viewport_state);
@@ -2419,7 +2415,8 @@ int main(void) {
                 {
                     UIButtonStyle delete_style = editor_delete_button_style_get();
                     if(rohr_ui_button("editor.anchor.delete", &delete_anchor_label,
-                            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 660.0f,
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
+                                editor_panel_delete_y_get(&project, &viewport_state),
                                 EDITOR_TOOLS_WIDTH - 20.0f, 34.0f},
                             &delete_style).clicked) {
                         (void)editor_open_item_delete(&project, &viewport_state);
@@ -2614,7 +2611,8 @@ int main(void) {
                     }
                 }
                 if(rohr_ui_button("editor.soft_body.delete", &delete_soft_body_label,
-                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 660.0f,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
+                            editor_panel_delete_y_get(&project, &viewport_state),
                             EDITOR_TOOLS_WIDTH - 20.0f, 34.0f},
                         &delete_style).clicked) {
                     (void)editor_open_item_delete(&project, &viewport_state);
@@ -2777,7 +2775,8 @@ int main(void) {
                             field_width, 26.0f});
                 }
                 if(rohr_ui_button("editor.soft_node.delete", &delete_node_label,
-                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 660.0f,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
+                            editor_panel_delete_y_get(&project, &viewport_state),
                             EDITOR_TOOLS_WIDTH - 20.0f, 34.0f}, &delete_style).clicked) {
                     (void)editor_open_item_delete(&project, &viewport_state);
                 }
@@ -2874,7 +2873,8 @@ int main(void) {
                             field_width, 26.0f});
                 }
                 if(rohr_ui_button("editor.soft_beam.delete", &delete_beam_label,
-                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 660.0f,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
+                            editor_panel_delete_y_get(&project, &viewport_state),
                             EDITOR_TOOLS_WIDTH - 20.0f, 34.0f}, &delete_style).clicked) {
                     (void)editor_open_item_delete(&project, &viewport_state);
                 }
@@ -3162,7 +3162,8 @@ int main(void) {
                 {
                     UIButtonStyle delete_style = editor_delete_button_style_get();
                     if(rohr_ui_button("editor.object.delete", &delete_object_label,
-                            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 660.0f,
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
+                                editor_panel_delete_y_get(&project, &viewport_state),
                                 EDITOR_TOOLS_WIDTH - 20.0f, 34.0f},
                             &delete_style).clicked) {
                         (void)editor_open_item_delete(&project, &viewport_state);
