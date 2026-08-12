@@ -74,6 +74,8 @@ typedef struct EditorViewportState {
     EditorSoftNodeId selected_soft_node;
     EditorSoftBeamId selected_soft_beam;
     EditorSoftAreaId selected_soft_area;
+    EditorSoftAreaId soft_area_candidates[EDITOR_SOFT_AREA_MAX];
+    size_t soft_area_candidate_count;
     EditorOriginKind selected_origin_kind;
     EditorRigidBodyId preview_rigid_body;
     EditorAnchorId preview_anchor;

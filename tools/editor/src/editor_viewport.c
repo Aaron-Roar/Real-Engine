@@ -187,6 +187,44 @@ static void editor_line_draw(Position start, Position end, Color color) {
         length, 2.0f, -atan2f(delta.y, delta.x), color);
 }
 
+static void editor_triangle_filled_draw(Position a, Position b, Position c, Color color) {
+    Position points[3] = {
+        editor_view_world_to_screen(a),
+        editor_view_world_to_screen(b),
+        editor_view_world_to_screen(c)
+    };
+    float minimum_y = fminf(points[0].y, fminf(points[1].y, points[2].y));
+    float maximum_y = fmaxf(points[0].y, fmaxf(points[1].y, points[2].y));
+    int first_row = (int)floorf(fmaxf(minimum_y, EDITOR_MENU_HEIGHT));
+    int last_row = (int)ceilf(fminf(maximum_y, WINDOW_HEIGHT - 1.0f));
+
+    for(int row = first_row; row <= last_row; row += 1) {
+        float scan_y = (float)row + 0.5f;
+        float intersections[3];
+        size_t count = 0;
+        for(size_t edge = 0; edge < 3; edge += 1) {
+            Position start = points[edge];
+            Position end = points[(edge + 1) % 3];
+            float low = fminf(start.y, end.y);
+            float high = fmaxf(start.y, end.y);
+            if(scan_y < low || scan_y >= high || fabsf(end.y - start.y) <= 0.0001f) {
+                continue;
+            }
+            intersections[count++] = start.x + (scan_y - start.y) *
+                (end.x - start.x) / (end.y - start.y);
+        }
+        if(count >= 2) {
+            float left = fmaxf(fminf(intersections[0], intersections[1]), 0.0f);
+            float right = fminf(fmaxf(intersections[0], intersections[1]),
+                EDITOR_VIEWPORT_WIDTH);
+            if(right > left) {
+                (void)rohr_graphics_screen_rect_draw(
+                    left, (float)row, right - left, 1.0f, color);
+            }
+        }
+    }
+}
+
 static void editor_quad_draw(Position center, float width, float height,
     float rotation, Color color) {
     (void)rohr_graphics_screen_quad_draw(editor_view_world_to_screen(center),
@@ -845,38 +883,44 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                 }
                 return true;
             }
-            for(size_t i = 0; i < soft_body->area_count; i += 1) {
-                EditorSoftArea *area = &soft_body->areas[i];
-                Uint64 now;
-                bool double_clicked;
-                if(!area->visible || !editor_soft_area_point_contains(
-                        object, soft_body, area, pointer)) continue;
-                state->selected_soft_body = soft_body->id;
-                if(state->mode != EDITOR_VIEWPORT_SOFT_BODY ||
-                        state->selected_soft_body != soft_body->id) {
+            {
+                bool parent_editor_active = state->mode == EDITOR_VIEWPORT_SOFT_BODY &&
+                    state->selected_soft_body == soft_body->id;
+                state->soft_area_candidate_count = 0;
+                for(size_t i = 0; i < soft_body->area_count; i += 1) {
+                    EditorSoftArea *area = &soft_body->areas[i];
+                    if(!area->visible || !editor_soft_area_point_contains(
+                            object, soft_body, area, pointer)) continue;
+                    state->soft_area_candidates[state->soft_area_candidate_count++] = area->id;
+                }
+                if(state->soft_area_candidate_count > 0 && !parent_editor_active) {
+                    state->selected_soft_body = soft_body->id;
                     state->selection = EDITOR_SELECTION_SOFT_BODY;
                     state->mode = EDITOR_VIEWPORT_SOFT_BODY;
                     state->last_viewport_click_selection = EDITOR_SELECTION_NONE;
                     return true;
                 }
-                now = SDL_GetTicks();
-                double_clicked = state->last_viewport_click_selection ==
+                if(state->soft_area_candidate_count > 0) {
+                    EditorSoftAreaId area_id = state->soft_area_candidates[0];
+                    Uint64 now = SDL_GetTicks();
+                    bool double_clicked = state->last_viewport_click_selection ==
                         EDITOR_SELECTION_SOFT_AREA &&
-                    state->last_viewport_click_object == object->id &&
-                    state->last_viewport_click_index == area->id &&
-                    now - state->last_viewport_click_at <= 400;
-                state->selection = EDITOR_SELECTION_SOFT_AREA;
-                state->selected_soft_area = area->id;
-                if(double_clicked) {
-                    state->mode = EDITOR_VIEWPORT_SOFT_AREA;
-                    state->last_viewport_click_selection = EDITOR_SELECTION_NONE;
-                } else {
-                    state->last_viewport_click_selection = EDITOR_SELECTION_SOFT_AREA;
-                    state->last_viewport_click_object = object->id;
-                    state->last_viewport_click_index = area->id;
-                    state->last_viewport_click_at = now;
+                        state->last_viewport_click_object == object->id &&
+                        state->last_viewport_click_index == area_id &&
+                        now - state->last_viewport_click_at <= 400;
+                    if(double_clicked) {
+                        state->selection = EDITOR_SELECTION_SOFT_AREA;
+                        state->selected_soft_area = area_id;
+                        state->mode = EDITOR_VIEWPORT_SOFT_AREA;
+                        state->last_viewport_click_selection = EDITOR_SELECTION_NONE;
+                    } else {
+                        state->last_viewport_click_selection = EDITOR_SELECTION_SOFT_AREA;
+                        state->last_viewport_click_object = object->id;
+                        state->last_viewport_click_index = area_id;
+                        state->last_viewport_click_at = now;
+                    }
+                    return true;
                 }
-                return true;
             }
             if(editor_soft_body_area_contains(object, soft_body, pointer)) {
                 state->selection = EDITOR_SELECTION_SOFT_BODY;
@@ -1046,6 +1090,18 @@ static void editor_viewport_object_draw(const EditorObject *object,
             }
         }
         if(!body->visible) continue;
+        if(selected_area != NULL && selected_area->visible) {
+            const EditorSoftNode *a = editor_soft_node_get(body, selected_area->node_a);
+            const EditorSoftNode *b = editor_soft_node_get(body, selected_area->node_b);
+            const EditorSoftNode *c = editor_soft_node_get(body, selected_area->node_c);
+            if(a != NULL && b != NULL && c != NULL) {
+                editor_triangle_filled_draw(
+                    editor_soft_node_world_get(object, body, a),
+                    editor_soft_node_world_get(object, body, b),
+                    editor_soft_node_world_get(object, body, c),
+                    (Color){255, 215, 70, 72});
+            }
+        }
         for(size_t beam_index = 0; beam_index < body->beam_count; beam_index += 1) {
             const EditorSoftBeam *beam = &body->beams[beam_index];
             const EditorSoftNode *a = NULL;

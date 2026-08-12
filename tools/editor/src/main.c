@@ -749,6 +749,15 @@ static bool editor_selected_open(
         return true;
     }
     if(viewport_state->selection == EDITOR_SELECTION_SOFT_AREA) {
+        bool candidate_found = false;
+        for(size_t i = 0; i < viewport_state->soft_area_candidate_count; i += 1) {
+            if(viewport_state->soft_area_candidates[i] ==
+                    viewport_state->selected_soft_area) candidate_found = true;
+        }
+        if(!candidate_found) {
+            viewport_state->soft_area_candidates[0] = viewport_state->selected_soft_area;
+            viewport_state->soft_area_candidate_count = 1;
+        }
         viewport_state->mode = EDITOR_VIEWPORT_SOFT_AREA;
         return true;
     }
@@ -936,6 +945,8 @@ int main(void) {
     TextAsset color_fields[3] = {0};
     char color_buffers[3][10] = {{0}};
     const uint32_t *color_targets[3] = {0};
+    uint32_t boundary_beam_color = UINT32_C(0xffffffff);
+    EditorSoftAreaId boundary_beam_color_area = 0;
     TextAsset vertices_label = {0};
     TextAsset lines_label = {0};
     TextAsset vertex_labels[EDITOR_HITBOX_VERTEX_MAX] = {0};
@@ -2414,6 +2425,8 @@ int main(void) {
                             if(result.clicked || result.focus_changed) {
                                 viewport_state.selection = EDITOR_SELECTION_SOFT_AREA;
                                 viewport_state.selected_soft_area = area->id;
+                                viewport_state.soft_area_candidates[0] = area->id;
+                                viewport_state.soft_area_candidate_count = 1;
                                 if(result.double_clicked) (void)editor_selected_open(
                                     &project, &viewport_state);
                             }
@@ -2685,24 +2698,88 @@ int main(void) {
                 UIFieldResult name_result;
                 uint32_t previous;
                 UIFieldResult color_result;
+                float controls_y = 42.0f;
+                for(size_t candidate_index = 0;
+                        candidate_index < viewport_state.soft_area_candidate_count;
+                        candidate_index += 1) {
+                    EditorSoftArea *candidate = NULL;
+                    UIButtonStyle selected_style = editor_selected_button_style_get();
+                    UIButtonResult result;
+                    char id[64];
+                    size_t candidate_body_index;
+                    for(size_t i = 0; i < body->area_count; i += 1) {
+                        if(body->areas[i].id ==
+                                viewport_state.soft_area_candidates[candidate_index]) {
+                            candidate = &body->areas[i];
+                        }
+                    }
+                    if(candidate == NULL) continue;
+                    candidate_body_index = (size_t)(candidate - body->areas);
+                    if(!editor_named_text_sync(&font, candidate->name,
+                            &soft_area_labels[candidate_body_index],
+                            soft_area_cache[candidate_body_index],
+                            EDITOR_OBJECT_NAME_MAX)) goto fail;
+                    snprintf(id, sizeof(id), "editor.soft_area.candidate.%u", candidate->id);
+                    result = rohr_ui_button(id, &soft_area_labels[candidate_body_index],
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, controls_y,
+                            EDITOR_TOOLS_WIDTH - 20.0f, 28.0f},
+                        candidate->id == area->id ? &selected_style : NULL);
+                    if(result.clicked || result.focus_changed) {
+                        viewport_state.selected_soft_area = candidate->id;
+                        viewport_state.selection = EDITOR_SELECTION_SOFT_AREA;
+                        boundary_beam_color_area = 0;
+                    }
+                    controls_y += 32.0f;
+                }
+                controls_y += 10.0f;
                 if(!editor_named_text_sync(&font, area->name, &soft_area_labels[index],
                         soft_area_cache[index], EDITOR_OBJECT_NAME_MAX)) goto fail;
                 if(!area->color_overridden) area->color = body->area_color;
                 previous = area->color;
                 rohr_ui_label(&name_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
-                    42.0f, 48.0f, 30.0f});
+                    controls_y, 48.0f, 30.0f});
                 name_result = editor_property_name_field("editor.soft_area.name", area->name,
                     sizeof(area->name), &soft_area_labels[index],
-                    (UIRect){EDITOR_VIEWPORT_WIDTH + 58.0f, 42.0f,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 58.0f, controls_y,
                         EDITOR_TOOLS_WIDTH - 68.0f, 30.0f});
+                controls_y += 40.0f;
                 rohr_ui_label(&area_color_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
-                    92.0f, 90.0f, 26.0f});
+                    controls_y, 90.0f, 26.0f});
                 color_result = editor_hex_color_field("editor.soft_area.color", &area->color,
                     &color_fields[0], color_buffers[0], &color_targets[0],
-                    (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 92.0f,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, controls_y,
                         EDITOR_TOOLS_WIDTH - 110.0f, 26.0f});
                 if(area->color != previous) area->color_overridden = true;
                 field_editing = name_result.active || color_result.active;
+                controls_y += 36.0f;
+                if(boundary_beam_color_area != area->id) {
+                    EditorSoftBeam *first = editor_soft_area_beam_get(body, area, 0);
+                    boundary_beam_color = first != NULL && first->color_overridden ?
+                        first->color : body->beam_color;
+                    boundary_beam_color_area = area->id;
+                    color_targets[1] = NULL;
+                }
+                {
+                    uint32_t previous_beam_color = boundary_beam_color;
+                    UIFieldResult beam_color_result;
+                    rohr_ui_label(&beam_color_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                        controls_y, 90.0f, 26.0f});
+                    beam_color_result = editor_hex_color_field(
+                        "editor.soft_area.boundary_beam_color", &boundary_beam_color,
+                        &color_fields[1], color_buffers[1], &color_targets[1],
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, controls_y,
+                            EDITOR_TOOLS_WIDTH - 110.0f, 26.0f});
+                    if(boundary_beam_color != previous_beam_color) {
+                        for(size_t edge = 0; edge < 3; edge += 1) {
+                            EditorSoftBeam *beam = editor_soft_area_beam_get(body, area, edge);
+                            if(beam == NULL) continue;
+                            beam->color = boundary_beam_color;
+                            beam->color_overridden = true;
+                        }
+                    }
+                    field_editing = field_editing || beam_color_result.active;
+                }
+                controls_y += 36.0f;
                 for(size_t edge = 0; edge < 3; edge += 1) {
                     EditorSoftBeam *beam = editor_soft_area_beam_get(body, area, edge);
                     UIButtonStyle selected_style = editor_selected_button_style_get();
@@ -2717,7 +2794,7 @@ int main(void) {
                     snprintf(id, sizeof(id), "editor.soft_area.beam.%u", beam->id);
                     result = rohr_ui_button(id, &soft_beam_labels[beam_index],
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
-                            136.0f + (float)edge * 34.0f,
+                            controls_y + (float)edge * 34.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, &selected_style);
                     if(result.clicked || result.focus_changed) {
                         viewport_state.selection = EDITOR_SELECTION_SOFT_BEAM;
