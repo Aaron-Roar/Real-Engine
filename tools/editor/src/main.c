@@ -188,6 +188,16 @@ static UIFieldResult editor_hex_color_field(const char *id, uint32_t *color,
     return result;
 }
 
+static void editor_hex_color_field_disabled_draw(uint32_t color,
+        TextAsset *display, char buffer[10], UIRect bounds) {
+    UIButtonStyle style = rohr_ui_button_style_default_get();
+    editor_hex_color_format(buffer, color);
+    (void)rohr_graphics_text_value_set(display, buffer);
+    style.disabled = (Color){54, 58, 66, 255};
+    rohr_ui_button_disabled(bounds, &style);
+    rohr_ui_label(display, bounds);
+}
+
 static void editor_numeric_field_disabled_draw(
     TextAsset *display,
     float value,
@@ -942,6 +952,7 @@ int main(void) {
     TextAsset node_color_label = {0};
     TextAsset beam_color_label = {0};
     TextAsset area_color_label = {0};
+    TextAsset inherit_label = {0};
     TextAsset color_fields[3] = {0};
     char color_buffers[3][10] = {{0}};
     const uint32_t *color_targets[3] = {0};
@@ -1090,6 +1101,7 @@ int main(void) {
             !editor_text_create(&font, "Node Color", &node_color_label) ||
             !editor_text_create(&font, "Beam Color", &beam_color_label) ||
             !editor_text_create(&font, "Area Color", &area_color_label) ||
+            !editor_text_create(&font, "Inherit", &inherit_label) ||
             !editor_text_create(&font, "Mass", &mass_label) ||
             !editor_text_create(&font, "Radius", &radius_label) ||
             !editor_text_create(&font, "Gravity", &gravity_label) ||
@@ -2579,16 +2591,32 @@ int main(void) {
                     mass_result.active || radius_result.active || friction_result.active ||
                     restitution_result.active || field_editing;
                 {
+                    bool inherit = !node->color_overridden;
+                    float field_width = fmaxf(34.0f, EDITOR_TOOLS_WIDTH - 196.0f);
                     if(!node->color_overridden) node->color = body->node_color;
                     uint32_t previous = node->color;
-                    UIFieldResult color_result;
+                    UIFieldResult color_result = {0};
                     rohr_ui_label(&node_color_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         620.0f, 90.0f, 26.0f});
-                    color_result = editor_hex_color_field("editor.soft_node.color", &node->color,
-                        &color_fields[0], color_buffers[0], &color_targets[0],
+                    if(editor_checkbox_label_left("editor.soft_node.color_inherit",
+                            &inherit_label, (UIRect){EDITOR_VIEWPORT_WIDTH +
+                                EDITOR_TOOLS_WIDTH - 92.0f,
+                                620.0f, 82.0f, 26.0f}, &inherit)) {
+                        node->color_overridden = !inherit;
+                        node->color = body->node_color;
+                        color_targets[0] = NULL;
+                    }
+                    if(inherit) editor_hex_color_field_disabled_draw(body->node_color,
+                        &color_fields[0], color_buffers[0],
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 620.0f,
-                            EDITOR_TOOLS_WIDTH - 110.0f, 26.0f});
-                    if(node->color != previous) node->color_overridden = true;
+                            field_width, 26.0f});
+                    else color_result = editor_hex_color_field("editor.soft_node.color",
+                        &node->color, &color_fields[0], color_buffers[0], &color_targets[0],
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 620.0f,
+                            field_width, 26.0f});
+                    if(node->color_overridden && node->color != previous) {
+                        node->color_overridden = true;
+                    }
                     field_editing = field_editing || color_result.active;
                 }
                 if(rohr_ui_button("editor.soft_node.delete", &delete_node_label,
@@ -2671,16 +2699,32 @@ int main(void) {
                 field_editing = name_result.active || stiffness_result.active ||
                     damping_result.active;
                 {
+                    bool inherit = !beam->color_overridden;
+                    float field_width = fmaxf(34.0f, EDITOR_TOOLS_WIDTH - 196.0f);
                     if(!beam->color_overridden) beam->color = body->beam_color;
                     uint32_t previous = beam->color;
-                    UIFieldResult color_result;
+                    UIFieldResult color_result = {0};
                     rohr_ui_label(&beam_color_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         268.0f, 90.0f, 26.0f});
-                    color_result = editor_hex_color_field("editor.soft_beam.color", &beam->color,
-                        &color_fields[0], color_buffers[0], &color_targets[0],
+                    if(editor_checkbox_label_left("editor.soft_beam.color_inherit",
+                            &inherit_label, (UIRect){EDITOR_VIEWPORT_WIDTH +
+                                EDITOR_TOOLS_WIDTH - 92.0f,
+                                268.0f, 82.0f, 26.0f}, &inherit)) {
+                        beam->color_overridden = !inherit;
+                        beam->color = body->beam_color;
+                        color_targets[0] = NULL;
+                    }
+                    if(inherit) editor_hex_color_field_disabled_draw(body->beam_color,
+                        &color_fields[0], color_buffers[0],
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 268.0f,
-                            EDITOR_TOOLS_WIDTH - 110.0f, 26.0f});
-                    if(beam->color != previous) beam->color_overridden = true;
+                            field_width, 26.0f});
+                    else color_result = editor_hex_color_field("editor.soft_beam.color",
+                        &beam->color, &color_fields[0], color_buffers[0], &color_targets[0],
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 268.0f,
+                            field_width, 26.0f});
+                    if(beam->color_overridden && beam->color != previous) {
+                        beam->color_overridden = true;
+                    }
                     field_editing = field_editing || color_result.active;
                 }
                 if(rohr_ui_button("editor.soft_beam.delete", &delete_beam_label,
@@ -2745,11 +2789,29 @@ int main(void) {
                 controls_y += 40.0f;
                 rohr_ui_label(&area_color_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     controls_y, 90.0f, 26.0f});
-                color_result = editor_hex_color_field("editor.soft_area.color", &area->color,
-                    &color_fields[0], color_buffers[0], &color_targets[0],
-                    (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, controls_y,
-                        EDITOR_TOOLS_WIDTH - 110.0f, 26.0f});
-                if(area->color != previous) area->color_overridden = true;
+                {
+                    bool inherit = !area->color_overridden;
+                    float field_width = fmaxf(34.0f, EDITOR_TOOLS_WIDTH - 196.0f);
+                    if(editor_checkbox_label_left("editor.soft_area.color_inherit",
+                            &inherit_label, (UIRect){EDITOR_VIEWPORT_WIDTH +
+                                EDITOR_TOOLS_WIDTH - 92.0f,
+                                controls_y, 82.0f, 26.0f}, &inherit)) {
+                        area->color_overridden = !inherit;
+                        area->color = body->area_color;
+                        color_targets[0] = NULL;
+                    }
+                    if(inherit) editor_hex_color_field_disabled_draw(body->area_color,
+                        &color_fields[0], color_buffers[0],
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, controls_y,
+                            field_width, 26.0f});
+                    else color_result = editor_hex_color_field("editor.soft_area.color",
+                        &area->color, &color_fields[0], color_buffers[0], &color_targets[0],
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, controls_y,
+                            field_width, 26.0f});
+                }
+                if(area->color_overridden && area->color != previous) {
+                    area->color_overridden = true;
+                }
                 field_editing = name_result.active || color_result.active;
                 controls_y += 36.0f;
                 if(boundary_beam_color_area != area->id) {
@@ -2760,16 +2822,39 @@ int main(void) {
                     color_targets[1] = NULL;
                 }
                 {
+                    bool inherit = true;
                     uint32_t previous_beam_color = boundary_beam_color;
-                    UIFieldResult beam_color_result;
+                    UIFieldResult beam_color_result = {0};
+                    float field_width = fmaxf(34.0f, EDITOR_TOOLS_WIDTH - 196.0f);
+                    for(size_t edge = 0; edge < 3; edge += 1) {
+                        EditorSoftBeam *beam = editor_soft_area_beam_get(body, area, edge);
+                        if(beam != NULL && beam->color_overridden) inherit = false;
+                    }
                     rohr_ui_label(&beam_color_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         controls_y, 90.0f, 26.0f});
-                    beam_color_result = editor_hex_color_field(
+                    if(editor_checkbox_label_left("editor.soft_area.beam_color_inherit",
+                            &inherit_label, (UIRect){EDITOR_VIEWPORT_WIDTH +
+                                EDITOR_TOOLS_WIDTH - 92.0f,
+                                controls_y, 82.0f, 26.0f}, &inherit)) {
+                        for(size_t edge = 0; edge < 3; edge += 1) {
+                            EditorSoftBeam *beam = editor_soft_area_beam_get(body, area, edge);
+                            if(beam == NULL) continue;
+                            beam->color_overridden = !inherit;
+                            beam->color = body->beam_color;
+                        }
+                        boundary_beam_color = body->beam_color;
+                        color_targets[1] = NULL;
+                    }
+                    if(inherit) editor_hex_color_field_disabled_draw(body->beam_color,
+                        &color_fields[1], color_buffers[1],
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, controls_y,
+                            field_width, 26.0f});
+                    else beam_color_result = editor_hex_color_field(
                         "editor.soft_area.boundary_beam_color", &boundary_beam_color,
                         &color_fields[1], color_buffers[1], &color_targets[1],
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, controls_y,
-                            EDITOR_TOOLS_WIDTH - 110.0f, 26.0f});
-                    if(boundary_beam_color != previous_beam_color) {
+                            field_width, 26.0f});
+                    if(!inherit && boundary_beam_color != previous_beam_color) {
                         for(size_t edge = 0; edge < 3; edge += 1) {
                             EditorSoftBeam *beam = editor_soft_area_beam_get(body, area, edge);
                             if(beam == NULL) continue;
@@ -3307,6 +3392,7 @@ int main(void) {
     rohr_graphics_text_destroy(&node_color_label);
     rohr_graphics_text_destroy(&beam_color_label);
     rohr_graphics_text_destroy(&area_color_label);
+    rohr_graphics_text_destroy(&inherit_label);
     for(size_t i = 0; i < 3; i += 1) rohr_graphics_text_destroy(&color_fields[i]);
     rohr_graphics_text_destroy(&gravity_label);
     rohr_graphics_text_destroy(&friction_label);
@@ -3447,6 +3533,7 @@ fail:
     rohr_graphics_text_destroy(&node_color_label);
     rohr_graphics_text_destroy(&beam_color_label);
     rohr_graphics_text_destroy(&area_color_label);
+    rohr_graphics_text_destroy(&inherit_label);
     for(size_t i = 0; i < 3; i += 1) rohr_graphics_text_destroy(&color_fields[i]);
     rohr_graphics_text_destroy(&gravity_label);
     rohr_graphics_text_destroy(&friction_label);
