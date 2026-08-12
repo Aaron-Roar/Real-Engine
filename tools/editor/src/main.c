@@ -1006,7 +1006,7 @@ static void editor_current_selection_clear(
     } else if(viewport_state->mode == EDITOR_VIEWPORT_PARTICLE) {
         viewport_state->selection = EDITOR_SELECTION_PARTICLE;
     } else if(viewport_state->mode == EDITOR_VIEWPORT_HITBOX) {
-        viewport_state->selection = EDITOR_SELECTION_HITBOX;
+        viewport_state->selection = EDITOR_SELECTION_NONE;
     } else if(viewport_state->mode == EDITOR_VIEWPORT_VERTEX) {
         viewport_state->selection = EDITOR_SELECTION_VERTEX;
     } else if(viewport_state->mode == EDITOR_VIEWPORT_LINE) {
@@ -1043,6 +1043,7 @@ int main(void) {
     TextAsset particle_label = {0};
     TextAsset particle_ring_color_label = {0};
     TextAsset particle_fill_color_label = {0};
+    TextAsset auto_fit_label = {0};
     TextAsset context_action_one_label = {0};
     TextAsset context_action_two_label = {0};
     TextAsset context_action_three_label = {0};
@@ -1232,6 +1233,7 @@ int main(void) {
             !editor_text_create(&font, "Particle", &particle_label) ||
             !editor_text_create(&font, "Ring Color", &particle_ring_color_label) ||
             !editor_text_create(&font, "Fill Color", &particle_fill_color_label) ||
+            !editor_text_create(&font, "Auto Fit", &auto_fit_label) ||
             !editor_text_create(&font, "Action 1", &context_action_one_label) ||
             !editor_text_create(&font, "Action 2", &context_action_two_label) ||
             !editor_text_create(&font, "Action 3", &context_action_three_label) ||
@@ -1336,6 +1338,7 @@ int main(void) {
 
     while(running) {
         SDL_Event event;
+        editor_project_particle_auto_fit_update(&project);
         viewport_wheel_y = 0.0f;
         rohr_controller_key_states_update(&keyboard);
         rohr_controller_mouse_states_update(&mouse);
@@ -1550,18 +1553,31 @@ int main(void) {
             EditorObject *selected = editor_project_selected_get(&project);
             EditorRigidBody *body = editor_selected_body_get(selected, &viewport_state);
             if(body != NULL && body->particle) {
-                UIFieldResult radius_result;
+                UIFieldResult radius_result = {0};
                 rohr_ui_label(&particle_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
                     42.0f, EDITOR_TOOLS_WIDTH - 20.0f, 30.0f});
                 rohr_ui_label(&radius_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
-                    84.0f, 90.0f, 26.0f});
-                radius_result = rohr_ui_field("editor.particle.radius",
-                    (UIFieldBinding){.kind = UI_FIELD_FLOAT,
-                        .number = &body->particle_radius}, &length_field,
-                    (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 84.0f,
-                        EDITOR_TOOLS_WIDTH - 110.0f, 26.0f}, NULL);
+                    84.0f, 52.0f, 26.0f});
+                if(body->particle_auto_fit) {
+                    editor_numeric_field_disabled_draw(&length_field,
+                        body->particle_radius,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 62.0f, 84.0f,
+                            fmaxf(30.0f, EDITOR_TOOLS_WIDTH - 166.0f), 26.0f});
+                } else {
+                    radius_result = rohr_ui_field("editor.particle.radius",
+                        (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                            .number = &body->particle_radius}, &length_field,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 62.0f, 84.0f,
+                            fmaxf(30.0f, EDITOR_TOOLS_WIDTH - 166.0f), 26.0f}, NULL);
+                }
                 if(radius_result.changed) body->particle_radius =
                     fmaxf(0.0f, body->particle_radius);
+                if(editor_checkbox_label_left("editor.particle.auto_fit", &auto_fit_label,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + EDITOR_TOOLS_WIDTH - 100.0f,
+                            84.0f, 90.0f, 26.0f}, &body->particle_auto_fit) &&
+                        body->particle_auto_fit) {
+                    body->particle_radius = editor_project_particle_auto_radius_get(body);
+                }
                 rohr_ui_label(&particle_ring_color_label,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 120.0f, 104.0f, 26.0f});
                 (void)editor_color_swatch("editor.particle.ring_color",
@@ -3703,6 +3719,7 @@ int main(void) {
     rohr_graphics_text_destroy(&particle_label);
     rohr_graphics_text_destroy(&particle_ring_color_label);
     rohr_graphics_text_destroy(&particle_fill_color_label);
+    rohr_graphics_text_destroy(&auto_fit_label);
     rohr_graphics_text_destroy(&context_action_one_label);
     rohr_graphics_text_destroy(&context_action_two_label);
     rohr_graphics_text_destroy(&context_action_three_label);
@@ -3848,6 +3865,7 @@ fail:
     rohr_graphics_text_destroy(&particle_label);
     rohr_graphics_text_destroy(&particle_ring_color_label);
     rohr_graphics_text_destroy(&particle_fill_color_label);
+    rohr_graphics_text_destroy(&auto_fit_label);
     rohr_graphics_text_destroy(&context_action_one_label);
     rohr_graphics_text_destroy(&context_action_two_label);
     rohr_graphics_text_destroy(&context_action_three_label);

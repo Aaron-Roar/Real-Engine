@@ -93,6 +93,8 @@ static yyjson_mut_val *editor_json_body_write(yyjson_mut_doc *document,
     const EditorRigidBody *body) {
     yyjson_mut_val *value = yyjson_mut_obj(document);
     yyjson_mut_val *hitboxes = yyjson_mut_arr(document);
+    float particle_radius = body->particle_auto_fit ?
+        editor_project_particle_auto_radius_get(body) : body->particle_radius;
     yyjson_mut_obj_add_uint(document, value, "id", body->id);
     yyjson_mut_obj_add_strcpy(document, value, "name", body->name);
     yyjson_mut_obj_add_val(document, value, "position",
@@ -106,7 +108,9 @@ static yyjson_mut_val *editor_json_body_write(yyjson_mut_doc *document,
     yyjson_mut_obj_add_bool(document, value, "gravity_enabled", body->gravity_enabled);
     yyjson_mut_obj_add_bool(document, value, "collision_enabled", body->collision_enabled);
     yyjson_mut_obj_add_bool(document, value, "particle", body->particle);
-    yyjson_mut_obj_add_real(document, value, "particle_radius", body->particle_radius);
+    yyjson_mut_obj_add_bool(document, value, "particle_auto_fit",
+        body->particle_auto_fit);
+    yyjson_mut_obj_add_real(document, value, "particle_radius", particle_radius);
     yyjson_mut_obj_add_uint(document, value, "particle_ring_color",
         body->particle_ring_color);
     yyjson_mut_obj_add_uint(document, value, "particle_fill_color",
@@ -347,6 +351,7 @@ static bool editor_json_body_read(yyjson_val *value, EditorRigidBody *body,
     yyjson_val *collision_category = yyjson_obj_get(value, "collision_category");
     yyjson_val *collision_with = yyjson_obj_get(value, "collision_with");
     yyjson_val *particle = yyjson_obj_get(value, "particle");
+    yyjson_val *particle_auto_fit = yyjson_obj_get(value, "particle_auto_fit");
     yyjson_val *particle_radius = yyjson_obj_get(value, "particle_radius");
     yyjson_val *particle_ring_color = yyjson_obj_get(value, "particle_ring_color");
     yyjson_val *particle_fill_color = yyjson_obj_get(value, "particle_fill_color");
@@ -372,6 +377,8 @@ static bool editor_json_body_read(yyjson_val *value, EditorRigidBody *body,
             !editor_json_uint64(value, "collision_category", &body->collision_category) ||
             !editor_json_uint64(value, "collision_with", &body->collision_with))) return false;
     if(particle != NULL && !editor_json_bool(value, "particle", &body->particle)) return false;
+    if(particle_auto_fit != NULL && !editor_json_bool(
+            value, "particle_auto_fit", &body->particle_auto_fit)) return false;
     if((particle_radius != NULL && !editor_json_real(
                 value, "particle_radius", &body->particle_radius)) ||
             (particle_ring_color != NULL && !editor_json_uint(

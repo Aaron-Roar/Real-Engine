@@ -398,6 +398,9 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
         for(size_t body_index = 0; body_index < object->rigid_body_count; body_index += 1) {
             const EditorRigidBody *body = &object->rigid_bodies[body_index];
             const EditorHitbox *hitbox = body->hitbox_count > 0 ? &body->hitboxes[0] : NULL;
+            Position particle_center = editor_project_particle_center_get(body);
+            float particle_radius = body->particle_auto_fit ?
+                editor_project_particle_auto_radius_get(body) : body->particle_radius;
 
             fprintf(source,
                 "    result = generated_body_create(&object->%s, "
@@ -406,10 +409,12 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 body->name, body->position.x, body->position.y, body->rotation,
                 body->particle ? 4 : hitbox == NULL ? 0 : hitbox->vertex_count);
             if(body->particle) {
-                fprintf(source, "{%#.9gf, 0.00000000f}, {0.00000000f, %#.9gf}, "
-                    "{%#.9gf, 0.00000000f}, {0.00000000f, %#.9gf}",
-                    body->particle_radius, body->particle_radius,
-                    -body->particle_radius, -body->particle_radius);
+                fprintf(source, "{%#.9gf, %#.9gf}, {%#.9gf, %#.9gf}, "
+                    "{%#.9gf, %#.9gf}, {%#.9gf, %#.9gf}",
+                    particle_center.x + particle_radius, particle_center.y,
+                    particle_center.x, particle_center.y + particle_radius,
+                    particle_center.x - particle_radius, particle_center.y,
+                    particle_center.x, particle_center.y - particle_radius);
             } else if(hitbox != NULL) {
                 for(uint32_t vertex = 0; vertex < hitbox->vertex_count; vertex += 1) {
                     fprintf(source, "%s{%#.9gf, %#.9gf}", vertex == 0 ? "" : ", ",

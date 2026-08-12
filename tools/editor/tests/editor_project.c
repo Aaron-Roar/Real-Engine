@@ -279,7 +279,8 @@ int main(void) {
             wheel->hitbox_count != 1 || fabsf(chassis->mass_value - 1.0f) > 0.001f ||
             fabsf(chassis->friction - 0.5f) > 0.001f ||
             fabsf(chassis->restitution) > 0.001f || chassis->static_body ||
-            chassis->rotation_locked || chassis->gravity_enabled) return 1;
+            chassis->rotation_locked || chassis->gravity_enabled ||
+            !chassis->particle_auto_fit) return 1;
     if(project.collision_mask_count != 1 ||
             strcmp(project.collision_masks[0].name, "default") != 0 ||
             !chassis->collision_enabled || chassis->collision_category != UINT64_C(1) ||
@@ -294,6 +295,11 @@ int main(void) {
     }
     chassis->collision_category |= UINT64_C(1) << 1;
     chassis->particle = true;
+    editor_project_particle_auto_fit_update(&project);
+    if(fabsf(chassis->particle_radius -
+            editor_project_particle_auto_radius_get(chassis)) > 0.001f ||
+            chassis->particle_radius <= 0.0f) return 1;
+    chassis->particle_auto_fit = false;
     chassis->particle_radius = 42.0f;
     chassis->particle_ring_color = UINT32_C(0xff8800ff);
     chassis->particle_fill_color = UINT32_C(0x22446680);
@@ -501,6 +507,7 @@ int main(void) {
                 loaded_object->rigid_bodies[0].collision_category !=
                     (UINT64_C(1) | (UINT64_C(1) << 1)) ||
                 !loaded_object->rigid_bodies[0].particle ||
+                loaded_object->rigid_bodies[0].particle_auto_fit ||
                 fabsf(loaded_object->rigid_bodies[0].particle_radius - 42.0f) > 0.001f ||
                 loaded_object->rigid_bodies[0].particle_ring_color !=
                     UINT32_C(0xff8800ff) ||

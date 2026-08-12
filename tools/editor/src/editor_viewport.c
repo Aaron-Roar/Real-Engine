@@ -46,6 +46,17 @@ static Position editor_hitbox_vertex_world_get(const EditorObject *object,
     };
 }
 
+static Position editor_particle_center_world_get(const EditorObject *object,
+    const EditorRigidBody *body) {
+    Position local = editor_project_particle_center_get(body);
+    float cosine = cosf(body->rotation);
+    float sine = sinf(body->rotation);
+    return (Position){object->position.x + body->position.x +
+            local.x * cosine - local.y * sine,
+        object->position.y + body->position.y +
+            local.x * sine + local.y * cosine};
+}
+
 static Position editor_soft_node_world_get(const EditorObject *object,
     const EditorSoftBody *body, const EditorSoftNode *node) {
     float cosine = cosf(body->rotation);
@@ -871,14 +882,17 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
     if(object->visible && primary_button == MOUSE_BUTTON_STATE_PRESSED) {
         for(size_t i = object->rigid_body_count; i > 0; i -= 1) {
             EditorRigidBody *particle_body = &object->rigid_bodies[i - 1];
-            Position center = {object->position.x + particle_body->position.x,
-                object->position.y + particle_body->position.y};
+            Position center = editor_particle_center_world_get(object, particle_body);
             float distance = hypotf(pointer.x - center.x, pointer.y - center.y);
             float tolerance = 7.0f / editor_view_scale;
             Uint64 now;
             bool double_clicked;
             if(!particle_body->visible || !particle_body->particle ||
                     fabsf(distance - particle_body->particle_radius) > tolerance) continue;
+            if(state->mode == EDITOR_VIEWPORT_HITBOX &&
+                    state->selected_rigid_body == particle_body->id) {
+                continue;
+            }
             now = SDL_GetTicks();
             double_clicked = state->last_viewport_click_selection ==
                     EDITOR_SELECTION_PARTICLE &&
@@ -894,7 +908,10 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                 if(state->mode != EDITOR_VIEWPORT_PARTICLE)
                     state->mode = EDITOR_VIEWPORT_RIGID_BODY;
                 state->dragged_body = true;
-                state->drag_offset = (Vec2D){pointer.x - center.x, pointer.y - center.y};
+                state->drag_offset = (Vec2D){
+                    pointer.x - object->position.x - particle_body->position.x,
+                    pointer.y - object->position.y - particle_body->position.y
+                };
                 state->last_viewport_click_selection = EDITOR_SELECTION_PARTICLE;
                 state->last_viewport_click_object = object->id;
                 state->last_viewport_click_index = particle_body->id;
@@ -1169,8 +1186,7 @@ static void editor_viewport_particle_fills_draw(const EditorObject *object) {
         const EditorRigidBody *body = &object->rigid_bodies[body_index];
         Position center;
         if(!body->visible || !body->particle || body->particle_radius <= 0.0f) continue;
-        center = (Position){object->position.x + body->position.x,
-            object->position.y + body->position.y};
+        center = editor_particle_center_world_get(object, body);
         editor_circle_filled_draw(center, body->particle_radius,
             graphics_color_hex_create(body->particle_fill_color));
     }
@@ -1220,8 +1236,7 @@ static void editor_viewport_object_draw(const EditorObject *object,
         Position center;
         Color ring;
         if(!body->visible || !body->particle || body->particle_radius <= 0.0f) continue;
-        center = (Position){object->position.x + body->position.x,
-            object->position.y + body->position.y};
+        center = editor_particle_center_world_get(object, body);
         ring = object_highlighted ||
                 (state->selection == EDITOR_SELECTION_PARTICLE &&
                     state->selected_rigid_body == body->id) ?

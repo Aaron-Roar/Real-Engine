@@ -227,6 +227,7 @@ EditorRigidBody editor_project_rigid_body_default_get(void) {
         .collision_enabled = true,
         .collision_category = UINT64_C(1),
         .collision_with = UINT64_C(1),
+        .particle_auto_fit = true,
         .particle_radius = 30.0f,
         .particle_ring_color = UINT32_C(0x4a90e2ff),
         .particle_fill_color = UINT32_C(0x4a90e240),
@@ -234,6 +235,59 @@ EditorRigidBody editor_project_rigid_body_default_get(void) {
         .surface_color = UINT32_C(0x808080ff),
         .visible = true
     };
+}
+
+Position editor_project_particle_center_get(const EditorRigidBody *body) {
+    const EditorHitbox *hitbox;
+    float twice_area = 0.0f;
+    Position weighted = {0};
+
+    if(body == NULL || body->hitbox_count == 0) return (Position){0};
+    hitbox = &body->hitboxes[0];
+    if(hitbox->vertex_count == 0) return (Position){0};
+    for(uint32_t i = 0; i < hitbox->vertex_count; i += 1) {
+        Position a = hitbox->vertices[i].position;
+        Position b = hitbox->vertices[(i + 1) % hitbox->vertex_count].position;
+        float cross = a.x * b.y - b.x * a.y;
+        twice_area += cross;
+        weighted.x += (a.x + b.x) * cross;
+        weighted.y += (a.y + b.y) * cross;
+    }
+    if(fabsf(twice_area) > 0.0001f) {
+        return (Position){weighted.x / (3.0f * twice_area),
+            weighted.y / (3.0f * twice_area)};
+    }
+    weighted = (Position){0};
+    for(uint32_t i = 0; i < hitbox->vertex_count; i += 1) {
+        weighted.x += hitbox->vertices[i].position.x;
+        weighted.y += hitbox->vertices[i].position.y;
+    }
+    return (Position){weighted.x / (float)hitbox->vertex_count,
+        weighted.y / (float)hitbox->vertex_count};
+}
+
+float editor_project_particle_auto_radius_get(const EditorRigidBody *body) {
+    Position center = editor_project_particle_center_get(body);
+    float radius = 0.0f;
+
+    if(body == NULL || body->hitbox_count == 0) return radius;
+    for(uint32_t i = 0; i < body->hitboxes[0].vertex_count; i += 1) {
+        Position point = body->hitboxes[0].vertices[i].position;
+        radius = fmaxf(radius, hypotf(point.x - center.x, point.y - center.y));
+    }
+    return radius;
+}
+
+void editor_project_particle_auto_fit_update(EditorProject *project) {
+    if(project == NULL) return;
+    for(size_t object_index = 0; object_index < project->object_count; object_index += 1) {
+        EditorObject *object = &project->objects[object_index];
+        for(size_t body_index = 0; body_index < object->rigid_body_count; body_index += 1) {
+            EditorRigidBody *body = &object->rigid_bodies[body_index];
+            if(body->particle && body->particle_auto_fit)
+                body->particle_radius = editor_project_particle_auto_radius_get(body);
+        }
+    }
 }
 
 EditorJoint editor_project_joint_default_get(EditorJointKind kind) {
