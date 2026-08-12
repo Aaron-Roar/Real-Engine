@@ -13,6 +13,17 @@ int main(void) {
     EntityIndexResult index_a;
     EntityIndexResult index_b;
 
+    {
+        Color white = rohr_graphics_color_hex_create(UINT32_C(0xffffffff));
+        Color black = rohr_graphics_color_hex_create(UINT32_C(0x000000ff));
+        Color yellow = rohr_graphics_color_hex_create(UINT32_C(0xffff00ff));
+        Color orange = rohr_graphics_color_hex_create(UINT32_C(0xff800080));
+        if(white.red != 255 || white.green != 255 || white.blue != 255 ||
+                white.alpha != 255 || black.red != 0 || black.green != 0 ||
+                black.blue != 0 || black.alpha != 255 || yellow.red != 255 ||
+                yellow.green != 255 || yellow.blue != 0 || orange.red != 255 ||
+                orange.green != 128 || orange.blue != 0 || orange.alpha != 128) return 1;
+    }
     if(rohr_error_check(rohr_engine_init())) return 1;
     body = rohr_physics_soft_body_create();
     if(rohr_error_check(body)) goto fail;

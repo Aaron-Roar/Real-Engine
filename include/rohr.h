@@ -1177,8 +1177,8 @@ size_t rohr_physics_contacts_get(
 );
 
 /**
- * @brief Creates an engine color from a hexadecimal RGB or RGBA value.
- * @param hex_color_code Hex color value.
+ * @brief Creates an engine color from a hexadecimal RRGGBBAA value.
+ * @param hex_color_code RRGGBBAA hex color value.
  * @return Color created from hex_color_code.
  */
 Color rohr_graphics_color_hex_create(uint32_t hex_color_code);

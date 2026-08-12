@@ -243,7 +243,7 @@ typedef enum Fill {
 } Fill;
 
 /**
- * Create a color from a 32-bit RGBA hex value.
+ * Create a color from a 32-bit RRGGBBAA hex value.
  */
 Color graphics_color_hex_create(uint32_t hex_color_code);
 

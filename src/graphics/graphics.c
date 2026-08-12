@@ -544,10 +544,10 @@ void graphics_textures_scale(Entity entity, Scale scale) {
 
 Color graphics_color_hex_create(uint32_t hex_color_code) {
   return (Color) {
-    .red = (hex_color_code >> 16) & 0xFF,
-    .green = (hex_color_code >> 8)  & 0xFF,
-    .blue = hex_color_code         & 0xFF,
-    .alpha = 255
+    .red = (hex_color_code >> 24) & 0xFF,
+    .green = (hex_color_code >> 16) & 0xFF,
+    .blue = (hex_color_code >> 8) & 0xFF,
+    .alpha = hex_color_code & 0xFF
   };
 }
 
