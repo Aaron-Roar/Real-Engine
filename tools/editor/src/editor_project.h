@@ -108,6 +108,7 @@ typedef struct EditorSoftNode {
     char name[EDITOR_OBJECT_NAME_MAX];
     Position position;
     float node_mass;
+    float radius;
     float friction;
     float restitution;
     bool gravity_enabled;

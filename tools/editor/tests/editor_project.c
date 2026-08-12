@@ -170,6 +170,7 @@ int main(void) {
                     &loaded_project, generated_soft_body, generated_node_a->id,
                     generated_node_b->id);
             if(generated_node_a != NULL) {
+                generated_node_a->radius = 6.5f;
                 generated_node_a->friction = 0.6f;
                 generated_node_a->restitution = 0.4f;
             }
@@ -196,6 +197,7 @@ int main(void) {
                 !file_contains(path, "rohr_physics_joint_spring_set") ||
                 !file_contains(path, "rohr_physics_soft_body_create") ||
                 !file_contains(path, "rohr_physics_soft_body_node_create") ||
+                !file_contains(path, "6.50000000f") ||
                 !file_contains(path, "rohr_physics_friction_set") ||
                 !file_contains(path, "rohr_physics_restitution_set") ||
                 !file_contains(path,
@@ -364,6 +366,7 @@ int main(void) {
     if(soft_body == NULL || node_a == NULL || node_b == NULL) return 1;
     node_b->collision_category = UINT64_C(1) | (UINT64_C(1) << 1);
     node_b->collision_with = UINT64_C(1);
+    node_b->radius = 7.25f;
     node_b->friction = 0.7f;
     node_b->restitution = 0.35f;
     {
@@ -449,6 +452,8 @@ int main(void) {
                 loaded_object->soft_body_items[0].nodes[0].collision_category !=
                     (UINT64_C(1) | (UINT64_C(1) << 1)) ||
                 loaded_object->soft_body_items[0].nodes[0].collision_with != UINT64_C(1) ||
+                fabsf(loaded_object->soft_body_items[0].nodes[0].radius - 7.25f) >
+                    0.001f ||
                 fabsf(loaded_object->soft_body_items[0].nodes[0].friction - 0.7f) >
                     0.001f ||
                 fabsf(loaded_object->soft_body_items[0].nodes[0].restitution - 0.35f) >

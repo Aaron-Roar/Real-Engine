@@ -64,6 +64,21 @@ Add reusable editor and UI drawing tools for lines, arrows, handles, selection
 outlines, relationship links, axes, and transform gizmos. Keep these tools
 available through direct C APIs so they are useful outside Rohr Editor.
 
+### Example Generation Coverage
+
+Add the remaining editor and generator features needed to author the existing
+examples while keeping runtime behavior in developer-owned C:
+
+- Soft-body triangles and filled surfaces.
+- Standalone particle definitions.
+- Configurable soft-body node radius.
+- Beam and triangle topology tooling.
+- Textures, colors, and rendering configuration.
+- UI layouts.
+- Spawn templates and repeated entity arrays.
+- Runtime behavior support for controls, torque, timed spawning, scoring, and
+  recording.
+
 ## 4. Composable UI Entities
 
 Replace the widget-specific direction with a small UI-specific entity and

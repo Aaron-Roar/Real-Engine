@@ -492,12 +492,12 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 fprintf(source,
                     "    { EntityResult created = rohr_physics_soft_body_node_create("
                     "object->%s, (Position){position.x + %#.9gf, "
-                    "position.y + %#.9gf}, %#.9gf, 4.00000000f);\n"
+                    "position.y + %#.9gf}, %#.9gf, %#.9gf);\n"
                     "      if(rohr_error_check(created)) { result = rohr_error_result_error("
                     "created.result.error); goto fail; }\n"
                     "      object->%s = created.result.value; }\n",
                     body->name, transformed.x, transformed.y,
-                    node->node_mass, node->name);
+                    node->node_mass, node->radius, node->name);
                 if(node->gravity_enabled) {
                     fprintf(source,
                         "    result = rohr_physics_gravity_enable(object->%s);\n"
