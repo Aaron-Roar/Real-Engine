@@ -997,7 +997,7 @@ static void editor_current_selection_clear(
         editor_project_selection_clear(project);
         viewport_state->selection = EDITOR_SELECTION_NONE;
     } else if(viewport_state->mode == EDITOR_VIEWPORT_OBJECT) {
-        viewport_state->selection = EDITOR_SELECTION_OBJECT;
+        viewport_state->selection = EDITOR_SELECTION_NONE;
     } else if(viewport_state->mode == EDITOR_VIEWPORT_RIGID_BODY) {
         viewport_state->selection = EDITOR_SELECTION_RIGID_BODY;
     } else if(viewport_state->mode == EDITOR_VIEWPORT_HITBOX) {
@@ -1368,6 +1368,10 @@ int main(void) {
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             if(editor_viewport_hitbox_editor_active_get(&viewport_state)) {
                 editor_viewport_back(&viewport_state);
+            } else if(viewport_state.mode == EDITOR_VIEWPORT_HIERARCHY &&
+                    viewport_state.selection == EDITOR_SELECTION_OBJECT) {
+                editor_project_selection_clear(&project);
+                viewport_state.selection = EDITOR_SELECTION_NONE;
             }
         }
         if(workspace.open && !field_editing && !color_picker.open && !file_browser.active &&

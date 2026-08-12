@@ -349,7 +349,7 @@ void editor_viewport_hitbox_editor_enter(EditorViewportState *state) {
 void editor_viewport_object_editor_enter(EditorViewportState *state) {
     if(state == NULL) return;
     state->mode = EDITOR_VIEWPORT_OBJECT;
-    state->selection = EDITOR_SELECTION_OBJECT;
+    state->selection = EDITOR_SELECTION_NONE;
     state->selected_rigid_body = 0;
     state->selected_hitbox = 0;
     state->selected_joint = 0;
@@ -458,6 +458,72 @@ static bool editor_soft_area_point_contains(const EditorObject *object,
         (signs[0] <= 0.0f && signs[1] <= 0.0f && signs[2] <= 0.0f);
 }
 
+static bool editor_object_visual_point_contains(const EditorObject *object,
+        Position point) {
+    if(object == NULL || !object->visible) return false;
+    for(size_t body_index = 0; body_index < object->rigid_body_count; body_index += 1) {
+        const EditorRigidBody *body = &object->rigid_bodies[body_index];
+        if(!body->visible) continue;
+        for(size_t hitbox_index = 0; hitbox_index < body->hitbox_count; hitbox_index += 1) {
+            const EditorHitbox *hitbox = &body->hitboxes[hitbox_index];
+            if(hitbox->visible && editor_hitbox_point_contains(
+                    object, body, hitbox, point)) return true;
+        }
+    }
+    for(size_t body_index = 0; body_index < object->soft_body_count; body_index += 1) {
+        const EditorSoftBody *body = &object->soft_body_items[body_index];
+        if(!body->visible) continue;
+        for(size_t node_index = 0; node_index < body->node_count; node_index += 1) {
+            const EditorSoftNode *node = &body->nodes[node_index];
+            Position world;
+            if(!node->visible) continue;
+            world = editor_soft_node_world_get(object, body, node);
+            if((point.x - world.x) * (point.x - world.x) +
+                    (point.y - world.y) * (point.y - world.y) <= 100.0f) return true;
+        }
+        for(size_t beam_index = 0; beam_index < body->beam_count; beam_index += 1) {
+            const EditorSoftBeam *beam = &body->beams[beam_index];
+            const EditorSoftNode *a = editor_soft_node_get(body, beam->node_a);
+            const EditorSoftNode *b = editor_soft_node_get(body, beam->node_b);
+            if(beam->visible && a != NULL && b != NULL &&
+                    editor_segment_distance_squared(point,
+                        editor_soft_node_world_get(object, body, a),
+                        editor_soft_node_world_get(object, body, b)) <= 36.0f) return true;
+        }
+        for(size_t area_index = 0; area_index < body->area_count; area_index += 1) {
+            const EditorSoftArea *area = &body->areas[area_index];
+            if(area->visible && editor_soft_area_point_contains(
+                    object, body, area, point)) return true;
+        }
+    }
+    for(size_t anchor_index = 0; anchor_index < object->anchor_count; anchor_index += 1) {
+        const EditorAnchor *anchor = &object->anchors[anchor_index];
+        Position world;
+        if(!anchor->visible) continue;
+        world = editor_anchor_world_get(object, anchor);
+        if((point.x - world.x) * (point.x - world.x) +
+                (point.y - world.y) * (point.y - world.y) <= 100.0f) return true;
+    }
+    for(size_t joint_index = 0; joint_index < object->joint_count; joint_index += 1) {
+        const EditorJoint *joint = &object->joint_items[joint_index];
+        const EditorAnchor *a = NULL;
+        const EditorAnchor *b = NULL;
+        if(!joint->visible) continue;
+        for(size_t anchor_index = 0; anchor_index < object->anchor_count; anchor_index += 1) {
+            if(object->anchors[anchor_index].id == joint->anchor_a) {
+                a = &object->anchors[anchor_index];
+            }
+            if(object->anchors[anchor_index].id == joint->anchor_b) {
+                b = &object->anchors[anchor_index];
+            }
+        }
+        if(a != NULL && b != NULL && editor_segment_distance_squared(point,
+                editor_anchor_world_get(object, a),
+                editor_anchor_world_get(object, b)) <= 64.0f) return true;
+    }
+    return false;
+}
+
 bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
     Position pointer, MouseButtonState primary_button,
     MouseButtonState pan_button, bool pan_modifier, float wheel_y,
@@ -514,24 +580,26 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
             primary_button == MOUSE_BUTTON_STATE_PRESSED) {
         for(size_t object_index = project->object_count; object_index > 0; object_index -= 1) {
             EditorObject *candidate_object = &project->objects[object_index - 1];
-            if(!candidate_object->visible) continue;
-            for(size_t body_index = 0; body_index < candidate_object->rigid_body_count;
-                    body_index += 1) {
-                EditorRigidBody *candidate_body =
-                    &candidate_object->rigid_bodies[body_index];
-                if(!candidate_body->visible) continue;
-                for(size_t hitbox_index = 0; hitbox_index < candidate_body->hitbox_count;
-                        hitbox_index += 1) {
-                    EditorHitbox *candidate_hitbox =
-                        &candidate_body->hitboxes[hitbox_index];
-                    if(candidate_hitbox->visible && editor_hitbox_point_contains(
-                            candidate_object, candidate_body, candidate_hitbox, pointer)) {
-                        (void)editor_project_object_select(project, candidate_object->id);
-                        editor_viewport_object_editor_enter(state);
-                        return true;
-                    }
-                }
+            Uint64 now;
+            bool double_clicked;
+            if(!editor_object_visual_point_contains(candidate_object, pointer)) continue;
+            now = SDL_GetTicks();
+            double_clicked = state->last_viewport_click_selection ==
+                    EDITOR_SELECTION_OBJECT &&
+                state->last_viewport_click_object == candidate_object->id &&
+                now - state->last_viewport_click_at <= 400;
+            (void)editor_project_object_select(project, candidate_object->id);
+            if(double_clicked) {
+                editor_viewport_object_editor_enter(state);
+                state->last_viewport_click_selection = EDITOR_SELECTION_NONE;
+            } else {
+                state->selection = EDITOR_SELECTION_OBJECT;
+                state->last_viewport_click_selection = EDITOR_SELECTION_OBJECT;
+                state->last_viewport_click_object = candidate_object->id;
+                state->last_viewport_click_index = candidate_object->id;
+                state->last_viewport_click_at = now;
             }
+            return true;
         }
         return false;
     }
@@ -1027,7 +1095,10 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
 
 static void editor_viewport_object_draw(const EditorObject *object,
     const EditorViewportState *state, bool object_selected) {
+    bool object_highlighted;
     if(object == NULL || state == NULL || !object->visible) return;
+    object_highlighted = state->mode == EDITOR_VIEWPORT_HIERARCHY &&
+        state->selection == EDITOR_SELECTION_OBJECT && object_selected;
 
     for(size_t body_index = 0; body_index < object->rigid_body_count; body_index += 1) {
         const EditorRigidBody *body = &object->rigid_bodies[body_index];
@@ -1036,9 +1107,7 @@ static void editor_viewport_object_draw(const EditorObject *object,
             const EditorHitbox *hitbox = &body->hitboxes[box_index];
             bool selected_body = state->selected_rigid_body == body->id;
             bool selected_hitbox = selected_body && state->selected_hitbox == hitbox->id;
-            Color base = (state->mode == EDITOR_VIEWPORT_HIERARCHY &&
-                    state->selection == EDITOR_SELECTION_OBJECT && object_selected) ||
-                    state->preview_rigid_body == body->id ||
+            Color base = object_highlighted || state->preview_rigid_body == body->id ||
                     (state->selection == EDITOR_SELECTION_RIGID_BODY && selected_body) ||
                     (state->selection == EDITOR_SELECTION_HITBOX && selected_hitbox) ?
                 (Color){255, 215, 70, 255} : graphics_color_hex_create(body->border_color);
@@ -1106,6 +1175,20 @@ static void editor_viewport_object_draw(const EditorObject *object,
             }
         }
         if(!body->visible) continue;
+        if(object_highlighted) {
+            for(size_t area_index = 0; area_index < body->area_count; area_index += 1) {
+                const EditorSoftArea *area = &body->areas[area_index];
+                const EditorSoftNode *a = editor_soft_node_get(body, area->node_a);
+                const EditorSoftNode *b = editor_soft_node_get(body, area->node_b);
+                const EditorSoftNode *c = editor_soft_node_get(body, area->node_c);
+                if(!area->visible || a == NULL || b == NULL || c == NULL) continue;
+                editor_triangle_filled_draw(
+                    editor_soft_node_world_get(object, body, a),
+                    editor_soft_node_world_get(object, body, b),
+                    editor_soft_node_world_get(object, body, c),
+                    (Color){255, 215, 70, 48});
+            }
+        }
         if(selected_area != NULL && selected_area->visible) {
             const EditorSoftNode *a = editor_soft_node_get(body, selected_area->node_a);
             const EditorSoftNode *b = editor_soft_node_get(body, selected_area->node_b);
@@ -1138,7 +1221,8 @@ static void editor_viewport_object_draw(const EditorObject *object,
                 if(a != NULL && b != NULL) editor_line_draw(
                 editor_soft_node_world_get(object, body, a),
                 editor_soft_node_world_get(object, body, b),
-                selected_body || (state->selection == EDITOR_SELECTION_SOFT_BEAM &&
+                object_highlighted || selected_body ||
+                    (state->selection == EDITOR_SELECTION_SOFT_BEAM &&
                     state->selected_soft_body == body->id &&
                     state->selected_soft_beam == beam->id) || selected_area_edge ?
                     (Color){255, 215, 70, 255} : graphics_color_hex_create(
@@ -1150,7 +1234,8 @@ static void editor_viewport_object_draw(const EditorObject *object,
             if(!node->visible) continue;
             editor_quad_draw(editor_soft_node_world_get(object, body, node),
                 8.0f, 8.0f, 0.0f,
-                selected_body || (state->selection == EDITOR_SELECTION_SOFT_NODE &&
+                object_highlighted || selected_body ||
+                    (state->selection == EDITOR_SELECTION_SOFT_NODE &&
                     state->selected_soft_body == body->id &&
                     state->selected_soft_node == node->id) ||
                     state->preview_soft_node == node->id ?
@@ -1196,8 +1281,8 @@ static void editor_viewport_object_draw(const EditorObject *object,
         if(a != NULL && b != NULL) editor_joint_symbol_draw(joint->kind,
             editor_anchor_world_get(object, a), editor_anchor_world_get(object, b),
             fmaxf(0.1f, joint->visual_size),
-            state->selection == EDITOR_SELECTION_JOINT &&
-                state->selected_joint == joint->id ?
+            object_highlighted || (state->selection == EDITOR_SELECTION_JOINT &&
+                state->selected_joint == joint->id) ?
                 (Color){255, 215, 70, 255} : (Color){220, 120, 210, 255});
     }
     for(size_t i = 0; i < object->anchor_count; i += 1) {
@@ -1215,7 +1300,7 @@ static void editor_viewport_object_draw(const EditorObject *object,
         }
         editor_quad_draw(editor_anchor_world_get(object, anchor),
             9.0f, 9.0f, rotation + 0.78539816339f,
-            (state->selection == EDITOR_SELECTION_ANCHOR &&
+            object_highlighted || (state->selection == EDITOR_SELECTION_ANCHOR &&
                 state->selected_anchor == anchor->id) || state->preview_anchor == anchor->id ?
                 (Color){255, 215, 70, 255} : (Color){235, 150, 215, 255});
     }
