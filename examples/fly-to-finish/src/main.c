@@ -275,11 +275,16 @@ int main(void) {
         bool player_control_enabled;
         size_t i;
 
-        event = rohr_engine_event_poll();
+        bool exit_requested = false;
         rohr_controller_key_states_update(&keyboard);
-        rohr_controller_key_event_add(&keyboard, rohr_controller_keyboard_event_capture(&event));
-        if(event.type == SDL_EVENT_QUIT ||
+        while((event = rohr_engine_event_poll()).type != 0) {
+            rohr_controller_key_event_add(&keyboard,
+                rohr_controller_keyboard_event_capture(&event));
+            if(event.type == SDL_EVENT_QUIT) exit_requested = true;
+        }
+        if(exit_requested ||
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) break;
+        Tick ticks_advanced = rohr_system_tick_update();
 
         if(rohr_controller_key_pressed_get(&keyboard, SDLK_R)) {
             EngineResult reset_result = reset_level(
@@ -320,7 +325,8 @@ int main(void) {
         speed = rohr_math_vector_magnitude(player_velocity);
 
         thrust_axis = player_forward(orientations[player_index]);
-        if(player_control_enabled && rohr_controller_key_down_get(&keyboard, SDLK_W)) {
+        if(ticks_advanced > 0 && player_control_enabled &&
+                rohr_controller_key_down_get(&keyboard, SDLK_W)) {
             EngineResult thrust_result = rohr_physics_force_for_one_tick_apply(player, (Force){
                 .x = thrust_axis.x * player_mass * player_thrust_acceleration,
                 .y = thrust_axis.y * player_mass * player_thrust_acceleration
@@ -330,7 +336,8 @@ int main(void) {
                 goto fail;
             }
         }
-        if(player_control_enabled && rohr_controller_key_down_get(&keyboard, SDLK_S) && speed > 0.001f) {
+        if(ticks_advanced > 0 && player_control_enabled &&
+                rohr_controller_key_down_get(&keyboard, SDLK_S) && speed > 0.001f) {
             EngineResult brake_result = rohr_physics_force_for_one_tick_apply(player, (Force){
                 .x = -(player_velocity.x / speed) * player_mass * player_brake_acceleration,
                 .y = -(player_velocity.y / speed) * player_mass * player_brake_acceleration
@@ -342,7 +349,7 @@ int main(void) {
         }
 
         turn_axis = rohr_controller_axis_from_keycodes_get(&keyboard, SDLK_UNKNOWN, SDLK_A, SDLK_UNKNOWN, SDLK_D);
-        if(player_control_enabled && turn_axis.x != 0.0f) {
+        if(ticks_advanced > 0 && player_control_enabled && turn_axis.x != 0.0f) {
             EngineResult torque_result = rohr_physics_torque_for_one_tick_apply(player, -turn_axis.x * player_control_torque);
             if(rohr_error_check(torque_result)) {
                 PRINT_ENGINE_ERROR(torque_result);
@@ -354,7 +361,6 @@ int main(void) {
             animated_sprites[player_index].animation.time_per_frame = fmaxf(0.015f, 0.09f - speed * 0.0002f);
         }
 
-        Tick ticks_advanced = rohr_system_tick_update();
         if(level_active) {
             rohr_physics_update(ticks_advanced);
         }

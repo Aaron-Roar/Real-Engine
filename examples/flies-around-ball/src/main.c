@@ -113,12 +113,17 @@ int main(void) {
     bool phase_2 = false;
     bool phase_3 = false;
     while(true) {
-        SDL_Event event = rohr_engine_event_poll();
-        KeyboardEvent key_event = rohr_controller_keyboard_event_capture(&event);
+        SDL_Event event;
+        bool exit_requested = false;
         rohr_controller_key_states_update(&keyboard);
-        rohr_controller_key_event_add(&keyboard, key_event);
-        if(event.type == SDL_EVENT_QUIT ||
+        while((event = rohr_engine_event_poll()).type != 0) {
+            rohr_controller_key_event_add(&keyboard,
+                rohr_controller_keyboard_event_capture(&event));
+            if(event.type == SDL_EVENT_QUIT) exit_requested = true;
+        }
+        if(exit_requested ||
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) break;
+        Tick ticks_advanced = rohr_system_tick_update();
         if(!phase_1 && rohr_engine_time_get() > 3) {
             phase_1 = true;
         }
@@ -136,7 +141,7 @@ int main(void) {
         Vec2D move_axis = rohr_controller_wasd_axis_get(&keyboard);
         Vec2D turn_axis = rohr_controller_axis_from_keycodes_get(&keyboard, SDLK_UNKNOWN, SDLK_LEFT, SDLK_UNKNOWN, SDLK_RIGHT);
 
-        if(move_axis.x != 0.0f || move_axis.y != 0.0f) {
+        if(ticks_advanced > 0 && (move_axis.x != 0.0f || move_axis.y != 0.0f)) {
             EngineResult force_result = rohr_physics_force_for_one_tick_apply(ball, (Force){
                 .x = move_axis.x * ball_mass * ball_control_acceleration,
                 .y = move_axis.y * ball_mass * ball_control_acceleration
@@ -146,7 +151,7 @@ int main(void) {
                 goto fail;
             }
         }
-        if(turn_axis.x != 0.0f) {
+        if(ticks_advanced > 0 && turn_axis.x != 0.0f) {
             EngineResult torque_result = rohr_physics_torque_for_one_tick_apply(ball, -turn_axis.x * ball_control_torque);
             if(rohr_error_check(torque_result)) {
                 PRINT_ENGINE_ERROR(torque_result);
@@ -166,7 +171,6 @@ int main(void) {
         }
 
         //physics
-        Tick ticks_advanced = rohr_system_tick_update();
         rohr_physics_update(ticks_advanced);
 
         //render

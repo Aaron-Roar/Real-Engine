@@ -206,20 +206,21 @@ int main(void) {
     }
 
     while(running) {
-        SDL_Event event = rohr_engine_event_poll();
+        SDL_Event event;
+        bool exit_requested = false;
 
         rohr_controller_key_states_update(&keyboard);
-        rohr_controller_key_event_add(
-            &keyboard,
-            rohr_controller_keyboard_event_capture(&event)
-        );
-        if(event.type == SDL_EVENT_QUIT ||
-                rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) break;
         rohr_controller_mouse_states_update(&mouse);
-        rohr_controller_mouse_event_add(
-            &mouse,
-            rohr_controller_mouse_event_capture(&event)
-        );
+        while((event = rohr_engine_event_poll()).type != 0) {
+            rohr_controller_key_event_add(&keyboard,
+                rohr_controller_keyboard_event_capture(&event));
+            rohr_controller_mouse_event_add(&mouse,
+                rohr_controller_mouse_event_capture(&event));
+            rohr_ui_event_add(&event);
+            if(event.type == SDL_EVENT_QUIT) exit_requested = true;
+        }
+        if(exit_requested ||
+                rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) break;
 
         rohr_graphics_background_draw((Color){18, 22, 30, 255});
         rohr_ui_frame_begin((UIInput){

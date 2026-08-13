@@ -88,13 +88,19 @@ int main(void) {
         rohr_ui_physics_debug_panel_draw(&debug_panel);
         rohr_graphics_show();
 
-        SDL_Event sdl_event = rohr_engine_event_poll();
-        KeyboardEvent key_event = rohr_controller_keyboard_event_capture(&sdl_event);
-        MouseEvent mouse_event = rohr_controller_mouse_event_capture(&sdl_event);
+        SDL_Event sdl_event;
+        bool exit_requested = false;
 
         rohr_controller_key_states_update(&keyboard);
-        rohr_controller_key_event_add(&keyboard, key_event);
-        if(sdl_event.type == SDL_EVENT_QUIT ||
+        rohr_controller_mouse_states_update(&mouse);
+        while((sdl_event = rohr_engine_event_poll()).type != 0) {
+            rohr_controller_key_event_add(&keyboard,
+                rohr_controller_keyboard_event_capture(&sdl_event));
+            rohr_controller_mouse_event_add(&mouse,
+                rohr_controller_mouse_event_capture(&sdl_event));
+            if(sdl_event.type == SDL_EVENT_QUIT) exit_requested = true;
+        }
+        if(exit_requested ||
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) break;
         Vec2D move_axis = rohr_controller_wasd_axis_get(&keyboard);
         Vec2D camera_move_axis = rohr_controller_axis_from_keycodes_get(
@@ -123,8 +129,6 @@ int main(void) {
             camera_turn_axis.x * camera_turn_speed * tick_time
         );
 
-        rohr_controller_mouse_states_update(&mouse);
-        rohr_controller_mouse_event_add(&mouse, mouse_event);
         if(mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_DOWN) {
             rohr_physics_position_set(
                 water_smash,

@@ -133,14 +133,19 @@ int main(void) {
 
     rohr_engine_clock_reset();
     while(true) {
-        SDL_Event event = rohr_engine_event_poll();
-        KeyboardEvent key_event = rohr_controller_keyboard_event_capture(&event);
+        SDL_Event event;
+        bool exit_requested = false;
         rohr_controller_key_states_update(&keyboard);
-        rohr_controller_key_event_add(&keyboard, key_event);
-        if(event.type == SDL_EVENT_QUIT ||
+        while((event = rohr_engine_event_poll()).type != 0) {
+            rohr_controller_key_event_add(&keyboard,
+                rohr_controller_keyboard_event_capture(&event));
+            if(event.type == SDL_EVENT_QUIT) exit_requested = true;
+        }
+        if(exit_requested ||
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) break;
+        Tick ticks_advanced = rohr_system_tick_update();
 
-        if(rohr_engine_time_get() >= next_throw) {
+        if(ticks_advanced > 0 && rohr_engine_time_get() >= next_throw) {
             Entity body = bodies[throw_index % BODY_COUNT];
             Force impulse = throws[throw_index % (sizeof(throws) / sizeof(throws[0]))];
             if(!result_ok(rohr_physics_impulse_apply(body, impulse)) ||
@@ -152,7 +157,7 @@ int main(void) {
             next_throw += 1.5;
         }
 
-        rohr_physics_update(rohr_system_tick_update());
+        rohr_physics_update(ticks_advanced);
         rohr_graphics_background_draw(background_color);
         for(uint32_t i = 0; i < 4; i += 1) rohr_graphics_hit_box_colored_draw(walls[i], GRAPHICS_FILLED, wall_color);
         rohr_graphics_hit_box_colored_draw(bodies[0], GRAPHICS_FILLED, pin_color);

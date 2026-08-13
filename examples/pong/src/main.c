@@ -385,14 +385,15 @@ int main(void) {
 
     rohr_engine_clock_reset();
     while(true) {
-        SDL_Event event = rohr_engine_event_poll();
+        SDL_Event event;
         Vec2D left_axis;
         Vec2D right_axis;
         EntityIndex ball_index;
         Tick ticks_advanced;
+        bool exit_requested = false;
 
         rohr_controller_key_states_update(&keyboard);
-        {
+        while((event = rohr_engine_event_poll()).type != 0) {
             KeyboardEvent key_event =
                 rohr_controller_keyboard_event_capture(&event);
             rohr_controller_key_event_add(&keyboard, key_event);
@@ -401,8 +402,9 @@ int main(void) {
                 broadphase_debug = !broadphase_debug;
                 rohr_graphics_aabb_tree_debug_set(broadphase_debug);
             }
+            if(event.type == SDL_EVENT_QUIT) exit_requested = true;
         }
-        if(event.type == SDL_EVENT_QUIT ||
+        if(exit_requested ||
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) break;
         left_axis = rohr_controller_axis_get(&keyboard, &left_controller, "movement");
         right_axis = rohr_controller_axis_get(&keyboard, &right_controller, "movement");
