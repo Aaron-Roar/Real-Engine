@@ -18,8 +18,53 @@ typedef enum EditorCommandType {
     EDITOR_COMMAND_VIEWPORT_CAMERA,
     EDITOR_COMMAND_VIEWPORT_COORDINATES,
     EDITOR_COMMAND_VISIBILITY,
-    EDITOR_COMMAND_NAVIGATION_SET
+    EDITOR_COMMAND_NAVIGATION_SET,
+    EDITOR_COMMAND_ITEM_ADD,
+    EDITOR_COMMAND_ITEM_REMOVE,
+    EDITOR_COMMAND_ITEM_RENAME
 } EditorCommandType;
+
+typedef enum EditorItemKind {
+    EDITOR_ITEM_OBJECT,
+    EDITOR_ITEM_RIGID_BODY,
+    EDITOR_ITEM_HITBOX,
+    EDITOR_ITEM_JOINT,
+    EDITOR_ITEM_ANCHOR,
+    EDITOR_ITEM_SOFT_BODY,
+    EDITOR_ITEM_SOFT_NODE,
+    EDITOR_ITEM_SOFT_BEAM,
+    EDITOR_ITEM_VERTEX,
+    EDITOR_ITEM_LINE
+} EditorItemKind;
+
+typedef struct EditorItemAddCommand {
+    EditorItemKind kind;
+    EditorObjectId object;
+    uint32_t parent;
+    uint32_t first;
+    uint32_t second;
+    uint32_t index;
+    uint32_t option;
+    Position position;
+    char name[EDITOR_OBJECT_NAME_MAX];
+} EditorItemAddCommand;
+
+typedef struct EditorItemRemoveCommand {
+    EditorItemKind kind;
+    EditorObjectId object;
+    uint32_t parent;
+    uint32_t item;
+    uint32_t index;
+} EditorItemRemoveCommand;
+
+typedef struct EditorItemRenameCommand {
+    EditorItemKind kind;
+    EditorObjectId object;
+    uint32_t parent;
+    uint32_t item;
+    uint32_t index;
+    char name[EDITOR_OBJECT_NAME_MAX];
+} EditorItemRenameCommand;
 
 typedef enum EditorVisibilityKind {
     EDITOR_VISIBILITY_OBJECT,
@@ -101,6 +146,9 @@ typedef struct EditorCommand {
             bool visible;
         } visibility;
         EditorNavigationState navigation;
+        EditorItemAddCommand item_add;
+        EditorItemRemoveCommand item_remove;
+        EditorItemRenameCommand item_rename;
     } data;
 } EditorCommand;
 

@@ -84,6 +84,7 @@ int main(int count, char **arguments) {
     if(count >= 2 && (strcmp(arguments[1], "object") == 0 ||
             strcmp(arguments[1], "rigid-body") == 0 ||
             strcmp(arguments[1], "hitbox") == 0 ||
+            strcmp(arguments[1], "line") == 0 ||
             strcmp(arguments[1], "joint") == 0 ||
             strcmp(arguments[1], "vertex") == 0 ||
             strcmp(arguments[1], "anchor") == 0 ||

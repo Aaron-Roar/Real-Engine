@@ -140,6 +140,105 @@ static int transform_commands_test(void) {
     return 0;
 }
 
+static int item_commands_test(void) {
+    static EditorProject project;
+    EditorCommand command;
+    EditorCommandResult result;
+    EditorObject *object;
+    EditorRigidBody *rigid_body;
+    EditorSoftBody *soft_body;
+    uint32_t rigid_body_id;
+    uint32_t hitbox_id;
+    uint32_t anchor_id;
+    uint32_t joint_id;
+    uint32_t soft_body_id;
+    uint32_t node_a;
+    uint32_t node_b;
+    uint32_t beam_id;
+    char cli_text[512];
+    const char *path;
+    char *rename_arguments[] = {"editor-cli", "soft-node", "rename",
+        "project.rohr.json", "1", "1", "1", "renamed node"};
+
+    editor_project_init(&project);
+    object = editor_project_object_add(&project, (Position){0});
+    if(object == NULL) return 1;
+#define ITEM_ADD(value) do { \
+    command = (value); \
+    result = editor_command_execute(&project, &command); \
+    if(result.kind != ERROR_RESULT_VALUE || editor_result_check( \
+            editor_command_cli_write(&command, "project.rohr.json", cli_text, \
+                sizeof(cli_text)))) return 1; \
+} while(0)
+    ITEM_ADD(((EditorCommand){.type = EDITOR_COMMAND_ITEM_ADD,
+        .data.item_add = {.kind = EDITOR_ITEM_RIGID_BODY, .object = object->id}}));
+    rigid_body_id = result.result.object;
+    rigid_body = editor_project_rigid_body_get(object, rigid_body_id);
+    if(rigid_body == NULL) return 1;
+    ITEM_ADD(((EditorCommand){.type = EDITOR_COMMAND_ITEM_ADD,
+        .data.item_add = {.kind = EDITOR_ITEM_HITBOX, .object = object->id,
+            .parent = rigid_body_id}}));
+    hitbox_id = result.result.object;
+    ITEM_ADD(((EditorCommand){.type = EDITOR_COMMAND_ITEM_ADD,
+        .data.item_add = {.kind = EDITOR_ITEM_ANCHOR, .object = object->id,
+            .parent = rigid_body_id, .position = {2.0f, 3.0f}}}));
+    anchor_id = result.result.object;
+    ITEM_ADD(((EditorCommand){.type = EDITOR_COMMAND_ITEM_ADD,
+        .data.item_add = {.kind = EDITOR_ITEM_JOINT, .object = object->id,
+            .option = EDITOR_JOINT_SPRING}}));
+    joint_id = result.result.object;
+    ITEM_ADD(((EditorCommand){.type = EDITOR_COMMAND_ITEM_ADD,
+        .data.item_add = {.kind = EDITOR_ITEM_SOFT_BODY, .object = object->id}}));
+    soft_body_id = result.result.object;
+    soft_body = NULL;
+    for(size_t i = 0; i < object->soft_body_count; i += 1)
+        if(object->soft_body_items[i].id == soft_body_id)
+            soft_body = &object->soft_body_items[i];
+    if(soft_body == NULL) return 1;
+    ITEM_ADD(((EditorCommand){.type = EDITOR_COMMAND_ITEM_ADD,
+        .data.item_add = {.kind = EDITOR_ITEM_SOFT_NODE, .object = object->id,
+            .parent = soft_body_id}}));
+    node_a = result.result.object;
+    ITEM_ADD(((EditorCommand){.type = EDITOR_COMMAND_ITEM_ADD,
+        .data.item_add = {.kind = EDITOR_ITEM_SOFT_NODE, .object = object->id,
+            .parent = soft_body_id, .position = {1.0f, 0.0f}}}));
+    node_b = result.result.object;
+    ITEM_ADD(((EditorCommand){.type = EDITOR_COMMAND_ITEM_ADD,
+        .data.item_add = {.kind = EDITOR_ITEM_SOFT_BEAM, .object = object->id,
+            .parent = soft_body_id, .first = node_a, .second = node_b}}));
+    beam_id = result.result.object;
+#undef ITEM_ADD
+    command = (EditorCommand){.type = EDITOR_COMMAND_ITEM_RENAME,
+        .data.item_rename = {.kind = EDITOR_ITEM_SOFT_NODE, .object = object->id,
+            .parent = soft_body_id, .item = node_a}};
+    snprintf(command.data.item_rename.name, sizeof(command.data.item_rename.name),
+        "%s", "renamed node");
+    if(editor_command_execute(&project, &command).kind != ERROR_RESULT_VALUE ||
+            strcmp(soft_body->nodes[0].name, "renamed_node") != 0 ||
+            editor_result_check(editor_command_cli_parse(8, rename_arguments,
+                &path, &command)) || command.type != EDITOR_COMMAND_ITEM_RENAME)
+        return 1;
+    {
+        EditorItemRemoveCommand removals[] = {
+            {EDITOR_ITEM_SOFT_BEAM, object->id, soft_body_id, beam_id, 0},
+            {EDITOR_ITEM_SOFT_NODE, object->id, soft_body_id, node_b, 0},
+            {EDITOR_ITEM_SOFT_BODY, object->id, 0, soft_body_id, 0},
+            {EDITOR_ITEM_JOINT, object->id, 0, joint_id, 0},
+            {EDITOR_ITEM_ANCHOR, object->id, 0, anchor_id, 0},
+            {EDITOR_ITEM_HITBOX, object->id, rigid_body_id, hitbox_id, 0},
+            {EDITOR_ITEM_RIGID_BODY, object->id, 0, rigid_body_id, 0}
+        };
+        for(size_t i = 0; i < sizeof(removals) / sizeof(removals[0]); i += 1) {
+            command = (EditorCommand){.type = EDITOR_COMMAND_ITEM_REMOVE,
+                .data.item_remove = removals[i]};
+            if(editor_command_execute(&project, &command).kind != ERROR_RESULT_VALUE ||
+                    editor_result_check(editor_command_cli_write(&command,
+                        "project.rohr.json", cli_text, sizeof(cli_text)))) return 1;
+        }
+    }
+    return 0;
+}
+
 int main(void) {
     const char *path = "/tmp/rohr-editor-core-test.json";
     EditorDocument document;
@@ -219,6 +318,7 @@ int main(void) {
             strstr(cli_text, "'a project'\\''s/state.json'") == NULL ||
             strstr(cli_text, "object add") == NULL) return 1;
     if(transform_commands_test() != 0) return 1;
+    if(item_commands_test() != 0) return 1;
 
     editor_document_destroy(&loaded);
     editor_document_destroy(&document);

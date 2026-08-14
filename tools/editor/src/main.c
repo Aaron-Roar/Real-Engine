@@ -519,8 +519,8 @@ static bool editor_selected_delete(
     selected = editor_project_selected_get(project);
     if(selected == NULL) return false;
     if(viewport_state->selection == EDITOR_SELECTION_OBJECT) {
-        EditorCommand command = {.type = EDITOR_COMMAND_OBJECT_REMOVE,
-            .data.object_remove.object = selected->id};
+        EditorCommand command = {.type = EDITOR_COMMAND_ITEM_REMOVE,
+            .data.item_remove = {EDITOR_ITEM_OBJECT, selected->id, 0, 0, 0}};
         size_t index = (size_t)(selected - project->objects);
         EditorCommandResult result = editor_command_execute(project, &command);
         if(result.kind == ERROR_RESULT_ERROR) return false;
@@ -537,8 +537,13 @@ static bool editor_selected_delete(
         size_t index;
         if(body == NULL || hitbox == NULL) return false;
         index = (size_t)(hitbox - body->hitboxes);
-        if(body == NULL || !editor_project_hitbox_remove(
-                body, viewport_state->selected_hitbox)) return false;
+        {
+            EditorCommand command = {.type = EDITOR_COMMAND_ITEM_REMOVE,
+                .data.item_remove = {EDITOR_ITEM_HITBOX, selected->id, body->id,
+                    hitbox->id, 0}};
+            if(editor_command_execute(project, &command).kind == ERROR_RESULT_ERROR)
+                return false;
+        }
         viewport_state->mode = EDITOR_VIEWPORT_RIGID_BODY;
         if(index < body->hitbox_count) {
             viewport_state->selection = EDITOR_SELECTION_HITBOX;
@@ -553,8 +558,13 @@ static bool editor_selected_delete(
         size_t index;
         if(body == NULL) return false;
         index = (size_t)(body - selected->rigid_bodies);
-        if(!editor_project_rigid_body_remove(
-                selected, viewport_state->selected_rigid_body)) return false;
+        {
+            EditorCommand command = {.type = EDITOR_COMMAND_ITEM_REMOVE,
+                .data.item_remove = {EDITOR_ITEM_RIGID_BODY, selected->id, 0,
+                    body->id, 0}};
+            if(editor_command_execute(project, &command).kind == ERROR_RESULT_ERROR)
+                return false;
+        }
         viewport_state->mode = EDITOR_VIEWPORT_OBJECT;
         if(index < selected->rigid_body_count) {
             viewport_state->selection = EDITOR_SELECTION_RIGID_BODY;
@@ -575,7 +585,13 @@ static bool editor_selected_delete(
         size_t index;
         if(joint == NULL) return false;
         index = (size_t)(joint - selected->joint_items);
-        if(!editor_project_joint_remove(selected, viewport_state->selected_joint)) return false;
+        {
+            EditorCommand command = {.type = EDITOR_COMMAND_ITEM_REMOVE,
+                .data.item_remove = {EDITOR_ITEM_JOINT, selected->id, 0,
+                    joint->id, 0}};
+            if(editor_command_execute(project, &command).kind == ERROR_RESULT_ERROR)
+                return false;
+        }
         viewport_state->mode = EDITOR_VIEWPORT_OBJECT;
         if(index < selected->joint_count) {
             viewport_state->selection = EDITOR_SELECTION_JOINT;
@@ -594,8 +610,13 @@ static bool editor_selected_delete(
         size_t index;
         if(anchor == NULL) return false;
         index = (size_t)(anchor - selected->anchors);
-        if(!editor_project_anchor_remove(
-                selected, viewport_state->selected_anchor)) return false;
+        {
+            EditorCommand command = {.type = EDITOR_COMMAND_ITEM_REMOVE,
+                .data.item_remove = {EDITOR_ITEM_ANCHOR, selected->id, 0,
+                    anchor->id, 0}};
+            if(editor_command_execute(project, &command).kind == ERROR_RESULT_ERROR)
+                return false;
+        }
         viewport_state->mode = EDITOR_VIEWPORT_JOINT;
         if(index < selected->anchor_count) {
             viewport_state->selection = EDITOR_SELECTION_ANCHOR;
@@ -615,8 +636,13 @@ static bool editor_selected_delete(
         size_t index;
         if(body == NULL) return false;
         index = (size_t)(body - selected->soft_body_items);
-        if(!editor_project_soft_body_remove(
-                selected, viewport_state->selected_soft_body)) return false;
+        {
+            EditorCommand command = {.type = EDITOR_COMMAND_ITEM_REMOVE,
+                .data.item_remove = {EDITOR_ITEM_SOFT_BODY, selected->id, 0,
+                    body->id, 0}};
+            if(editor_command_execute(project, &command).kind == ERROR_RESULT_ERROR)
+                return false;
+        }
         viewport_state->mode = EDITOR_VIEWPORT_OBJECT;
         if(index < selected->soft_body_count) {
             viewport_state->selection = EDITOR_SELECTION_SOFT_BODY;
@@ -632,8 +658,13 @@ static bool editor_selected_delete(
         size_t index;
         if(body == NULL || node == NULL) return false;
         index = (size_t)(node - body->nodes);
-        if(body == NULL || !editor_project_soft_node_remove(
-                body, viewport_state->selected_soft_node)) return false;
+        {
+            EditorCommand command = {.type = EDITOR_COMMAND_ITEM_REMOVE,
+                .data.item_remove = {EDITOR_ITEM_SOFT_NODE, selected->id, body->id,
+                    node->id, 0}};
+            if(editor_command_execute(project, &command).kind == ERROR_RESULT_ERROR)
+                return false;
+        }
         viewport_state->mode = EDITOR_VIEWPORT_SOFT_BODY;
         if(index < body->node_count) {
             viewport_state->selection = EDITOR_SELECTION_SOFT_NODE;
@@ -657,8 +688,13 @@ static bool editor_selected_delete(
         size_t index;
         if(body == NULL || beam == NULL) return false;
         index = (size_t)(beam - body->beams);
-        if(body == NULL || !editor_project_soft_beam_remove(
-                body, viewport_state->selected_soft_beam)) return false;
+        {
+            EditorCommand command = {.type = EDITOR_COMMAND_ITEM_REMOVE,
+                .data.item_remove = {EDITOR_ITEM_SOFT_BEAM, selected->id, body->id,
+                    beam->id, 0}};
+            if(editor_command_execute(project, &command).kind == ERROR_RESULT_ERROR)
+                return false;
+        }
         viewport_state->mode = EDITOR_VIEWPORT_SOFT_BODY;
         if(index < body->beam_count) {
             viewport_state->selection = EDITOR_SELECTION_SOFT_BEAM;
@@ -669,10 +705,16 @@ static bool editor_selected_delete(
         return true;
     }
     if(viewport_state->selection == EDITOR_SELECTION_VERTEX) {
+        EditorRigidBody *body = editor_selected_body_get(selected, viewport_state);
         EditorHitbox *hitbox = editor_selected_hitbox_get(selected, viewport_state);
         uint32_t index = viewport_state->selected_vertex;
-        if(!editor_project_hitbox_vertex_remove(
-                hitbox, viewport_state->selected_vertex)) return false;
+        EditorCommand command;
+        if(body == NULL || hitbox == NULL || index >= hitbox->vertex_count) return false;
+        command = (EditorCommand){.type = EDITOR_COMMAND_ITEM_REMOVE,
+            .data.item_remove = {EDITOR_ITEM_VERTEX, selected->id, body->id,
+                hitbox->id, hitbox->vertices[index].id}};
+        if(editor_command_execute(project, &command).kind == ERROR_RESULT_ERROR)
+            return false;
         viewport_state->mode = EDITOR_VIEWPORT_HITBOX;
         if(index < hitbox->vertex_count) {
             viewport_state->selection = EDITOR_SELECTION_VERTEX;
@@ -686,10 +728,14 @@ static bool editor_selected_delete(
         return true;
     }
     if(viewport_state->selection == EDITOR_SELECTION_LINE) {
+        EditorRigidBody *body = editor_selected_body_get(selected, viewport_state);
         EditorHitbox *hitbox = editor_selected_hitbox_get(selected, viewport_state);
         uint32_t index = viewport_state->selected_line;
-        if(!editor_project_hitbox_line_remove(
-                hitbox, viewport_state->selected_line)) return false;
+        EditorCommand command = {.type = EDITOR_COMMAND_ITEM_REMOVE,
+            .data.item_remove = {EDITOR_ITEM_LINE, selected->id,
+                body == NULL ? 0 : body->id, hitbox == NULL ? 0 : hitbox->id, index}};
+        if(editor_command_execute(project, &command).kind == ERROR_RESULT_ERROR)
+            return false;
         viewport_state->mode = EDITOR_VIEWPORT_HITBOX;
         if(index < hitbox->vertex_count) {
             viewport_state->selection = EDITOR_SELECTION_LINE;
@@ -1223,6 +1269,14 @@ int main(void) {
                     body->name, sizeof(body->name), &rigid_body_labels[body_index],
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 88.0f, 42.0f,
                         EDITOR_TOOLS_WIDTH - 96.0f, 30.0f});
+                if(name_result.changed) {
+                    EditorCommand command = {.type = EDITOR_COMMAND_ITEM_RENAME,
+                        .data.item_rename = {.kind = EDITOR_ITEM_RIGID_BODY,
+                            .object = selected->id, .item = body->id}};
+                    snprintf(command.data.item_rename.name,
+                        sizeof(command.data.item_rename.name), "%s", body->name);
+                    (void)editor_command_execute(&project, &command);
+                }
                 (void)editor_visibility_toggle("editor.rigid_body.visibility",
                     &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         44.0f, 26.0f, 26.0f}, &project,
@@ -1406,10 +1460,14 @@ int main(void) {
                         if(rohr_ui_button("editor.rigid_body.add_hitbox", &add_hitbox_label,
                                 (UIRect){row_x, hitbox_button_y, row_width, 32.0f},
                                 NULL).clicked) {
-                            EditorHitbox *added = editor_project_hitbox_add(&project, body);
-                            if(added != NULL) {
+                            EditorCommand command = {.type = EDITOR_COMMAND_ITEM_ADD,
+                                .data.item_add = {.kind = EDITOR_ITEM_HITBOX,
+                                    .object = selected->id, .parent = body->id}};
+                            EditorCommandResult added = editor_command_execute(
+                                &project, &command);
+                            if(added.kind == ERROR_RESULT_VALUE) {
                                 viewport_state.selection = EDITOR_SELECTION_HITBOX;
-                                viewport_state.selected_hitbox = added->id;
+                                viewport_state.selected_hitbox = added.result.object;
                             }
                         }
                         for(size_t i = 0; i < body->hitbox_count; i += 1) {
@@ -1472,6 +1530,15 @@ int main(void) {
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 88.0f, 44.0f,
                         EDITOR_TOOLS_WIDTH - 96.0f, 28.0f});
                 field_editing = name_result.active;
+                if(name_result.changed) {
+                    EditorCommand command = {.type = EDITOR_COMMAND_ITEM_RENAME,
+                        .data.item_rename = {.kind = EDITOR_ITEM_HITBOX,
+                            .object = selected->id, .parent = body->id,
+                            .item = hitbox->id}};
+                    snprintf(command.data.item_rename.name,
+                        sizeof(command.data.item_rename.name), "%s", hitbox->name);
+                    (void)editor_command_execute(&project, &command);
+                }
                 (void)editor_visibility_toggle("editor.hitbox.visibility",
                     &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         47.0f, 26.0f, 26.0f}, &project, EDITOR_VISIBILITY_HITBOX,
@@ -1565,6 +1632,15 @@ int main(void) {
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 56.0f, 48.0f,
                         EDITOR_TOOLS_WIDTH - 64.0f, 24.0f});
                 field_editing = name_result.active;
+                if(name_result.changed) {
+                    EditorCommand command = {.type = EDITOR_COMMAND_ITEM_RENAME,
+                        .data.item_rename = {.kind = EDITOR_ITEM_VERTEX,
+                            .object = selected->id, .parent = body->id,
+                            .item = hitbox->id, .index = vertex->id}};
+                    snprintf(command.data.item_rename.name,
+                        sizeof(command.data.item_rename.name), "%s", vertex->name);
+                    (void)editor_command_execute(&project, &command);
+                }
                 if(rohr_ui_button("editor.vertex.lock",
                         vertex->position_locked ? &unlock_label : &lock_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 82.0f,
@@ -1646,12 +1722,34 @@ int main(void) {
                     &line_labels[line], (UIRect){EDITOR_VIEWPORT_WIDTH + 56.0f,
                         48.0f, EDITOR_TOOLS_WIDTH - 64.0f, 24.0f});
                 field_editing = name_result.active;
+                if(name_result.changed) {
+                    EditorRigidBody *body = editor_selected_body_get(
+                        selected, &viewport_state);
+                    EditorCommand command = {.type = EDITOR_COMMAND_ITEM_RENAME,
+                        .data.item_rename = {.kind = EDITOR_ITEM_LINE,
+                            .object = selected->id,
+                            .parent = body == NULL ? 0 : body->id,
+                            .item = hitbox->id, .index = line}};
+                    snprintf(command.data.item_rename.name,
+                        sizeof(command.data.item_rename.name), "%s",
+                        hitbox->line_names[line]);
+                    (void)editor_command_execute(&project, &command);
+                }
                 if(rohr_ui_button("editor.line.add_vertex", &add_vertex_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 82.0f,
-                            EDITOR_TOOLS_WIDTH - 20.0f, 34.0f}, NULL).clicked &&
-                        editor_project_hitbox_vertex_insert(&project, hitbox, line)) {
-                    editor_viewport_hitbox_editor_enter(&viewport_state);
-                    vertex_inserted = true;
+                            EDITOR_TOOLS_WIDTH - 20.0f, 34.0f}, NULL).clicked) {
+                    EditorRigidBody *body = editor_selected_body_get(
+                        selected, &viewport_state);
+                    EditorCommand command = {.type = EDITOR_COMMAND_ITEM_ADD,
+                        .data.item_add = {.kind = EDITOR_ITEM_VERTEX,
+                            .object = selected->id,
+                            .parent = body == NULL ? 0 : body->id,
+                            .first = hitbox->id, .index = line}};
+                    if(editor_command_execute(&project, &command).kind ==
+                            ERROR_RESULT_VALUE) {
+                        editor_viewport_hitbox_editor_enter(&viewport_state);
+                        vertex_inserted = true;
+                    }
                 }
                 if(!vertex_inserted) {
                     rohr_ui_label(&length_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
@@ -1719,6 +1817,14 @@ int main(void) {
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 88.0f, 40.0f,
                         EDITOR_TOOLS_WIDTH - 96.0f, 30.0f});
                 field_editing = name_result.active;
+                if(name_result.changed) {
+                    EditorCommand command = {.type = EDITOR_COMMAND_ITEM_RENAME,
+                        .data.item_rename = {.kind = EDITOR_ITEM_JOINT,
+                            .object = selected->id, .item = joint->id}};
+                    snprintf(command.data.item_rename.name,
+                        sizeof(command.data.item_rename.name), "%s", joint->name);
+                    (void)editor_command_execute(&project, &command);
+                }
                 rohr_ui_label(&visual_size_label,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, 76.0f,
                         EDITOR_TOOLS_WIDTH - 48.0f, 24.0f});
@@ -1793,10 +1899,14 @@ int main(void) {
                 if(rohr_ui_button("editor.joint.add_anchor", &add_anchor_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 232.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 30.0f}, NULL).clicked) {
-                    EditorAnchor *added = editor_project_anchor_add(&project, selected,
-                        (Position){0}, selected->rigid_body_count > 0 ?
-                            selected->rigid_bodies[0].id : 0);
-                    if(added != NULL) viewport_state.selected_anchor = added->id;
+                    EditorCommand command = {.type = EDITOR_COMMAND_ITEM_ADD,
+                        .data.item_add = {.kind = EDITOR_ITEM_ANCHOR,
+                            .object = selected->id,
+                            .parent = selected->rigid_body_count > 0 ?
+                                selected->rigid_bodies[0].id : 0}};
+                    EditorCommandResult added = editor_command_execute(&project, &command);
+                    if(added.kind == ERROR_RESULT_VALUE)
+                        viewport_state.selected_anchor = added.result.object;
                 }
                 {
                     size_t anchor_start = 0;
@@ -2007,6 +2117,14 @@ int main(void) {
                     sizeof(anchor->name), &anchor_labels[anchor_index],
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 88.0f, 42.0f,
                         EDITOR_TOOLS_WIDTH - 96.0f, 30.0f});
+                if(name_result.changed) {
+                    EditorCommand command = {.type = EDITOR_COMMAND_ITEM_RENAME,
+                        .data.item_rename = {.kind = EDITOR_ITEM_ANCHOR,
+                            .object = selected->id, .item = anchor->id}};
+                    snprintf(command.data.item_rename.name,
+                        sizeof(command.data.item_rename.name), "%s", anchor->name);
+                    (void)editor_command_execute(&project, &command);
+                }
                 (void)editor_visibility_toggle("editor.anchor.visibility",
                     &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         44.0f, 26.0f, 26.0f}, &project, EDITOR_VISIBILITY_ANCHOR,
@@ -2137,6 +2255,14 @@ int main(void) {
                     sizeof(body->name), &soft_body_labels[body_index],
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 88.0f, 42.0f,
                         EDITOR_TOOLS_WIDTH - 96.0f, 30.0f});
+                if(name_result.changed) {
+                    EditorCommand command = {.type = EDITOR_COMMAND_ITEM_RENAME,
+                        .data.item_rename = {.kind = EDITOR_ITEM_SOFT_BODY,
+                            .object = selected->id, .item = body->id}};
+                    snprintf(command.data.item_rename.name,
+                        sizeof(command.data.item_rename.name), "%s", body->name);
+                    (void)editor_command_execute(&project, &command);
+                }
                 (void)editor_visibility_toggle("editor.soft_body.visibility",
                     &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         44.0f, 26.0f, 26.0f}, &project, EDITOR_VISIBILITY_SOFT_BODY,
@@ -2186,21 +2312,26 @@ int main(void) {
                 if(rohr_ui_button("editor.soft_body.add_node", &add_node_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 264.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 30.0f}, NULL).clicked) {
-                    EditorSoftNode *node = editor_project_soft_node_add(&project, body,
-                        (Position){(float)body->node_count * 24.0f, 0.0f});
-                    if(node != NULL) {
+                    EditorCommand command = {.type = EDITOR_COMMAND_ITEM_ADD,
+                        .data.item_add = {.kind = EDITOR_ITEM_SOFT_NODE,
+                            .object = selected->id, .parent = body->id,
+                            .position = {(float)body->node_count * 24.0f, 0.0f}}};
+                    EditorCommandResult node = editor_command_execute(&project, &command);
+                    if(node.kind == ERROR_RESULT_VALUE) {
                         viewport_state.selection = EDITOR_SELECTION_SOFT_NODE;
-                        viewport_state.selected_soft_node = node->id;
+                        viewport_state.selected_soft_node = node.result.object;
                     }
                 }
                 if(rohr_ui_button("editor.soft_body.add_beam", &add_beam_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 300.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 30.0f}, NULL).clicked) {
-                    EditorSoftBeam *beam = editor_project_soft_beam_add(
-                        &project, body, 0, 0);
-                    if(beam != NULL) {
+                    EditorCommand command = {.type = EDITOR_COMMAND_ITEM_ADD,
+                        .data.item_add = {.kind = EDITOR_ITEM_SOFT_BEAM,
+                            .object = selected->id, .parent = body->id}};
+                    EditorCommandResult beam = editor_command_execute(&project, &command);
+                    if(beam.kind == ERROR_RESULT_VALUE) {
                         viewport_state.selection = EDITOR_SELECTION_SOFT_BEAM;
-                        viewport_state.selected_soft_beam = beam->id;
+                        viewport_state.selected_soft_beam = beam.result.object;
                     }
                 }
                 {
@@ -2292,6 +2423,15 @@ int main(void) {
                     sizeof(node->name), &soft_node_labels[index],
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 88.0f, 40.0f,
                         EDITOR_TOOLS_WIDTH - 96.0f, 30.0f});
+                if(name_result.changed) {
+                    EditorCommand command = {.type = EDITOR_COMMAND_ITEM_RENAME,
+                        .data.item_rename = {.kind = EDITOR_ITEM_SOFT_NODE,
+                            .object = selected->id, .parent = body->id,
+                            .item = node->id}};
+                    snprintf(command.data.item_rename.name,
+                        sizeof(command.data.item_rename.name), "%s", node->name);
+                    (void)editor_command_execute(&project, &command);
+                }
                 (void)editor_visibility_toggle("editor.soft_node.visibility",
                     &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         44.0f, 26.0f, 26.0f}, &project, EDITOR_VISIBILITY_SOFT_NODE,
@@ -2432,6 +2572,15 @@ int main(void) {
                     sizeof(beam->name), &soft_beam_labels[index],
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 88.0f, 40.0f,
                         EDITOR_TOOLS_WIDTH - 96.0f, 30.0f});
+                if(name_result.changed) {
+                    EditorCommand command = {.type = EDITOR_COMMAND_ITEM_RENAME,
+                        .data.item_rename = {.kind = EDITOR_ITEM_SOFT_BEAM,
+                            .object = selected->id, .parent = body->id,
+                            .item = beam->id}};
+                    snprintf(command.data.item_rename.name,
+                        sizeof(command.data.item_rename.name), "%s", beam->name);
+                    (void)editor_command_execute(&project, &command);
+                }
                 (void)editor_visibility_toggle("editor.soft_beam.visibility",
                     &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         44.0f, 26.0f, 26.0f}, &project, EDITOR_VISIBILITY_SOFT_BEAM,
@@ -2519,11 +2668,12 @@ int main(void) {
                         EDITOR_TOOLS_WIDTH - 140.0f, 34.0f}, NULL);
                     field_editing = name_result.active;
                     if(name_result.changed) {
-                        EditorCommand command = {.type = EDITOR_COMMAND_OBJECT_RENAME,
-                            .data.object_rename.object = selected->id};
+                        EditorCommand command = {.type = EDITOR_COMMAND_ITEM_RENAME,
+                            .data.item_rename = {.kind = EDITOR_ITEM_OBJECT,
+                                .object = selected->id}};
                         EditorCommandResult command_result;
-                        snprintf(command.data.object_rename.name,
-                            sizeof(command.data.object_rename.name), "%s", selected->name);
+                        snprintf(command.data.item_rename.name,
+                            sizeof(command.data.item_rename.name), "%s", selected->name);
                         command_result = editor_command_execute(&project, &command);
                         snprintf(object_name_cache[selected_index],
                             EDITOR_OBJECT_NAME_MAX, "%s", selected->name);
@@ -2533,29 +2683,37 @@ int main(void) {
                 if(rohr_ui_button("editor.add_rigid_body", &add_rigid_body_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 128.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 32.0f}, NULL).clicked) {
-                    EditorRigidBody *body = editor_project_rigid_body_add(&project, selected);
-                    if(body != NULL) {
+                    EditorCommand command = {.type = EDITOR_COMMAND_ITEM_ADD,
+                        .data.item_add = {.kind = EDITOR_ITEM_RIGID_BODY,
+                            .object = selected->id}};
+                    EditorCommandResult body = editor_command_execute(&project, &command);
+                    if(body.kind == ERROR_RESULT_VALUE) {
                         viewport_state.selection = EDITOR_SELECTION_RIGID_BODY;
-                        viewport_state.selected_rigid_body = body->id;
+                        viewport_state.selected_rigid_body = body.result.object;
                     }
                 }
                 if(rohr_ui_button("editor.add_joint", &add_joint_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 166.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 32.0f}, NULL).clicked) {
-                    EditorJoint *joint = editor_project_joint_add(
-                        &project, selected, EDITOR_JOINT_SPRING);
-                    if(joint != NULL) {
+                    EditorCommand command = {.type = EDITOR_COMMAND_ITEM_ADD,
+                        .data.item_add = {.kind = EDITOR_ITEM_JOINT,
+                            .object = selected->id, .option = EDITOR_JOINT_SPRING}};
+                    EditorCommandResult joint = editor_command_execute(&project, &command);
+                    if(joint.kind == ERROR_RESULT_VALUE) {
                         viewport_state.selection = EDITOR_SELECTION_JOINT;
-                        viewport_state.selected_joint = joint->id;
+                        viewport_state.selected_joint = joint.result.object;
                     }
                 }
                 if(rohr_ui_button("editor.add_soft_body", &add_soft_body_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 204.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 32.0f}, NULL).clicked) {
-                    EditorSoftBody *body = editor_project_soft_body_add(&project, selected);
-                    if(body != NULL) {
+                    EditorCommand command = {.type = EDITOR_COMMAND_ITEM_ADD,
+                        .data.item_add = {.kind = EDITOR_ITEM_SOFT_BODY,
+                            .object = selected->id}};
+                    EditorCommandResult body = editor_command_execute(&project, &command);
+                    if(body.kind == ERROR_RESULT_VALUE) {
                         viewport_state.selection = EDITOR_SELECTION_SOFT_BODY;
-                        viewport_state.selected_soft_body = body->id;
+                        viewport_state.selected_soft_body = body.result.object;
                     }
                 }
                 {
@@ -2662,17 +2820,18 @@ int main(void) {
                 (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 42.0f,
                     EDITOR_TOOLS_WIDTH - 20.0f, 38.0f}, NULL);
             if(add_object.clicked) {
-                EditorCommand command = {.type = EDITOR_COMMAND_OBJECT_ADD};
-                snprintf(command.data.object_add.name,
-                    sizeof(command.data.object_add.name), "Object%u", project.next_id);
+                EditorCommand command = {.type = EDITOR_COMMAND_ITEM_ADD,
+                    .data.item_add = {.kind = EDITOR_ITEM_OBJECT}};
+                snprintf(command.data.item_add.name,
+                    sizeof(command.data.item_add.name), "Object%u", project.next_id);
                 EditorCommandResult added = editor_command_execute(&project, &command);
                 if(added.kind == ERROR_RESULT_VALUE) {
                     EditorObject *object = editor_object_query_get(
                         &project, added.result.object);
                     viewport_state.selection = EDITOR_SELECTION_OBJECT;
                     if(object != NULL) {
-                        snprintf(command.data.object_add.name,
-                            sizeof(command.data.object_add.name), "%s", object->name);
+                        snprintf(command.data.item_add.name,
+                            sizeof(command.data.item_add.name), "%s", object->name);
                     }
                 }
             }
