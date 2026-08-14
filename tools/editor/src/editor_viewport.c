@@ -260,6 +260,59 @@ static void editor_soft_area_filled_draw(const EditorObject *object,
     }
 }
 
+static void editor_hitbox_filled_draw(const EditorObject *object,
+        const EditorRigidBody *body, const EditorHitbox *hitbox, Color color) {
+    Position points[EDITOR_HITBOX_VERTEX_MAX];
+    float minimum_y;
+    float maximum_y;
+
+    if(object == NULL || body == NULL || hitbox == NULL || hitbox->vertex_count < 3)
+        return;
+    for(uint32_t i = 0; i < hitbox->vertex_count; i += 1) {
+        points[i] = editor_view_world_to_screen(
+            editor_hitbox_vertex_world_get(object, body, hitbox, i));
+    }
+    minimum_y = points[0].y;
+    maximum_y = points[0].y;
+    for(uint32_t i = 1; i < hitbox->vertex_count; i += 1) {
+        minimum_y = fminf(minimum_y, points[i].y);
+        maximum_y = fmaxf(maximum_y, points[i].y);
+    }
+
+    int first_row = (int)floorf(fmaxf(minimum_y, EDITOR_MENU_HEIGHT));
+    int last_row = (int)ceilf(fminf(maximum_y, WINDOW_HEIGHT - 1.0f));
+    for(int row = first_row; row <= last_row; row += 1) {
+        float scan_y = (float)row + 0.5f;
+        float intersections[EDITOR_HITBOX_VERTEX_MAX];
+        uint32_t count = 0;
+        for(uint32_t edge = 0; edge < hitbox->vertex_count; edge += 1) {
+            Position start = points[edge];
+            Position end = points[(edge + 1) % hitbox->vertex_count];
+            float low = fminf(start.y, end.y);
+            float high = fmaxf(start.y, end.y);
+            if(scan_y < low || scan_y >= high || fabsf(end.y - start.y) <= 0.0001f)
+                continue;
+            intersections[count++] = start.x + (scan_y - start.y) *
+                (end.x - start.x) / (end.y - start.y);
+        }
+        for(uint32_t i = 1; i < count; i += 1) {
+            float value = intersections[i];
+            uint32_t position = i;
+            while(position > 0 && intersections[position - 1] > value) {
+                intersections[position] = intersections[position - 1];
+                position -= 1;
+            }
+            intersections[position] = value;
+        }
+        for(uint32_t i = 0; i + 1 < count; i += 2) {
+            float left = fmaxf(intersections[i], 0.0f);
+            float right = fminf(intersections[i + 1], EDITOR_VIEWPORT_WIDTH);
+            if(right > left) (void)rohr_graphics_screen_rect_draw(
+                left, (float)row, right - left, 1.0f, color);
+        }
+    }
+}
+
 static void editor_quad_draw(Position center, float width, float height,
     float rotation, Color color) {
     (void)rohr_graphics_screen_quad_draw(editor_view_world_to_screen(center),
@@ -1245,6 +1298,8 @@ static void editor_viewport_object_draw(const EditorObject *object,
                     (state->selection == EDITOR_SELECTION_HITBOX && selected_hitbox) ?
                 (Color){255, 215, 70, 255} : graphics_color_hex_create(body->border_color);
             if(!hitbox->visible) continue;
+            editor_hitbox_filled_draw(object, body, hitbox,
+                graphics_color_hex_create(body->surface_color));
             for(uint32_t i = 0; i < hitbox->vertex_count; i += 1) {
                 Position start = editor_hitbox_vertex_world_get(object, body, hitbox, i);
                 Position end = editor_hitbox_vertex_world_get(
