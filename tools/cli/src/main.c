@@ -1,36 +1,12 @@
+#include "editor_command.h"
 #include "editor_document.h"
-#include "editor_object_commands.h"
 
-#include <errno.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 static int cli_error(EditorResult result) {
     editor_result_stderr_print(result);
     return 1;
-}
-
-static bool cli_uint_parse(const char *text, uint32_t *value) {
-    char *end;
-    unsigned long parsed;
-    if(text == NULL || value == NULL || text[0] == '\0') return false;
-    errno = 0;
-    parsed = strtoul(text, &end, 10);
-    if(errno != 0 || *end != '\0' || parsed > UINT32_MAX) return false;
-    *value = (uint32_t)parsed;
-    return true;
-}
-
-static bool cli_float_parse(const char *text, float *value) {
-    char *end;
-    float parsed;
-    if(text == NULL || value == NULL || text[0] == '\0') return false;
-    errno = 0;
-    parsed = strtof(text, &end);
-    if(errno != 0 || *end != '\0') return false;
-    *value = parsed;
-    return true;
 }
 
 static void cli_usage_print(void) {
@@ -43,6 +19,8 @@ static void cli_usage_print(void) {
 }
 
 static int cli_object_command(int count, char **arguments) {
+    EditorCommand command;
+    EditorCommandResult command_result;
     EditorDocument document;
     EditorResult result;
     const char *action;
@@ -63,47 +41,14 @@ static int cli_object_command(int count, char **arguments) {
             printf("%u\t%s\n", project->objects[i].id, project->objects[i].name);
         return 0;
     }
-    if(strcmp(action, "add") == 0) {
-        EditorObjectAddArgs add;
-        EditorObjectIdResult add_result;
-        if(count != 5 && count != 7) {
-            cli_usage_print();
-            return 1;
-        }
-        add = (EditorObjectAddArgs){.name = arguments[4]};
-        if(count == 7 && (!cli_float_parse(arguments[5], &add.position.x) ||
-                !cli_float_parse(arguments[6], &add.position.y))) {
-            fputs("object position must contain valid numbers\n", stderr);
-            return 1;
-        }
-        add_result = editor_object_command_add(document.project, &add);
-        if(add_result.kind == ERROR_RESULT_ERROR) {
-            EditorResult command_error = {.kind = ERROR_RESULT_ERROR,
-                .result.error = add_result.result.error};
-            return cli_error(command_error);
-        }
-        printf("added object %u\n", add_result.result.value);
-    } else if(strcmp(action, "rename") == 0) {
-        uint32_t object;
-        if(count != 6 || !cli_uint_parse(arguments[4], &object)) {
-            cli_usage_print();
-            return 1;
-        }
-        result = editor_object_command_rename(
-            document.project, object, arguments[5]);
-        if(editor_result_check(result)) return cli_error(result);
-    } else if(strcmp(action, "delete") == 0) {
-        uint32_t object;
-        if(count != 5 || !cli_uint_parse(arguments[4], &object)) {
-            cli_usage_print();
-            return 1;
-        }
-        result = editor_object_command_remove(document.project, object);
-        if(editor_result_check(result)) return cli_error(result);
-    } else {
-        cli_usage_print();
-        return 1;
-    }
+    result = editor_command_cli_parse(count, arguments, &path, &command);
+    if(editor_result_check(result)) return cli_error(result);
+    command_result = editor_command_execute(document.project, &command);
+    if(command_result.kind == ERROR_RESULT_ERROR)
+        return cli_error((EditorResult){.kind = ERROR_RESULT_ERROR,
+            .result.error = command_result.result.error});
+    if(command.type == EDITOR_COMMAND_OBJECT_ADD)
+        printf("added object %u\n", command_result.result.object);
     document.dirty = true;
     result = editor_document_save(&document);
     return editor_result_check(result) ? cli_error(result) : 0;

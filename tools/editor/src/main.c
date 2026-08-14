@@ -5,12 +5,12 @@
 #include "editor_viewport.h"
 #include "editor_layout.h"
 #include "editor_navigation.h"
+#include "editor_command.h"
 #include "editor_object_commands.h"
 #include "panels/editor_origin_panel.h"
 #include "panels/editor_terminal_panel.h"
 
 #include <math.h>
-#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -49,21 +49,14 @@ static EditorTerminalPanel *editor_operation_terminal;
 static const EditorWorkspace *editor_operation_workspace;
 static bool *editor_operation_enabled;
 
-static void editor_operation_command_write(const char *action,
-        const char *format, ...) {
-    char arguments[1536];
+static void editor_operation_command_write(const EditorCommand *editor_command) {
     char command[3072];
-    va_list values;
     if(editor_operation_terminal == NULL || editor_operation_workspace == NULL ||
             editor_operation_enabled == NULL || !*editor_operation_enabled ||
-            !editor_operation_workspace->open || action == NULL || format == NULL) return;
-    va_start(values, format);
-    (void)vsnprintf(arguments, sizeof(arguments), format, values);
-    va_end(values);
-    (void)snprintf(command, sizeof(command),
-        "editor-cli %.64s \"%.1023s\"%s%.1535s", action,
-        editor_operation_workspace->config.editor_state_file,
-        arguments[0] == '\0' ? "" : " ", arguments);
+            !editor_operation_workspace->open || editor_command == NULL) return;
+    if(editor_result_check(editor_command_cli_write(editor_command,
+            editor_operation_workspace->config.editor_state_file,
+            command, sizeof(command)))) return;
     editor_terminal_panel_operation_write(editor_operation_terminal, command);
 }
 
@@ -481,10 +474,12 @@ static bool editor_selected_delete(
     selected = editor_project_selected_get(project);
     if(selected == NULL) return false;
     if(viewport_state->selection == EDITOR_SELECTION_OBJECT) {
+        EditorCommand command = {.type = EDITOR_COMMAND_OBJECT_REMOVE,
+            .data.object_remove.object = selected->id};
         size_t index = (size_t)(selected - project->objects);
-        editor_operation_command_write("object delete", "%u", selected->id);
-        if(editor_result_check(editor_object_command_remove(
-                project, selected->id))) return false;
+        EditorCommandResult result = editor_command_execute(project, &command);
+        if(result.kind == ERROR_RESULT_ERROR) return false;
+        editor_operation_command_write(&command);
         editor_viewport_hitbox_editor_exit(viewport_state);
         if(index < project->object_count) {
             (void)editor_project_object_select(project, project->objects[index].id);
@@ -2423,12 +2418,16 @@ int main(void) {
                         EDITOR_TOOLS_WIDTH - 140.0f, 34.0f}, NULL);
                     field_editing = name_result.active;
                     if(name_result.changed) {
-                        (void)editor_object_command_rename(
-                            &project, selected->id, selected->name);
+                        EditorCommand command = {.type = EDITOR_COMMAND_OBJECT_RENAME,
+                            .data.object_rename.object = selected->id};
+                        EditorCommandResult command_result;
+                        snprintf(command.data.object_rename.name,
+                            sizeof(command.data.object_rename.name), "%s", selected->name);
+                        command_result = editor_command_execute(&project, &command);
                         snprintf(object_name_cache[selected_index],
                             EDITOR_OBJECT_NAME_MAX, "%s", selected->name);
-                        editor_operation_command_write("object rename", "%u %s",
-                            selected->id, selected->name);
+                        if(command_result.kind == ERROR_RESULT_VALUE)
+                            editor_operation_command_write(&command);
                     }
                 }
                 if(rohr_ui_button("editor.add_rigid_body", &add_rigid_body_label,
@@ -2560,15 +2559,17 @@ int main(void) {
                 (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 42.0f,
                     EDITOR_TOOLS_WIDTH - 20.0f, 38.0f}, NULL);
             if(add_object.clicked) {
-                EditorObjectIdResult added = editor_object_command_add(&project,
-                    &(EditorObjectAddArgs){.position = {0.0f, 0.0f}});
+                EditorCommand command = {.type = EDITOR_COMMAND_OBJECT_ADD};
+                EditorCommandResult added = editor_command_execute(&project, &command);
                 if(added.kind == ERROR_RESULT_VALUE) {
                     EditorObject *object = editor_object_query_get(
-                        &project, added.result.value);
+                        &project, added.result.object);
                     viewport_state.selection = EDITOR_SELECTION_OBJECT;
-                    if(object != NULL) editor_operation_command_write("object add",
-                        "%s %.9g %.9g", object->name,
-                        object->position.x, object->position.y);
+                    if(object != NULL) {
+                        snprintf(command.data.object_add.name,
+                            sizeof(command.data.object_add.name), "%s", object->name);
+                        editor_operation_command_write(&command);
+                    }
                 }
             }
             (void)rohr_graphics_screen_rect_draw(
