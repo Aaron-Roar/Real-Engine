@@ -5,6 +5,81 @@
 #include <stdio.h>
 #include <string.h>
 
+static int named_selector_commands_test(void) {
+    static EditorProject project;
+    EditorObject *object;
+    EditorRigidBody *body;
+    EditorHitbox *hitbox;
+    EditorCommand command;
+    EditorResult result;
+    const char *path;
+    char body_id[16];
+    char cli_text[512];
+    char *named_arguments[] = {"editor-cli", "rigid-body", "transform",
+        "project.rohr.json", "--object", "fast car", "--body", "car body",
+        "10", "20", "0.5"};
+    char *id_arguments[] = {"editor-cli", "rigid-body", "set",
+        "project.rohr.json", "--object", "FastCar", "--body-id", body_id,
+        "mass", "5"};
+    char *vertex_arguments[] = {"editor-cli", "vertex", "position",
+        "project.rohr.json", "--object", "FastCar", "--body", "car_body",
+        "--hitbox", "hitbox_1", "--vertex", "vertex_1", "3", "4"};
+    char *missing_arguments[] = {"editor-cli", "rigid-body", "transform",
+        "project.rohr.json", "--object", "FastCar", "--body", "missing",
+        "0", "0", "0"};
+
+    editor_project_init(&project);
+    object = editor_project_object_add(&project, (Position){0});
+    body = editor_project_rigid_body_add(&project, object);
+    hitbox = body == NULL ? NULL : &body->hitboxes[0];
+    if(object == NULL || body == NULL || hitbox == NULL) return 1;
+    snprintf(object->name, sizeof(object->name), "FastCar");
+    snprintf(body->name, sizeof(body->name), "car_body");
+    snprintf(hitbox->name, sizeof(hitbox->name), "hitbox_1");
+    snprintf(hitbox->vertices[0].name, sizeof(hitbox->vertices[0].name), "vertex_1");
+
+    result = editor_command_cli_named_parse(&project, 11, named_arguments,
+        &path, &command);
+    if(editor_result_check(result) || command.type != EDITOR_COMMAND_RIGID_BODY_TRANSFORM ||
+            command.data.rigid_body_transform.object != object->id ||
+            command.data.rigid_body_transform.body != body->id) return 1;
+    result = editor_command_cli_named_write(&project, &command,
+        "project.rohr.json", cli_text, sizeof(cli_text));
+    if(editor_result_check(result) || strstr(cli_text, "--object FastCar") == NULL ||
+            strstr(cli_text, "--body car_body") == NULL) return 1;
+
+    snprintf(body_id, sizeof(body_id), "%u", body->id);
+    result = editor_command_cli_named_parse(&project, 10, id_arguments,
+        &path, &command);
+    if(editor_result_check(result) || command.type != EDITOR_COMMAND_PROPERTY_SET ||
+            command.data.property_set.item != body->id) return 1;
+
+    result = editor_command_cli_named_parse(&project, 14, vertex_arguments,
+        &path, &command);
+    if(editor_result_check(result) || command.type != EDITOR_COMMAND_VERTEX_POSITION ||
+            command.data.vertex_position.vertex != hitbox->vertices[0].id) return 1;
+    result = editor_command_cli_named_write(&project, &command,
+        "project.rohr.json", cli_text, sizeof(cli_text));
+    if(editor_result_check(result) || strstr(cli_text, "--hitbox hitbox_1") == NULL ||
+            strstr(cli_text, "--vertex vertex_1") == NULL) return 1;
+
+    result = editor_command_cli_named_parse(&project, 11, missing_arguments,
+        &path, &command);
+    if(!editor_result_check(result) ||
+            result.result.error.code != EDITOR_ERROR_NOT_FOUND) return 1;
+    {
+        EditorRigidBody *duplicate = editor_project_rigid_body_add(&project, object);
+        if(duplicate == NULL) return 1;
+        snprintf(duplicate->name, sizeof(duplicate->name), "car_body");
+        result = editor_command_cli_named_parse(&project, 11, named_arguments,
+            &path, &command);
+        if(!editor_result_check(result) ||
+                result.result.error.code != EDITOR_ERROR_INVALID_ARGUMENT ||
+                strstr(result.result.error.message, "--body-id") == NULL) return 1;
+    }
+    return 0;
+}
+
 static int transform_commands_test(void) {
     static EditorProject project;
     EditorObject *object;
@@ -555,6 +630,7 @@ int main(void) {
     if(property_commands_test() != 0) return 1;
     if(relationship_commands_test() != 0) return 1;
     if(collision_filter_commands_test() != 0) return 1;
+    if(named_selector_commands_test() != 0) return 1;
 
     editor_document_destroy(&loaded);
     editor_document_destroy(&document);

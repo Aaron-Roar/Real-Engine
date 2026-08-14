@@ -251,5 +251,11 @@ EditorResult editor_command_cli_parse(int count, char **arguments,
     const char **document_path, EditorCommand *command);
 EditorResult editor_command_cli_write(const EditorCommand *command,
     const char *document_path, char *output, size_t output_capacity);
+EditorResult editor_command_cli_named_parse(const EditorProject *project,
+    int count, char **arguments, const char **document_path,
+    EditorCommand *command);
+EditorResult editor_command_cli_named_write(const EditorProject *project,
+    const EditorCommand *command, const char *document_path,
+    char *output, size_t output_capacity);
 
 #endif

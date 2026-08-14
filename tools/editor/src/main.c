@@ -47,6 +47,7 @@ float editor_viewport_bottom = WINDOW_HEIGHT;
 
 static EditorTerminalPanel *editor_operation_terminal;
 static const EditorWorkspace *editor_operation_workspace;
+static const EditorProject *editor_operation_project;
 static bool *editor_operation_enabled;
 
 static void editor_operation_command_write(const EditorCommand *editor_command,
@@ -56,7 +57,8 @@ static void editor_operation_command_write(const EditorCommand *editor_command,
     if(editor_operation_terminal == NULL || editor_operation_workspace == NULL ||
             editor_operation_enabled == NULL || !*editor_operation_enabled ||
             !editor_operation_workspace->open || editor_command == NULL) return;
-    if(editor_result_check(editor_command_cli_write(editor_command,
+    if(editor_result_check(editor_command_cli_named_write(editor_operation_project,
+            editor_command,
             editor_operation_workspace->config.editor_state_file,
             command, sizeof(command)))) return;
     editor_terminal_panel_operation_write(editor_operation_terminal, command);
@@ -976,6 +978,7 @@ int main(void) {
 
     editor_operation_terminal = &terminal_panel;
     editor_operation_workspace = &workspace;
+    editor_operation_project = &project;
     editor_operation_enabled = &terminal_editor_operations;
     editor_command_executed_callback_set(editor_operation_command_write, NULL);
     editor_project_init(&project);

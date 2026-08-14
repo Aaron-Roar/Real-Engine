@@ -12,6 +12,10 @@ static int cli_error(EditorResult result) {
 
 static void cli_usage_print(void) {
     puts("usage:\n"
+        "  Entity selectors may appear after the project path in any order.\n"
+        "  Prefer names: --object <name> --body <name> --joint <name> ...\n"
+        "  IDs remain available: --object-id <id> --body-id <id> --joint-id <id> ...\n"
+        "  Lines use --line <name> or --line-index <index>.\n"
         "  rohr project create <directory> <engine-root>\n"
         "  rohr project load <directory>\n"
         "  rohr project validate <directory>\n"
@@ -22,7 +26,7 @@ static void cli_usage_print(void) {
         "  rohr object rename <project.rohr.json> <id> <name>\n"
         "  rohr object delete <project.rohr.json> <id>\n"
         "  rohr object position <project.rohr.json> <object> <x> <y>\n"
-        "  rohr rigid-body transform <project.rohr.json> <object> <body> <x> <y> <rotation>\n"
+        "  rohr rigid-body transform <project.rohr.json> --object <name> --body <name> <x> <y> <rotation>\n"
         "  rohr rigid-body origin <project.rohr.json> <object> <body> <x> <y>\n"
         "  rohr vertex position <project.rohr.json> <object> <body> <hitbox> <vertex> <x> <y>\n"
         "  rohr anchor transform <project.rohr.json> <object> <anchor> <x> <y> <rotation>\n"
@@ -116,7 +120,8 @@ static int cli_object_command(int count, char **arguments) {
             printf("%u\t%s\n", project->objects[i].id, project->objects[i].name);
         return 0;
     }
-    result = editor_command_cli_parse(count, arguments, &path, &command);
+    result = editor_command_cli_named_parse(document.project, count, arguments,
+        &path, &command);
     if(editor_result_check(result)) return cli_error(result);
     command_result = editor_command_execute(document.project, &command);
     if(command_result.kind == ERROR_RESULT_ERROR)
