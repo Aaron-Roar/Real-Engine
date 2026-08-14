@@ -160,6 +160,20 @@ void editor_terminal_panel_update(EditorTerminalPanel *panel) {
         rohr_terminal_error_message_get(&result));
 }
 
+void editor_terminal_panel_operation_write(EditorTerminalPanel *panel,
+        const char *command) {
+    RohrTerminalResult result;
+    if(panel == NULL || panel->terminal == NULL || command == NULL) return;
+    result = rohr_terminal_output_write(panel->terminal, "\r\n$ ", 4);
+    if(result.success)
+        result = rohr_terminal_output_write(panel->terminal, command, strlen(command));
+    if(result.success)
+        result = rohr_terminal_output_write(panel->terminal, "\r\n", 2);
+    if(!result.success) fprintf(stderr, "Terminal operation output failed: %s\n",
+        rohr_terminal_error_message_get(&result));
+    panel->scroll_offset = 0;
+}
+
 float editor_terminal_panel_viewport_bottom_get(const EditorTerminalPanel *panel) {
     if(panel == NULL || !panel->visible) return WINDOW_HEIGHT;
     return WINDOW_HEIGHT - panel->height;

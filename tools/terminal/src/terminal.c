@@ -92,6 +92,13 @@ RohrTerminalResult rohr_terminal_input_write(RohrTerminal *terminal,
     return rohr_terminal_platform_write(terminal, input, length);
 }
 
+RohrTerminalResult rohr_terminal_output_write(RohrTerminal *terminal,
+        const char *output, size_t length) {
+    if(terminal == NULL || output == NULL) return rohr_terminal_result_error(
+        ROHR_TERMINAL_ERROR_INVALID_ARGUMENT, "terminal output is null");
+    return rohr_terminal_emulator_output_write(terminal->emulator, output, length);
+}
+
 RohrTerminalResult rohr_terminal_interrupt(RohrTerminal *terminal) {
     const char interrupt = 3;
     return rohr_terminal_input_write(terminal, &interrupt, 1);

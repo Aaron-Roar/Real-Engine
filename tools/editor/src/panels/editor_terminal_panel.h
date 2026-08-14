@@ -26,6 +26,8 @@ bool editor_terminal_panel_focused_check(const EditorTerminalPanel *panel);
 bool editor_terminal_panel_event_add(EditorTerminalPanel *panel,
     const SDL_Event *event, float viewport_width, float viewport_bottom);
 void editor_terminal_panel_update(EditorTerminalPanel *panel);
+void editor_terminal_panel_operation_write(EditorTerminalPanel *panel,
+    const char *command);
 float editor_terminal_panel_viewport_bottom_get(const EditorTerminalPanel *panel);
 void editor_terminal_panel_draw(EditorTerminalPanel *panel, float viewport_width,
     float viewport_bottom);

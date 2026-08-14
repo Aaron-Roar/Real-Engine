@@ -80,6 +80,8 @@ RohrTerminalResult rohr_terminal_create(RohrTerminal **terminal,
 RohrTerminalResult rohr_terminal_update(RohrTerminal *terminal);
 RohrTerminalResult rohr_terminal_input_write(RohrTerminal *terminal,
     const char *input, size_t length);
+RohrTerminalResult rohr_terminal_output_write(RohrTerminal *terminal,
+    const char *output, size_t length);
 RohrTerminalResult rohr_terminal_interrupt(RohrTerminal *terminal);
 bool rohr_terminal_running_check(const RohrTerminal *terminal);
 int rohr_terminal_exit_code_get(const RohrTerminal *terminal);

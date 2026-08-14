@@ -10,6 +10,7 @@
 #include "panels/editor_terminal_panel.h"
 
 #include <math.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -43,6 +44,28 @@ typedef enum EditorCloseAction {
 float editor_viewport_width = WINDOW_WIDTH * 0.8f;
 float editor_window_width = WINDOW_WIDTH;
 float editor_viewport_bottom = WINDOW_HEIGHT;
+
+static EditorTerminalPanel *editor_operation_terminal;
+static const EditorWorkspace *editor_operation_workspace;
+static bool *editor_operation_enabled;
+
+static void editor_operation_command_write(const char *action,
+        const char *format, ...) {
+    char arguments[1536];
+    char command[3072];
+    va_list values;
+    if(editor_operation_terminal == NULL || editor_operation_workspace == NULL ||
+            editor_operation_enabled == NULL || !*editor_operation_enabled ||
+            !editor_operation_workspace->open || action == NULL || format == NULL) return;
+    va_start(values, format);
+    (void)vsnprintf(arguments, sizeof(arguments), format, values);
+    va_end(values);
+    (void)snprintf(command, sizeof(command),
+        "editor-cli %.64s \"%.1023s\"%s%.1535s", action,
+        editor_operation_workspace->config.editor_state_file,
+        arguments[0] == '\0' ? "" : " ", arguments);
+    editor_terminal_panel_operation_write(editor_operation_terminal, command);
+}
 
 static void editor_window_layout_sync(void) {
     Scale output = rohr_graphics_render_output_size_get();
@@ -459,6 +482,7 @@ static bool editor_selected_delete(
     if(selected == NULL) return false;
     if(viewport_state->selection == EDITOR_SELECTION_OBJECT) {
         size_t index = (size_t)(selected - project->objects);
+        editor_operation_command_write("object delete", "%u", selected->id);
         if(editor_result_check(editor_object_command_remove(
                 project, selected->id))) return false;
         editor_viewport_hitbox_editor_exit(viewport_state);
@@ -686,6 +710,10 @@ int main(void) {
     TextAsset reset_view_label = {0};
     TextAsset grid_label = {0};
     TextAsset terminal_label = {0};
+    TextAsset terminal_menu_label = {0};
+    TextAsset terminal_visible_label = {0};
+    TextAsset terminal_editor_operations_label = {0};
+    TextAsset terminal_build_operations_label = {0};
     TextAsset preferences_label = {0};
     TextAsset file_browser_field = {0};
     TextAsset add_object_label = {0};
@@ -784,12 +812,17 @@ int main(void) {
     bool field_editing = false;
     bool panel_resizing = false;
     bool terminal_resizing = false;
+    bool terminal_editor_operations = false;
+    bool terminal_build_operations = false;
     bool collision_category_open = false;
     bool collide_with_open = false;
     EditorCloseAction close_action = EDITOR_CLOSE_NONE;
     float panel_scroll_offset = 0.0f;
     EditorViewportMode panel_scroll_mode = EDITOR_VIEWPORT_HIERARCHY;
 
+    editor_operation_terminal = &terminal_panel;
+    editor_operation_workspace = &workspace;
+    editor_operation_enabled = &terminal_editor_operations;
     editor_project_init(&project);
     saved_project_hash = editor_project_hash_get(&project);
     editor_viewport_state_init(&viewport_state);
@@ -860,6 +893,12 @@ int main(void) {
             !editor_text_create(&font, "Reset View", &reset_view_label) ||
             !editor_text_create(&font, "Toggle Grid", &grid_label) ||
             !editor_text_create(&font, "Terminal", &terminal_label) ||
+            !editor_text_create(&font, "Terminal", &terminal_menu_label) ||
+            !editor_text_create(&font, "[ ] Visible", &terminal_visible_label) ||
+            !editor_text_create(&font, "[ ] Show editor operations",
+                &terminal_editor_operations_label) ||
+            !editor_text_create(&font, "[ ] Show build operations",
+                &terminal_build_operations_label) ||
             !editor_text_create(&font, "Preferences", &preferences_label) ||
             !editor_text_create(&font, "", &file_browser_field) ||
             !editor_text_create(&font, "Add Object", &add_object_label) ||
@@ -2384,10 +2423,12 @@ int main(void) {
                         EDITOR_TOOLS_WIDTH - 140.0f, 34.0f}, NULL);
                     field_editing = name_result.active;
                     if(name_result.changed) {
-                        editor_project_object_name_format(selected->name,
-                            sizeof(selected->name), selected->name);
+                        (void)editor_object_command_rename(
+                            &project, selected->id, selected->name);
                         snprintf(object_name_cache[selected_index],
                             EDITOR_OBJECT_NAME_MAX, "%s", selected->name);
+                        editor_operation_command_write("object rename", "%u %s",
+                            selected->id, selected->name);
                     }
                 }
                 if(rohr_ui_button("editor.add_rigid_body", &add_rigid_body_label,
@@ -2521,8 +2562,14 @@ int main(void) {
             if(add_object.clicked) {
                 EditorObjectIdResult added = editor_object_command_add(&project,
                     &(EditorObjectAddArgs){.position = {0.0f, 0.0f}});
-                if(added.kind == ERROR_RESULT_VALUE)
+                if(added.kind == ERROR_RESULT_VALUE) {
+                    EditorObject *object = editor_object_query_get(
+                        &project, added.result.value);
                     viewport_state.selection = EDITOR_SELECTION_OBJECT;
+                    if(object != NULL) editor_operation_command_write("object add",
+                        "%s %.9g %.9g", object->name,
+                        object->position.x, object->position.y);
+                }
             }
             (void)rohr_graphics_screen_rect_draw(
                 EDITOR_VIEWPORT_WIDTH + 10.0f, 90.0f,
@@ -2639,6 +2686,10 @@ int main(void) {
             const TextAsset *view_options[] = {
                 &reset_view_label, &grid_label, &terminal_label
             };
+            const TextAsset *terminal_options[] = {
+                &terminal_visible_label, &terminal_editor_operations_label,
+                &terminal_build_operations_label
+            };
             const TextAsset *build_options[] = {
                 &generate_c_label
             };
@@ -2653,6 +2704,10 @@ int main(void) {
             const TextAsset *view_texts[] = {
                 &view_label, &reset_view_label, &grid_label, &terminal_label
             };
+            const TextAsset *terminal_texts[] = {
+                &terminal_menu_label, &terminal_visible_label,
+                &terminal_editor_operations_label, &terminal_build_operations_label
+            };
             const TextAsset *settings_texts[] = {&settings_label, &preferences_label};
             UIComponentConfig menu_components = {
                 .components = UI_COMPONENT_SIZE_TO_TEXT,
@@ -2666,6 +2721,18 @@ int main(void) {
             UIRect build_bounds;
             UIRect view_bounds;
             UIRect settings_bounds;
+            UIRect terminal_bounds;
+
+            (void)rohr_graphics_text_value_set(&terminal_label,
+                terminal_panel.visible ? "[x] Terminal" : "[ ] Terminal");
+            (void)rohr_graphics_text_value_set(&terminal_visible_label,
+                terminal_panel.visible ? "[x] Visible" : "[ ] Visible");
+            (void)rohr_graphics_text_value_set(&terminal_editor_operations_label,
+                terminal_editor_operations ? "[x] Show editor operations" :
+                    "[ ] Show editor operations");
+            (void)rohr_graphics_text_value_set(&terminal_build_operations_label,
+                terminal_build_operations ? "[x] Show build operations" :
+                    "[ ] Show build operations");
 
             menu_x += file_bounds.width + 4.0f;
             build_bounds = rohr_ui_component_bounds_get(
@@ -2676,6 +2743,10 @@ int main(void) {
                 (UIRect){menu_x, 3.0f, 0.0f, 0.0f}, view_texts,
                 sizeof(view_texts) / sizeof(view_texts[0]), menu_components);
             menu_x += view_bounds.width + 4.0f;
+            terminal_bounds = rohr_ui_component_bounds_get(
+                (UIRect){menu_x, 3.0f, 0.0f, 0.0f}, terminal_texts,
+                sizeof(terminal_texts) / sizeof(terminal_texts[0]), menu_components);
+            menu_x += terminal_bounds.width + 4.0f;
             settings_bounds = rohr_ui_component_bounds_get(
                 (UIRect){menu_x, 3.0f, 0.0f, 0.0f}, settings_texts,
                 sizeof(settings_texts) / sizeof(settings_texts[0]), menu_components);
@@ -2730,6 +2801,18 @@ int main(void) {
                 view_bounds, NULL);
                 if(view_menu.changed && view_menu.selected_index == 2)
                     editor_terminal_panel_visible_toggle(&terminal_panel);
+            }
+            {
+                UIDropdownResult terminal_menu = rohr_ui_menu(
+                    "editor.menu.terminal", &terminal_menu_label, terminal_options,
+                    sizeof(terminal_options) / sizeof(terminal_options[0]),
+                    terminal_bounds, NULL);
+                if(terminal_menu.changed && terminal_menu.selected_index == 0)
+                    editor_terminal_panel_visible_toggle(&terminal_panel);
+                else if(terminal_menu.changed && terminal_menu.selected_index == 1)
+                    terminal_editor_operations = !terminal_editor_operations;
+                else if(terminal_menu.changed && terminal_menu.selected_index == 2)
+                    terminal_build_operations = !terminal_build_operations;
             }
             (void)rohr_ui_menu("editor.menu.settings", &settings_label,
                 settings_options, sizeof(settings_options) / sizeof(settings_options[0]),
@@ -2967,6 +3050,10 @@ int main(void) {
     rohr_graphics_text_destroy(&preferences_label);
     rohr_graphics_text_destroy(&grid_label);
     rohr_graphics_text_destroy(&terminal_label);
+    rohr_graphics_text_destroy(&terminal_menu_label);
+    rohr_graphics_text_destroy(&terminal_visible_label);
+    rohr_graphics_text_destroy(&terminal_editor_operations_label);
+    rohr_graphics_text_destroy(&terminal_build_operations_label);
     rohr_graphics_text_destroy(&reset_view_label);
     rohr_graphics_text_destroy(&save_label);
     rohr_graphics_text_destroy(&cancel_label);
@@ -3100,6 +3187,10 @@ fail:
     rohr_graphics_text_destroy(&preferences_label);
     rohr_graphics_text_destroy(&grid_label);
     rohr_graphics_text_destroy(&terminal_label);
+    rohr_graphics_text_destroy(&terminal_menu_label);
+    rohr_graphics_text_destroy(&terminal_visible_label);
+    rohr_graphics_text_destroy(&terminal_editor_operations_label);
+    rohr_graphics_text_destroy(&terminal_build_operations_label);
     rohr_graphics_text_destroy(&reset_view_label);
     rohr_graphics_text_destroy(&save_label);
     rohr_graphics_text_destroy(&cancel_label);
