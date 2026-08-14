@@ -5,6 +5,57 @@
 #include <stdio.h>
 #include <string.h>
 
+static int transform_commands_test(void) {
+    static EditorProject project;
+    EditorObject *object;
+    EditorRigidBody *rigid_body;
+    EditorHitbox *hitbox;
+    EditorAnchor *anchor;
+    EditorSoftBody *soft_body;
+    EditorSoftNode *node;
+    EditorCommand commands[8];
+    char cli_text[512];
+
+    editor_project_init(&project);
+    object = editor_project_object_add(&project, (Position){0});
+    rigid_body = editor_project_rigid_body_add(&project, object);
+    hitbox = rigid_body == NULL ? NULL : &rigid_body->hitboxes[0];
+    anchor = editor_project_anchor_add(&project, object, (Position){0}, 0);
+    soft_body = editor_project_soft_body_add(&project, object);
+    node = editor_project_soft_node_add(&project, soft_body, (Position){0});
+    if(object == NULL || rigid_body == NULL || hitbox == NULL || anchor == NULL ||
+            soft_body == NULL || node == NULL) return 1;
+    commands[0] = (EditorCommand){.type = EDITOR_COMMAND_OBJECT_POSITION,
+        .data.object_position = {object->id, {1.0f, 2.0f}}};
+    commands[1] = (EditorCommand){.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
+        .data.rigid_body_transform = {object->id, rigid_body->id,
+            {3.0f, 4.0f}, 0.5f}};
+    commands[2] = (EditorCommand){.type = EDITOR_COMMAND_VERTEX_POSITION,
+        .data.vertex_position = {object->id, rigid_body->id, hitbox->id,
+            hitbox->vertices[0].id, {5.0f, 6.0f}}};
+    commands[3] = (EditorCommand){.type = EDITOR_COMMAND_ANCHOR_TRANSFORM,
+        .data.anchor_transform = {object->id, anchor->id, {7.0f, 8.0f}, 0.75f}};
+    commands[4] = (EditorCommand){.type = EDITOR_COMMAND_SOFT_BODY_TRANSFORM,
+        .data.soft_body_transform = {object->id, soft_body->id,
+            {9.0f, 10.0f}, 1.0f}};
+    commands[5] = (EditorCommand){.type = EDITOR_COMMAND_SOFT_NODE_POSITION,
+        .data.soft_node_position = {object->id, soft_body->id, node->id,
+            {11.0f, 12.0f}}};
+    commands[6] = (EditorCommand){.type = EDITOR_COMMAND_RIGID_BODY_ORIGIN,
+        .data.origin = {object->id, rigid_body->id, {2.0f, 3.0f}}};
+    commands[7] = (EditorCommand){.type = EDITOR_COMMAND_SOFT_BODY_ORIGIN,
+        .data.origin = {object->id, soft_body->id, {4.0f, 5.0f}}};
+    for(size_t i = 0; i < sizeof(commands) / sizeof(commands[0]); i += 1) {
+        if(editor_command_execute(&project, &commands[i]).kind != ERROR_RESULT_VALUE ||
+                editor_result_check(editor_command_cli_write(&commands[i],
+                    "project.rohr.json", cli_text, sizeof(cli_text))) ||
+                strstr(cli_text, "editor-cli ") != cli_text) return 1;
+    }
+    if(object->position.x != 1.0f || rigid_body->rotation != 0.5f ||
+            anchor->rotation != 0.75f || node->position.x == 0.0f) return 1;
+    return 0;
+}
+
 int main(void) {
     const char *path = "/tmp/rohr-editor-core-test.json";
     EditorDocument document;
@@ -70,6 +121,7 @@ int main(void) {
     if(editor_result_check(result) ||
             strstr(cli_text, "'a project'\\''s/state.json'") == NULL ||
             strstr(cli_text, "object add") == NULL) return 1;
+    if(transform_commands_test() != 0) return 1;
 
     editor_document_destroy(&loaded);
     editor_document_destroy(&document);

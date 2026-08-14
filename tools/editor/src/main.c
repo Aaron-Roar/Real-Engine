@@ -49,8 +49,10 @@ static EditorTerminalPanel *editor_operation_terminal;
 static const EditorWorkspace *editor_operation_workspace;
 static bool *editor_operation_enabled;
 
-static void editor_operation_command_write(const EditorCommand *editor_command) {
+static void editor_operation_command_write(const EditorCommand *editor_command,
+        void *context) {
     char command[3072];
+    (void)context;
     if(editor_operation_terminal == NULL || editor_operation_workspace == NULL ||
             editor_operation_enabled == NULL || !*editor_operation_enabled ||
             !editor_operation_workspace->open || editor_command == NULL) return;
@@ -479,7 +481,6 @@ static bool editor_selected_delete(
         size_t index = (size_t)(selected - project->objects);
         EditorCommandResult result = editor_command_execute(project, &command);
         if(result.kind == ERROR_RESULT_ERROR) return false;
-        editor_operation_command_write(&command);
         editor_viewport_hitbox_editor_exit(viewport_state);
         if(index < project->object_count) {
             (void)editor_project_object_select(project, project->objects[index].id);
@@ -818,6 +819,7 @@ int main(void) {
     editor_operation_terminal = &terminal_panel;
     editor_operation_workspace = &workspace;
     editor_operation_enabled = &terminal_editor_operations;
+    editor_command_executed_callback_set(editor_operation_command_write, NULL);
     editor_project_init(&project);
     saved_project_hash = editor_project_hash_get(&project);
     editor_viewport_state_init(&viewport_state);
@@ -1200,7 +1202,10 @@ int main(void) {
                     field_editing = name_result.active || x_result.active || y_result.active ||
                         rotation_result.active;
                     if(x_result.changed || y_result.changed || rotation_result.changed) {
-                        editor_project_rigid_body_constraints_apply(selected, body->id);
+                        EditorCommand command = {.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
+                            .data.rigid_body_transform = {selected->id, body->id,
+                                body->position, body->rotation}};
+                        (void)editor_command_execute(&project, &command);
                     }
                 }
                 rohr_ui_label(&mass_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
@@ -1492,8 +1497,10 @@ int main(void) {
             }
         } else if(viewport_state.mode == EDITOR_VIEWPORT_VERTEX) {
             EditorObject *selected = editor_project_selected_get(&project);
+            EditorRigidBody *body = editor_selected_body_get(selected, &viewport_state);
             EditorHitbox *hitbox = editor_selected_hitbox_get(selected, &viewport_state);
-            if(hitbox != NULL && viewport_state.selected_vertex < hitbox->vertex_count) {
+            if(body != NULL && hitbox != NULL &&
+                    viewport_state.selected_vertex < hitbox->vertex_count) {
                 EditorVertex *vertex = &hitbox->vertices[viewport_state.selected_vertex];
                 UISliderConfig slider = rohr_ui_slider_config_default_get();
                 UIFieldResult name_result;
@@ -1539,9 +1546,20 @@ int main(void) {
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 28.0f, 192.0f,
                             EDITOR_TOOLS_WIDTH - 38.0f, 24.0f}, NULL);
                     field_editing = name_result.active || x_result.active || y_result.active;
-                    vertex->position.x = rohr_ui_slider("editor.vertex.x", vertex->position.x, &slider).value;
+                    UISliderResult x_slider = rohr_ui_slider(
+                        "editor.vertex.x", vertex->position.x, &slider);
+                    vertex->position.x = x_slider.value;
                     slider.center.y = 227.0f;
-                    vertex->position.y = rohr_ui_slider("editor.vertex.y", vertex->position.y, &slider).value;
+                    UISliderResult y_slider = rohr_ui_slider(
+                        "editor.vertex.y", vertex->position.y, &slider);
+                    vertex->position.y = y_slider.value;
+                    if(x_result.changed || y_result.changed ||
+                            x_slider.changed || y_slider.changed) {
+                        EditorCommand command = {.type = EDITOR_COMMAND_VERTEX_POSITION,
+                            .data.vertex_position = {selected->id, body->id, hitbox->id,
+                                vertex->id, vertex->position}};
+                        (void)editor_command_execute(&project, &command);
+                    }
                 }
                 {
                     UIButtonStyle delete_style = editor_delete_button_style_get();
@@ -1877,6 +1895,12 @@ int main(void) {
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 86.0f, 544.0f,
                                 EDITOR_TOOLS_WIDTH - 96.0f, 26.0f}, NULL);
                         field_editing = field_editing || rotation_result.active;
+                        if(x_result.changed || y_result.changed || rotation_result.changed) {
+                            EditorCommand command = {.type = EDITOR_COMMAND_ANCHOR_TRANSFORM,
+                                .data.anchor_transform = {selected->id, anchor->id,
+                                    anchor->position, anchor->rotation}};
+                            (void)editor_command_execute(&project, &command);
+                        }
                         {
                             const TextAsset *position_options[] = {
                                 &position_global_label, &position_body_label
@@ -1949,7 +1973,10 @@ int main(void) {
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 34.0f, 124.0f,
                         EDITOR_TOOLS_WIDTH - 44.0f, 26.0f}, NULL);
                 if(x_result.changed || y_result.changed) {
-                    editor_project_anchor_constraints_apply(selected, anchor->id);
+                    EditorCommand command = {.type = EDITOR_COMMAND_ANCHOR_TRANSFORM,
+                        .data.anchor_transform = {selected->id, anchor->id,
+                            anchor->position, anchor->rotation}};
+                    (void)editor_command_execute(&project, &command);
                 }
                 rohr_ui_label(&rigid_body_label,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 158.0f, 90.0f, 28.0f});
@@ -1992,7 +2019,10 @@ int main(void) {
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 86.0f, 192.0f,
                         EDITOR_TOOLS_WIDTH - 96.0f, 26.0f}, NULL);
                 if(rotation_result.changed) {
-                    editor_project_anchor_constraints_apply(selected, anchor->id);
+                    EditorCommand command = {.type = EDITOR_COMMAND_ANCHOR_TRANSFORM,
+                        .data.anchor_transform = {selected->id, anchor->id,
+                            anchor->position, anchor->rotation}};
+                    (void)editor_command_execute(&project, &command);
                 }
                 field_editing = name_result.active || x_result.active || y_result.active ||
                     rotation_result.active;
@@ -2077,6 +2107,12 @@ int main(void) {
                         EDITOR_TOOLS_WIDTH - 102.0f, 26.0f}, NULL);
                 field_editing = name_result.active || x_result.active || y_result.active ||
                     rotation_result.active;
+                if(x_result.changed || y_result.changed || rotation_result.changed) {
+                    EditorCommand command = {.type = EDITOR_COMMAND_SOFT_BODY_TRANSFORM,
+                        .data.soft_body_transform = {selected->id, body->id,
+                            body->position, body->rotation}};
+                    (void)editor_command_execute(&project, &command);
+                }
                 {
                     UIButtonStyle origin_style = editor_selected_button_style_get();
                     UIButtonResult origin_result = rohr_ui_button(
@@ -2213,6 +2249,12 @@ int main(void) {
                     (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &node->position.y},
                     &y_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 60.0f, 158.0f,
                         EDITOR_TOOLS_WIDTH - 70.0f, 26.0f}, NULL);
+                if(x_result.changed || y_result.changed) {
+                    EditorCommand command = {.type = EDITOR_COMMAND_SOFT_NODE_POSITION,
+                        .data.soft_node_position = {selected->id, body->id,
+                            node->id, node->position}};
+                    (void)editor_command_execute(&project, &command);
+                }
                 rohr_ui_label(&mass_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 194.0f, 68.0f, 26.0f});
                 mass_result = rohr_ui_field("editor.soft_node.mass",
                     (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &node->node_mass},
@@ -2426,8 +2468,7 @@ int main(void) {
                         command_result = editor_command_execute(&project, &command);
                         snprintf(object_name_cache[selected_index],
                             EDITOR_OBJECT_NAME_MAX, "%s", selected->name);
-                        if(command_result.kind == ERROR_RESULT_VALUE)
-                            editor_operation_command_write(&command);
+                        (void)command_result;
                     }
                 }
                 if(rohr_ui_button("editor.add_rigid_body", &add_rigid_body_label,
@@ -2560,6 +2601,8 @@ int main(void) {
                     EDITOR_TOOLS_WIDTH - 20.0f, 38.0f}, NULL);
             if(add_object.clicked) {
                 EditorCommand command = {.type = EDITOR_COMMAND_OBJECT_ADD};
+                snprintf(command.data.object_add.name,
+                    sizeof(command.data.object_add.name), "Object%u", project.next_id);
                 EditorCommandResult added = editor_command_execute(&project, &command);
                 if(added.kind == ERROR_RESULT_VALUE) {
                     EditorObject *object = editor_object_query_get(
@@ -2568,7 +2611,6 @@ int main(void) {
                     if(object != NULL) {
                         snprintf(command.data.object_add.name,
                             sizeof(command.data.object_add.name), "%s", object->name);
-                        editor_operation_command_write(&command);
                     }
                 }
             }

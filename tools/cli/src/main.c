@@ -15,7 +15,15 @@ static void cli_usage_print(void) {
         "  rohr object list <project.rohr.json>\n"
         "  rohr object add <project.rohr.json> <name> [x y]\n"
         "  rohr object rename <project.rohr.json> <id> <name>\n"
-        "  rohr object delete <project.rohr.json> <id>");
+        "  rohr object delete <project.rohr.json> <id>\n"
+        "  rohr object position <project.rohr.json> <object> <x> <y>\n"
+        "  rohr rigid-body transform <project.rohr.json> <object> <body> <x> <y> <rotation>\n"
+        "  rohr rigid-body origin <project.rohr.json> <object> <body> <x> <y>\n"
+        "  rohr vertex position <project.rohr.json> <object> <body> <hitbox> <vertex> <x> <y>\n"
+        "  rohr anchor transform <project.rohr.json> <object> <anchor> <x> <y> <rotation>\n"
+        "  rohr soft-body transform <project.rohr.json> <object> <body> <x> <y> <rotation>\n"
+        "  rohr soft-body origin <project.rohr.json> <object> <body> <x> <y>\n"
+        "  rohr soft-node position <project.rohr.json> <object> <body> <node> <x> <y>");
 }
 
 static int cli_object_command(int count, char **arguments) {
@@ -66,7 +74,12 @@ int main(int count, char **arguments) {
         puts("valid");
         return 0;
     }
-    if(count >= 2 && strcmp(arguments[1], "object") == 0)
+    if(count >= 2 && (strcmp(arguments[1], "object") == 0 ||
+            strcmp(arguments[1], "rigid-body") == 0 ||
+            strcmp(arguments[1], "vertex") == 0 ||
+            strcmp(arguments[1], "anchor") == 0 ||
+            strcmp(arguments[1], "soft-body") == 0 ||
+            strcmp(arguments[1], "soft-node") == 0))
         return cli_object_command(count, arguments);
     cli_usage_print();
     return 1;

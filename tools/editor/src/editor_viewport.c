@@ -1,4 +1,5 @@
 #include "editor_viewport.h"
+#include "editor_command.h"
 #include "editor_layout.h"
 
 #include <math.h>
@@ -76,7 +77,8 @@ static Position editor_anchor_world_get(const EditorObject *object,
         object->position.y + anchor->position.y};
 }
 
-static void editor_anchor_world_set(const EditorObject *object, EditorAnchor *anchor,
+static Position editor_anchor_world_local_get(const EditorObject *object,
+    const EditorAnchor *anchor,
     const EditorRigidBody *body, Position world) {
     Position local = {world.x - object->position.x, world.y - object->position.y};
     if(body != NULL && anchor->position_follows_body) {
@@ -84,11 +86,10 @@ static void editor_anchor_world_set(const EditorObject *object, EditorAnchor *an
         float sine = sinf(-body->rotation);
         local.x -= body->position.x;
         local.y -= body->position.y;
-        anchor->position = (Position){local.x * cosine - local.y * sine,
+        return (Position){local.x * cosine - local.y * sine,
             local.x * sine + local.y * cosine};
-    } else {
-        anchor->position = local;
     }
+    return local;
 }
 
 static float editor_body_radius_get(const EditorRigidBody *body) {
@@ -471,9 +472,15 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
         EditorAnchor *anchor = editor_project_anchor_get(object, state->selected_anchor);
         EditorRigidBody *anchor_body = anchor == NULL ? NULL :
             editor_project_rigid_body_get(object, anchor->rigid_body);
-        if(anchor != NULL) editor_anchor_world_set(object, anchor, anchor_body,
-            (Position){pointer.x - state->drag_offset.x, pointer.y - state->drag_offset.y});
-        if(anchor != NULL) editor_project_anchor_constraints_apply(object, anchor->id);
+        if(anchor != NULL) {
+            Position position = editor_anchor_world_local_get(object, anchor, anchor_body,
+                (Position){pointer.x - state->drag_offset.x,
+                    pointer.y - state->drag_offset.y});
+            EditorCommand command = {.type = EDITOR_COMMAND_ANCHOR_TRANSFORM,
+                .data.anchor_transform = {object->id, anchor->id,
+                    position, anchor->rotation}};
+            (void)editor_command_execute(project, &command);
+        }
         return true;
     }
     if(state->dragged_soft_node &&
@@ -496,10 +503,14 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                 };
                 float cosine = cosf(-soft_body->rotation);
                 float sine = sinf(-soft_body->rotation);
-                soft_body->nodes[i].position = (Position){
+                Position position = {
                     local.x * cosine - local.y * sine,
                     local.x * sine + local.y * cosine
                 };
+                EditorCommand command = {.type = EDITOR_COMMAND_SOFT_NODE_POSITION,
+                    .data.soft_node_position = {object->id, soft_body->id,
+                        soft_body->nodes[i].id, position}};
+                (void)editor_command_execute(project, &command);
                 break;
             }
         }
@@ -510,10 +521,14 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
         for(size_t i = 0; i < object->soft_body_count; i += 1) {
             EditorSoftBody *soft_body = &object->soft_body_items[i];
             if(soft_body->id != state->selected_soft_body) continue;
-            soft_body->position = (Position){
+            Position position = {
                 pointer.x - object->position.x - state->drag_offset.x,
                 pointer.y - object->position.y - state->drag_offset.y
             };
+            EditorCommand command = {.type = EDITOR_COMMAND_SOFT_BODY_TRANSFORM,
+                .data.soft_body_transform = {object->id, soft_body->id,
+                    position, soft_body->rotation}};
+            (void)editor_command_execute(project, &command);
             return true;
         }
     }
@@ -524,13 +539,21 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
         if(state->selected_origin_kind == EDITOR_ORIGIN_RIGID_BODY) {
             EditorRigidBody *origin_body = editor_project_rigid_body_get(
                 object, state->selected_rigid_body);
-            return editor_project_rigid_body_origin_set(object, origin_body, position);
+            EditorCommand command = {.type = EDITOR_COMMAND_RIGID_BODY_ORIGIN,
+                .data.origin = {object->id, origin_body == NULL ? 0 : origin_body->id,
+                    position}};
+            return editor_command_execute(project, &command).kind == ERROR_RESULT_VALUE;
         }
         if(state->selected_origin_kind == EDITOR_ORIGIN_SOFT_BODY) {
             for(size_t i = 0; i < object->soft_body_count; i += 1) {
                 if(object->soft_body_items[i].id == state->selected_soft_body)
-                    return editor_project_soft_body_origin_set(
-                        &object->soft_body_items[i], position);
+                    {
+                        EditorCommand command = {.type = EDITOR_COMMAND_SOFT_BODY_ORIGIN,
+                            .data.origin = {object->id, object->soft_body_items[i].id,
+                                position}};
+                        return editor_command_execute(project, &command).kind ==
+                            ERROR_RESULT_VALUE;
+                    }
             }
         }
         return false;
@@ -543,25 +566,34 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
             if(soft_body->id != state->selected_soft_body) continue;
             center = (Position){object->position.x + soft_body->position.x,
                 object->position.y + soft_body->position.y};
-            soft_body->rotation = atan2f(pointer.y - center.y, pointer.x - center.x) +
-                state->rotation_pointer_offset;
+            EditorCommand command = {.type = EDITOR_COMMAND_SOFT_BODY_TRANSFORM,
+                .data.soft_body_transform = {object->id, soft_body->id,
+                    soft_body->position,
+                    atan2f(pointer.y - center.y, pointer.x - center.x) +
+                        state->rotation_pointer_offset}};
+            (void)editor_command_execute(project, &command);
             return true;
         }
     }
     if(body != NULL && state->dragged_body && (primary_button == MOUSE_BUTTON_STATE_DOWN ||
             primary_button == MOUSE_BUTTON_STATE_PRESSED)) {
-        body->position = (Position){pointer.x - object->position.x - state->drag_offset.x,
-            pointer.y - object->position.y - state->drag_offset.y};
-        editor_project_rigid_body_constraints_apply(object, body->id);
+        EditorCommand command = {.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
+            .data.rigid_body_transform = {object->id, body->id,
+                {pointer.x - object->position.x - state->drag_offset.x,
+                    pointer.y - object->position.y - state->drag_offset.y},
+                body->rotation}};
+        (void)editor_command_execute(project, &command);
         return true;
     }
     if(body != NULL && state->rotated_body && (primary_button == MOUSE_BUTTON_STATE_DOWN ||
             primary_button == MOUSE_BUTTON_STATE_PRESSED)) {
         Position center = {object->position.x + body->position.x,
             object->position.y + body->position.y};
-        body->rotation = atan2f(pointer.y - center.y, pointer.x - center.x) +
-            state->rotation_pointer_offset;
-        editor_project_rigid_body_constraints_apply(object, body->id);
+        EditorCommand command = {.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
+            .data.rigid_body_transform = {object->id, body->id, body->position,
+                atan2f(pointer.y - center.y, pointer.x - center.x) +
+                    state->rotation_pointer_offset}};
+        (void)editor_command_execute(project, &command);
         return true;
     }
     if(hitbox != NULL && state->dragged_vertex >= 0 &&
@@ -573,8 +605,12 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                 pointer.y - object->position.y - body->position.y};
             float cosine = cosf(-body->rotation);
             float sine = sinf(-body->rotation);
-            hitbox->vertices[state->dragged_vertex].position = (Position){
-                local.x * cosine - local.y * sine, local.x * sine + local.y * cosine};
+            EditorVertex *vertex = &hitbox->vertices[state->dragged_vertex];
+            EditorCommand command = {.type = EDITOR_COMMAND_VERTEX_POSITION,
+                .data.vertex_position = {object->id, body->id, hitbox->id,
+                    vertex->id, {local.x * cosine - local.y * sine,
+                        local.x * sine + local.y * cosine}}};
+            (void)editor_command_execute(project, &command);
         }
         return true;
     }
@@ -1095,10 +1131,11 @@ bool editor_viewport_selection_nudge(EditorViewportState *state,
     if(object == NULL) return false;
     body = editor_selected_body_get(object, state);
     if(state->selection == EDITOR_SELECTION_RIGID_BODY && body != NULL) {
-        body->position.x += screen_delta.x;
-        body->position.y += screen_delta.y;
-        editor_project_rigid_body_constraints_apply(object, body->id);
-        return true;
+        EditorCommand command = {.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
+            .data.rigid_body_transform = {object->id, body->id,
+                {body->position.x + screen_delta.x,
+                    body->position.y + screen_delta.y}, body->rotation}};
+        return editor_command_execute(project, &command).kind == ERROR_RESULT_VALUE;
     }
     if(state->selection == EDITOR_SELECTION_VERTEX && body != NULL) {
         EditorHitbox *hitbox = editor_selected_hitbox_get(object, state);
@@ -1106,11 +1143,16 @@ bool editor_viewport_selection_nudge(EditorViewportState *state,
         float sine = sinf(-body->rotation);
         if(hitbox == NULL || state->selected_vertex >= hitbox->vertex_count ||
                 hitbox->vertices[state->selected_vertex].position_locked) return false;
-        hitbox->vertices[state->selected_vertex].position.x +=
-            screen_delta.x * cosine - screen_delta.y * sine;
-        hitbox->vertices[state->selected_vertex].position.y +=
-            screen_delta.x * sine + screen_delta.y * cosine;
-        return true;
+        {
+            EditorVertex *vertex = &hitbox->vertices[state->selected_vertex];
+            EditorCommand command = {.type = EDITOR_COMMAND_VERTEX_POSITION,
+                .data.vertex_position = {object->id, body->id, hitbox->id,
+                    vertex->id,
+                    {vertex->position.x + screen_delta.x * cosine - screen_delta.y * sine,
+                        vertex->position.y + screen_delta.x * sine +
+                            screen_delta.y * cosine}}};
+            return editor_command_execute(project, &command).kind == ERROR_RESULT_VALUE;
+        }
     }
     if(state->selection == EDITOR_SELECTION_ANCHOR) {
         EditorAnchor *anchor = editor_project_anchor_get(object, state->selected_anchor);
@@ -1121,9 +1163,14 @@ bool editor_viewport_selection_nudge(EditorViewportState *state,
         world = editor_anchor_world_get(object, anchor);
         world.x += screen_delta.x;
         world.y += screen_delta.y;
-        editor_anchor_world_set(object, anchor, anchor_body, world);
-        editor_project_anchor_constraints_apply(object, anchor->id);
-        return true;
+        {
+            Position position = editor_anchor_world_local_get(
+                object, anchor, anchor_body, world);
+            EditorCommand command = {.type = EDITOR_COMMAND_ANCHOR_TRANSFORM,
+                .data.anchor_transform = {object->id, anchor->id,
+                    position, anchor->rotation}};
+            return editor_command_execute(project, &command).kind == ERROR_RESULT_VALUE;
+        }
     }
     if(state->selection == EDITOR_SELECTION_SOFT_NODE) {
         for(size_t body_index = 0; body_index < object->soft_body_count; body_index += 1) {
@@ -1132,9 +1179,14 @@ bool editor_viewport_selection_nudge(EditorViewportState *state,
             for(size_t node_index = 0; node_index < soft_body->node_count; node_index += 1) {
                 EditorSoftNode *node = &soft_body->nodes[node_index];
                 if(node->id != state->selected_soft_node) continue;
-                node->position.x += screen_delta.x;
-                node->position.y += screen_delta.y;
-                return true;
+                {
+                    EditorCommand command = {.type = EDITOR_COMMAND_SOFT_NODE_POSITION,
+                        .data.soft_node_position = {object->id, soft_body->id, node->id,
+                            {node->position.x + screen_delta.x,
+                                node->position.y + screen_delta.y}}};
+                    return editor_command_execute(project, &command).kind ==
+                        ERROR_RESULT_VALUE;
+                }
             }
         }
     }

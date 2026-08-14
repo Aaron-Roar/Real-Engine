@@ -1,4 +1,5 @@
 #include "editor_origin_panel.h"
+#include "editor_command.h"
 
 #include <stdio.h>
 
@@ -85,10 +86,11 @@ bool editor_origin_panel_draw(EditorOriginPanel *panel,
         &panel->y_field,
         (UIRect){context->x + 60.0f, 158.0f, context->width - 70.0f, 26.0f}, NULL);
     if(x_result.changed || y_result.changed) {
-        if(rigid_body != NULL)
-            (void)editor_project_rigid_body_origin_set(object, rigid_body, position);
-        else
-            (void)editor_project_soft_body_origin_set(soft_body, position);
+        EditorCommand command = {.type = rigid_body != NULL ?
+                EDITOR_COMMAND_RIGID_BODY_ORIGIN : EDITOR_COMMAND_SOFT_BODY_ORIGIN,
+            .data.origin = {object->id,
+                rigid_body != NULL ? rigid_body->id : soft_body->id, position}};
+        (void)editor_command_execute(context->project, &command);
     }
     return x_result.active || y_result.active;
 }
