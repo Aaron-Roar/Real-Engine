@@ -227,6 +227,24 @@ bool editor_project_save(const EditorProject *project, const char *path) {
         project->viewport_camera_zoom);
     yyjson_mut_obj_add_bool(document, root, "viewport_local_view",
         project->viewport_local_view);
+    {
+        const EditorNavigationState *navigation = &project->navigation;
+        yyjson_mut_val *value = yyjson_mut_obj(document);
+        yyjson_mut_obj_add_uint(document, value, "mode", navigation->mode);
+        yyjson_mut_obj_add_uint(document, value, "selection", navigation->selection);
+        yyjson_mut_obj_add_uint(document, value, "object", navigation->object);
+        yyjson_mut_obj_add_uint(document, value, "line", navigation->selected_line);
+        yyjson_mut_obj_add_uint(document, value, "vertex", navigation->selected_vertex);
+        yyjson_mut_obj_add_uint(document, value, "rigid_body", navigation->rigid_body);
+        yyjson_mut_obj_add_uint(document, value, "hitbox", navigation->hitbox);
+        yyjson_mut_obj_add_uint(document, value, "joint", navigation->joint);
+        yyjson_mut_obj_add_uint(document, value, "anchor", navigation->anchor);
+        yyjson_mut_obj_add_uint(document, value, "soft_body", navigation->soft_body);
+        yyjson_mut_obj_add_uint(document, value, "soft_node", navigation->soft_node);
+        yyjson_mut_obj_add_uint(document, value, "soft_beam", navigation->soft_beam);
+        yyjson_mut_obj_add_uint(document, value, "origin_kind", navigation->origin_kind);
+        yyjson_mut_obj_add_val(document, root, "navigation", value);
+    }
     yyjson_mut_obj_add_uint(document, root, "selected", project->selected);
     yyjson_mut_obj_add_uint(document, root, "next_object_id", project->next_id);
     yyjson_mut_obj_add_uint(document, root, "next_vertex_id", project->next_vertex_id);
@@ -588,6 +606,25 @@ EditorResult editor_project_load(EditorProject *project, const char *path) {
             loaded.viewport_camera_zoom = (float)yyjson_get_real(camera_zoom);
         if(local_view != NULL)
             loaded.viewport_local_view = yyjson_get_bool(local_view);
+    }
+    {
+        yyjson_val *navigation = yyjson_obj_get(root, "navigation");
+        if(navigation != NULL && (!yyjson_is_obj(navigation) ||
+                !editor_json_uint(navigation, "mode", &loaded.navigation.mode) ||
+                !editor_json_uint(navigation, "selection", &loaded.navigation.selection) ||
+                !editor_json_uint(navigation, "object", &loaded.navigation.object) ||
+                !editor_json_uint(navigation, "line", &loaded.navigation.selected_line) ||
+                !editor_json_uint(navigation, "vertex", &loaded.navigation.selected_vertex) ||
+                !editor_json_uint(navigation, "rigid_body", &loaded.navigation.rigid_body) ||
+                !editor_json_uint(navigation, "hitbox", &loaded.navigation.hitbox) ||
+                !editor_json_uint(navigation, "joint", &loaded.navigation.joint) ||
+                !editor_json_uint(navigation, "anchor", &loaded.navigation.anchor) ||
+                !editor_json_uint(navigation, "soft_body", &loaded.navigation.soft_body) ||
+                !editor_json_uint(navigation, "soft_node", &loaded.navigation.soft_node) ||
+                !editor_json_uint(navigation, "soft_beam", &loaded.navigation.soft_beam) ||
+                !editor_json_uint(navigation, "origin_kind", &loaded.navigation.origin_kind) ||
+                loaded.navigation.mode > 11 || loaded.navigation.selection > 11 ||
+                loaded.navigation.origin_kind > 2)) goto done;
     }
     if(!editor_json_uint(root, "selected", &loaded.selected) || !yyjson_is_arr(objects) ||
             yyjson_arr_size(objects) > EDITOR_OBJECT_MAX ||

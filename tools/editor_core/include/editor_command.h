@@ -17,7 +17,8 @@ typedef enum EditorCommandType {
     EDITOR_COMMAND_SOFT_BODY_ORIGIN,
     EDITOR_COMMAND_VIEWPORT_CAMERA,
     EDITOR_COMMAND_VIEWPORT_COORDINATES,
-    EDITOR_COMMAND_VISIBILITY
+    EDITOR_COMMAND_VISIBILITY,
+    EDITOR_COMMAND_NAVIGATION_SET
 } EditorCommandType;
 
 typedef enum EditorVisibilityKind {
@@ -99,6 +100,7 @@ typedef struct EditorCommand {
             uint32_t item;
             bool visible;
         } visibility;
+        EditorNavigationState navigation;
     } data;
 } EditorCommand;
 

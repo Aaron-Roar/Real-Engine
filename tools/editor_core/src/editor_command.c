@@ -254,6 +254,21 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
             *visible = command->data.visibility.visible;
             return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
         }
+        case EDITOR_COMMAND_NAVIGATION_SET:
+            if(command->data.navigation.mode > 11 ||
+                    command->data.navigation.selection > 11 ||
+                    command->data.navigation.origin_kind > 2)
+                return editor_command_error(editor_result_error(
+                    EDITOR_ERROR_INVALID_ARGUMENT,
+                    "navigation state contains an invalid mode or selection").result.error);
+            if(command->data.navigation.object != 0 &&
+                    editor_object_query_get(project,
+                        command->data.navigation.object) == NULL)
+                return editor_command_not_found("object",
+                    command->data.navigation.object);
+            project->selected = command->data.navigation.object;
+            project->navigation = command->data.navigation;
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
     }
     return editor_command_error((EditorError){EDITOR_ERROR_INVALID_ARGUMENT,
         "unknown editor command"});
@@ -308,6 +323,31 @@ static bool editor_command_bool_parse(const char *text, bool *value) {
     return false;
 }
 
+static const char *editor_command_navigation_modes[] = {
+    "hierarchy", "object", "rigid-body", "hitbox", "joint", "anchor",
+    "soft-body", "soft-node", "soft-beam", "origin", "line", "vertex"
+};
+
+static const char *editor_command_navigation_selections[] = {
+    "none", "object", "rigid-body", "hitbox", "joint", "anchor",
+    "soft-body", "soft-node", "soft-beam", "origin", "line", "vertex"
+};
+
+static const char *editor_command_origin_kinds[] = {
+    "none", "rigid-body", "soft-body"
+};
+
+static bool editor_command_named_uint_parse(const char *text,
+        const char *const *names, size_t count, uint32_t *value) {
+    if(text == NULL || names == NULL || value == NULL) return false;
+    for(size_t i = 0; i < count; i += 1) {
+        if(strcmp(text, names[i]) != 0) continue;
+        *value = (uint32_t)i;
+        return true;
+    }
+    return false;
+}
+
 EditorResult editor_command_cli_parse(int count, char **arguments,
         const char **document_path, EditorCommand *command) {
     const char *domain;
@@ -319,6 +359,37 @@ EditorResult editor_command_cli_parse(int count, char **arguments,
     action = arguments[2];
     *document_path = arguments[3];
     memset(command, 0, sizeof(*command));
+    if(strcmp(domain, "navigation") == 0 && strcmp(action, "set") == 0) {
+        EditorNavigationState *navigation = &command->data.navigation;
+        if(count != 17 || !editor_command_named_uint_parse(arguments[4],
+                    editor_command_navigation_modes,
+                    sizeof(editor_command_navigation_modes) /
+                        sizeof(editor_command_navigation_modes[0]), &navigation->mode) ||
+                !editor_command_named_uint_parse(arguments[5],
+                    editor_command_navigation_selections,
+                    sizeof(editor_command_navigation_selections) /
+                        sizeof(editor_command_navigation_selections[0]),
+                    &navigation->selection) ||
+                !editor_command_uint_parse(arguments[6], &navigation->object) ||
+                !editor_command_uint_parse(arguments[7], &navigation->rigid_body) ||
+                !editor_command_uint_parse(arguments[8], &navigation->hitbox) ||
+                !editor_command_uint_parse(arguments[9], &navigation->joint) ||
+                !editor_command_uint_parse(arguments[10], &navigation->anchor) ||
+                !editor_command_uint_parse(arguments[11], &navigation->soft_body) ||
+                !editor_command_uint_parse(arguments[12], &navigation->soft_node) ||
+                !editor_command_uint_parse(arguments[13], &navigation->soft_beam) ||
+                !editor_command_uint_parse(arguments[14], &navigation->selected_line) ||
+                !editor_command_uint_parse(arguments[15], &navigation->selected_vertex) ||
+                !editor_command_named_uint_parse(arguments[16],
+                    editor_command_origin_kinds,
+                    sizeof(editor_command_origin_kinds) /
+                        sizeof(editor_command_origin_kinds[0]),
+                    &navigation->origin_kind))
+            return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                "invalid navigation set command");
+        command->type = EDITOR_COMMAND_NAVIGATION_SET;
+        return editor_result_value(true);
+    }
     if(strcmp(action, "visibility") == 0) {
         EditorVisibilityKind kind;
         bool has_parent = false;
@@ -531,7 +602,7 @@ static bool editor_command_shell_text_append(char *output, size_t capacity,
 EditorResult editor_command_cli_write(const EditorCommand *command,
         const char *document_path, char *output, size_t output_capacity) {
     const char *domain;
-    char values[128];
+    char values[512];
     size_t used = 0;
     if(command == NULL || document_path == NULL || output == NULL ||
             output_capacity == 0)
@@ -566,6 +637,7 @@ EditorResult editor_command_cli_write(const EditorCommand *command,
                     "unknown visibility target");
             }
             break;
+        case EDITOR_COMMAND_NAVIGATION_SET: domain = "navigation"; break;
         default: return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
             "unknown editor command");
     }
@@ -723,6 +795,28 @@ EditorResult editor_command_cli_write(const EditorCommand *command,
                     command->data.visibility.visible ? "true" : "false");
             }
             break;
+        case EDITOR_COMMAND_NAVIGATION_SET: {
+            const EditorNavigationState *navigation = &command->data.navigation;
+            if(navigation->mode >= sizeof(editor_command_navigation_modes) /
+                        sizeof(editor_command_navigation_modes[0]) ||
+                    navigation->selection >= sizeof(editor_command_navigation_selections) /
+                        sizeof(editor_command_navigation_selections[0]) ||
+                    navigation->origin_kind >= sizeof(editor_command_origin_kinds) /
+                        sizeof(editor_command_origin_kinds[0]) ||
+                    !editor_command_text_append(output, output_capacity, &used, "set ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            snprintf(values, sizeof(values),
+                " %s %s %u %u %u %u %u %u %u %u %u %u %s",
+                editor_command_navigation_modes[navigation->mode],
+                editor_command_navigation_selections[navigation->selection],
+                navigation->object, navigation->rigid_body, navigation->hitbox,
+                navigation->joint, navigation->anchor, navigation->soft_body,
+                navigation->soft_node, navigation->soft_beam,
+                navigation->selected_line, navigation->selected_vertex,
+                editor_command_origin_kinds[navigation->origin_kind]);
+            break;
+        }
     }
     if(!editor_command_text_append(output, output_capacity, &used, values))
         goto capacity_error;

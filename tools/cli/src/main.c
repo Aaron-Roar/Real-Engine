@@ -27,7 +27,10 @@ static void cli_usage_print(void) {
         "  rohr viewport camera <project.rohr.json> <offset-x> <offset-y> <zoom>\n"
         "  rohr viewport coordinates <project.rohr.json> <local|world>\n"
         "  rohr <target> visibility <project.rohr.json> <object> [parent] [item] <true|false>\n"
-        "    targets: object, rigid-body, hitbox, joint, anchor, soft-body, soft-node, soft-beam");
+        "    targets: object, rigid-body, hitbox, joint, anchor, soft-body, soft-node, soft-beam\n"
+        "  rohr navigation set <project.rohr.json> <mode> <selection> <object>\n"
+        "      <rigid-body> <hitbox> <joint> <anchor> <soft-body> <soft-node>\n"
+        "      <soft-beam> <line> <vertex> <origin-kind>");
 }
 
 static int cli_object_command(int count, char **arguments) {
@@ -88,6 +91,8 @@ int main(int count, char **arguments) {
             strcmp(arguments[1], "soft-node") == 0 ||
             strcmp(arguments[1], "soft-beam") == 0 ||
             strcmp(arguments[1], "viewport") == 0))
+        return cli_object_command(count, arguments);
+    if(count >= 2 && strcmp(arguments[1], "navigation") == 0)
         return cli_object_command(count, arguments);
     cli_usage_print();
     return 1;

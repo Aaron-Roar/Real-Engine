@@ -62,6 +62,44 @@ static void editor_operation_command_write(const EditorCommand *editor_command,
     editor_terminal_panel_operation_write(editor_operation_terminal, command);
 }
 
+static EditorNavigationState editor_navigation_state_get(
+        const EditorProject *project, const EditorViewportState *state) {
+    if(project == NULL || state == NULL) return (EditorNavigationState){0};
+    return (EditorNavigationState){
+        .mode = (uint32_t)state->mode,
+        .selection = (uint32_t)state->selection,
+        .object = project->selected,
+        .selected_line = state->selected_line,
+        .selected_vertex = state->selected_vertex,
+        .rigid_body = state->selected_rigid_body,
+        .hitbox = state->selected_hitbox,
+        .joint = state->selected_joint,
+        .anchor = state->selected_anchor,
+        .soft_body = state->selected_soft_body,
+        .soft_node = state->selected_soft_node,
+        .soft_beam = state->selected_soft_beam,
+        .origin_kind = (uint32_t)state->selected_origin_kind
+    };
+}
+
+static void editor_navigation_state_apply(EditorProject *project,
+        EditorViewportState *state, const EditorNavigationState *navigation) {
+    if(project == NULL || state == NULL || navigation == NULL) return;
+    project->selected = navigation->object;
+    state->mode = (EditorViewportMode)navigation->mode;
+    state->selection = (EditorHierarchySelection)navigation->selection;
+    state->selected_line = navigation->selected_line;
+    state->selected_vertex = navigation->selected_vertex;
+    state->selected_rigid_body = navigation->rigid_body;
+    state->selected_hitbox = navigation->hitbox;
+    state->selected_joint = navigation->joint;
+    state->selected_anchor = navigation->anchor;
+    state->selected_soft_body = navigation->soft_body;
+    state->selected_soft_node = navigation->soft_node;
+    state->selected_soft_beam = navigation->soft_beam;
+    state->selected_origin_kind = (EditorOriginKind)navigation->origin_kind;
+}
+
 static void editor_window_layout_sync(void) {
     Scale output = rohr_graphics_render_output_size_get();
     float logical_width;
@@ -828,6 +866,7 @@ int main(void) {
     editor_project_init(&project);
     saved_project_hash = editor_project_hash_get(&project);
     editor_viewport_state_init(&viewport_state);
+    editor_navigation_state_apply(&project, &viewport_state, &project.navigation);
     editor_file_browser_init(&file_browser);
     {
         char *directory = SDL_GetCurrentDirectory();
@@ -976,6 +1015,8 @@ int main(void) {
 
     while(running) {
         SDL_Event event;
+        EditorNavigationState navigation_before = editor_navigation_state_get(
+            &project, &viewport_state);
         EDITOR_VIEWPORT_BOTTOM = editor_terminal_panel_viewport_bottom_get(
             &terminal_panel);
         viewport_wheel_y = 0.0f;
@@ -2974,6 +3015,8 @@ int main(void) {
                 if(opened) {
                     saved_project_hash = editor_project_hash_get(&project);
                     editor_viewport_state_init(&viewport_state);
+                    editor_navigation_state_apply(
+                        &project, &viewport_state, &project.navigation);
                     panel_scroll_offset = 0.0f;
                     (void)editor_terminal_panel_project_open(
                         &terminal_panel, workspace.directory);
@@ -3010,6 +3053,16 @@ int main(void) {
             if(mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_PRESSED &&
                     !ui_consumed && !viewport_consumed && !panel_resizing) {
                 editor_navigation_current_selection_clear(&project, &viewport_state);
+            }
+        }
+        if(workspace.open) {
+            EditorNavigationState navigation_after = editor_navigation_state_get(
+                &project, &viewport_state);
+            if(memcmp(&navigation_before, &navigation_after,
+                    sizeof(navigation_after)) != 0) {
+                EditorCommand command = {.type = EDITOR_COMMAND_NAVIGATION_SET,
+                    .data.navigation = navigation_after};
+                (void)editor_command_execute(&project, &command);
             }
         }
         rohr_ui_frame_end();

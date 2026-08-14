@@ -162,10 +162,27 @@ typedef struct EditorObject {
     size_t soft_body_count;
 } EditorObject;
 
+typedef struct EditorNavigationState {
+    uint32_t mode;
+    uint32_t selection;
+    EditorObjectId object;
+    uint32_t selected_line;
+    uint32_t selected_vertex;
+    EditorRigidBodyId rigid_body;
+    EditorHitboxId hitbox;
+    EditorJointId joint;
+    EditorAnchorId anchor;
+    EditorSoftBodyId soft_body;
+    EditorSoftNodeId soft_node;
+    EditorSoftBeamId soft_beam;
+    uint32_t origin_kind;
+} EditorNavigationState;
+
 typedef struct EditorProject {
     Vec2D viewport_camera_offset;
     float viewport_camera_zoom;
     bool viewport_local_view;
+    EditorNavigationState navigation;
     EditorCollisionMask collision_masks[EDITOR_COLLISION_MASK_MAX];
     size_t collision_mask_count;
     EditorObject objects[EDITOR_OBJECT_MAX];

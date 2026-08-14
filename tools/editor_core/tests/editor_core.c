@@ -86,6 +86,23 @@ static int transform_commands_test(void) {
             parsed.type != EDITOR_COMMAND_VIEWPORT_COORDINATES ||
             !parsed.data.viewport_coordinates.local) return 1;
     {
+        EditorCommand navigation = {.type = EDITOR_COMMAND_NAVIGATION_SET,
+            .data.navigation = {.mode = 3, .selection = 3, .object = object->id,
+                .rigid_body = rigid_body->id, .hitbox = hitbox->id}};
+        char *navigation_arguments[] = {"editor-cli", "navigation", "set",
+            "project.rohr.json", "hitbox", "hitbox", "1", "1", "1", "0",
+            "0", "0", "0", "0", "0", "0", "none"};
+        if(editor_command_execute(&project, &navigation).kind != ERROR_RESULT_VALUE ||
+                project.navigation.mode != 3 || project.selected != object->id ||
+                editor_result_check(editor_command_cli_write(&navigation,
+                    "project.rohr.json", cli_text, sizeof(cli_text))) ||
+                editor_result_check(editor_command_cli_parse(17, navigation_arguments,
+                    &parsed_path, &parsed)) ||
+                parsed.type != EDITOR_COMMAND_NAVIGATION_SET ||
+                parsed.data.navigation.mode != 3 ||
+                parsed.data.navigation.hitbox != 1) return 1;
+    }
+    {
         EditorCommand visibility[] = {
             {.type = EDITOR_COMMAND_VISIBILITY,
                 .data.visibility = {EDITOR_VISIBILITY_OBJECT, object->id, 0, 0, false}},
@@ -156,6 +173,9 @@ int main(void) {
     document.project->viewport_camera_offset = (Vec2D){21.0f, 22.0f};
     document.project->viewport_camera_zoom = 1.5f;
     document.project->viewport_local_view = true;
+    document.project->navigation = (EditorNavigationState){
+        .mode = 1, .selection = 1, .object = added.result.value
+    };
     result = editor_document_save_as(&document, path);
     if(editor_result_check(result)) return 1;
 
@@ -169,7 +189,10 @@ int main(void) {
             loaded.project->viewport_camera_offset.x != 21.0f ||
             loaded.project->viewport_camera_offset.y != 22.0f ||
             loaded.project->viewport_camera_zoom != 1.5f ||
-            !loaded.project->viewport_local_view) return 1;
+            !loaded.project->viewport_local_view ||
+            loaded.project->navigation.mode != 1 ||
+            loaded.project->navigation.selection != 1 ||
+            loaded.project->navigation.object != added.result.value) return 1;
     result = editor_object_command_remove(loaded.project, added.result.value);
     if(editor_result_check(result) || loaded.project->object_count != 0) return 1;
 
