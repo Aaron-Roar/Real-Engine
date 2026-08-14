@@ -7,6 +7,7 @@ add_executable(rohr_editor
     src/editor_workspace.c
     src/editor_viewport.c
     src/panels/editor_origin_panel.c
+    src/panels/editor_terminal_panel.c
     src/main.c
 )
 
@@ -15,7 +16,7 @@ target_compile_definitions(rohr_editor PRIVATE
     ROHR_ENGINE_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
 )
 
-target_link_libraries(rohr_editor PRIVATE rohr_engine)
+target_link_libraries(rohr_editor PRIVATE rohr_engine rohr_terminal)
 
 set_target_properties(rohr_editor PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/editor

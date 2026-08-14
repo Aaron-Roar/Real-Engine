@@ -119,14 +119,39 @@ static bool rohr_terminal_codepoint_add(RohrTerminal *terminal, uint32_t codepoi
     return rohr_terminal_cell_add(terminal, codepoint);
 }
 
+static bool rohr_terminal_screen_clear(RohrTerminal *terminal) {
+    for(size_t i = 0; i < terminal->line_capacity; i += 1)
+        terminal->lines[i].count = 0;
+    terminal->line_first = 0;
+    terminal->line_count = 0;
+    return rohr_terminal_line_start(terminal);
+}
+
+static long rohr_terminal_csi_first_parameter_get(const RohrTerminal *terminal) {
+    const char *parameter = terminal->escape_parameters;
+    while(*parameter != '\0' && (*parameter < '0' || *parameter > '9')) parameter += 1;
+    return *parameter == '\0' ? 0 : strtol(parameter, NULL, 10);
+}
+
 static bool rohr_terminal_byte_add(RohrTerminal *terminal, uint8_t byte) {
     if(terminal->escape_state == ROHR_TERMINAL_ESCAPE_STARTED) {
-        terminal->escape_state = byte == '[' ? ROHR_TERMINAL_ESCAPE_CSI :
-            ROHR_TERMINAL_ESCAPE_NONE;
+        if(byte == '[') terminal->escape_state = ROHR_TERMINAL_ESCAPE_CSI;
+        else if(byte == ']') terminal->escape_state = ROHR_TERMINAL_ESCAPE_OSC;
+        else terminal->escape_state = ROHR_TERMINAL_ESCAPE_NONE;
+        return true;
+    }
+    if(terminal->escape_state == ROHR_TERMINAL_ESCAPE_OSC) {
+        if(byte == 0x07) terminal->escape_state = ROHR_TERMINAL_ESCAPE_NONE;
+        else if(byte == 0x1b) terminal->escape_state = ROHR_TERMINAL_ESCAPE_OSC_END;
+        return true;
+    }
+    if(terminal->escape_state == ROHR_TERMINAL_ESCAPE_OSC_END) {
+        terminal->escape_state = byte == '\\' ? ROHR_TERMINAL_ESCAPE_NONE :
+            ROHR_TERMINAL_ESCAPE_OSC;
         return true;
     }
     if(terminal->escape_state == ROHR_TERMINAL_ESCAPE_CSI) {
-        if((byte >= '0' && byte <= '9') || byte == ';') {
+        if(byte >= 0x20 && byte <= 0x3f) {
             if(terminal->escape_parameter_count + 1 <
                     sizeof(terminal->escape_parameters)) {
                 terminal->escape_parameters[terminal->escape_parameter_count++] = (char)byte;
@@ -135,6 +160,10 @@ static bool rohr_terminal_byte_add(RohrTerminal *terminal, uint8_t byte) {
             return true;
         }
         if(byte == 'm') rohr_terminal_sgr_apply(terminal);
+        else if(byte == 'J' &&
+                rohr_terminal_csi_first_parameter_get(terminal) >= 2) {
+            if(!rohr_terminal_screen_clear(terminal)) return false;
+        }
         terminal->escape_state = ROHR_TERMINAL_ESCAPE_NONE;
         terminal->escape_parameter_count = 0;
         terminal->escape_parameters[0] = '\0';

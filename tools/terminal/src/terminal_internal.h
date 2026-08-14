@@ -12,7 +12,9 @@ typedef struct RohrTerminalLine {
 typedef enum RohrTerminalEscapeState {
     ROHR_TERMINAL_ESCAPE_NONE,
     ROHR_TERMINAL_ESCAPE_STARTED,
-    ROHR_TERMINAL_ESCAPE_CSI
+    ROHR_TERMINAL_ESCAPE_CSI,
+    ROHR_TERMINAL_ESCAPE_OSC,
+    ROHR_TERMINAL_ESCAPE_OSC_END
 } RohrTerminalEscapeState;
 
 struct RohrTerminal {

@@ -9,7 +9,8 @@ static float editor_view_scale = 1.0f;
 static void editor_view_transform_set(const EditorViewportState *state,
     const EditorObject *object) {
     Position center = {EDITOR_VIEWPORT_WIDTH * 0.5f,
-        EDITOR_MENU_HEIGHT + (WINDOW_HEIGHT - EDITOR_MENU_HEIGHT) * 0.5f};
+        EDITOR_MENU_HEIGHT +
+            (EDITOR_VIEWPORT_BOTTOM - EDITOR_MENU_HEIGHT) * 0.5f};
 
     editor_view_origin = center;
     editor_view_scale = state != NULL && state->camera_zoom > 0.0f ?

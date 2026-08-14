@@ -116,12 +116,15 @@ if(ROHR_BUILD_TESTS)
     include(CTest)
 endif()
 
-if(ROHR_BUILD_EDITOR)
-    add_subdirectory(tools/editor)
-endif()
-
 if(ROHR_BUILD_TERMINAL)
     add_subdirectory(tools/terminal)
+endif()
+
+if(ROHR_BUILD_EDITOR)
+    if(NOT ROHR_BUILD_TERMINAL)
+        message(FATAL_ERROR "ROHR_BUILD_EDITOR requires ROHR_BUILD_TERMINAL")
+    endif()
+    add_subdirectory(tools/editor)
 endif()
 
 if(ROHR_BUILD_EXAMPLES)
