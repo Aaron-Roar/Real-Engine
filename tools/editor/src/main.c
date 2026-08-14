@@ -357,6 +357,17 @@ static void editor_relationship_set(EditorProject *project,
     (void)editor_command_execute(project, &command);
 }
 
+static void editor_collision_filter_set(EditorProject *project, EditorItemKind kind,
+        EditorObjectId object, uint32_t parent, uint32_t item,
+        EditorCollisionFilterKind filter, const char *mask, bool enabled) {
+    EditorCommand command = {.type = EDITOR_COMMAND_COLLISION_FILTER_SET,
+        .data.collision_filter_set = {.kind = kind, .object = object,
+            .parent = parent, .item = item, .filter = filter, .enabled = enabled}};
+    snprintf(command.data.collision_filter_set.mask,
+        sizeof(command.data.collision_filter_set.mask), "%s", mask);
+    (void)editor_command_execute(project, &command);
+}
+
 static bool editor_checkbox_label_left(const char *id, const TextAsset *label,
     UIRect bounds, bool *checked) {
     UIButtonResult interaction;
@@ -391,6 +402,8 @@ static bool editor_checkbox_label_left(const char *id, const TextAsset *label,
 
 static bool editor_collision_mask_menu_draw(const char *id_prefix,
     EditorProject *project, RohrCollisionCategoryMask *active_masks,
+    EditorItemKind target_kind, EditorObjectId object, uint32_t parent,
+    uint32_t item, EditorCollisionFilterKind filter,
     FontAsset *font, TextAsset labels[EDITOR_COLLISION_MASK_MAX],
     char caches[EDITOR_COLLISION_MASK_MAX][EDITOR_OBJECT_NAME_MAX],
     char *name, size_t name_capacity, TextAsset *name_field,
@@ -413,10 +426,17 @@ static bool editor_collision_mask_menu_draw(const char *id_prefix,
         snprintf(add_id, sizeof(add_id), "%s.add", id_prefix);
         if(rohr_ui_button(add_id, add_label,
                 (UIRect){x + width * 0.72f, y, width * 0.28f, 28.0f}, NULL).clicked) {
-            size_t mask_index = SIZE_MAX;
-            (void)editor_project_collision_mask_add(project, name, &mask_index);
+            EditorCommand command = {.type = EDITOR_COMMAND_COLLISION_MASK_ADD};
+            EditorCommandResult result;
+            size_t mask_index;
+            snprintf(command.data.collision_mask_add.name,
+                sizeof(command.data.collision_mask_add.name), "%s", name);
+            result = editor_command_execute(project, &command);
+            mask_index = result.kind == ERROR_RESULT_VALUE ?
+                (size_t)result.result.object : SIZE_MAX;
             if(mask_index < project->collision_mask_count) {
-                *active_masks |= UINT64_C(1) << mask_index;
+                editor_collision_filter_set(project, target_kind, object, parent,
+                    item, filter, project->collision_masks[mask_index].name, true);
                 name[0] = '\0';
                 (void)rohr_graphics_text_value_set(name_field, "");
             }
@@ -436,10 +456,9 @@ static bool editor_collision_mask_menu_draw(const char *id_prefix,
         snprintf(mask_id, sizeof(mask_id), "%s.%zu", id_prefix, mask);
         if(editor_checkbox(mask_id, &labels[mask],
                 (UIRect){x, y + (float)*row_count * 30.0f, width, 28.0f},
-                &enabled)) {
-            if(enabled) *active_masks |= bit;
-            else *active_masks &= ~bit;
-        }
+                &enabled)) editor_collision_filter_set(project, target_kind,
+                    object, parent, item, filter,
+                    project->collision_masks[mask].name, enabled);
         *row_count += 1;
     }
     for(size_t i = 1; i < inactive_count; i += 1) {
@@ -462,10 +481,9 @@ static bool editor_collision_mask_menu_draw(const char *id_prefix,
         snprintf(mask_id, sizeof(mask_id), "%s.%zu", id_prefix, mask);
         if(editor_checkbox(mask_id, &labels[mask],
                 (UIRect){x, y + (float)*row_count * 30.0f, width, 28.0f},
-                &enabled)) {
-            if(enabled) *active_masks |= bit;
-            else *active_masks &= ~bit;
-        }
+                &enabled)) editor_collision_filter_set(project, target_kind,
+                    object, parent, item, filter,
+                    project->collision_masks[mask].name, enabled);
         *row_count += 1;
     }
     rohr_ui_border((UIRect){x, y, width, (float)*row_count * 30.0f - 2.0f},
@@ -1456,7 +1474,9 @@ int main(void) {
                         size_t rows = 0;
                         if(!editor_collision_mask_menu_draw(
                                 "editor.rigid_body.collision_category.mask",
-                                &project, &body->collision_category, &font,
+                                &project, &body->collision_category,
+                                EDITOR_ITEM_RIGID_BODY, selected->id, 0, body->id,
+                                EDITOR_COLLISION_FILTER_CATEGORY, &font,
                                 collision_mask_labels, collision_mask_cache,
                                 collision_mask_name, sizeof(collision_mask_name),
                                 &collision_mask_name_field, &add_label, row_x,
@@ -1478,7 +1498,10 @@ int main(void) {
                         size_t rows = 0;
                         if(!editor_collision_mask_menu_draw(
                                 "editor.rigid_body.collide_with.mask", &project,
-                                &body->collision_with, &font, collision_mask_labels,
+                                &body->collision_with, EDITOR_ITEM_RIGID_BODY,
+                                selected->id, 0, body->id,
+                                EDITOR_COLLISION_FILTER_COLLIDE_WITH, &font,
+                                collision_mask_labels,
                                 collision_mask_cache, collision_mask_name,
                                 sizeof(collision_mask_name), &collision_mask_name_field,
                                 &add_label, row_x, controls_bottom, row_width,
@@ -2611,7 +2634,10 @@ int main(void) {
                         size_t rows = 0;
                         if(!editor_collision_mask_menu_draw(
                                 "editor.soft_node.collision_category.mask", &project,
-                                &node->collision_category, &font, collision_mask_labels,
+                                &node->collision_category, EDITOR_ITEM_SOFT_NODE,
+                                selected->id, body->id, node->id,
+                                EDITOR_COLLISION_FILTER_CATEGORY, &font,
+                                collision_mask_labels,
                                 collision_mask_cache, collision_mask_name,
                                 sizeof(collision_mask_name), &collision_mask_name_field,
                                 &add_label, row_x, controls_bottom, row_width,
@@ -2634,7 +2660,10 @@ int main(void) {
                         size_t rows = 0;
                         if(!editor_collision_mask_menu_draw(
                                 "editor.soft_node.collide_with.mask", &project,
-                                &node->collision_with, &font, collision_mask_labels,
+                                &node->collision_with, EDITOR_ITEM_SOFT_NODE,
+                                selected->id, body->id, node->id,
+                                EDITOR_COLLISION_FILTER_COLLIDE_WITH, &font,
+                                collision_mask_labels,
                                 collision_mask_cache, collision_mask_name,
                                 sizeof(collision_mask_name), &collision_mask_name_field,
                                 &add_label, row_x, controls_bottom, row_width,

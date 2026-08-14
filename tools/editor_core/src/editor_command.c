@@ -55,6 +55,20 @@ static EditorSoftBeam *editor_command_soft_beam_get(EditorSoftBody *body,
     return NULL;
 }
 
+static bool editor_command_collision_mask_find(const EditorProject *project,
+        const char *name, size_t *index) {
+    char formatted[EDITOR_OBJECT_NAME_MAX];
+    if(project == NULL || name == NULL || index == NULL) return false;
+    editor_project_property_name_format(formatted, sizeof(formatted), name);
+    if(formatted[0] == '\0') return false;
+    for(size_t i = 0; i < project->collision_mask_count; i += 1) {
+        if(strcmp(project->collision_masks[i].name, formatted) != 0) continue;
+        *index = i;
+        return true;
+    }
+    return false;
+}
+
 static EditorCommandResult editor_command_execute_internal(EditorProject *project,
         const EditorCommand *command) {
     if(project == NULL || command == NULL)
@@ -644,6 +658,59 @@ property_invalid:
             }
             return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
         }
+        case EDITOR_COMMAND_COLLISION_MASK_ADD: {
+            size_t index;
+            if(editor_command_collision_mask_find(project,
+                    command->data.collision_mask_add.name, &index))
+                return (EditorCommandResult){.kind = ERROR_RESULT_VALUE,
+                    .result.object = (uint32_t)index};
+            if(!editor_project_collision_mask_add(project,
+                    command->data.collision_mask_add.name, &index))
+                return editor_command_error(editor_result_error(
+                    EDITOR_ERROR_CAPACITY,
+                    "collision mask could not be added").result.error);
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE,
+                .result.object = (uint32_t)index};
+        }
+        case EDITOR_COMMAND_COLLISION_FILTER_SET: {
+            const EditorCollisionFilterSetCommand *set =
+                &command->data.collision_filter_set;
+            EditorObject *object = editor_object_query_get(project, set->object);
+            RohrCollisionCategoryMask *filter;
+            size_t index;
+            uint64_t bit;
+            if(object == NULL) return editor_command_not_found("object", set->object);
+            if(set->filter != EDITOR_COLLISION_FILTER_CATEGORY &&
+                    set->filter != EDITOR_COLLISION_FILTER_COLLIDE_WITH)
+                return editor_command_error(editor_result_error(
+                    EDITOR_ERROR_INVALID_ARGUMENT,
+                    "unknown collision filter kind").result.error);
+            if(!editor_command_collision_mask_find(project, set->mask, &index))
+                return editor_command_error(editor_result_error(
+                    EDITOR_ERROR_NOT_FOUND,
+                    "collision mask '%s' was not found", set->mask).result.error);
+            if(set->kind == EDITOR_ITEM_RIGID_BODY) {
+                EditorRigidBody *body = editor_project_rigid_body_get(object, set->item);
+                if(body == NULL) return editor_command_not_found("rigid body", set->item);
+                filter = set->filter == EDITOR_COLLISION_FILTER_CATEGORY ?
+                    &body->collision_category : &body->collision_with;
+            } else if(set->kind == EDITOR_ITEM_SOFT_NODE) {
+                EditorSoftBody *body = editor_command_soft_body_get(object, set->parent);
+                EditorSoftNode *node = editor_command_soft_node_get(body, set->item);
+                if(node == NULL) return editor_command_not_found("soft node", set->item);
+                filter = set->filter == EDITOR_COLLISION_FILTER_CATEGORY ?
+                    &node->collision_category : &node->collision_with;
+            } else {
+                return editor_command_error(editor_result_error(
+                    EDITOR_ERROR_INVALID_ARGUMENT,
+                    "collision filters are only supported by rigid bodies and soft nodes")
+                        .result.error);
+            }
+            bit = UINT64_C(1) << index;
+            if(set->enabled) *filter |= bit;
+            else *filter &= ~bit;
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+        }
     }
     return editor_command_error((EditorError){EDITOR_ERROR_INVALID_ARGUMENT,
         "unknown editor command"});
@@ -862,6 +929,51 @@ EditorResult editor_command_cli_parse(int count, char **arguments,
                 "invalid navigation set command");
         command->type = EDITOR_COMMAND_NAVIGATION_SET;
         return editor_result_value(true);
+    }
+    if(strcmp(domain, "collision-mask") == 0 && strcmp(action, "add") == 0) {
+        if(count != 5 || arguments[4][0] == '\0')
+            return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                "invalid collision-mask add command");
+        command->type = EDITOR_COMMAND_COLLISION_MASK_ADD;
+        snprintf(command->data.collision_mask_add.name,
+            sizeof(command->data.collision_mask_add.name), "%s", arguments[4]);
+        return editor_result_value(true);
+    }
+    if(strcmp(action, "filter") == 0) {
+        EditorCollisionFilterSetCommand *set = &command->data.collision_filter_set;
+        int filter_index;
+        int mask_index;
+        int enabled_index;
+        if(strcmp(domain, "rigid-body") == 0 && count == 9) {
+            set->kind = EDITOR_ITEM_RIGID_BODY;
+            if(!editor_command_uint_parse(arguments[4], &set->object) ||
+                    !editor_command_uint_parse(arguments[5], &set->item))
+                goto collision_filter_invalid;
+            filter_index = 6;
+        } else if(strcmp(domain, "soft-node") == 0 && count == 10) {
+            set->kind = EDITOR_ITEM_SOFT_NODE;
+            if(!editor_command_uint_parse(arguments[4], &set->object) ||
+                    !editor_command_uint_parse(arguments[5], &set->parent) ||
+                    !editor_command_uint_parse(arguments[6], &set->item))
+                goto collision_filter_invalid;
+            filter_index = 7;
+        } else goto collision_filter_invalid;
+        mask_index = filter_index + 1;
+        enabled_index = filter_index + 2;
+        if(strcmp(arguments[filter_index], "category") == 0)
+            set->filter = EDITOR_COLLISION_FILTER_CATEGORY;
+        else if(strcmp(arguments[filter_index], "collide-with") == 0)
+            set->filter = EDITOR_COLLISION_FILTER_COLLIDE_WITH;
+        else goto collision_filter_invalid;
+        if(arguments[mask_index][0] == '\0' ||
+                !editor_command_bool_parse(arguments[enabled_index], &set->enabled))
+            goto collision_filter_invalid;
+        snprintf(set->mask, sizeof(set->mask), "%s", arguments[mask_index]);
+        command->type = EDITOR_COMMAND_COLLISION_FILTER_SET;
+        return editor_result_value(true);
+collision_filter_invalid:
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "invalid %s collision-filter command", domain);
     }
     if(strcmp(action, "connect") == 0) {
         EditorRelationshipSetCommand *set = &command->data.relationship_set;
@@ -1312,6 +1424,11 @@ EditorResult editor_command_cli_write(const EditorCommand *command,
             else return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
                 "unknown relationship target");
             break;
+        case EDITOR_COMMAND_COLLISION_MASK_ADD: domain = "collision-mask"; break;
+        case EDITOR_COMMAND_COLLISION_FILTER_SET:
+            domain = editor_command_item_domain_get(
+                command->data.collision_filter_set.kind);
+            break;
         default: return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
             "unknown editor command");
     }
@@ -1627,6 +1744,40 @@ EditorResult editor_command_cli_write(const EditorCommand *command,
                     set->parent, set->item, slot, target);
             } else goto capacity_error;
             break;
+        }
+        case EDITOR_COMMAND_COLLISION_MASK_ADD:
+            if(!editor_command_text_append(output, output_capacity, &used, "add ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path) ||
+                    !editor_command_text_append(output, output_capacity, &used, " ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        command->data.collision_mask_add.name)) goto capacity_error;
+            return editor_result_value(true);
+        case EDITOR_COMMAND_COLLISION_FILTER_SET: {
+            const EditorCollisionFilterSetCommand *set =
+                &command->data.collision_filter_set;
+            const char *filter = set->filter == EDITOR_COLLISION_FILTER_CATEGORY ?
+                "category" : "collide-with";
+            const char *enabled = set->enabled ? "true" : "false";
+            if((set->kind != EDITOR_ITEM_RIGID_BODY &&
+                        set->kind != EDITOR_ITEM_SOFT_NODE) ||
+                    (set->filter != EDITOR_COLLISION_FILTER_CATEGORY &&
+                        set->filter != EDITOR_COLLISION_FILTER_COLLIDE_WITH) ||
+                    !editor_command_text_append(output, output_capacity, &used, "filter ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            if(set->kind == EDITOR_ITEM_RIGID_BODY)
+                snprintf(values, sizeof(values), " %u %u %s ", set->object,
+                    set->item, filter);
+            else snprintf(values, sizeof(values), " %u %u %u %s ", set->object,
+                set->parent, set->item, filter);
+            if(!editor_command_text_append(output, output_capacity, &used, values) ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        set->mask) ||
+                    !editor_command_text_append(output, output_capacity, &used, " ") ||
+                    !editor_command_text_append(output, output_capacity, &used, enabled))
+                goto capacity_error;
+            return editor_result_value(true);
         }
     }
     if(!editor_command_text_append(output, output_capacity, &used, values))

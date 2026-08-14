@@ -23,7 +23,9 @@ typedef enum EditorCommandType {
     EDITOR_COMMAND_ITEM_REMOVE,
     EDITOR_COMMAND_ITEM_RENAME,
     EDITOR_COMMAND_PROPERTY_SET,
-    EDITOR_COMMAND_RELATIONSHIP_SET
+    EDITOR_COMMAND_RELATIONSHIP_SET,
+    EDITOR_COMMAND_COLLISION_MASK_ADD,
+    EDITOR_COMMAND_COLLISION_FILTER_SET
 } EditorCommandType;
 
 typedef enum EditorItemKind {
@@ -124,6 +126,21 @@ typedef struct EditorRelationshipSetCommand {
     uint32_t target;
 } EditorRelationshipSetCommand;
 
+typedef enum EditorCollisionFilterKind {
+    EDITOR_COLLISION_FILTER_CATEGORY,
+    EDITOR_COLLISION_FILTER_COLLIDE_WITH
+} EditorCollisionFilterKind;
+
+typedef struct EditorCollisionFilterSetCommand {
+    EditorItemKind kind;
+    EditorObjectId object;
+    uint32_t parent;
+    uint32_t item;
+    EditorCollisionFilterKind filter;
+    char mask[EDITOR_OBJECT_NAME_MAX];
+    bool enabled;
+} EditorCollisionFilterSetCommand;
+
 typedef enum EditorVisibilityKind {
     EDITOR_VISIBILITY_OBJECT,
     EDITOR_VISIBILITY_RIGID_BODY,
@@ -209,6 +226,10 @@ typedef struct EditorCommand {
         EditorItemRenameCommand item_rename;
         EditorPropertySetCommand property_set;
         EditorRelationshipSetCommand relationship_set;
+        struct {
+            char name[EDITOR_OBJECT_NAME_MAX];
+        } collision_mask_add;
+        EditorCollisionFilterSetCommand collision_filter_set;
     } data;
 } EditorCommand;
 

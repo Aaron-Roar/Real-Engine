@@ -33,6 +33,9 @@ static void cli_usage_print(void) {
         "  rohr joint connect <project.rohr.json> <object> <joint> <anchor-a|anchor-b> <anchor|none>\n"
         "  rohr anchor connect <project.rohr.json> <object> <anchor> rigid-body <body|none>\n"
         "  rohr soft-beam connect <project.rohr.json> <object> <body> <beam> <node-a|node-b> <node|none>\n"
+        "  rohr collision-mask add <project.rohr.json> <name>\n"
+        "  rohr rigid-body filter <project.rohr.json> <object> <body> <category|collide-with> <mask> <true|false>\n"
+        "  rohr soft-node filter <project.rohr.json> <object> <body> <node> <category|collide-with> <mask> <true|false>\n"
         "  rohr navigation set <project.rohr.json> <mode> <selection> <object>\n"
         "      <rigid-body> <hitbox> <joint> <anchor> <soft-body> <soft-node>\n"
         "      <soft-beam> <line> <vertex> <origin-kind>");
@@ -96,6 +99,7 @@ int main(int count, char **arguments) {
             strcmp(arguments[1], "soft-body") == 0 ||
             strcmp(arguments[1], "soft-node") == 0 ||
             strcmp(arguments[1], "soft-beam") == 0 ||
+            strcmp(arguments[1], "collision-mask") == 0 ||
             strcmp(arguments[1], "viewport") == 0))
         return cli_object_command(count, arguments);
     if(count >= 2 && strcmp(arguments[1], "navigation") == 0)

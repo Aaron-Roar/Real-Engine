@@ -403,6 +403,71 @@ static int relationship_commands_test(void) {
     return 0;
 }
 
+static int collision_filter_commands_test(void) {
+    static EditorProject project;
+    EditorObject *object;
+    EditorRigidBody *body;
+    EditorSoftBody *soft_body;
+    EditorSoftNode *node;
+    EditorCommand command;
+    EditorCommand parsed;
+    EditorCommandResult result;
+    const char *path;
+    char cli_text[512];
+    char *add_arguments[] = {"editor-cli", "collision-mask", "add",
+        "project.rohr.json", "Player Body"};
+    char *node_arguments[] = {"editor-cli", "soft-node", "filter",
+        "project.rohr.json", "1", "1", "1", "collide-with", "player_body",
+        "true"};
+
+    editor_project_init(&project);
+    object = editor_project_object_add(&project, (Position){0});
+    body = editor_project_rigid_body_add(&project, object);
+    soft_body = editor_project_soft_body_add(&project, object);
+    node = editor_project_soft_node_add(&project, soft_body, (Position){0});
+    if(object == NULL || body == NULL || soft_body == NULL || node == NULL) return 1;
+    command = (EditorCommand){.type = EDITOR_COMMAND_COLLISION_MASK_ADD};
+    snprintf(command.data.collision_mask_add.name,
+        sizeof(command.data.collision_mask_add.name), "%s", "Player Body");
+    result = editor_command_execute(&project, &command);
+    if(result.kind != ERROR_RESULT_VALUE || result.result.object != 1 ||
+            project.collision_mask_count != 2 ||
+            strcmp(project.collision_masks[1].name, "player_body") != 0 ||
+            editor_result_check(editor_command_cli_write(&command,
+                "project.rohr.json", cli_text, sizeof(cli_text)))) return 1;
+    result = editor_command_execute(&project, &command);
+    if(result.kind != ERROR_RESULT_VALUE || result.result.object != 1 ||
+            project.collision_mask_count != 2) return 1;
+    command = (EditorCommand){.type = EDITOR_COMMAND_COLLISION_FILTER_SET,
+        .data.collision_filter_set = {.kind = EDITOR_ITEM_RIGID_BODY,
+            .object = object->id, .item = body->id,
+            .filter = EDITOR_COLLISION_FILTER_CATEGORY,
+            .mask = "player_body", .enabled = true}};
+    if(editor_command_execute(&project, &command).kind != ERROR_RESULT_VALUE ||
+            (body->collision_category & (UINT64_C(1) << 1)) == 0 ||
+            editor_result_check(editor_command_cli_write(&command,
+                "project.rohr.json", cli_text, sizeof(cli_text)))) return 1;
+    command = (EditorCommand){.type = EDITOR_COMMAND_COLLISION_FILTER_SET,
+        .data.collision_filter_set = {.kind = EDITOR_ITEM_SOFT_NODE,
+            .object = object->id, .parent = soft_body->id, .item = node->id,
+            .filter = EDITOR_COLLISION_FILTER_COLLIDE_WITH,
+            .mask = "player_body", .enabled = true}};
+    if(editor_command_execute(&project, &command).kind != ERROR_RESULT_VALUE ||
+            (node->collision_with & (UINT64_C(1) << 1)) == 0) return 1;
+    if(editor_result_check(editor_command_cli_parse(5, add_arguments, &path,
+                &parsed)) || parsed.type != EDITOR_COMMAND_COLLISION_MASK_ADD ||
+            editor_result_check(editor_command_cli_parse(10, node_arguments, &path,
+                &parsed)) || parsed.type != EDITOR_COMMAND_COLLISION_FILTER_SET ||
+            parsed.data.collision_filter_set.kind != EDITOR_ITEM_SOFT_NODE ||
+            parsed.data.collision_filter_set.filter !=
+                EDITOR_COLLISION_FILTER_COLLIDE_WITH ||
+            !parsed.data.collision_filter_set.enabled) return 1;
+    snprintf(command.data.collision_filter_set.mask,
+        sizeof(command.data.collision_filter_set.mask), "%s", "missing");
+    if(editor_command_execute(&project, &command).kind != ERROR_RESULT_ERROR) return 1;
+    return 0;
+}
+
 int main(void) {
     const char *path = "/tmp/rohr-editor-core-test.json";
     EditorDocument document;
@@ -485,6 +550,7 @@ int main(void) {
     if(item_commands_test() != 0) return 1;
     if(property_commands_test() != 0) return 1;
     if(relationship_commands_test() != 0) return 1;
+    if(collision_filter_commands_test() != 0) return 1;
 
     editor_document_destroy(&loaded);
     editor_document_destroy(&document);
