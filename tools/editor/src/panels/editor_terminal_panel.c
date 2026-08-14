@@ -35,17 +35,13 @@ static size_t editor_terminal_codepoint_write(char *output, size_t capacity,
 }
 
 bool editor_terminal_panel_create(EditorTerminalPanel *panel, FontAsset *font) {
-    TextAsset width_probe = {0};
+    int glyph_advance = 0;
     if(panel == NULL || font == NULL) return false;
     memset(panel, 0, sizeof(*panel));
     panel->height = EDITOR_TERMINAL_DEFAULT_HEIGHT;
-    if(!editor_terminal_text_create(font, &width_probe) ||
-            !rohr_graphics_text_value_set(&width_probe, "MMMMMMMMMM")) {
-        rohr_graphics_text_destroy(&width_probe);
-        return false;
-    }
-    panel->cell_width = width_probe.size.x / 10.0f;
-    rohr_graphics_text_destroy(&width_probe);
+    if(font->font == NULL || !TTF_GetGlyphMetrics(font->font, 'M', NULL, NULL,
+            NULL, NULL, &glyph_advance) || glyph_advance <= 0) return false;
+    panel->cell_width = (float)glyph_advance;
     for(size_t i = 0; i < EDITOR_TERMINAL_VISIBLE_LINE_MAX; i += 1) {
         if(!editor_terminal_text_create(font, &panel->lines[i])) {
             editor_terminal_panel_destroy(panel);

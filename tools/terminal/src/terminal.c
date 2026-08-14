@@ -3,16 +3,6 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-
-#define ROHR_TERMINAL_COLOR_DEFAULT_FOREGROUND UINT32_C(0xe6ebf4ff)
-#define ROHR_TERMINAL_COLOR_DEFAULT_BACKGROUND UINT32_C(0x000000ff)
-
-static const uint32_t terminal_colors[8] = {
-    UINT32_C(0x000000ff), UINT32_C(0xcd3131ff), UINT32_C(0x0dbc79ff),
-    UINT32_C(0xe5e510ff), UINT32_C(0x2472c8ff), UINT32_C(0xbc3fbcff),
-    UINT32_C(0x11a8cdff), UINT32_C(0xe5e5e5ff)
-};
 
 RohrTerminalResult rohr_terminal_result_value(void) {
     return (RohrTerminalResult){.success = true};
@@ -38,261 +28,37 @@ RohrTerminalConfig rohr_terminal_config_default_get(void) {
     };
 }
 
-static RohrTerminalLine *rohr_terminal_current_line_get(RohrTerminal *terminal) {
-    size_t index = (terminal->line_first + terminal->cursor_line) %
-        terminal->line_capacity;
-    return &terminal->lines[index];
-}
-
-static bool rohr_terminal_line_start(RohrTerminal *terminal) {
-    size_t index;
-    RohrTerminalLine *line;
-    if(terminal->line_count == terminal->line_capacity) {
-        index = terminal->line_first;
-        terminal->line_first = (terminal->line_first + 1) % terminal->line_capacity;
-        if(terminal->cursor_line > 0) terminal->cursor_line -= 1;
-    } else {
-        index = (terminal->line_first + terminal->line_count) % terminal->line_capacity;
-        terminal->line_count += 1;
-    }
-    line = &terminal->lines[index];
-    line->count = 0;
-    terminal->cursor_line = terminal->line_count - 1;
-    terminal->cursor_column = 0;
-    return true;
-}
-
-static bool rohr_terminal_cell_add(RohrTerminal *terminal, uint32_t codepoint) {
-    RohrTerminalLine *line = rohr_terminal_current_line_get(terminal);
-    size_t required = terminal->cursor_column + 1;
-    if(required > line->capacity) {
-        size_t capacity = line->capacity == 0 ? 64 : line->capacity * 2;
-        while(capacity < required) capacity *= 2;
-        RohrTerminalCell *cells = realloc(line->cells, capacity * sizeof(*cells));
-        if(cells == NULL) return false;
-        line->cells = cells;
-        line->capacity = capacity;
-    }
-    while(line->count < terminal->cursor_column) {
-        line->cells[line->count++] = (RohrTerminalCell){
-            .codepoint = ' ',
-            .foreground = terminal->foreground,
-            .background = terminal->background
-        };
-    }
-    line->cells[terminal->cursor_column] = (RohrTerminalCell){
-        .codepoint = codepoint,
-        .foreground = terminal->foreground,
-        .background = terminal->background,
-        .attributes = terminal->attributes
-    };
-    terminal->cursor_column += 1;
-    if(terminal->cursor_column > line->count) line->count = terminal->cursor_column;
-    return true;
-}
-
-static void rohr_terminal_sgr_apply(RohrTerminal *terminal) {
-    char parameters[sizeof(terminal->escape_parameters)];
-    char *cursor;
-    snprintf(parameters, sizeof(parameters), "%s", terminal->escape_parameters);
-    cursor = parameters;
-    if(cursor[0] == '\0') cursor = "0";
-    while(cursor != NULL) {
-        char *next = strchr(cursor, ';');
-        long value;
-        if(next != NULL) *next++ = '\0';
-        value = strtol(cursor, NULL, 10);
-        if(value == 0) {
-            terminal->foreground = ROHR_TERMINAL_COLOR_DEFAULT_FOREGROUND;
-            terminal->background = ROHR_TERMINAL_COLOR_DEFAULT_BACKGROUND;
-            terminal->attributes = 0;
-        } else if(value == 1) terminal->attributes |= UINT16_C(1);
-        else if(value == 4) terminal->attributes |= UINT16_C(2);
-        else if(value == 7) terminal->attributes |= UINT16_C(4);
-        else if(value >= 30 && value <= 37)
-            terminal->foreground = terminal_colors[value - 30];
-        else if(value >= 40 && value <= 47)
-            terminal->background = terminal_colors[value - 40];
-        else if(value == 39)
-            terminal->foreground = ROHR_TERMINAL_COLOR_DEFAULT_FOREGROUND;
-        else if(value == 49)
-            terminal->background = ROHR_TERMINAL_COLOR_DEFAULT_BACKGROUND;
-        cursor = next;
-    }
-}
-
-static bool rohr_terminal_codepoint_add(RohrTerminal *terminal, uint32_t codepoint) {
-    if(codepoint == '\n') return rohr_terminal_line_start(terminal);
-    if(codepoint == '\r') {
-        terminal->cursor_column = 0;
-        return true;
-    }
-    if(codepoint == '\b') {
-        RohrTerminalLine *line = rohr_terminal_current_line_get(terminal);
-        if(terminal->cursor_column > 0) terminal->cursor_column -= 1;
-        return true;
-    }
-    if(codepoint < 32 && codepoint != '\t') return true;
-    return rohr_terminal_cell_add(terminal, codepoint);
-}
-
-static bool rohr_terminal_screen_clear(RohrTerminal *terminal) {
-    for(size_t i = 0; i < terminal->line_capacity; i += 1)
-        terminal->lines[i].count = 0;
-    terminal->line_first = 0;
-    terminal->line_count = 0;
-    return rohr_terminal_line_start(terminal);
-}
-
-static long rohr_terminal_csi_first_parameter_get(const RohrTerminal *terminal) {
-    const char *parameter = terminal->escape_parameters;
-    while(*parameter != '\0' && (*parameter < '0' || *parameter > '9')) parameter += 1;
-    return *parameter == '\0' ? 0 : strtol(parameter, NULL, 10);
-}
-
-static long rohr_terminal_csi_parameter_get(const RohrTerminal *terminal,
-        size_t requested, long fallback) {
-    const char *cursor = terminal->escape_parameters;
-    size_t index = 0;
-    while(*cursor == '?' || *cursor == '>' || *cursor == '!') cursor += 1;
-    while(index < requested && *cursor != '\0') {
-        cursor = strchr(cursor, ';');
-        if(cursor == NULL) return fallback;
-        cursor += 1;
-        index += 1;
-    }
-    if(*cursor < '0' || *cursor > '9') return fallback;
-    return strtol(cursor, NULL, 10);
-}
-
-static void rohr_terminal_cursor_move(RohrTerminal *terminal, uint8_t command) {
-    size_t amount = (size_t)rohr_terminal_csi_parameter_get(terminal, 0, 1);
-    if(amount == 0) amount = 1;
-    if(command == 'A') terminal->cursor_line = amount > terminal->cursor_line ?
-        0 : terminal->cursor_line - amount;
-    else if(command == 'B') {
-        terminal->cursor_line += amount;
-        if(terminal->cursor_line >= terminal->line_count)
-            terminal->cursor_line = terminal->line_count - 1;
-    } else if(command == 'C') terminal->cursor_column += amount;
-    else if(command == 'D') terminal->cursor_column = amount > terminal->cursor_column ?
-        0 : terminal->cursor_column - amount;
-    else if(command == 'G') terminal->cursor_column = amount - 1;
-    else if(command == 'H' || command == 'f') {
-        size_t visible_first = terminal->line_count > terminal->rows ?
-            terminal->line_count - terminal->rows : 0;
-        size_t row = (size_t)rohr_terminal_csi_parameter_get(terminal, 0, 1);
-        size_t column = (size_t)rohr_terminal_csi_parameter_get(terminal, 1, 1);
-        terminal->cursor_line = visible_first + (row > 0 ? row - 1 : 0);
-        if(terminal->cursor_line >= terminal->line_count)
-            terminal->cursor_line = terminal->line_count - 1;
-        terminal->cursor_column = column > 0 ? column - 1 : 0;
-    }
-}
-
-static bool rohr_terminal_byte_add(RohrTerminal *terminal, uint8_t byte) {
-    if(terminal->escape_state == ROHR_TERMINAL_ESCAPE_STARTED) {
-        if(byte == '[') terminal->escape_state = ROHR_TERMINAL_ESCAPE_CSI;
-        else if(byte == ']') terminal->escape_state = ROHR_TERMINAL_ESCAPE_OSC;
-        else terminal->escape_state = ROHR_TERMINAL_ESCAPE_NONE;
-        return true;
-    }
-    if(terminal->escape_state == ROHR_TERMINAL_ESCAPE_OSC) {
-        if(byte == 0x07) terminal->escape_state = ROHR_TERMINAL_ESCAPE_NONE;
-        else if(byte == 0x1b) terminal->escape_state = ROHR_TERMINAL_ESCAPE_OSC_END;
-        return true;
-    }
-    if(terminal->escape_state == ROHR_TERMINAL_ESCAPE_OSC_END) {
-        terminal->escape_state = byte == '\\' ? ROHR_TERMINAL_ESCAPE_NONE :
-            ROHR_TERMINAL_ESCAPE_OSC;
-        return true;
-    }
-    if(terminal->escape_state == ROHR_TERMINAL_ESCAPE_CSI) {
-        if(byte >= 0x20 && byte <= 0x3f) {
-            if(terminal->escape_parameter_count + 1 <
-                    sizeof(terminal->escape_parameters)) {
-                terminal->escape_parameters[terminal->escape_parameter_count++] = (char)byte;
-                terminal->escape_parameters[terminal->escape_parameter_count] = '\0';
-            }
-            return true;
-        }
-        if(byte == 'm') rohr_terminal_sgr_apply(terminal);
-        else if(byte == 'J' &&
-                rohr_terminal_csi_first_parameter_get(terminal) >= 2) {
-            if(!rohr_terminal_screen_clear(terminal)) return false;
-        }
-        else if(byte == 'A' || byte == 'B' || byte == 'C' || byte == 'D' ||
-                byte == 'G' || byte == 'H' || byte == 'f')
-            rohr_terminal_cursor_move(terminal, byte);
-        else if((byte == 'h' || byte == 'l') &&
-                terminal->escape_parameters[0] == '?' &&
-                rohr_terminal_csi_first_parameter_get(terminal) == 25)
-            terminal->cursor_visible = byte == 'h';
-        terminal->escape_state = ROHR_TERMINAL_ESCAPE_NONE;
-        terminal->escape_parameter_count = 0;
-        terminal->escape_parameters[0] = '\0';
-        return true;
-    }
-    if(byte == 0x1b) {
-        terminal->escape_state = ROHR_TERMINAL_ESCAPE_STARTED;
-        return true;
-    }
-    if(terminal->utf8_remaining == 0) {
-        if(byte < 0x80) return rohr_terminal_codepoint_add(terminal, byte);
-        if((byte & 0xe0) == 0xc0) {
-            terminal->utf8_codepoint = byte & 0x1f;
-            terminal->utf8_remaining = 1;
-        } else if((byte & 0xf0) == 0xe0) {
-            terminal->utf8_codepoint = byte & 0x0f;
-            terminal->utf8_remaining = 2;
-        } else if((byte & 0xf8) == 0xf0) {
-            terminal->utf8_codepoint = byte & 0x07;
-            terminal->utf8_remaining = 3;
-        } else return rohr_terminal_codepoint_add(terminal, UINT32_C(0xfffd));
-        return true;
-    }
-    if((byte & 0xc0) != 0x80) {
-        terminal->utf8_remaining = 0;
-        return rohr_terminal_codepoint_add(terminal, UINT32_C(0xfffd));
-    }
-    terminal->utf8_codepoint = (terminal->utf8_codepoint << 6) | (byte & 0x3f);
-    terminal->utf8_remaining -= 1;
-    return terminal->utf8_remaining != 0 ||
-        rohr_terminal_codepoint_add(terminal, terminal->utf8_codepoint);
-}
-
 RohrTerminalResult rohr_terminal_create(RohrTerminal **output,
         const RohrTerminalConfig *config) {
-    RohrTerminalConfig defaults;
+    RohrTerminalConfig value = config == NULL ?
+        rohr_terminal_config_default_get() : *config;
+    RohrTerminalEmulatorConfig emulator_config;
     RohrTerminal *terminal;
     RohrTerminalResult result;
     if(output == NULL) return rohr_terminal_result_error(
         ROHR_TERMINAL_ERROR_INVALID_ARGUMENT, "terminal output pointer is null");
     *output = NULL;
-    defaults = config == NULL ? rohr_terminal_config_default_get() : *config;
-    if(defaults.scrollback_lines == 0) defaults.scrollback_lines =
+    if(value.scrollback_lines == 0) value.scrollback_lines =
         ROHR_TERMINAL_DEFAULT_SCROLLBACK_LINES;
-    if(defaults.columns == 0) defaults.columns = 120;
-    if(defaults.rows == 0) defaults.rows = 30;
+    if(value.columns == 0) value.columns = 120;
+    if(value.rows == 0) value.rows = 30;
     terminal = calloc(1, sizeof(*terminal));
     if(terminal == NULL) return rohr_terminal_result_error(
         ROHR_TERMINAL_ERROR_ALLOCATION_FAILED, "terminal allocation failed");
-    terminal->lines = calloc(defaults.scrollback_lines, sizeof(*terminal->lines));
-    if(terminal->lines == NULL) {
-        free(terminal);
-        return rohr_terminal_result_error(
-            ROHR_TERMINAL_ERROR_ALLOCATION_FAILED, "terminal scrollback allocation failed");
-    }
     terminal->platform_handle = -1;
     terminal->process_handle = -1;
-    terminal->line_capacity = defaults.scrollback_lines;
-    terminal->foreground = ROHR_TERMINAL_COLOR_DEFAULT_FOREGROUND;
-    terminal->background = ROHR_TERMINAL_COLOR_DEFAULT_BACKGROUND;
     terminal->exit_code = -1;
-    terminal->rows = defaults.rows;
-    terminal->cursor_visible = true;
-    (void)rohr_terminal_line_start(terminal);
-    result = rohr_terminal_platform_start(terminal, &defaults);
+    emulator_config = (RohrTerminalEmulatorConfig){
+        .scrollback_lines = value.scrollback_lines,
+        .columns = value.columns,
+        .rows = value.rows
+    };
+    result = rohr_terminal_emulator_create(&terminal->emulator, &emulator_config);
+    if(!result.success) {
+        free(terminal);
+        return result;
+    }
+    result = rohr_terminal_platform_start(terminal, &value);
     if(!result.success) {
         rohr_terminal_destroy(terminal);
         return result;
@@ -311,12 +77,9 @@ RohrTerminalResult rohr_terminal_update(RohrTerminal *terminal) {
             terminal, buffer, sizeof(buffer), &count);
         if(!result.success) return result;
         if(count == 0) break;
-        for(size_t i = 0; i < count; i += 1) {
-            if(!rohr_terminal_byte_add(terminal, (uint8_t)buffer[i]))
-                return rohr_terminal_result_error(
-                    ROHR_TERMINAL_ERROR_ALLOCATION_FAILED,
-                    "terminal output line allocation failed");
-        }
+        result = rohr_terminal_emulator_output_write(
+            terminal->emulator, buffer, count);
+        if(!result.success) return result;
     }
     rohr_terminal_platform_status_update(terminal);
     return rohr_terminal_result_value();
@@ -343,24 +106,19 @@ int rohr_terminal_exit_code_get(const RohrTerminal *terminal) {
 }
 
 size_t rohr_terminal_line_count_get(const RohrTerminal *terminal) {
-    return terminal == NULL ? 0 : terminal->line_count;
+    return terminal == NULL ? 0 :
+        rohr_terminal_emulator_line_count_get(terminal->emulator);
 }
 
 RohrTerminalLineView rohr_terminal_line_get(const RohrTerminal *terminal,
         size_t index) {
-    const RohrTerminalLine *line;
-    if(terminal == NULL || index >= terminal->line_count) return (RohrTerminalLineView){0};
-    line = &terminal->lines[(terminal->line_first + index) % terminal->line_capacity];
-    return (RohrTerminalLineView){.cells = line->cells, .cell_count = line->count};
+    return terminal == NULL ? (RohrTerminalLineView){0} :
+        rohr_terminal_emulator_line_get(terminal->emulator, index);
 }
 
 RohrTerminalCursor rohr_terminal_cursor_get(const RohrTerminal *terminal) {
-    if(terminal == NULL) return (RohrTerminalCursor){0};
-    return (RohrTerminalCursor){
-        .line_index = terminal->cursor_line,
-        .column = terminal->cursor_column,
-        .visible = terminal->cursor_visible
-    };
+    return terminal == NULL ? (RohrTerminalCursor){0} :
+        rohr_terminal_emulator_cursor_get(terminal->emulator);
 }
 
 const char *rohr_terminal_error_message_get(const RohrTerminalResult *result) {
@@ -370,8 +128,6 @@ const char *rohr_terminal_error_message_get(const RohrTerminalResult *result) {
 void rohr_terminal_destroy(RohrTerminal *terminal) {
     if(terminal == NULL) return;
     rohr_terminal_platform_destroy(terminal);
-    for(size_t i = 0; i < terminal->line_capacity; i += 1)
-        free(terminal->lines[i].cells);
-    free(terminal->lines);
+    rohr_terminal_emulator_destroy(terminal->emulator);
     free(terminal);
 }

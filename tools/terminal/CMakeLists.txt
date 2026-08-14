@@ -4,6 +4,7 @@ if(UNIX)
 endif()
 
 add_library(rohr_terminal STATIC
+    src/terminal_emulator.c
     src/terminal.c
     ${ROHR_TERMINAL_PLATFORM_SOURCE}
 )

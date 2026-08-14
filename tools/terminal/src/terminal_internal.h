@@ -22,6 +22,10 @@ struct RohrTerminal {
     intptr_t process_handle;
     bool running;
     int exit_code;
+    RohrTerminalEmulator *emulator;
+};
+
+struct RohrTerminalEmulator {
     RohrTerminalLine *lines;
     size_t line_capacity;
     size_t line_count;
@@ -29,6 +33,7 @@ struct RohrTerminal {
     size_t cursor_line;
     size_t cursor_column;
     uint16_t rows;
+    uint16_t columns;
     bool cursor_visible;
     uint32_t foreground;
     uint32_t background;

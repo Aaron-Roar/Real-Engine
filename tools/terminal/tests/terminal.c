@@ -22,6 +22,45 @@ static bool terminal_line_contains(const RohrTerminal *terminal, const char *tex
     return false;
 }
 
+static bool emulator_line_equals(const RohrTerminalEmulator *emulator,
+        size_t index, const char *text) {
+    RohrTerminalLineView line = rohr_terminal_emulator_line_get(emulator, index);
+    size_t length = strlen(text);
+    if(line.cell_count != length) return false;
+    for(size_t i = 0; i < length; i += 1) {
+        if(line.cells[i].codepoint != (unsigned char)text[i]) return false;
+    }
+    return true;
+}
+
+static bool emulator_test(void) {
+    RohrTerminalEmulator *emulator = NULL;
+    RohrTerminalEmulatorConfig config =
+        rohr_terminal_emulator_config_default_get();
+    RohrTerminalResult result;
+    const char output[] =
+        "abcdef\r\033[3C\033[KXYZ\n"
+        "123456\r\033[2C\033[2P\n"
+        "abcdef\r\033[2C\033[2X\n"
+        "abcd\r\033[2C\033[2@XY\n";
+    config.scrollback_lines = 16;
+    config.columns = 80;
+    config.rows = 8;
+    result = rohr_terminal_emulator_create(&emulator, &config);
+    if(!result.success) return false;
+    result = rohr_terminal_emulator_output_write(
+        emulator, output, sizeof(output) - 1);
+    if(!result.success || !emulator_line_equals(emulator, 0, "abcXYZ") ||
+            !emulator_line_equals(emulator, 1, "1256") ||
+            !emulator_line_equals(emulator, 2, "ab  ef") ||
+            !emulator_line_equals(emulator, 3, "abXYcd")) {
+        rohr_terminal_emulator_destroy(emulator);
+        return false;
+    }
+    rohr_terminal_emulator_destroy(emulator);
+    return true;
+}
+
 int main(void) {
     RohrTerminal *terminal = NULL;
     RohrTerminalConfig config = rohr_terminal_config_default_get();
@@ -31,6 +70,7 @@ int main(void) {
         "pwd; printf '\\033[?25l\\033[4G'; exit 7\n";
     struct timespec delay = {.tv_nsec = 10000000};
 
+    if(!emulator_test()) return 1;
     config.shell = "/bin/sh";
     config.working_directory = "/tmp";
     config.scrollback_lines = 16;

@@ -8,6 +8,7 @@
 #define ROHR_TERMINAL_DEFAULT_SCROLLBACK_LINES 5000
 
 typedef struct RohrTerminal RohrTerminal;
+typedef struct RohrTerminalEmulator RohrTerminalEmulator;
 
 typedef enum RohrTerminalError {
     ROHR_TERMINAL_ERROR_NONE = 0,
@@ -53,6 +54,25 @@ typedef struct RohrTerminalCursor {
     size_t column;
     bool visible;
 } RohrTerminalCursor;
+
+typedef struct RohrTerminalEmulatorConfig {
+    size_t scrollback_lines;
+    uint16_t columns;
+    uint16_t rows;
+} RohrTerminalEmulatorConfig;
+
+RohrTerminalEmulatorConfig rohr_terminal_emulator_config_default_get(void);
+RohrTerminalResult rohr_terminal_emulator_create(RohrTerminalEmulator **emulator,
+    const RohrTerminalEmulatorConfig *config);
+RohrTerminalResult rohr_terminal_emulator_output_write(
+    RohrTerminalEmulator *emulator, const char *output, size_t length);
+size_t rohr_terminal_emulator_line_count_get(
+    const RohrTerminalEmulator *emulator);
+RohrTerminalLineView rohr_terminal_emulator_line_get(
+    const RohrTerminalEmulator *emulator, size_t index);
+RohrTerminalCursor rohr_terminal_emulator_cursor_get(
+    const RohrTerminalEmulator *emulator);
+void rohr_terminal_emulator_destroy(RohrTerminalEmulator *emulator);
 
 RohrTerminalConfig rohr_terminal_config_default_get(void);
 RohrTerminalResult rohr_terminal_create(RohrTerminal **terminal,
