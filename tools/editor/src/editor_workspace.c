@@ -561,24 +561,35 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
             }
             for(size_t area_index = 0; area_index < body->area_count; area_index += 1) {
                 const EditorSoftArea *area = &body->areas[area_index];
-                const EditorSoftNode *node_a = editor_workspace_soft_node_get(body, area->node_a);
-                const EditorSoftNode *node_b = editor_workspace_soft_node_get(body, area->node_b);
-                const EditorSoftNode *node_c = editor_workspace_soft_node_get(body, area->node_c);
-                if(node_a == NULL || node_b == NULL || node_c == NULL) continue;
-                fprintf(source,
-                    "    { EntityResult created = rohr_physics_soft_body_triangle_create("
-                    "object->%s, object->%s, object->%s, object->%s);\n"
-                    "      if(rohr_error_check(created)) { result = rohr_error_result_error("
-                    "created.result.error); goto fail; }\n"
-                    "      object->%s = created.result.value; }\n",
-                    body->name, node_a->name, node_b->name, node_c->name, area->name);
-                if(area->color_overridden) {
+                uint32_t triangles[EDITOR_SOFT_AREA_NODE_MAX - 2][3];
+                size_t triangle_count = editor_project_soft_area_triangulate(
+                    body, area, triangles, EDITOR_SOFT_AREA_NODE_MAX - 2);
+                for(size_t triangle = 0; triangle < triangle_count; triangle += 1) {
+                    const EditorSoftNode *node_a = editor_workspace_soft_node_get(
+                        body, area->nodes[triangles[triangle][0]]);
+                    const EditorSoftNode *node_b = editor_workspace_soft_node_get(
+                        body, area->nodes[triangles[triangle][1]]);
+                    const EditorSoftNode *node_c = editor_workspace_soft_node_get(
+                        body, area->nodes[triangles[triangle][2]]);
+                    if(node_a == NULL || node_b == NULL || node_c == NULL) continue;
                     fprintf(source,
-                        "    result = rohr_graphics_soft_body_area_color_set(object->%s, "
-                        "object->%s, object->%s, object->%s, "
-                        "rohr_graphics_color_hex_create(UINT32_C(0x%08x)));\n"
-                        "    if(rohr_error_check(result)) goto fail;\n",
-                        body->name, node_a->name, node_b->name, node_c->name, area->color);
+                        "    { EntityResult created = rohr_physics_soft_body_triangle_create("
+                        "object->%s, object->%s, object->%s, object->%s);\n"
+                        "      if(rohr_error_check(created)) { result = rohr_error_result_error("
+                        "created.result.error); goto fail; }\n",
+                        body->name, node_a->name, node_b->name, node_c->name);
+                    if(triangle == 0) fprintf(source,
+                        "      object->%s = created.result.value; }\n", area->name);
+                    else fprintf(source, "    }\n");
+                    if(area->color_overridden) {
+                        fprintf(source,
+                            "    result = rohr_graphics_soft_body_area_color_set(object->%s, "
+                            "object->%s, object->%s, object->%s, "
+                            "rohr_graphics_color_hex_create(UINT32_C(0x%08x)));\n"
+                            "    if(rohr_error_check(result)) goto fail;\n",
+                            body->name, node_a->name, node_b->name, node_c->name,
+                            area->color);
+                    }
                 }
             }
             for(size_t node_index = 0; node_index < body->node_count; node_index += 1) {

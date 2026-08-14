@@ -130,8 +130,10 @@ written to JSON, and recomputed during generation to prevent stale output.
 - Parent removal owns removal of its children.
 - Anchors are independent object children and are referenced by joints.
 - Joints do not own anchors and therefore do not implicitly delete them.
-- Soft areas are derived from node/beam topology and are synchronized after
-  topology changes.
+- Soft areas are bounded faces derived from the planar node/beam graph and are
+  synchronized after topology changes. Ordered boundaries preserve separate
+  cross-section faces; ear-clipping produces runtime triangles without changing
+  the editor-level area.
 - Generated source owns no editor data; it materializes runtime entities only.
 
 ## Extending the editor
@@ -147,4 +149,3 @@ When adding an authored property:
 
 Keep editor-only concepts out of the public engine API unless a game can use the
 same concept independently of the editor.
-

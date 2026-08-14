@@ -15,8 +15,9 @@
 #define EDITOR_SOFT_NODE_MAX 64
 #define EDITOR_SOFT_BEAM_MAX 128
 #define EDITOR_SOFT_AREA_MAX 128
+#define EDITOR_SOFT_AREA_NODE_MAX EDITOR_SOFT_NODE_MAX
 #define EDITOR_COLLISION_MASK_MAX 64
-#define EDITOR_PROJECT_FORMAT_VERSION 4
+#define EDITOR_PROJECT_FORMAT_VERSION 5
 
 typedef uint32_t EditorObjectId;
 typedef uint32_t EditorVertexId;
@@ -143,9 +144,8 @@ typedef struct EditorSoftBeam {
 typedef struct EditorSoftArea {
     EditorSoftAreaId id;
     char name[EDITOR_OBJECT_NAME_MAX];
-    EditorSoftNodeId node_a;
-    EditorSoftNodeId node_b;
-    EditorSoftNodeId node_c;
+    EditorSoftNodeId nodes[EDITOR_SOFT_AREA_NODE_MAX];
+    size_t node_count;
     uint32_t color;
     bool color_overridden;
     bool visible;
@@ -268,5 +268,7 @@ EditorSoftBeam *editor_project_soft_beam_add(EditorProject *project, EditorSoftB
 bool editor_project_soft_beam_remove(EditorProject *project, EditorSoftBody *body,
     EditorSoftBeamId id);
 void editor_project_soft_areas_sync(EditorProject *project, EditorSoftBody *body);
+size_t editor_project_soft_area_triangulate(const EditorSoftBody *body,
+    const EditorSoftArea *area, uint32_t triangles[][3], size_t capacity);
 
 #endif

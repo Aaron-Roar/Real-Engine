@@ -215,11 +215,12 @@ static yyjson_mut_val *editor_json_soft_body_write(yyjson_mut_doc *document,
     for(size_t i = 0; i < body->area_count; i += 1) {
         const EditorSoftArea *area = &body->areas[i];
         yyjson_mut_val *item = yyjson_mut_obj(document);
+        yyjson_mut_val *area_nodes = yyjson_mut_arr(document);
         yyjson_mut_obj_add_uint(document, item, "id", area->id);
         yyjson_mut_obj_add_strcpy(document, item, "name", area->name);
-        yyjson_mut_obj_add_uint(document, item, "node_a", area->node_a);
-        yyjson_mut_obj_add_uint(document, item, "node_b", area->node_b);
-        yyjson_mut_obj_add_uint(document, item, "node_c", area->node_c);
+        for(size_t node_index = 0; node_index < area->node_count; node_index += 1)
+            yyjson_mut_arr_add_uint(document, area_nodes, area->nodes[node_index]);
+        yyjson_mut_obj_add_val(document, item, "nodes", area_nodes);
         yyjson_mut_obj_add_uint(document, item, "color", area->color);
         yyjson_mut_obj_add_bool(document, item, "color_overridden", area->color_overridden);
         yyjson_mut_obj_add_bool(document, item, "visible", area->visible);
@@ -532,23 +533,35 @@ static bool editor_json_soft_body_read(yyjson_val *value, EditorSoftBody *body,
         body->area_count = yyjson_arr_size(areas);
         for(size_t i = 0; i < body->area_count; i += 1) {
             yyjson_val *item = yyjson_arr_get(areas, i);
+            yyjson_val *area_nodes = yyjson_obj_get(item, "nodes");
             EditorSoftArea *area = &body->areas[i];
             if(!yyjson_is_obj(item) || !editor_json_uint(item, "id", &area->id) ||
                     area->id == 0 || !editor_json_name(item, area->name) ||
-                    !editor_json_uint(item, "node_a", &area->node_a) ||
-                    !editor_json_uint(item, "node_b", &area->node_b) ||
-                    !editor_json_uint(item, "node_c", &area->node_c) ||
                     !editor_json_uint(item, "color", &area->color) ||
                     !editor_json_bool(item, "color_overridden", &area->color_overridden) ||
                     !editor_json_bool(item, "visible", &area->visible)) return false;
+            if(area_nodes != NULL) {
+                if(!yyjson_is_arr(area_nodes) || yyjson_arr_size(area_nodes) < 3 ||
+                        yyjson_arr_size(area_nodes) > EDITOR_SOFT_AREA_NODE_MAX) return false;
+                area->node_count = yyjson_arr_size(area_nodes);
+                for(size_t node_index = 0; node_index < area->node_count; node_index += 1) {
+                    yyjson_val *node = yyjson_arr_get(area_nodes, node_index);
+                    if(!yyjson_is_uint(node) || yyjson_get_uint(node) > UINT32_MAX) return false;
+                    area->nodes[node_index] = (EditorSoftNodeId)yyjson_get_uint(node);
+                }
+            } else {
+                area->node_count = 3;
+                if(!editor_json_uint(item, "node_a", &area->nodes[0]) ||
+                        !editor_json_uint(item, "node_b", &area->nodes[1]) ||
+                        !editor_json_uint(item, "node_c", &area->nodes[2])) return false;
+            }
             editor_project_property_name_format(area->name, sizeof(area->name), area->name);
             if(project->next_soft_area_id <= area->id) {
                 project->next_soft_area_id = area->id + 1;
             }
         }
-    } else {
-        editor_project_soft_areas_sync(project, body);
     }
+    editor_project_soft_areas_sync(project, body);
     if(project->next_soft_body_id <= body->id) project->next_soft_body_id = body->id + 1;
     return true;
 }

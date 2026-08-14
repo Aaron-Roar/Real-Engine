@@ -668,15 +668,11 @@ static EditorSoftArea *editor_selected_soft_area_get(EditorSoftBody *body,
 
 static EditorSoftBeam *editor_soft_area_beam_get(EditorSoftBody *body,
         const EditorSoftArea *area, size_t edge) {
-    EditorSoftNodeId nodes[3];
     EditorSoftNodeId a;
     EditorSoftNodeId b;
-    if(body == NULL || area == NULL || edge >= 3) return NULL;
-    nodes[0] = area->node_a;
-    nodes[1] = area->node_b;
-    nodes[2] = area->node_c;
-    a = nodes[edge];
-    b = nodes[(edge + 1) % 3];
+    if(body == NULL || area == NULL || edge >= area->node_count) return NULL;
+    a = area->nodes[edge];
+    b = area->nodes[(edge + 1) % area->node_count];
     for(size_t i = 0; i < body->beam_count; i += 1) {
         if((body->beams[i].node_a == a && body->beams[i].node_b == b) ||
                 (body->beams[i].node_a == b && body->beams[i].node_b == a)) {
@@ -3038,7 +3034,7 @@ int main(void) {
                 {
                     bool inherit = true;
                     float field_width = fmaxf(34.0f, EDITOR_TOOLS_WIDTH - 196.0f);
-                    for(size_t edge = 0; edge < 3; edge += 1) {
+                    for(size_t edge = 0; edge < area->node_count; edge += 1) {
                         EditorSoftBeam *beam = editor_soft_area_beam_get(body, area, edge);
                         if(beam != NULL && beam->color_overridden) inherit = false;
                     }
@@ -3048,7 +3044,7 @@ int main(void) {
                             &inherit_label, (UIRect){EDITOR_VIEWPORT_WIDTH +
                                 EDITOR_TOOLS_WIDTH - 92.0f,
                                 controls_y, 82.0f, 26.0f}, &inherit)) {
-                        for(size_t edge = 0; edge < 3; edge += 1) {
+                        for(size_t edge = 0; edge < area->node_count; edge += 1) {
                             EditorSoftBeam *beam = editor_soft_area_beam_get(body, area, edge);
                             if(beam == NULL) continue;
                             beam->color_overridden = !inherit;
@@ -3061,7 +3057,7 @@ int main(void) {
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, controls_y,
                             field_width, 26.0f});
                     if(!inherit && color_picker.target == &boundary_beam_color) {
-                        for(size_t edge = 0; edge < 3; edge += 1) {
+                        for(size_t edge = 0; edge < area->node_count; edge += 1) {
                             EditorSoftBeam *beam = editor_soft_area_beam_get(body, area, edge);
                             if(beam == NULL) continue;
                             beam->color = boundary_beam_color;
@@ -3070,7 +3066,7 @@ int main(void) {
                     }
                 }
                 controls_y += 36.0f;
-                for(size_t edge = 0; edge < 3; edge += 1) {
+                for(size_t edge = 0; edge < area->node_count; edge += 1) {
                     EditorSoftBeam *beam = editor_soft_area_beam_get(body, area, edge);
                     UIButtonStyle selected_style = editor_selected_button_style_get();
                     char id[64];

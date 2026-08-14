@@ -158,9 +158,15 @@ Soft bodies own nodes and beams. Nodes provide mass, radius, friction,
 restitution, gravity, particle collision filters, and color overrides. Beams
 provide stiffness, damping, endpoints, and color overrides.
 
-Three mutually connected nodes generate a triangular area automatically. Areas
-may override the parent area color and their boundary beams may override the
-parent beam color. When **Inherit** is selected, the local color control is
+Closed node-and-beam loops generate colorable areas automatically. A hexagonal
+loop becomes one area; cross-section beams divide an enclosure into multiple
+independently selectable areas. Beam crossings without nodes are not topology
+and do not divide an area. Concave areas are triangulated internally for drawing
+and generated runtime physics, while the editor preserves one boundary and one
+color setting for the complete area.
+
+Areas may override the parent area color and their boundary beams may override
+the parent beam color. When **Inherit** is selected, the local color control is
 disabled and follows the soft-body color.
 
 Dragging any node, beam, or filled area while in the soft-body editor translates

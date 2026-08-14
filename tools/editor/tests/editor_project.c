@@ -519,6 +519,40 @@ int main(void) {
                     "upper_edge") != 0) return 1;
     }
 
+    {
+        static EditorProject topology_project;
+        EditorObject *topology_object;
+        EditorSoftBody *topology_body;
+        EditorSoftNode *nodes[6];
+        const Position node_positions[6] = {
+            {20.0f, 0.0f}, {10.0f, 17.0f}, {-10.0f, 17.0f},
+            {-20.0f, 0.0f}, {-10.0f, -17.0f}, {10.0f, -17.0f}
+        };
+        uint32_t triangles[EDITOR_SOFT_AREA_NODE_MAX - 2][3];
+        editor_project_init(&topology_project);
+        topology_object = editor_project_object_add(&topology_project, (Position){0});
+        topology_body = editor_project_soft_body_add(&topology_project, topology_object);
+        if(topology_object == NULL || topology_body == NULL) return 1;
+        for(size_t i = 0; i < 6; i += 1) {
+            nodes[i] = editor_project_soft_node_add(
+                &topology_project, topology_body, node_positions[i]);
+            if(nodes[i] == NULL) return 1;
+        }
+        for(size_t i = 0; i < 6; i += 1) {
+            if(editor_project_soft_beam_add(&topology_project, topology_body,
+                    nodes[i]->id, nodes[(i + 1) % 6]->id) == NULL) return 1;
+        }
+        if(topology_body->area_count != 1 || topology_body->areas[0].node_count != 6 ||
+                editor_project_soft_area_triangulate(topology_body,
+                    &topology_body->areas[0], triangles,
+                    EDITOR_SOFT_AREA_NODE_MAX - 2) != 4) return 1;
+        if(editor_project_soft_beam_add(&topology_project, topology_body,
+                nodes[0]->id, nodes[3]->id) == NULL ||
+                topology_body->area_count != 2 ||
+                topology_body->areas[0].node_count != 4 ||
+                topology_body->areas[1].node_count != 4) return 1;
+    }
+
     editor_project_selection_clear(&project);
     if(editor_project_selected_get(&project) != NULL ||
             !editor_project_object_select(&project, object->id) ||
