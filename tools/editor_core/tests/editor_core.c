@@ -327,7 +327,11 @@ static int property_commands_test(void) {
             .property = EDITOR_PROPERTY_RESTITUTION,
             .value_kind = EDITOR_PROPERTY_VALUE_FLOAT,
             .value.number = 2.0f}};
-    if(editor_command_execute(&project, &command).kind != ERROR_RESULT_ERROR) return 1;
+    {
+        float restitution = rigid_body->restitution;
+        if(editor_command_execute(&project, &command).kind != ERROR_RESULT_ERROR ||
+                rigid_body->restitution != restitution) return 1;
+    }
     return 0;
 }
 

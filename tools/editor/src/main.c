@@ -1329,13 +1329,15 @@ int main(void) {
             if(body != NULL) {
                 size_t body_index = (size_t)(body - selected->rigid_bodies);
                 UIFieldResult name_result;
+                char edited_name[EDITOR_OBJECT_NAME_MAX];
+                snprintf(edited_name, sizeof(edited_name), "%s", body->name);
                 if(!editor_named_text_sync(&font, body->name,
                         &rigid_body_labels[body_index], rigid_body_cache[body_index],
                         EDITOR_OBJECT_NAME_MAX)) goto fail;
                 rohr_ui_label(&name_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f,
                     42.0f, 48.0f, 30.0f});
                 name_result = editor_property_name_field("editor.rigid_body.name",
-                    body->name, sizeof(body->name), &rigid_body_labels[body_index],
+                    edited_name, sizeof(edited_name), &rigid_body_labels[body_index],
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 88.0f, 42.0f,
                         EDITOR_TOOLS_WIDTH - 96.0f, 30.0f});
                 if(name_result.changed) {
@@ -1343,7 +1345,7 @@ int main(void) {
                         .data.item_rename = {.kind = EDITOR_ITEM_RIGID_BODY,
                             .object = selected->id, .item = body->id}};
                     snprintf(command.data.item_rename.name,
-                        sizeof(command.data.item_rename.name), "%s", body->name);
+                        sizeof(command.data.item_rename.name), "%s", edited_name);
                     (void)editor_command_execute(&project, &command);
                 }
                 (void)editor_visibility_toggle("editor.rigid_body.visibility",
@@ -1353,20 +1355,25 @@ int main(void) {
                 rohr_ui_label(&x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     80.0f, 24.0f, 26.0f});
                 {
+                    Position edited_position = body->position;
+                    float edited_rotation = body->rotation;
                     UIFieldResult x_result = rohr_ui_field("editor.rigid_body.x",
-                        (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &body->position.x},
+                        (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                            .number = &edited_position.x},
                         &x_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 34.0f, 80.0f,
                             EDITOR_TOOLS_WIDTH - 44.0f, 26.0f}, NULL);
                     rohr_ui_label(&y_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         112.0f, 24.0f, 26.0f});
                     UIFieldResult y_result = rohr_ui_field("editor.rigid_body.y",
-                        (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &body->position.y},
+                        (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                            .number = &edited_position.y},
                         &y_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 34.0f, 112.0f,
                             EDITOR_TOOLS_WIDTH - 44.0f, 26.0f}, NULL);
                     rohr_ui_label(&rotation_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         144.0f, 76.0f, 26.0f});
                     UIFieldResult rotation_result = rohr_ui_field("editor.rigid_body.rotation",
-                        (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &body->rotation},
+                        (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                            .number = &edited_rotation},
                         &length_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 86.0f, 144.0f,
                             EDITOR_TOOLS_WIDTH - 96.0f, 26.0f}, NULL);
                     field_editing = name_result.active || x_result.active || y_result.active ||
@@ -1374,59 +1381,63 @@ int main(void) {
                     if(x_result.changed || y_result.changed || rotation_result.changed) {
                         EditorCommand command = {.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
                             .data.rigid_body_transform = {selected->id, body->id,
-                                body->position, body->rotation}};
+                                edited_position, edited_rotation}};
                         (void)editor_command_execute(&project, &command);
                     }
                 }
                 rohr_ui_label(&mass_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     180.0f, 76.0f, 26.0f});
                 {
+                    float edited_value = body->mass_value;
                     UIFieldResult result = rohr_ui_field("editor.rigid_body.mass",
                         (UIFieldBinding){.kind = UI_FIELD_FLOAT,
-                            .number = &body->mass_value},
+                            .number = &edited_value},
                         &length_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 86.0f, 180.0f,
                             EDITOR_TOOLS_WIDTH - 96.0f, 26.0f}, NULL);
-                    if(result.changed && body->mass_value < 0.0f) body->mass_value = 0.0f;
+                    if(result.changed && edited_value < 0.0f) edited_value = 0.0f;
                     if(result.changed) editor_property_float_set(&project,
                         EDITOR_ITEM_RIGID_BODY, selected->id, 0, body->id, 0,
-                        EDITOR_PROPERTY_MASS, body->mass_value);
+                        EDITOR_PROPERTY_MASS, edited_value);
                     field_editing = field_editing || result.active;
                 }
                 rohr_ui_label(&friction_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     212.0f, 76.0f, 26.0f});
                 {
+                    float edited_value = body->friction;
                     UIFieldResult result = rohr_ui_field("editor.rigid_body.friction",
-                        (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &body->friction},
+                        (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &edited_value},
                         &length_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 86.0f, 212.0f,
                             EDITOR_TOOLS_WIDTH - 96.0f, 26.0f}, NULL);
-                    if(result.changed && body->friction < 0.0f) body->friction = 0.0f;
+                    if(result.changed && edited_value < 0.0f) edited_value = 0.0f;
                     if(result.changed) editor_property_float_set(&project,
                         EDITOR_ITEM_RIGID_BODY, selected->id, 0, body->id, 0,
-                        EDITOR_PROPERTY_FRICTION, body->friction);
+                        EDITOR_PROPERTY_FRICTION, edited_value);
                     field_editing = field_editing || result.active;
                 }
                 rohr_ui_label(&restitution_label,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 244.0f, 96.0f, 26.0f});
                 {
+                    float edited_value = body->restitution;
                     UIFieldResult result = rohr_ui_field("editor.rigid_body.restitution",
                         (UIFieldBinding){.kind = UI_FIELD_FLOAT,
-                            .number = &body->restitution}, &length_field,
+                            .number = &edited_value}, &length_field,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 106.0f, 244.0f,
                             EDITOR_TOOLS_WIDTH - 116.0f, 26.0f}, NULL);
-                    if(result.changed) body->restitution =
-                        fminf(1.0f, fmaxf(0.0f, body->restitution));
+                    if(result.changed) edited_value =
+                        fminf(1.0f, fmaxf(0.0f, edited_value));
                     if(result.changed) editor_property_float_set(&project,
                         EDITOR_ITEM_RIGID_BODY, selected->id, 0, body->id, 0,
-                        EDITOR_PROPERTY_RESTITUTION, body->restitution);
+                        EDITOR_PROPERTY_RESTITUTION, edited_value);
                     field_editing = field_editing || result.active;
                 }
                 {
+                    bool edited = body->gravity_enabled;
                     if(editor_checkbox("editor.rigid_body.gravity", &gravity_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 276.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 28.0f},
-                        &body->gravity_enabled)) editor_property_bool_set(&project,
+                        &edited)) editor_property_bool_set(&project,
                             EDITOR_ITEM_RIGID_BODY, selected->id, 0, body->id, 0,
-                            EDITOR_PROPERTY_GRAVITY, body->gravity_enabled);
+                            EDITOR_PROPERTY_GRAVITY, edited);
                 }
                 {
                     const TextAsset *options[] = {&dynamic_label, &static_label};
@@ -1455,25 +1466,27 @@ int main(void) {
                     float row_width = EDITOR_TOOLS_WIDTH - 20.0f;
                     float controls_bottom = 404.0f;
 
+                    bool collision_enabled = body->collision_enabled;
                     if(editor_checkbox("editor.rigid_body.collision", &collision_label,
                             (UIRect){row_x, 372.0f, row_width * 0.52f, 28.0f},
-                            &body->collision_enabled)) {
+                            &collision_enabled)) {
                         editor_property_bool_set(&project, EDITOR_ITEM_RIGID_BODY,
                             selected->id, 0, body->id, 0, EDITOR_PROPERTY_COLLISION,
-                            body->collision_enabled);
-                        if(!body->collision_enabled) {
+                            collision_enabled);
+                        if(!collision_enabled) {
                             collision_category_open = false;
                             collide_with_open = false;
                         }
                     }
                     if(body->collision_enabled) {
+                        bool particle = body->particle;
                         if(editor_checkbox_label_left("editor.rigid_body.particle",
                             &particle_label,
                             (UIRect){row_x + row_width * 0.54f, 372.0f,
-                                row_width * 0.46f, 28.0f}, &body->particle))
+                                row_width * 0.46f, 28.0f}, &particle))
                             editor_property_bool_set(&project, EDITOR_ITEM_RIGID_BODY,
                                 selected->id, 0, body->id, 0,
-                                EDITOR_PROPERTY_PARTICLE, body->particle);
+                                EDITOR_PROPERTY_PARTICLE, particle);
                     }
                     if(body->collision_enabled && rohr_ui_button(
                             "editor.rigid_body.collision_category", &collision_category_label,
@@ -1616,13 +1629,15 @@ int main(void) {
             if(hitbox != NULL && body != NULL) {
                 size_t index = (size_t)(hitbox - body->hitboxes);
                 UIFieldResult name_result;
+                char edited_name[EDITOR_OBJECT_NAME_MAX];
+                snprintf(edited_name, sizeof(edited_name), "%s", hitbox->name);
                 if(!editor_named_text_sync(&font, hitbox->name,
                         &body_hitbox_labels[index], body_hitbox_cache[index],
                         EDITOR_OBJECT_NAME_MAX)) goto fail;
                 rohr_ui_label(&name_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f,
                     44.0f, 48.0f, 28.0f});
                 name_result = editor_property_name_field("editor.hitbox.name",
-                    hitbox->name, sizeof(hitbox->name), &body_hitbox_labels[index],
+                    edited_name, sizeof(edited_name), &body_hitbox_labels[index],
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 88.0f, 44.0f,
                         EDITOR_TOOLS_WIDTH - 96.0f, 28.0f});
                 field_editing = name_result.active;
@@ -1632,7 +1647,7 @@ int main(void) {
                             .object = selected->id, .parent = body->id,
                             .item = hitbox->id}};
                     snprintf(command.data.item_rename.name,
-                        sizeof(command.data.item_rename.name), "%s", hitbox->name);
+                        sizeof(command.data.item_rename.name), "%s", edited_name);
                     (void)editor_command_execute(&project, &command);
                 }
                 (void)editor_visibility_toggle("editor.hitbox.visibility",
@@ -1718,13 +1733,15 @@ int main(void) {
                 UISliderConfig slider = rohr_ui_slider_config_default_get();
                 UIFieldResult name_result;
                 uint32_t vertex_index = viewport_state.selected_vertex;
+                char edited_name[EDITOR_OBJECT_NAME_MAX];
+                snprintf(edited_name, sizeof(edited_name), "%s", vertex->name);
                 if(!editor_named_text_sync(&font, vertex->name,
                         &vertex_labels[vertex_index], vertex_name_cache[vertex_index],
                         EDITOR_OBJECT_NAME_MAX)) goto fail;
                 rohr_ui_label(&name_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     48.0f, 48.0f, 24.0f});
                 name_result = editor_property_name_field("editor.vertex.name",
-                    vertex->name, sizeof(vertex->name), &vertex_labels[vertex_index],
+                    edited_name, sizeof(edited_name), &vertex_labels[vertex_index],
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 56.0f, 48.0f,
                         EDITOR_TOOLS_WIDTH - 64.0f, 24.0f});
                 field_editing = name_result.active;
@@ -1734,7 +1751,7 @@ int main(void) {
                             .object = selected->id, .parent = body->id,
                             .item = hitbox->id, .index = vertex->id}};
                     snprintf(command.data.item_rename.name,
-                        sizeof(command.data.item_rename.name), "%s", vertex->name);
+                        sizeof(command.data.item_rename.name), "%s", edited_name);
                     (void)editor_command_execute(&project, &command);
                 }
                 if(rohr_ui_button("editor.vertex.lock",
@@ -1759,29 +1776,30 @@ int main(void) {
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 28.0f, 192.0f,
                             EDITOR_TOOLS_WIDTH - 38.0f, 24.0f});
                 } else {
+                    Position edited_position = vertex->position;
                     UIFieldResult x_result = rohr_ui_field("editor.vertex.x.field",
                         (UIFieldBinding){.kind = UI_FIELD_FLOAT,
-                            .number = &vertex->position.x}, &x_field,
+                            .number = &edited_position.x}, &x_field,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 28.0f, 122.0f,
                             EDITOR_TOOLS_WIDTH - 38.0f, 24.0f}, NULL);
                     UIFieldResult y_result = rohr_ui_field("editor.vertex.y.field",
                         (UIFieldBinding){.kind = UI_FIELD_FLOAT,
-                            .number = &vertex->position.y}, &y_field,
+                            .number = &edited_position.y}, &y_field,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 28.0f, 192.0f,
                             EDITOR_TOOLS_WIDTH - 38.0f, 24.0f}, NULL);
                     field_editing = name_result.active || x_result.active || y_result.active;
                     UISliderResult x_slider = rohr_ui_slider(
-                        "editor.vertex.x", vertex->position.x, &slider);
-                    vertex->position.x = x_slider.value;
+                        "editor.vertex.x", edited_position.x, &slider);
+                    edited_position.x = x_slider.value;
                     slider.center.y = 227.0f;
                     UISliderResult y_slider = rohr_ui_slider(
-                        "editor.vertex.y", vertex->position.y, &slider);
-                    vertex->position.y = y_slider.value;
+                        "editor.vertex.y", edited_position.y, &slider);
+                    edited_position.y = y_slider.value;
                     if(x_result.changed || y_result.changed ||
                             x_slider.changed || y_slider.changed) {
                         EditorCommand command = {.type = EDITOR_COMMAND_VERTEX_POSITION,
                             .data.vertex_position = {selected->id, body->id, hitbox->id,
-                                vertex->id, vertex->position}};
+                                vertex->id, edited_position}};
                         (void)editor_command_execute(&project, &command);
                     }
                 }
@@ -1812,13 +1830,16 @@ int main(void) {
                 float length = editor_project_hitbox_line_length_get(hitbox, line);
                 UISliderConfig slider = rohr_ui_slider_config_default_get();
                 UIFieldResult name_result;
+                char edited_name[EDITOR_OBJECT_NAME_MAX];
+                snprintf(edited_name, sizeof(edited_name), "%s",
+                    hitbox->line_names[line]);
                 if(!editor_named_text_sync(&font, hitbox->line_names[line],
                         &line_labels[line], line_name_cache[line],
                         EDITOR_OBJECT_NAME_MAX)) goto fail;
                 rohr_ui_label(&name_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     48.0f, 48.0f, 24.0f});
                 name_result = editor_property_name_field("editor.line.name",
-                    hitbox->line_names[line], sizeof(hitbox->line_names[line]),
+                    edited_name, sizeof(edited_name),
                     &line_labels[line], (UIRect){EDITOR_VIEWPORT_WIDTH + 56.0f,
                         48.0f, EDITOR_TOOLS_WIDTH - 64.0f, 24.0f});
                 field_editing = name_result.active;
@@ -1830,7 +1851,7 @@ int main(void) {
                             .item = hitbox->id, .index = line}};
                     snprintf(command.data.item_rename.name,
                         sizeof(command.data.item_rename.name), "%s",
-                        hitbox->line_names[line]);
+                        edited_name);
                     (void)editor_command_execute(&project, &command);
                 }
                 if(rohr_ui_button("editor.line.add_vertex", &add_vertex_label,
@@ -1910,12 +1931,14 @@ int main(void) {
                 UIFieldResult x_result;
                 UIFieldResult y_result;
                 UIFieldResult rotation_result;
+                char edited_name[EDITOR_OBJECT_NAME_MAX];
+                snprintf(edited_name, sizeof(edited_name), "%s", joint->name);
                 if(!editor_named_text_sync(&font, joint->name, &joint_labels[index],
                         joint_cache[index], EDITOR_OBJECT_NAME_MAX)) goto fail;
                 rohr_ui_label(&name_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f,
                     40.0f, 48.0f, 30.0f});
-                name_result = editor_property_name_field("editor.joint.name", joint->name,
-                    sizeof(joint->name), &joint_labels[index],
+                name_result = editor_property_name_field("editor.joint.name", edited_name,
+                    sizeof(edited_name), &joint_labels[index],
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 88.0f, 40.0f,
                         EDITOR_TOOLS_WIDTH - 96.0f, 30.0f});
                 field_editing = name_result.active;
@@ -1924,7 +1947,7 @@ int main(void) {
                         .data.item_rename = {.kind = EDITOR_ITEM_JOINT,
                             .object = selected->id, .item = joint->id}};
                     snprintf(command.data.item_rename.name,
-                        sizeof(command.data.item_rename.name), "%s", joint->name);
+                        sizeof(command.data.item_rename.name), "%s", edited_name);
                     (void)editor_command_execute(&project, &command);
                 }
                 rohr_ui_label(&visual_size_label,
@@ -2057,61 +2080,63 @@ int main(void) {
                     rohr_ui_label(&damping_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 442.0f, 76.0f, 26.0f});
                     {
+                        float edited_value = joint->damping;
                         UIFieldResult result = rohr_ui_field(
                             "editor.joint.revolute.damping",
                             (UIFieldBinding){.kind = UI_FIELD_FLOAT,
-                                .number = &joint->damping}, &length_field,
+                                .number = &edited_value}, &length_field,
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 86.0f, 442.0f,
                                 EDITOR_TOOLS_WIDTH - 96.0f, 26.0f}, NULL);
-                        if(result.changed && joint->damping < 0.0f) joint->damping = 0.0f;
+                        if(result.changed && edited_value < 0.0f) edited_value = 0.0f;
                         if(result.changed) editor_property_float_set(&project,
                             EDITOR_ITEM_JOINT, selected->id, 0, joint->id, 0,
-                            EDITOR_PROPERTY_DAMPING, joint->damping);
+                            EDITOR_PROPERTY_DAMPING, edited_value);
                         field_editing = field_editing || result.active;
                     }
                 } else if(joint->kind == EDITOR_JOINT_SPRING) {
                     rohr_ui_label(&rest_length_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 442.0f, 96.0f, 26.0f});
                     {
+                        float edited_value = joint->rest_length;
                         UIFieldResult result = rohr_ui_field("editor.joint.spring.rest_length",
                             (UIFieldBinding){.kind = UI_FIELD_FLOAT,
-                                .number = &joint->rest_length}, &length_field,
+                                .number = &edited_value}, &length_field,
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 106.0f, 442.0f,
                                 EDITOR_TOOLS_WIDTH - 116.0f, 26.0f}, NULL);
-                        if(result.changed && joint->rest_length < 0.0f) {
-                            joint->rest_length = 0.0f;
-                        }
+                        if(result.changed && edited_value < 0.0f) edited_value = 0.0f;
                         if(result.changed) editor_property_float_set(&project,
                             EDITOR_ITEM_JOINT, selected->id, 0, joint->id, 0,
-                            EDITOR_PROPERTY_REST_LENGTH, joint->rest_length);
+                            EDITOR_PROPERTY_REST_LENGTH, edited_value);
                         field_editing = field_editing || result.active;
                     }
                     rohr_ui_label(&stiffness_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 474.0f, 90.0f, 26.0f});
                     {
+                        float edited_value = joint->stiffness;
                         UIFieldResult result = rohr_ui_field("editor.joint.spring.stiffness",
                             (UIFieldBinding){.kind = UI_FIELD_FLOAT,
-                                .number = &joint->stiffness}, &length_field,
+                                .number = &edited_value}, &length_field,
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 474.0f,
                                 EDITOR_TOOLS_WIDTH - 110.0f, 26.0f}, NULL);
-                        if(result.changed && joint->stiffness < 0.0f) joint->stiffness = 0.0f;
+                        if(result.changed && edited_value < 0.0f) edited_value = 0.0f;
                         if(result.changed) editor_property_float_set(&project,
                             EDITOR_ITEM_JOINT, selected->id, 0, joint->id, 0,
-                            EDITOR_PROPERTY_STIFFNESS, joint->stiffness);
+                            EDITOR_PROPERTY_STIFFNESS, edited_value);
                         field_editing = field_editing || result.active;
                     }
                     rohr_ui_label(&damping_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 506.0f, 76.0f, 26.0f});
                     {
+                        float edited_value = joint->damping;
                         UIFieldResult result = rohr_ui_field("editor.joint.spring.damping",
                             (UIFieldBinding){.kind = UI_FIELD_FLOAT,
-                                .number = &joint->damping}, &length_field,
+                                .number = &edited_value}, &length_field,
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 86.0f, 506.0f,
                                 EDITOR_TOOLS_WIDTH - 96.0f, 26.0f}, NULL);
-                        if(result.changed && joint->damping < 0.0f) joint->damping = 0.0f;
+                        if(result.changed && edited_value < 0.0f) edited_value = 0.0f;
                         if(result.changed) editor_property_float_set(&project,
                             EDITOR_ITEM_JOINT, selected->id, 0, joint->id, 0,
-                            EDITOR_PROPERTY_DAMPING, joint->damping);
+                            EDITOR_PROPERTY_DAMPING, edited_value);
                         field_editing = field_editing || result.active;
                     }
                 }
@@ -2122,18 +2147,20 @@ int main(void) {
                         UIFieldResult x_result;
                         UIFieldResult y_result;
                         UIFieldResult rotation_result;
+                        Position edited_position = anchor->position;
+                        float edited_rotation = anchor->rotation;
                         rohr_ui_label(&x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                             442.0f, 24.0f, 26.0f});
                         x_result = rohr_ui_field("editor.anchor.x",
                             (UIFieldBinding){.kind = UI_FIELD_FLOAT,
-                                .number = &anchor->position.x}, &x_field,
+                                .number = &edited_position.x}, &x_field,
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 34.0f, 442.0f,
                                 EDITOR_TOOLS_WIDTH - 44.0f, 26.0f}, NULL);
                         rohr_ui_label(&y_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                             476.0f, 24.0f, 26.0f});
                         y_result = rohr_ui_field("editor.anchor.y",
                             (UIFieldBinding){.kind = UI_FIELD_FLOAT,
-                                .number = &anchor->position.y}, &y_field,
+                                .number = &edited_position.y}, &y_field,
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 34.0f, 476.0f,
                                 EDITOR_TOOLS_WIDTH - 44.0f, 26.0f}, NULL);
                         field_editing = x_result.active || y_result.active;
@@ -2174,14 +2201,14 @@ int main(void) {
                                 76.0f, 26.0f});
                         rotation_result = rohr_ui_field("editor.anchor.rotation",
                             (UIFieldBinding){.kind = UI_FIELD_FLOAT,
-                                .number = &anchor->rotation}, &length_field,
+                                .number = &edited_rotation}, &length_field,
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 86.0f, 544.0f,
                                 EDITOR_TOOLS_WIDTH - 96.0f, 26.0f}, NULL);
                         field_editing = field_editing || rotation_result.active;
                         if(x_result.changed || y_result.changed || rotation_result.changed) {
                             EditorCommand command = {.type = EDITOR_COMMAND_ANCHOR_TRANSFORM,
                                 .data.anchor_transform = {selected->id, anchor->id,
-                                    anchor->position, anchor->rotation}};
+                                    edited_position, edited_rotation}};
                             (void)editor_command_execute(&project, &command);
                         }
                         {
@@ -2233,13 +2260,17 @@ int main(void) {
                 UIFieldResult y_result;
                 UIFieldResult rotation_result;
                 UIFieldResult name_result;
+                Position edited_position = anchor->position;
+                float edited_rotation = anchor->rotation;
+                char edited_name[EDITOR_OBJECT_NAME_MAX];
+                snprintf(edited_name, sizeof(edited_name), "%s", anchor->name);
                 if(!editor_named_text_sync(&font, anchor->name,
                         &anchor_labels[anchor_index], anchor_cache[anchor_index],
                         EDITOR_OBJECT_NAME_MAX)) goto fail;
                 rohr_ui_label(&name_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f,
                     42.0f, 48.0f, 30.0f});
-                name_result = editor_property_name_field("editor.anchor.name", anchor->name,
-                    sizeof(anchor->name), &anchor_labels[anchor_index],
+                name_result = editor_property_name_field("editor.anchor.name", edited_name,
+                    sizeof(edited_name), &anchor_labels[anchor_index],
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 88.0f, 42.0f,
                         EDITOR_TOOLS_WIDTH - 96.0f, 30.0f});
                 if(name_result.changed) {
@@ -2247,7 +2278,7 @@ int main(void) {
                         .data.item_rename = {.kind = EDITOR_ITEM_ANCHOR,
                             .object = selected->id, .item = anchor->id}};
                     snprintf(command.data.item_rename.name,
-                        sizeof(command.data.item_rename.name), "%s", anchor->name);
+                        sizeof(command.data.item_rename.name), "%s", edited_name);
                     (void)editor_command_execute(&project, &command);
                 }
                 (void)editor_visibility_toggle("editor.anchor.visibility",
@@ -2258,20 +2289,20 @@ int main(void) {
                     90.0f, 24.0f, 26.0f});
                 x_result = rohr_ui_field("editor.anchor.x",
                     (UIFieldBinding){.kind = UI_FIELD_FLOAT,
-                        .number = &anchor->position.x}, &x_field,
+                        .number = &edited_position.x}, &x_field,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 34.0f, 90.0f,
                         EDITOR_TOOLS_WIDTH - 44.0f, 26.0f}, NULL);
                 rohr_ui_label(&y_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     124.0f, 24.0f, 26.0f});
                 y_result = rohr_ui_field("editor.anchor.y",
                     (UIFieldBinding){.kind = UI_FIELD_FLOAT,
-                        .number = &anchor->position.y}, &y_field,
+                        .number = &edited_position.y}, &y_field,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 34.0f, 124.0f,
                         EDITOR_TOOLS_WIDTH - 44.0f, 26.0f}, NULL);
                 if(x_result.changed || y_result.changed) {
                     EditorCommand command = {.type = EDITOR_COMMAND_ANCHOR_TRANSFORM,
                         .data.anchor_transform = {selected->id, anchor->id,
-                            anchor->position, anchor->rotation}};
+                            edited_position, edited_rotation}};
                     (void)editor_command_execute(&project, &command);
                 }
                 rohr_ui_label(&rigid_body_label,
@@ -2309,13 +2340,13 @@ int main(void) {
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 192.0f, 76.0f, 26.0f});
                 rotation_result = rohr_ui_field("editor.anchor.rotation",
                     (UIFieldBinding){.kind = UI_FIELD_FLOAT,
-                        .number = &anchor->rotation}, &length_field,
+                        .number = &edited_rotation}, &length_field,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 86.0f, 192.0f,
                         EDITOR_TOOLS_WIDTH - 96.0f, 26.0f}, NULL);
                 if(rotation_result.changed) {
                     EditorCommand command = {.type = EDITOR_COMMAND_ANCHOR_TRANSFORM,
                         .data.anchor_transform = {selected->id, anchor->id,
-                            anchor->position, anchor->rotation}};
+                            edited_position, edited_rotation}};
                     (void)editor_command_execute(&project, &command);
                 }
                 field_editing = name_result.active || x_result.active || y_result.active ||
@@ -2349,9 +2380,6 @@ int main(void) {
                             EDITOR_PROPERTY_ROTATION_FOLLOWS_BODY,
                             orientation_result.selected_index == 1);
                     }
-                    if(position_result.changed || orientation_result.changed) {
-                        editor_project_anchor_constraints_apply(selected, anchor->id);
-                    }
                 }
                 {
                     UIButtonStyle delete_style = editor_delete_button_style_get();
@@ -2373,13 +2401,17 @@ int main(void) {
                 UIFieldResult x_result;
                 UIFieldResult y_result;
                 UIFieldResult rotation_result;
+                Position edited_position = body->position;
+                float edited_rotation = body->rotation;
+                char edited_name[EDITOR_OBJECT_NAME_MAX];
+                snprintf(edited_name, sizeof(edited_name), "%s", body->name);
                 if(!editor_named_text_sync(&font, body->name,
                         &soft_body_labels[body_index], soft_body_cache[body_index],
                         EDITOR_OBJECT_NAME_MAX)) goto fail;
                 rohr_ui_label(&name_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f,
                     42.0f, 48.0f, 30.0f});
-                name_result = editor_property_name_field("editor.soft_body.name", body->name,
-                    sizeof(body->name), &soft_body_labels[body_index],
+                name_result = editor_property_name_field("editor.soft_body.name", edited_name,
+                    sizeof(edited_name), &soft_body_labels[body_index],
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 88.0f, 42.0f,
                         EDITOR_TOOLS_WIDTH - 96.0f, 30.0f});
                 if(name_result.changed) {
@@ -2387,7 +2419,7 @@ int main(void) {
                         .data.item_rename = {.kind = EDITOR_ITEM_SOFT_BODY,
                             .object = selected->id, .item = body->id}};
                     snprintf(command.data.item_rename.name,
-                        sizeof(command.data.item_rename.name), "%s", body->name);
+                        sizeof(command.data.item_rename.name), "%s", edited_name);
                     (void)editor_command_execute(&project, &command);
                 }
                 (void)editor_visibility_toggle("editor.soft_body.visibility",
@@ -2397,19 +2429,21 @@ int main(void) {
                 rohr_ui_label(&x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     118.0f, 50.0f, 26.0f});
                 x_result = rohr_ui_field("editor.soft_body.x",
-                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &body->position.x},
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                        .number = &edited_position.x},
                     &x_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 60.0f, 118.0f,
                         EDITOR_TOOLS_WIDTH - 70.0f, 26.0f}, NULL);
                 rohr_ui_label(&y_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     154.0f, 50.0f, 26.0f});
                 y_result = rohr_ui_field("editor.soft_body.y",
-                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &body->position.y},
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                        .number = &edited_position.y},
                     &y_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 60.0f, 154.0f,
                         EDITOR_TOOLS_WIDTH - 70.0f, 26.0f}, NULL);
                 rohr_ui_label(&rotation_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     190.0f, 82.0f, 26.0f});
                 rotation_result = rohr_ui_field("editor.soft_body.rotation",
-                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &body->rotation},
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &edited_rotation},
                     &length_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 92.0f, 190.0f,
                         EDITOR_TOOLS_WIDTH - 102.0f, 26.0f}, NULL);
                 field_editing = name_result.active || x_result.active || y_result.active ||
@@ -2417,7 +2451,7 @@ int main(void) {
                 if(x_result.changed || y_result.changed || rotation_result.changed) {
                     EditorCommand command = {.type = EDITOR_COMMAND_SOFT_BODY_TRANSFORM,
                         .data.soft_body_transform = {selected->id, body->id,
-                            body->position, body->rotation}};
+                            edited_position, edited_rotation}};
                     (void)editor_command_execute(&project, &command);
                 }
                 {
@@ -2542,12 +2576,18 @@ int main(void) {
                 UIFieldResult friction_result;
                 UIFieldResult restitution_result;
                 UIFieldResult name_result;
+                Position edited_position = node->position;
+                float edited_mass = node->node_mass;
+                float edited_friction = node->friction;
+                float edited_restitution = node->restitution;
+                char edited_name[EDITOR_OBJECT_NAME_MAX];
+                snprintf(edited_name, sizeof(edited_name), "%s", node->name);
                 if(!editor_named_text_sync(&font, node->name, &soft_node_labels[index],
                         soft_node_cache[index], EDITOR_OBJECT_NAME_MAX)) goto fail;
                 rohr_ui_label(&name_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f,
                     40.0f, 48.0f, 30.0f});
-                name_result = editor_property_name_field("editor.soft_node.name", node->name,
-                    sizeof(node->name), &soft_node_labels[index],
+                name_result = editor_property_name_field("editor.soft_node.name", edited_name,
+                    sizeof(edited_name), &soft_node_labels[index],
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 88.0f, 40.0f,
                         EDITOR_TOOLS_WIDTH - 96.0f, 30.0f});
                 if(name_result.changed) {
@@ -2556,7 +2596,7 @@ int main(void) {
                             .object = selected->id, .parent = body->id,
                             .item = node->id}};
                     snprintf(command.data.item_rename.name,
-                        sizeof(command.data.item_rename.name), "%s", node->name);
+                        sizeof(command.data.item_rename.name), "%s", edited_name);
                     (void)editor_command_execute(&project, &command);
                 }
                 (void)editor_visibility_toggle("editor.soft_node.visibility",
@@ -2565,70 +2605,77 @@ int main(void) {
                     selected->id, body->id, node->id, node->visible);
                 rohr_ui_label(&x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 122.0f, 50.0f, 26.0f});
                 x_result = rohr_ui_field("editor.soft_node.x",
-                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &node->position.x},
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                        .number = &edited_position.x},
                     &x_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 60.0f, 122.0f,
                         EDITOR_TOOLS_WIDTH - 70.0f, 26.0f}, NULL);
                 rohr_ui_label(&y_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 158.0f, 50.0f, 26.0f});
                 y_result = rohr_ui_field("editor.soft_node.y",
-                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &node->position.y},
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                        .number = &edited_position.y},
                     &y_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 60.0f, 158.0f,
                         EDITOR_TOOLS_WIDTH - 70.0f, 26.0f}, NULL);
                 if(x_result.changed || y_result.changed) {
                     EditorCommand command = {.type = EDITOR_COMMAND_SOFT_NODE_POSITION,
                         .data.soft_node_position = {selected->id, body->id,
-                            node->id, node->position}};
+                            node->id, edited_position}};
                     (void)editor_command_execute(&project, &command);
                 }
                 rohr_ui_label(&mass_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 194.0f, 68.0f, 26.0f});
                 mass_result = rohr_ui_field("editor.soft_node.mass",
-                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &node->node_mass},
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &edited_mass},
                     &length_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 78.0f, 194.0f,
                         EDITOR_TOOLS_WIDTH - 88.0f, 26.0f}, NULL);
                 if(mass_result.changed) {
-                    node->node_mass = fmaxf(0.0f, node->node_mass);
+                    edited_mass = fmaxf(0.0f, edited_mass);
                     editor_property_float_set(&project, EDITOR_ITEM_SOFT_NODE,
                         selected->id, body->id, node->id, 0,
-                        EDITOR_PROPERTY_MASS, node->node_mass);
+                        EDITOR_PROPERTY_MASS, edited_mass);
                 }
                 rohr_ui_label(&friction_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     230.0f, 68.0f, 26.0f});
                 friction_result = rohr_ui_field("editor.soft_node.friction",
-                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &node->friction},
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &edited_friction},
                     &length_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 78.0f, 230.0f,
                         EDITOR_TOOLS_WIDTH - 88.0f, 26.0f}, NULL);
-                if(friction_result.changed) node->friction = fmaxf(0.0f, node->friction);
+                if(friction_result.changed) edited_friction = fmaxf(0.0f, edited_friction);
                 if(friction_result.changed) editor_property_float_set(&project,
                     EDITOR_ITEM_SOFT_NODE, selected->id, body->id, node->id, 0,
-                    EDITOR_PROPERTY_FRICTION, node->friction);
+                    EDITOR_PROPERTY_FRICTION, edited_friction);
                 rohr_ui_label(&restitution_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     266.0f, 96.0f, 26.0f});
                 restitution_result = rohr_ui_field("editor.soft_node.restitution",
-                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &node->restitution},
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                        .number = &edited_restitution},
                     &length_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 106.0f, 266.0f,
                         EDITOR_TOOLS_WIDTH - 116.0f, 26.0f}, NULL);
-                if(restitution_result.changed) node->restitution =
-                    fminf(1.0f, fmaxf(0.0f, node->restitution));
+                if(restitution_result.changed) edited_restitution =
+                    fminf(1.0f, fmaxf(0.0f, edited_restitution));
                 if(restitution_result.changed) editor_property_float_set(&project,
                     EDITOR_ITEM_SOFT_NODE, selected->id, body->id, node->id, 0,
-                    EDITOR_PROPERTY_RESTITUTION, node->restitution);
+                    EDITOR_PROPERTY_RESTITUTION, edited_restitution);
+                {
+                    bool gravity_enabled = node->gravity_enabled;
                 if(editor_checkbox("editor.soft_node.gravity", &gravity_label,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 302.0f,
                         EDITOR_TOOLS_WIDTH - 20.0f, 28.0f},
-                    &node->gravity_enabled)) editor_property_bool_set(&project,
+                    &gravity_enabled)) editor_property_bool_set(&project,
                         EDITOR_ITEM_SOFT_NODE, selected->id, body->id, node->id, 0,
-                        EDITOR_PROPERTY_GRAVITY, node->gravity_enabled);
+                        EDITOR_PROPERTY_GRAVITY, gravity_enabled);
+                }
                 {
                     float row_x = EDITOR_VIEWPORT_WIDTH + 10.0f;
                     float row_width = EDITOR_TOOLS_WIDTH - 20.0f;
                     float controls_bottom = 370.0f;
 
+                    bool collision_enabled = node->collision_enabled;
                     if(editor_checkbox("editor.soft_node.collision", &collision_label,
                             (UIRect){row_x, 338.0f, row_width, 28.0f},
-                            &node->collision_enabled)) {
+                            &collision_enabled)) {
                         editor_property_bool_set(&project, EDITOR_ITEM_SOFT_NODE,
                             selected->id, body->id, node->id, 0,
-                            EDITOR_PROPERTY_COLLISION, node->collision_enabled);
-                        if(!node->collision_enabled) {
+                            EDITOR_PROPERTY_COLLISION, collision_enabled);
+                        if(!collision_enabled) {
                             collision_category_open = false;
                             collide_with_open = false;
                         }
@@ -2716,12 +2763,16 @@ int main(void) {
                 UIFieldResult stiffness_result;
                 UIFieldResult damping_result;
                 UIFieldResult name_result;
+                float edited_stiffness = beam->stiffness;
+                float edited_damping = beam->damping;
+                char edited_name[EDITOR_OBJECT_NAME_MAX];
+                snprintf(edited_name, sizeof(edited_name), "%s", beam->name);
                 if(!editor_named_text_sync(&font, beam->name, &soft_beam_labels[index],
                         soft_beam_cache[index], EDITOR_OBJECT_NAME_MAX)) goto fail;
                 rohr_ui_label(&name_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f,
                     40.0f, 48.0f, 30.0f});
-                name_result = editor_property_name_field("editor.soft_beam.name", beam->name,
-                    sizeof(beam->name), &soft_beam_labels[index],
+                name_result = editor_property_name_field("editor.soft_beam.name", edited_name,
+                    sizeof(edited_name), &soft_beam_labels[index],
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 88.0f, 40.0f,
                         EDITOR_TOOLS_WIDTH - 96.0f, 30.0f});
                 if(name_result.changed) {
@@ -2730,7 +2781,7 @@ int main(void) {
                             .object = selected->id, .parent = body->id,
                             .item = beam->id}};
                     snprintf(command.data.item_rename.name,
-                        sizeof(command.data.item_rename.name), "%s", beam->name);
+                        sizeof(command.data.item_rename.name), "%s", edited_name);
                     (void)editor_command_execute(&project, &command);
                 }
                 (void)editor_visibility_toggle("editor.soft_beam.visibility",
@@ -2778,26 +2829,27 @@ int main(void) {
                 rohr_ui_label(&stiffness_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     196.0f, 90.0f, 26.0f});
                 stiffness_result = rohr_ui_field("editor.soft_beam.stiffness",
-                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &beam->stiffness},
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                        .number = &edited_stiffness},
                     &length_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 196.0f,
                         EDITOR_TOOLS_WIDTH - 110.0f, 26.0f}, NULL);
                 if(stiffness_result.changed) {
-                    beam->stiffness = fmaxf(0.0f, beam->stiffness);
+                    edited_stiffness = fmaxf(0.0f, edited_stiffness);
                     editor_property_float_set(&project, EDITOR_ITEM_SOFT_BEAM,
                         selected->id, body->id, beam->id, 0,
-                        EDITOR_PROPERTY_STIFFNESS, beam->stiffness);
+                        EDITOR_PROPERTY_STIFFNESS, edited_stiffness);
                 }
                 rohr_ui_label(&damping_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     232.0f, 90.0f, 26.0f});
                 damping_result = rohr_ui_field("editor.soft_beam.damping",
-                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &beam->damping},
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &edited_damping},
                     &length_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 232.0f,
                         EDITOR_TOOLS_WIDTH - 110.0f, 26.0f}, NULL);
                 if(damping_result.changed) {
-                    beam->damping = fmaxf(0.0f, beam->damping);
+                    edited_damping = fmaxf(0.0f, edited_damping);
                     editor_property_float_set(&project, EDITOR_ITEM_SOFT_BEAM,
                         selected->id, body->id, beam->id, 0,
-                        EDITOR_PROPERTY_DAMPING, beam->damping);
+                        EDITOR_PROPERTY_DAMPING, edited_damping);
                 }
                 field_editing = name_result.active || stiffness_result.active ||
                     damping_result.active;
@@ -2826,10 +2878,12 @@ int main(void) {
                 rohr_ui_label(&object_name_label,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, 52.0f, 90.0f, 34.0f});
                 {
+                    char edited_name[EDITOR_OBJECT_NAME_MAX];
+                    snprintf(edited_name, sizeof(edited_name), "%s", selected->name);
                     UIFieldResult name_result = rohr_ui_field("editor.object.name",
                     (UIFieldBinding){.kind = UI_FIELD_STRING,
-                        .string = selected->name,
-                        .string_capacity = sizeof(selected->name)},
+                        .string = edited_name,
+                        .string_capacity = sizeof(edited_name)},
                     &object_name_labels[selected_index],
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 130.0f, 52.0f,
                         EDITOR_TOOLS_WIDTH - 140.0f, 34.0f}, NULL);
@@ -2840,10 +2894,11 @@ int main(void) {
                                 .object = selected->id}};
                         EditorCommandResult command_result;
                         snprintf(command.data.item_rename.name,
-                            sizeof(command.data.item_rename.name), "%s", selected->name);
+                            sizeof(command.data.item_rename.name), "%s", edited_name);
                         command_result = editor_command_execute(&project, &command);
-                        snprintf(object_name_cache[selected_index],
-                            EDITOR_OBJECT_NAME_MAX, "%s", selected->name);
+                        if(command_result.kind == ERROR_RESULT_VALUE)
+                            snprintf(object_name_cache[selected_index],
+                                EDITOR_OBJECT_NAME_MAX, "%s", selected->name);
                         (void)command_result;
                     }
                 }

@@ -580,6 +580,7 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
                     success = editor_project_anchor_rotation_lock_set(object, anchor,
                         set->value.boolean);
                 if(!success) goto property_invalid;
+                editor_project_anchor_constraints_apply(object, anchor->id);
             } else if(set->kind == EDITOR_ITEM_SOFT_NODE) {
                 EditorSoftBody *body = editor_command_soft_body_get(object, set->parent);
                 EditorSoftNode *node = editor_command_soft_node_get(body, set->item);
