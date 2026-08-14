@@ -50,10 +50,7 @@ typedef struct EditorViewportState {
     bool dragged_origin;
     bool camera_panning;
     bool camera_pan_with_primary;
-    bool local_view;
     Vec2D drag_offset;
-    Vec2D camera_offset;
-    float camera_zoom;
     Position camera_pointer;
     float rotation_pointer_offset;
     EditorViewportMode mode;

@@ -14,8 +14,22 @@ typedef enum EditorCommandType {
     EDITOR_COMMAND_SOFT_BODY_TRANSFORM,
     EDITOR_COMMAND_SOFT_NODE_POSITION,
     EDITOR_COMMAND_RIGID_BODY_ORIGIN,
-    EDITOR_COMMAND_SOFT_BODY_ORIGIN
+    EDITOR_COMMAND_SOFT_BODY_ORIGIN,
+    EDITOR_COMMAND_VIEWPORT_CAMERA,
+    EDITOR_COMMAND_VIEWPORT_COORDINATES,
+    EDITOR_COMMAND_VISIBILITY
 } EditorCommandType;
+
+typedef enum EditorVisibilityKind {
+    EDITOR_VISIBILITY_OBJECT,
+    EDITOR_VISIBILITY_RIGID_BODY,
+    EDITOR_VISIBILITY_HITBOX,
+    EDITOR_VISIBILITY_JOINT,
+    EDITOR_VISIBILITY_ANCHOR,
+    EDITOR_VISIBILITY_SOFT_BODY,
+    EDITOR_VISIBILITY_SOFT_NODE,
+    EDITOR_VISIBILITY_SOFT_BEAM
+} EditorVisibilityKind;
 
 typedef struct EditorCommand {
     EditorCommandType type;
@@ -71,6 +85,20 @@ typedef struct EditorCommand {
             uint32_t body;
             Position position;
         } origin;
+        struct {
+            Vec2D offset;
+            float zoom;
+        } viewport_camera;
+        struct {
+            bool local;
+        } viewport_coordinates;
+        struct {
+            EditorVisibilityKind kind;
+            EditorObjectId object;
+            uint32_t parent;
+            uint32_t item;
+            bool visible;
+        } visibility;
     } data;
 } EditorCommand;
 

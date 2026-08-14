@@ -11,20 +11,35 @@ static int transform_commands_test(void) {
     EditorRigidBody *rigid_body;
     EditorHitbox *hitbox;
     EditorAnchor *anchor;
+    EditorJoint *joint;
     EditorSoftBody *soft_body;
     EditorSoftNode *node;
-    EditorCommand commands[8];
+    EditorSoftNode *second_node;
+    EditorSoftBeam *beam;
+    EditorCommand commands[10];
+    EditorCommand parsed;
+    EditorResult parse_result;
+    const char *parsed_path;
     char cli_text[512];
+    char *camera_arguments[] = {"editor-cli", "viewport", "camera",
+        "project.rohr.json", "31", "32", "2.5"};
+    char *coordinates_arguments[] = {"editor-cli", "viewport", "coordinates",
+        "project.rohr.json", "local"};
 
     editor_project_init(&project);
     object = editor_project_object_add(&project, (Position){0});
     rigid_body = editor_project_rigid_body_add(&project, object);
     hitbox = rigid_body == NULL ? NULL : &rigid_body->hitboxes[0];
     anchor = editor_project_anchor_add(&project, object, (Position){0}, 0);
+    joint = editor_project_joint_add(&project, object, EDITOR_JOINT_SPRING);
     soft_body = editor_project_soft_body_add(&project, object);
     node = editor_project_soft_node_add(&project, soft_body, (Position){0});
+    second_node = editor_project_soft_node_add(&project, soft_body, (Position){1.0f, 0.0f});
+    beam = editor_project_soft_beam_add(&project, soft_body,
+        node == NULL ? 0 : node->id, second_node == NULL ? 0 : second_node->id);
     if(object == NULL || rigid_body == NULL || hitbox == NULL || anchor == NULL ||
-            soft_body == NULL || node == NULL) return 1;
+            joint == NULL || soft_body == NULL || node == NULL || second_node == NULL ||
+            beam == NULL) return 1;
     commands[0] = (EditorCommand){.type = EDITOR_COMMAND_OBJECT_POSITION,
         .data.object_position = {object->id, {1.0f, 2.0f}}};
     commands[1] = (EditorCommand){.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
@@ -45,6 +60,10 @@ static int transform_commands_test(void) {
         .data.origin = {object->id, rigid_body->id, {2.0f, 3.0f}}};
     commands[7] = (EditorCommand){.type = EDITOR_COMMAND_SOFT_BODY_ORIGIN,
         .data.origin = {object->id, soft_body->id, {4.0f, 5.0f}}};
+    commands[8] = (EditorCommand){.type = EDITOR_COMMAND_VIEWPORT_CAMERA,
+        .data.viewport_camera = {{13.0f, 14.0f}, 2.0f}};
+    commands[9] = (EditorCommand){.type = EDITOR_COMMAND_VIEWPORT_COORDINATES,
+        .data.viewport_coordinates.local = true};
     for(size_t i = 0; i < sizeof(commands) / sizeof(commands[0]); i += 1) {
         if(editor_command_execute(&project, &commands[i]).kind != ERROR_RESULT_VALUE ||
                 editor_result_check(editor_command_cli_write(&commands[i],
@@ -52,7 +71,55 @@ static int transform_commands_test(void) {
                 strstr(cli_text, "editor-cli ") != cli_text) return 1;
     }
     if(object->position.x != 1.0f || rigid_body->rotation != 0.5f ||
-            anchor->rotation != 0.75f || node->position.x == 0.0f) return 1;
+            anchor->rotation != 0.75f || node->position.x == 0.0f ||
+            project.viewport_camera_offset.x != 13.0f ||
+            project.viewport_camera_zoom != 2.0f || !project.viewport_local_view) return 1;
+    parse_result = editor_command_cli_parse(7, camera_arguments,
+        &parsed_path, &parsed);
+    if(editor_result_check(parse_result) ||
+            parsed.type != EDITOR_COMMAND_VIEWPORT_CAMERA ||
+            parsed.data.viewport_camera.offset.x != 31.0f ||
+            parsed.data.viewport_camera.zoom != 2.5f) return 1;
+    parse_result = editor_command_cli_parse(5, coordinates_arguments,
+        &parsed_path, &parsed);
+    if(editor_result_check(parse_result) ||
+            parsed.type != EDITOR_COMMAND_VIEWPORT_COORDINATES ||
+            !parsed.data.viewport_coordinates.local) return 1;
+    {
+        EditorCommand visibility[] = {
+            {.type = EDITOR_COMMAND_VISIBILITY,
+                .data.visibility = {EDITOR_VISIBILITY_OBJECT, object->id, 0, 0, false}},
+            {.type = EDITOR_COMMAND_VISIBILITY,
+                .data.visibility = {EDITOR_VISIBILITY_RIGID_BODY, object->id, 0,
+                    rigid_body->id, false}},
+            {.type = EDITOR_COMMAND_VISIBILITY,
+                .data.visibility = {EDITOR_VISIBILITY_HITBOX, object->id,
+                    rigid_body->id, hitbox->id, false}},
+            {.type = EDITOR_COMMAND_VISIBILITY,
+                .data.visibility = {EDITOR_VISIBILITY_JOINT, object->id, 0,
+                    joint->id, false}},
+            {.type = EDITOR_COMMAND_VISIBILITY,
+                .data.visibility = {EDITOR_VISIBILITY_ANCHOR, object->id, 0,
+                    anchor->id, false}},
+            {.type = EDITOR_COMMAND_VISIBILITY,
+                .data.visibility = {EDITOR_VISIBILITY_SOFT_BODY, object->id, 0,
+                    soft_body->id, false}},
+            {.type = EDITOR_COMMAND_VISIBILITY,
+                .data.visibility = {EDITOR_VISIBILITY_SOFT_NODE, object->id,
+                    soft_body->id, node->id, false}},
+            {.type = EDITOR_COMMAND_VISIBILITY,
+                .data.visibility = {EDITOR_VISIBILITY_SOFT_BEAM, object->id,
+                    soft_body->id, beam->id, false}}
+        };
+        for(size_t i = 0; i < sizeof(visibility) / sizeof(visibility[0]); i += 1) {
+            if(editor_command_execute(&project, &visibility[i]).kind != ERROR_RESULT_VALUE ||
+                    editor_result_check(editor_command_cli_write(&visibility[i],
+                        "project.rohr.json", cli_text, sizeof(cli_text)))) return 1;
+        }
+        if(object->visible || rigid_body->visible || hitbox->visible || joint->visible ||
+                anchor->visible || soft_body->visible || node->visible || beam->visible)
+            return 1;
+    }
     return 0;
 }
 
@@ -86,6 +153,9 @@ int main(void) {
     result = editor_object_command_rename(
         document.project, added.result.value, "faster car");
     if(editor_result_check(result)) return 1;
+    document.project->viewport_camera_offset = (Vec2D){21.0f, 22.0f};
+    document.project->viewport_camera_zoom = 1.5f;
+    document.project->viewport_local_view = true;
     result = editor_document_save_as(&document, path);
     if(editor_result_check(result)) return 1;
 
@@ -95,7 +165,11 @@ int main(void) {
     if(editor_result_check(result) || loaded.project->object_count != 1 ||
             strcmp(loaded.project->objects[0].name, "FasterCar") != 0 ||
             loaded.project->objects[0].position.x != 12.0f ||
-            loaded.project->objects[0].position.y != 34.0f) return 1;
+            loaded.project->objects[0].position.y != 34.0f ||
+            loaded.project->viewport_camera_offset.x != 21.0f ||
+            loaded.project->viewport_camera_offset.y != 22.0f ||
+            loaded.project->viewport_camera_zoom != 1.5f ||
+            !loaded.project->viewport_local_view) return 1;
     result = editor_object_command_remove(loaded.project, added.result.value);
     if(editor_result_check(result) || loaded.project->object_count != 0) return 1;
 

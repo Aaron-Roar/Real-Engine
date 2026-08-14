@@ -179,6 +179,81 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
                     "soft body origin could not be changed").result.error);
             return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
         }
+        case EDITOR_COMMAND_VIEWPORT_CAMERA:
+            if(command->data.viewport_camera.zoom < 0.1f ||
+                    command->data.viewport_camera.zoom > 8.0f)
+                return editor_command_error(editor_result_error(
+                    EDITOR_ERROR_INVALID_ARGUMENT,
+                    "viewport zoom must be between 0.1 and 8").result.error);
+            project->viewport_camera_offset = command->data.viewport_camera.offset;
+            project->viewport_camera_zoom = command->data.viewport_camera.zoom;
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+        case EDITOR_COMMAND_VIEWPORT_COORDINATES:
+            project->viewport_local_view = command->data.viewport_coordinates.local;
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+        case EDITOR_COMMAND_VISIBILITY: {
+            EditorObject *object = editor_object_query_get(project,
+                command->data.visibility.object);
+            bool *visible = NULL;
+            if(object == NULL) return editor_command_not_found("object",
+                command->data.visibility.object);
+            switch(command->data.visibility.kind) {
+                case EDITOR_VISIBILITY_OBJECT:
+                    visible = &object->visible;
+                    break;
+                case EDITOR_VISIBILITY_RIGID_BODY: {
+                    EditorRigidBody *body = editor_project_rigid_body_get(object,
+                        command->data.visibility.item);
+                    if(body != NULL) visible = &body->visible;
+                    break;
+                }
+                case EDITOR_VISIBILITY_HITBOX: {
+                    EditorRigidBody *body = editor_project_rigid_body_get(object,
+                        command->data.visibility.parent);
+                    EditorHitbox *hitbox = editor_project_hitbox_get(body,
+                        command->data.visibility.item);
+                    if(hitbox != NULL) visible = &hitbox->visible;
+                    break;
+                }
+                case EDITOR_VISIBILITY_JOINT:
+                    for(size_t i = 0; i < object->joint_count; i += 1)
+                        if(object->joint_items[i].id == command->data.visibility.item)
+                            visible = &object->joint_items[i].visible;
+                    break;
+                case EDITOR_VISIBILITY_ANCHOR: {
+                    EditorAnchor *anchor = editor_project_anchor_get(object,
+                        command->data.visibility.item);
+                    if(anchor != NULL) visible = &anchor->visible;
+                    break;
+                }
+                case EDITOR_VISIBILITY_SOFT_BODY: {
+                    EditorSoftBody *body = editor_command_soft_body_get(object,
+                        command->data.visibility.item);
+                    if(body != NULL) visible = &body->visible;
+                    break;
+                }
+                case EDITOR_VISIBILITY_SOFT_NODE: {
+                    EditorSoftBody *body = editor_command_soft_body_get(object,
+                        command->data.visibility.parent);
+                    if(body != NULL) for(size_t i = 0; i < body->node_count; i += 1)
+                        if(body->nodes[i].id == command->data.visibility.item)
+                            visible = &body->nodes[i].visible;
+                    break;
+                }
+                case EDITOR_VISIBILITY_SOFT_BEAM: {
+                    EditorSoftBody *body = editor_command_soft_body_get(object,
+                        command->data.visibility.parent);
+                    if(body != NULL) for(size_t i = 0; i < body->beam_count; i += 1)
+                        if(body->beams[i].id == command->data.visibility.item)
+                            visible = &body->beams[i].visible;
+                    break;
+                }
+            }
+            if(visible == NULL) return editor_command_not_found("visibility target",
+                command->data.visibility.item);
+            *visible = command->data.visibility.visible;
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+        }
     }
     return editor_command_error((EditorError){EDITOR_ERROR_INVALID_ARGUMENT,
         "unknown editor command"});
@@ -220,6 +295,19 @@ static bool editor_command_float_parse(const char *text, float *value) {
     return true;
 }
 
+static bool editor_command_bool_parse(const char *text, bool *value) {
+    if(text == NULL || value == NULL) return false;
+    if(strcmp(text, "true") == 0) {
+        *value = true;
+        return true;
+    }
+    if(strcmp(text, "false") == 0) {
+        *value = false;
+        return true;
+    }
+    return false;
+}
+
 EditorResult editor_command_cli_parse(int count, char **arguments,
         const char **document_path, EditorCommand *command) {
     const char *domain;
@@ -231,6 +319,47 @@ EditorResult editor_command_cli_parse(int count, char **arguments,
     action = arguments[2];
     *document_path = arguments[3];
     memset(command, 0, sizeof(*command));
+    if(strcmp(action, "visibility") == 0) {
+        EditorVisibilityKind kind;
+        bool has_parent = false;
+        if(strcmp(domain, "object") == 0) kind = EDITOR_VISIBILITY_OBJECT;
+        else if(strcmp(domain, "rigid-body") == 0) kind = EDITOR_VISIBILITY_RIGID_BODY;
+        else if(strcmp(domain, "hitbox") == 0) {
+            kind = EDITOR_VISIBILITY_HITBOX;
+            has_parent = true;
+        } else if(strcmp(domain, "joint") == 0) kind = EDITOR_VISIBILITY_JOINT;
+        else if(strcmp(domain, "anchor") == 0) kind = EDITOR_VISIBILITY_ANCHOR;
+        else if(strcmp(domain, "soft-body") == 0) kind = EDITOR_VISIBILITY_SOFT_BODY;
+        else if(strcmp(domain, "soft-node") == 0) {
+            kind = EDITOR_VISIBILITY_SOFT_NODE;
+            has_parent = true;
+        } else if(strcmp(domain, "soft-beam") == 0) {
+            kind = EDITOR_VISIBILITY_SOFT_BEAM;
+            has_parent = true;
+        } else goto visibility_invalid;
+        if(kind == EDITOR_VISIBILITY_OBJECT && count == 6) {
+            command->type = EDITOR_COMMAND_VISIBILITY;
+            command->data.visibility.kind = kind;
+            if(editor_command_uint_parse(arguments[4], &command->data.visibility.object) &&
+                    editor_command_bool_parse(arguments[5],
+                        &command->data.visibility.visible)) return editor_result_value(true);
+        } else if((has_parent && count == 8) || (!has_parent && count == 7)) {
+            command->type = EDITOR_COMMAND_VISIBILITY;
+            command->data.visibility.kind = kind;
+            if(editor_command_uint_parse(arguments[4], &command->data.visibility.object) &&
+                    (!has_parent || editor_command_uint_parse(arguments[5],
+                        &command->data.visibility.parent)) &&
+                    editor_command_uint_parse(arguments[has_parent ? 6 : 5],
+                        &command->data.visibility.item) &&
+                    editor_command_bool_parse(arguments[has_parent ? 7 : 6],
+                        &command->data.visibility.visible)) {
+                return editor_result_value(true);
+            }
+        }
+visibility_invalid:
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "invalid %s visibility command", domain);
+    }
     if(strcmp(domain, "object") == 0 && strcmp(action, "add") == 0) {
         if(count != 5 && count != 7)
             return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
@@ -356,6 +485,23 @@ EditorResult editor_command_cli_parse(int count, char **arguments,
             EDITOR_COMMAND_RIGID_BODY_ORIGIN : EDITOR_COMMAND_SOFT_BODY_ORIGIN;
         return editor_result_value(true);
     }
+    if(strcmp(domain, "viewport") == 0 && strcmp(action, "camera") == 0 &&
+            count == 7 && editor_command_float_parse(arguments[4],
+                &command->data.viewport_camera.offset.x) &&
+            editor_command_float_parse(arguments[5],
+                &command->data.viewport_camera.offset.y) &&
+            editor_command_float_parse(arguments[6],
+                &command->data.viewport_camera.zoom)) {
+        command->type = EDITOR_COMMAND_VIEWPORT_CAMERA;
+        return editor_result_value(true);
+    }
+    if(strcmp(domain, "viewport") == 0 && strcmp(action, "coordinates") == 0 &&
+            count == 5 && (strcmp(arguments[4], "local") == 0 ||
+                strcmp(arguments[4], "world") == 0)) {
+        command->type = EDITOR_COMMAND_VIEWPORT_COORDINATES;
+        command->data.viewport_coordinates.local = strcmp(arguments[4], "local") == 0;
+        return editor_result_value(true);
+    }
     return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
         "invalid or unknown %s %s command", domain, action);
 }
@@ -404,6 +550,22 @@ EditorResult editor_command_cli_write(const EditorCommand *command,
         case EDITOR_COMMAND_SOFT_BODY_TRANSFORM:
         case EDITOR_COMMAND_SOFT_BODY_ORIGIN: domain = "soft-body"; break;
         case EDITOR_COMMAND_SOFT_NODE_POSITION: domain = "soft-node"; break;
+        case EDITOR_COMMAND_VIEWPORT_CAMERA:
+        case EDITOR_COMMAND_VIEWPORT_COORDINATES: domain = "viewport"; break;
+        case EDITOR_COMMAND_VISIBILITY:
+            switch(command->data.visibility.kind) {
+                case EDITOR_VISIBILITY_OBJECT: domain = "object"; break;
+                case EDITOR_VISIBILITY_RIGID_BODY: domain = "rigid-body"; break;
+                case EDITOR_VISIBILITY_HITBOX: domain = "hitbox"; break;
+                case EDITOR_VISIBILITY_JOINT: domain = "joint"; break;
+                case EDITOR_VISIBILITY_ANCHOR: domain = "anchor"; break;
+                case EDITOR_VISIBILITY_SOFT_BODY: domain = "soft-body"; break;
+                case EDITOR_VISIBILITY_SOFT_NODE: domain = "soft-node"; break;
+                case EDITOR_VISIBILITY_SOFT_BEAM: domain = "soft-beam"; break;
+                default: return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                    "unknown visibility target");
+            }
+            break;
         default: return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
             "unknown editor command");
     }
@@ -519,6 +681,47 @@ EditorResult editor_command_cli_write(const EditorCommand *command,
             snprintf(values, sizeof(values), " %u %u %.9g %.9g",
                 command->data.origin.object, command->data.origin.body,
                 command->data.origin.position.x, command->data.origin.position.y);
+            break;
+        case EDITOR_COMMAND_VIEWPORT_CAMERA:
+            if(!editor_command_text_append(output, output_capacity, &used, "camera ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            snprintf(values, sizeof(values), " %.9g %.9g %.9g",
+                command->data.viewport_camera.offset.x,
+                command->data.viewport_camera.offset.y,
+                command->data.viewport_camera.zoom);
+            break;
+        case EDITOR_COMMAND_VIEWPORT_COORDINATES:
+            if(!editor_command_text_append(output, output_capacity, &used,
+                    "coordinates ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            snprintf(values, sizeof(values), " %s",
+                command->data.viewport_coordinates.local ? "local" : "world");
+            break;
+        case EDITOR_COMMAND_VISIBILITY:
+            if(!editor_command_text_append(output, output_capacity, &used,
+                    "visibility ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            if(command->data.visibility.kind == EDITOR_VISIBILITY_OBJECT) {
+                snprintf(values, sizeof(values), " %u %s",
+                    command->data.visibility.object,
+                    command->data.visibility.visible ? "true" : "false");
+            } else if(command->data.visibility.kind == EDITOR_VISIBILITY_HITBOX ||
+                    command->data.visibility.kind == EDITOR_VISIBILITY_SOFT_NODE ||
+                    command->data.visibility.kind == EDITOR_VISIBILITY_SOFT_BEAM) {
+                snprintf(values, sizeof(values), " %u %u %u %s",
+                    command->data.visibility.object,
+                    command->data.visibility.parent,
+                    command->data.visibility.item,
+                    command->data.visibility.visible ? "true" : "false");
+            } else {
+                snprintf(values, sizeof(values), " %u %u %s",
+                    command->data.visibility.object,
+                    command->data.visibility.item,
+                    command->data.visibility.visible ? "true" : "false");
+            }
             break;
     }
     if(!editor_command_text_append(output, output_capacity, &used, values))

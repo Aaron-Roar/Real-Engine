@@ -127,6 +127,7 @@ static void editor_hitbox_regular_set(EditorProject *project, EditorHitbox *hitb
 void editor_project_init(EditorProject *project) {
     if(project == NULL) return;
     *project = (EditorProject){
+        .viewport_camera_zoom = 1.0f,
         .collision_masks = {{.name = "default"}},
         .collision_mask_count = 1,
         .next_id = 1,

@@ -23,7 +23,11 @@ static void cli_usage_print(void) {
         "  rohr anchor transform <project.rohr.json> <object> <anchor> <x> <y> <rotation>\n"
         "  rohr soft-body transform <project.rohr.json> <object> <body> <x> <y> <rotation>\n"
         "  rohr soft-body origin <project.rohr.json> <object> <body> <x> <y>\n"
-        "  rohr soft-node position <project.rohr.json> <object> <body> <node> <x> <y>");
+        "  rohr soft-node position <project.rohr.json> <object> <body> <node> <x> <y>\n"
+        "  rohr viewport camera <project.rohr.json> <offset-x> <offset-y> <zoom>\n"
+        "  rohr viewport coordinates <project.rohr.json> <local|world>\n"
+        "  rohr <target> visibility <project.rohr.json> <object> [parent] [item] <true|false>\n"
+        "    targets: object, rigid-body, hitbox, joint, anchor, soft-body, soft-node, soft-beam");
 }
 
 static int cli_object_command(int count, char **arguments) {
@@ -76,10 +80,14 @@ int main(int count, char **arguments) {
     }
     if(count >= 2 && (strcmp(arguments[1], "object") == 0 ||
             strcmp(arguments[1], "rigid-body") == 0 ||
+            strcmp(arguments[1], "hitbox") == 0 ||
+            strcmp(arguments[1], "joint") == 0 ||
             strcmp(arguments[1], "vertex") == 0 ||
             strcmp(arguments[1], "anchor") == 0 ||
             strcmp(arguments[1], "soft-body") == 0 ||
-            strcmp(arguments[1], "soft-node") == 0))
+            strcmp(arguments[1], "soft-node") == 0 ||
+            strcmp(arguments[1], "soft-beam") == 0 ||
+            strcmp(arguments[1], "viewport") == 0))
         return cli_object_command(count, arguments);
     cli_usage_print();
     return 1;

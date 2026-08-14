@@ -163,6 +163,9 @@ typedef struct EditorObject {
 } EditorObject;
 
 typedef struct EditorProject {
+    Vec2D viewport_camera_offset;
+    float viewport_camera_zoom;
+    bool viewport_local_view;
     EditorCollisionMask collision_masks[EDITOR_COLLISION_MASK_MAX];
     size_t collision_mask_count;
     EditorObject objects[EDITOR_OBJECT_MAX];

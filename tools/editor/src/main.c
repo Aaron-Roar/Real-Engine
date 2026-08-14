@@ -212,16 +212,17 @@ static void editor_icon_line_draw(Position start, Position end, Color color) {
 }
 
 static bool editor_visibility_toggle(const char *id, TextAsset *empty_label,
-    UIRect bounds, bool *visible) {
+    UIRect bounds, EditorProject *project, EditorVisibilityKind kind,
+    EditorObjectId object, uint32_t parent, uint32_t item, bool visible) {
     UIButtonResult result;
     Position center;
     Color color = {225, 230, 240, 255};
 
-    if(id == NULL || empty_label == NULL || visible == NULL) return false;
+    if(id == NULL || empty_label == NULL || project == NULL) return false;
     result = rohr_ui_button(id, empty_label, bounds, NULL);
     center = (Position){bounds.x + bounds.width * 0.5f,
         bounds.y + bounds.height * 0.5f};
-    if(*visible) {
+    if(visible) {
         editor_icon_line_draw((Position){center.x - 8.0f, center.y},
             (Position){center.x - 3.0f, center.y - 4.0f}, color);
         editor_icon_line_draw((Position){center.x - 3.0f, center.y - 4.0f},
@@ -243,7 +244,11 @@ static bool editor_visibility_toggle(const char *id, TextAsset *empty_label,
         editor_icon_line_draw((Position){center.x + 6.0f, center.y - 3.0f},
             (Position){center.x + 3.0f, center.y}, color);
     }
-    if(result.clicked) *visible = !*visible;
+    if(result.clicked) {
+        EditorCommand command = {.type = EDITOR_COMMAND_VISIBILITY,
+            .data.visibility = {kind, object, parent, item, !visible}};
+        (void)editor_command_execute(project, &command);
+    }
     return result.clicked;
 }
 
@@ -1179,7 +1184,8 @@ int main(void) {
                         EDITOR_TOOLS_WIDTH - 96.0f, 30.0f});
                 (void)editor_visibility_toggle("editor.rigid_body.visibility",
                     &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
-                        44.0f, 26.0f, 26.0f}, &body->visible);
+                        44.0f, 26.0f, 26.0f}, &project,
+                    EDITOR_VISIBILITY_RIGID_BODY, selected->id, 0, body->id, body->visible);
                 rohr_ui_label(&x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     80.0f, 24.0f, 26.0f});
                 {
@@ -1380,7 +1386,9 @@ int main(void) {
                                 "editor.hitbox.%u.visibility", box->id);
                             (void)editor_visibility_toggle(visibility_id,
                                 &visibility_icon_label,
-                                (UIRect){row_x, y, 26.0f, 26.0f}, &box->visible);
+                                (UIRect){row_x, y, 26.0f, 26.0f}, &project,
+                                EDITOR_VISIBILITY_HITBOX, selected->id, body->id,
+                                box->id, box->visible);
                             result = rohr_ui_button(id, &body_hitbox_labels[i],
                                 (UIRect){row_x + 32.0f, y, row_width - 32.0f, 26.0f},
                                 viewport_state.selection == EDITOR_SELECTION_HITBOX &&
@@ -1425,7 +1433,8 @@ int main(void) {
                 field_editing = name_result.active;
                 (void)editor_visibility_toggle("editor.hitbox.visibility",
                     &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
-                        47.0f, 26.0f, 26.0f}, &hitbox->visible);
+                        47.0f, 26.0f, 26.0f}, &project, EDITOR_VISIBILITY_HITBOX,
+                    selected->id, body->id, hitbox->id, hitbox->visible);
             }
             rohr_ui_label(&vertices_label,
                 (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 110.0f,
@@ -1674,7 +1683,8 @@ int main(void) {
                         EDITOR_TOOLS_WIDTH - 48.0f, 24.0f});
                 (void)editor_visibility_toggle("editor.joint.visibility",
                     &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
-                        94.0f, 24.0f, 24.0f}, &joint->visible);
+                        94.0f, 24.0f, 24.0f}, &project, EDITOR_VISIBILITY_JOINT,
+                    selected->id, 0, joint->id, joint->visible);
                 {
                     UISliderConfig slider = rohr_ui_slider_config_default_get();
                     slider.center = (Position){EDITOR_VIEWPORT_WIDTH +
@@ -1768,7 +1778,8 @@ int main(void) {
                     (void)editor_visibility_toggle(visibility_id, &visibility_icon_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
                                 270.0f + (float)(i - anchor_start) * 27.0f,
-                                23.0f, 23.0f}, &anchor->visible);
+                                23.0f, 23.0f}, &project, EDITOR_VISIBILITY_ANCHOR,
+                        selected->id, 0, anchor->id, anchor->visible);
                     UIButtonResult result = rohr_ui_button(id, &anchor_labels[i],
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f,
                                 270.0f + (float)(i - anchor_start) * 27.0f,
@@ -1957,7 +1968,8 @@ int main(void) {
                         EDITOR_TOOLS_WIDTH - 96.0f, 30.0f});
                 (void)editor_visibility_toggle("editor.anchor.visibility",
                     &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
-                        44.0f, 26.0f, 26.0f}, &anchor->visible);
+                        44.0f, 26.0f, 26.0f}, &project, EDITOR_VISIBILITY_ANCHOR,
+                    selected->id, 0, anchor->id, anchor->visible);
                 rohr_ui_label(&x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     90.0f, 24.0f, 26.0f});
                 x_result = rohr_ui_field("editor.anchor.x",
@@ -2086,7 +2098,8 @@ int main(void) {
                         EDITOR_TOOLS_WIDTH - 96.0f, 30.0f});
                 (void)editor_visibility_toggle("editor.soft_body.visibility",
                     &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
-                        44.0f, 26.0f, 26.0f}, &body->visible);
+                        44.0f, 26.0f, 26.0f}, &project, EDITOR_VISIBILITY_SOFT_BODY,
+                    selected->id, 0, body->id, body->visible);
                 rohr_ui_label(&x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     118.0f, 50.0f, 26.0f});
                 x_result = rohr_ui_field("editor.soft_body.x",
@@ -2163,7 +2176,8 @@ int main(void) {
                             "editor.soft_node.%u.visibility", node->id);
                         (void)editor_visibility_toggle(visibility_id, &visibility_icon_label,
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, y, 24.0f, 24.0f},
-                            &node->visible);
+                            &project, EDITOR_VISIBILITY_SOFT_NODE, selected->id,
+                            body->id, node->id, node->visible);
                         {
                             UIButtonResult result = rohr_ui_button(id, &soft_node_labels[i],
                                 (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, y,
@@ -2191,7 +2205,8 @@ int main(void) {
                             "editor.soft_beam.%u.visibility", beam->id);
                         (void)editor_visibility_toggle(visibility_id, &visibility_icon_label,
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, y, 24.0f, 24.0f},
-                            &beam->visible);
+                            &project, EDITOR_VISIBILITY_SOFT_BEAM, selected->id,
+                            body->id, beam->id, beam->visible);
                         {
                             UIButtonResult result = rohr_ui_button(id, &soft_beam_labels[i],
                                 (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, y,
@@ -2238,7 +2253,8 @@ int main(void) {
                         EDITOR_TOOLS_WIDTH - 96.0f, 30.0f});
                 (void)editor_visibility_toggle("editor.soft_node.visibility",
                     &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
-                        44.0f, 26.0f, 26.0f}, &node->visible);
+                        44.0f, 26.0f, 26.0f}, &project, EDITOR_VISIBILITY_SOFT_NODE,
+                    selected->id, body->id, node->id, node->visible);
                 rohr_ui_label(&x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 122.0f, 50.0f, 26.0f});
                 x_result = rohr_ui_field("editor.soft_node.x",
                     (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &node->position.x},
@@ -2377,7 +2393,8 @@ int main(void) {
                         EDITOR_TOOLS_WIDTH - 96.0f, 30.0f});
                 (void)editor_visibility_toggle("editor.soft_beam.visibility",
                     &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
-                        44.0f, 26.0f, 26.0f}, &beam->visible);
+                        44.0f, 26.0f, 26.0f}, &project, EDITOR_VISIBILITY_SOFT_BEAM,
+                    selected->id, body->id, beam->id, beam->visible);
                 rohr_ui_label(&node_a_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 122.0f, 70.0f, 28.0f});
                 rohr_ui_label(&node_b_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 158.0f, 70.0f, 28.0f});
                 {
@@ -2447,7 +2464,8 @@ int main(void) {
                 }
                 (void)editor_visibility_toggle("editor.object.visibility",
                     &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
-                        56.0f, 26.0f, 26.0f}, &selected->visible);
+                        56.0f, 26.0f, 26.0f}, &project, EDITOR_VISIBILITY_OBJECT,
+                    selected->id, 0, 0, selected->visible);
                 rohr_ui_label(&object_name_label,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, 52.0f, 90.0f, 34.0f});
                 {
@@ -2515,7 +2533,8 @@ int main(void) {
                             "editor.rigid_body.%u.visibility", body->id);
                         (void)editor_visibility_toggle(visibility_id, &visibility_icon_label,
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, y, 26.0f, 26.0f},
-                            &body->visible);
+                            &project, EDITOR_VISIBILITY_RIGID_BODY, selected->id,
+                            0, body->id, body->visible);
                         result = rohr_ui_button(id, &rigid_body_labels[i],
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 42.0f, y,
                                 EDITOR_TOOLS_WIDTH - 50.0f, 26.0f},
@@ -2542,7 +2561,8 @@ int main(void) {
                             "editor.joint.%u.visibility", joint->id);
                         (void)editor_visibility_toggle(visibility_id, &visibility_icon_label,
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, y, 26.0f, 26.0f},
-                            &joint->visible);
+                            &project, EDITOR_VISIBILITY_JOINT, selected->id,
+                            0, joint->id, joint->visible);
                         result = rohr_ui_button(id, &joint_labels[i],
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 42.0f, y,
                                 EDITOR_TOOLS_WIDTH - 50.0f, 26.0f},
@@ -2569,7 +2589,8 @@ int main(void) {
                             "editor.soft_body.%u.visibility", body->id);
                         (void)editor_visibility_toggle(visibility_id, &visibility_icon_label,
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, y, 26.0f, 26.0f},
-                            &body->visible);
+                            &project, EDITOR_VISIBILITY_SOFT_BODY, selected->id,
+                            0, body->id, body->visible);
                         result = rohr_ui_button(id, &soft_body_labels[i],
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 42.0f, y,
                                 EDITOR_TOOLS_WIDTH - 50.0f, 26.0f},
@@ -2639,7 +2660,8 @@ int main(void) {
                     "editor.object.%u.visibility", object->id);
                 (void)editor_visibility_toggle(visibility_id, &visibility_icon_label,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, y + 1.0f, 26.0f, 26.0f},
-                    &object->visible);
+                    &project, EDITOR_VISIBILITY_OBJECT, object->id, 0, 0,
+                    object->visible);
                 {
                     UIButtonStyle selected_style = editor_selected_button_style_get();
                     const UIButtonStyle *style = viewport_state.selection ==
@@ -2714,10 +2736,12 @@ int main(void) {
         }
         if(viewport_state.mode != EDITOR_VIEWPORT_HIERARCHY &&
                 rohr_ui_button("editor.viewport.coordinates",
-                    viewport_state.local_view ? &local_view_label : &world_view_label,
+                    project.viewport_local_view ? &local_view_label : &world_view_label,
                     (UIRect){10.0f, EDITOR_MENU_HEIGHT + 10.0f, 84.0f, 30.0f},
                     NULL).clicked) {
-            viewport_state.local_view = !viewport_state.local_view;
+            EditorCommand command = {.type = EDITOR_COMMAND_VIEWPORT_COORDINATES,
+                .data.viewport_coordinates.local = !project.viewport_local_view};
+            (void)editor_command_execute(&project, &command);
         }
         rohr_ui_surface((UIRect){0.0f, 0.0f, editor_window_width,
             EDITOR_MENU_HEIGHT}, (Color){32, 36, 45, 255});

@@ -219,6 +219,14 @@ bool editor_project_save(const EditorProject *project, const char *path) {
     collision_masks = yyjson_mut_arr(document);
     yyjson_mut_doc_set_root(document, root);
     yyjson_mut_obj_add_uint(document, root, "format_version", EDITOR_PROJECT_FORMAT_VERSION);
+    yyjson_mut_obj_add_val(document, root, "viewport_camera_offset",
+        editor_json_position_write(document,
+            (Position){project->viewport_camera_offset.x,
+                project->viewport_camera_offset.y}));
+    yyjson_mut_obj_add_real(document, root, "viewport_camera_zoom",
+        project->viewport_camera_zoom);
+    yyjson_mut_obj_add_bool(document, root, "viewport_local_view",
+        project->viewport_local_view);
     yyjson_mut_obj_add_uint(document, root, "selected", project->selected);
     yyjson_mut_obj_add_uint(document, root, "next_object_id", project->next_id);
     yyjson_mut_obj_add_uint(document, root, "next_vertex_id", project->next_vertex_id);
@@ -562,6 +570,24 @@ EditorResult editor_project_load(EditorProject *project, const char *path) {
             "Project editor state '%s' uses format_version %u; this editor requires %u",
             path, version, EDITOR_PROJECT_FORMAT_VERSION);
         goto done;
+    }
+    {
+        yyjson_val *camera_offset = yyjson_obj_get(root, "viewport_camera_offset");
+        yyjson_val *camera_zoom = yyjson_obj_get(root, "viewport_camera_zoom");
+        yyjson_val *local_view = yyjson_obj_get(root, "viewport_local_view");
+        Position offset;
+        if((camera_offset != NULL &&
+                !editor_json_position_read(camera_offset, &offset)) ||
+                (camera_zoom != NULL && (!yyjson_is_num(camera_zoom) ||
+                    yyjson_get_real(camera_zoom) < 0.1 ||
+                    yyjson_get_real(camera_zoom) > 8.0)) ||
+                (local_view != NULL && !yyjson_is_bool(local_view))) goto done;
+        if(camera_offset != NULL)
+            loaded.viewport_camera_offset = (Vec2D){offset.x, offset.y};
+        if(camera_zoom != NULL)
+            loaded.viewport_camera_zoom = (float)yyjson_get_real(camera_zoom);
+        if(local_view != NULL)
+            loaded.viewport_local_view = yyjson_get_bool(local_view);
     }
     if(!editor_json_uint(root, "selected", &loaded.selected) || !yyjson_is_arr(objects) ||
             yyjson_arr_size(objects) > EDITOR_OBJECT_MAX ||
