@@ -1,9 +1,6 @@
 add_executable(rohr_editor
     src/editor_file_browser.c
-    src/editor_error.c
     src/editor_navigation.c
-    src/editor_project.c
-    src/editor_project_json.c
     src/editor_workspace.c
     src/editor_viewport.c
     src/panels/editor_origin_panel.c
@@ -16,7 +13,7 @@ target_compile_definitions(rohr_editor PRIVATE
     ROHR_ENGINE_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
 )
 
-target_link_libraries(rohr_editor PRIVATE rohr_engine rohr_terminal)
+target_link_libraries(rohr_editor PRIVATE rohr_engine rohr_terminal rohr_editor_core)
 
 set_target_properties(rohr_editor PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/editor
@@ -34,13 +31,10 @@ add_custom_command(TARGET rohr_editor POST_BUILD
 if(ROHR_BUILD_TESTS)
     add_executable(editor_project_test
         tests/editor_project.c
-        src/editor_error.c
-        src/editor_project.c
-        src/editor_project_json.c
         src/editor_workspace.c
     )
     target_include_directories(editor_project_test PRIVATE src ${PROJECT_SOURCE_DIR}/lib)
-    target_link_libraries(editor_project_test PRIVATE rohr_engine)
+    target_link_libraries(editor_project_test PRIVATE rohr_engine rohr_editor_core)
     set_target_properties(editor_project_test PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests
     )
@@ -48,16 +42,13 @@ if(ROHR_BUILD_TESTS)
 
     add_executable(editor_navigation_test
         tests/editor_navigation.c
-        src/editor_error.c
         src/editor_file_browser.c
         src/editor_navigation.c
-        src/editor_project.c
-        src/editor_project_json.c
         src/editor_viewport.c
     )
     target_include_directories(editor_navigation_test PRIVATE
         src ${PROJECT_SOURCE_DIR}/lib)
-    target_link_libraries(editor_navigation_test PRIVATE rohr_engine)
+    target_link_libraries(editor_navigation_test PRIVATE rohr_engine rohr_editor_core)
     set_target_properties(editor_navigation_test PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests
     )

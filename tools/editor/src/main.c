@@ -5,6 +5,7 @@
 #include "editor_viewport.h"
 #include "editor_layout.h"
 #include "editor_navigation.h"
+#include "editor_object_commands.h"
 #include "panels/editor_origin_panel.h"
 #include "panels/editor_terminal_panel.h"
 
@@ -458,7 +459,8 @@ static bool editor_selected_delete(
     if(selected == NULL) return false;
     if(viewport_state->selection == EDITOR_SELECTION_OBJECT) {
         size_t index = (size_t)(selected - project->objects);
-        if(!editor_project_object_remove(project, selected->id)) return false;
+        if(editor_result_check(editor_object_command_remove(
+                project, selected->id))) return false;
         editor_viewport_hitbox_editor_exit(viewport_state);
         if(index < project->object_count) {
             (void)editor_project_object_select(project, project->objects[index].id);
@@ -2517,9 +2519,10 @@ int main(void) {
                 (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 42.0f,
                     EDITOR_TOOLS_WIDTH - 20.0f, 38.0f}, NULL);
             if(add_object.clicked) {
-                EditorObject *added = editor_project_object_add(
-                    &project, (Position){0.0f, 0.0f});
-                if(added != NULL) viewport_state.selection = EDITOR_SELECTION_OBJECT;
+                EditorObjectIdResult added = editor_object_command_add(&project,
+                    &(EditorObjectAddArgs){.position = {0.0f, 0.0f}});
+                if(added.kind == ERROR_RESULT_VALUE)
+                    viewport_state.selection = EDITOR_SELECTION_OBJECT;
             }
             (void)rohr_graphics_screen_rect_draw(
                 EDITOR_VIEWPORT_WIDTH + 10.0f, 90.0f,

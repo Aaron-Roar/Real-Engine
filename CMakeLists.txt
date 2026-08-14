@@ -6,6 +6,7 @@ option(ROHR_BUILD_EXAMPLES "Build Rohr example programs" ON)
 option(ROHR_BUILD_TESTS "Build Rohr tests" ON)
 option(ROHR_BUILD_EDITOR "Build Rohr Editor" ON)
 option(ROHR_BUILD_TERMINAL "Build Rohr Terminal tool" ON)
+option(ROHR_BUILD_CLI "Build Rohr project CLI" ON)
 option(ROHR_ENABLE_DOCUMENTATION "Enable documentation build targets" ON)
 
 set(CMAKE_C_STANDARD 99)
@@ -118,6 +119,12 @@ endif()
 
 if(ROHR_BUILD_TERMINAL)
     add_subdirectory(tools/terminal)
+endif()
+
+add_subdirectory(tools/editor_core)
+
+if(ROHR_BUILD_CLI)
+    add_subdirectory(tools/cli)
 endif()
 
 if(ROHR_BUILD_EDITOR)
