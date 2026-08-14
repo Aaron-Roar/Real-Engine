@@ -25,7 +25,7 @@ typedef struct EditorWorkspace {
 } EditorWorkspace;
 
 EditorWorkspaceConfig editor_workspace_config_default_get(void);
-bool editor_workspace_create(EditorWorkspace *workspace, EditorProject *project,
+EditorResult editor_workspace_create(EditorWorkspace *workspace, EditorProject *project,
     const char *directory, const char *engine_root);
 EditorResult editor_workspace_load(EditorWorkspace *workspace, EditorProject *project,
     const char *directory);

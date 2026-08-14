@@ -99,8 +99,8 @@ int main(void) {
                 strcmp(defaults.generated_directory, "src/generated") != 0 ||
                 strcmp(defaults.editor_state_file,
                     "objects/project.rohr.json") != 0 ||
-                !editor_workspace_create(&workspace, &workspace_project,
-                    fixture, "/engine/root") ||
+                editor_result_check(editor_workspace_create(
+                    &workspace, &workspace_project, fixture, "/engine/root")) ||
                 editor_result_check(editor_workspace_load(
                     &loaded_workspace, &loaded_project, fixture)) ||
                 !loaded_workspace.open || strcmp(loaded_workspace.config.name,
@@ -518,6 +518,88 @@ int main(void) {
                 result.result.error.code != EDITOR_ERROR_SCHEMA_VERSION ||
                 strstr(result.result.error.message, "format_version 99") == NULL ||
                 strstr(result.result.error.message, "requires 1") == NULL) return 1;
+    }
+
+    {
+        static EditorProject invalid_project;
+        const char *path = "editor_project_invalid.json";
+        EditorResult result;
+
+        if(!file_replace(path, "{not valid json")) return 1;
+        result = editor_project_load(&invalid_project, path);
+        if(!editor_result_check(result) ||
+                result.result.error.code != EDITOR_ERROR_JSON_PARSE ||
+                strstr(result.result.error.message, "byte") == NULL) return 1;
+        if(!file_replace(path, "{\"objects\":[]}")) return 1;
+        result = editor_project_load(&invalid_project, path);
+        (void)remove(path);
+        if(!editor_result_check(result) ||
+                result.result.error.code != EDITOR_ERROR_SCHEMA_VERSION ||
+                strstr(result.result.error.message, "missing integer format_version") == NULL)
+            return 1;
+    }
+
+    {
+        static EditorProject reference_project;
+        static EditorProject ignored_project;
+        EditorObject *reference_object;
+        EditorRigidBody *reference_body;
+        const char *path = "editor_project_invalid_reference.json";
+        EditorResult result;
+
+        editor_project_init(&reference_project);
+        reference_object = editor_project_object_add(
+            &reference_project, (Position){0});
+        if(reference_object == NULL) return 1;
+        reference_body = editor_project_rigid_body_add(
+            &reference_project, reference_object);
+        if(reference_body == NULL) return 1;
+        reference_body->collision_category = UINT64_C(1) << 4;
+        if(!editor_project_save(&reference_project, path)) return 1;
+        result = editor_project_load(&ignored_project, path);
+        (void)remove(path);
+        if(!editor_result_check(result) ||
+                result.result.error.code != EDITOR_ERROR_REFERENCE_INVALID ||
+                strstr(result.result.error.message, "collision-mask reference") == NULL)
+            return 1;
+    }
+
+    {
+        static EditorProject manifest_project;
+        EditorWorkspace manifest_workspace = {0};
+        const char *fixture = "/tmp/rohr_editor_manifest_error_test";
+        char path[2048];
+        EditorResult result;
+
+        workspace_fixture_remove(fixture);
+        if(!SDL_CreateDirectory(fixture)) return 1;
+        snprintf(path, sizeof(path), "%s/project.rohr.json", fixture);
+        if(!file_replace(path,
+                "{\"format_version\":1,\"editor_state_file\":"
+                "\"objects/project.rohr.json\"}")) return 1;
+        result = editor_workspace_load(&manifest_workspace, &manifest_project, fixture);
+        workspace_fixture_remove(fixture);
+        if(!editor_result_check(result) ||
+                result.result.error.code != EDITOR_ERROR_SCHEMA_INVALID ||
+                strstr(result.result.error.message, "field 'name'") == NULL) return 1;
+    }
+
+    {
+        static EditorProject creation_project;
+        EditorWorkspace creation_workspace = {0};
+        const char *fixture = "/tmp/rohr_editor_creation_error_test";
+        char path[2048];
+        EditorResult result;
+
+        workspace_fixture_remove(fixture);
+        if(!SDL_CreateDirectory(fixture)) return 1;
+        snprintf(path, sizeof(path), "%s/project.rohr.json", fixture);
+        if(!file_replace(path, "occupied")) return 1;
+        result = editor_workspace_create(
+            &creation_workspace, &creation_project, fixture, "/engine/root");
+        workspace_fixture_remove(fixture);
+        if(!editor_result_check(result) || result.result.error.code != EDITOR_ERROR_FILE_IO ||
+                strstr(result.result.error.message, "not empty") == NULL) return 1;
     }
 
     editor_project_selection_clear(&project);

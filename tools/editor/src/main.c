@@ -2761,8 +2761,9 @@ int main(void) {
                 EditorResult load_result = editor_result_value(true);
                 bool opened;
                 if(workspace_browser_action == EDITOR_WORKSPACE_BROWSER_NEW) {
-                    opened = editor_workspace_create(&workspace, &project,
+                    load_result = editor_workspace_create(&workspace, &project,
                         browser_result.path, ROHR_ENGINE_SOURCE_DIR);
+                    opened = !editor_result_check(load_result);
                 } else {
                     load_result = editor_workspace_load(
                         &workspace, &project, browser_result.path);
@@ -2773,10 +2774,7 @@ int main(void) {
                     editor_viewport_state_init(&viewport_state);
                     panel_scroll_offset = 0.0f;
                 } else {
-                    if(workspace_browser_action == EDITOR_WORKSPACE_BROWSER_LOAD)
-                        editor_result_stderr_print(load_result);
-                    else fprintf(stderr, "Could not create project directory: %s\n",
-                        browser_result.path);
+                    editor_result_stderr_print(load_result);
                     file_browser.active = true;
                 }
                 if(opened) workspace_browser_action = EDITOR_WORKSPACE_BROWSER_NONE;
