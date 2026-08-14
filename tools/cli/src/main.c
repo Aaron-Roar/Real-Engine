@@ -30,6 +30,9 @@ static void cli_usage_print(void) {
         "    targets: object, rigid-body, hitbox, joint, anchor, soft-body, soft-node, soft-beam\n"
         "  rohr <target> set <project.rohr.json> <object> [parent] <item> [index] <property> <value>\n"
         "    targets: rigid-body, joint, anchor, soft-node, soft-beam, vertex, line\n"
+        "  rohr joint connect <project.rohr.json> <object> <joint> <anchor-a|anchor-b> <anchor|none>\n"
+        "  rohr anchor connect <project.rohr.json> <object> <anchor> rigid-body <body|none>\n"
+        "  rohr soft-beam connect <project.rohr.json> <object> <body> <beam> <node-a|node-b> <node|none>\n"
         "  rohr navigation set <project.rohr.json> <mode> <selection> <object>\n"
         "      <rigid-body> <hitbox> <joint> <anchor> <soft-body> <soft-node>\n"
         "      <soft-beam> <line> <vertex> <origin-kind>");

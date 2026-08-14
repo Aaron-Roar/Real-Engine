@@ -331,6 +331,78 @@ static int property_commands_test(void) {
     return 0;
 }
 
+static int relationship_commands_test(void) {
+    static EditorProject project;
+    EditorObject *object;
+    EditorRigidBody *body;
+    EditorAnchor *anchor_a;
+    EditorAnchor *anchor_b;
+    EditorJoint *joint;
+    EditorSoftBody *soft_body;
+    EditorSoftNode *node_a;
+    EditorSoftNode *node_b;
+    EditorSoftBeam *beam;
+    EditorCommand command;
+    EditorCommand parsed;
+    const char *path;
+    char cli_text[512];
+    char *joint_arguments[] = {"editor-cli", "joint", "connect",
+        "project.rohr.json", "1", "1", "anchor-b", "none"};
+    char *beam_arguments[] = {"editor-cli", "soft-beam", "connect",
+        "project.rohr.json", "1", "1", "1", "node-a", "2"};
+
+    editor_project_init(&project);
+    object = editor_project_object_add(&project, (Position){0});
+    body = editor_project_rigid_body_add(&project, object);
+    anchor_a = editor_project_anchor_add(&project, object, (Position){0}, 0);
+    anchor_b = editor_project_anchor_add(&project, object, (Position){1.0f, 0.0f}, 0);
+    joint = editor_project_joint_add(&project, object, EDITOR_JOINT_SPRING);
+    soft_body = editor_project_soft_body_add(&project, object);
+    node_a = editor_project_soft_node_add(&project, soft_body, (Position){0});
+    node_b = editor_project_soft_node_add(&project, soft_body, (Position){1.0f, 0.0f});
+    beam = editor_project_soft_beam_add(&project, soft_body, 0, 0);
+    if(object == NULL || body == NULL || anchor_a == NULL || anchor_b == NULL ||
+            joint == NULL || soft_body == NULL || node_a == NULL || node_b == NULL ||
+            beam == NULL) return 1;
+#define RELATIONSHIP_SET(relation_kind, relation_parent, relation_item, \
+        relation_endpoint, relation_target) do { \
+    command = (EditorCommand){.type = EDITOR_COMMAND_RELATIONSHIP_SET, \
+        .data.relationship_set = {relation_kind, object->id, relation_parent, \
+            relation_item, relation_endpoint, relation_target}}; \
+    if(editor_command_execute(&project, &command).kind != ERROR_RESULT_VALUE || \
+            editor_result_check(editor_command_cli_write(&command, \
+                "project.rohr.json", cli_text, sizeof(cli_text)))) return 1; \
+} while(0)
+    RELATIONSHIP_SET(EDITOR_RELATIONSHIP_JOINT_ANCHOR, 0, joint->id, 0,
+        anchor_a->id);
+    RELATIONSHIP_SET(EDITOR_RELATIONSHIP_JOINT_ANCHOR, 0, joint->id, 1,
+        anchor_b->id);
+    RELATIONSHIP_SET(EDITOR_RELATIONSHIP_ANCHOR_RIGID_BODY, 0, anchor_a->id, 0,
+        body->id);
+    RELATIONSHIP_SET(EDITOR_RELATIONSHIP_SOFT_BEAM_NODE, soft_body->id, beam->id, 0,
+        node_a->id);
+    RELATIONSHIP_SET(EDITOR_RELATIONSHIP_SOFT_BEAM_NODE, soft_body->id, beam->id, 1,
+        node_b->id);
+#undef RELATIONSHIP_SET
+    if(joint->anchor_a != anchor_a->id || joint->anchor_b != anchor_b->id ||
+            anchor_a->rigid_body != body->id || beam->node_a != node_a->id ||
+            beam->node_b != node_b->id) return 1;
+    if(editor_result_check(editor_command_cli_parse(8, joint_arguments, &path,
+                &parsed)) || parsed.type != EDITOR_COMMAND_RELATIONSHIP_SET ||
+            parsed.data.relationship_set.endpoint != 1 ||
+            parsed.data.relationship_set.target != 0 ||
+            editor_result_check(editor_command_cli_parse(9, beam_arguments, &path,
+                &parsed)) || parsed.data.relationship_set.kind !=
+                EDITOR_RELATIONSHIP_SOFT_BEAM_NODE ||
+            parsed.data.relationship_set.endpoint != 0 ||
+            parsed.data.relationship_set.target != 2) return 1;
+    command = (EditorCommand){.type = EDITOR_COMMAND_RELATIONSHIP_SET,
+        .data.relationship_set = {EDITOR_RELATIONSHIP_SOFT_BEAM_NODE,
+            object->id, soft_body->id, beam->id, 0, UINT32_MAX}};
+    if(editor_command_execute(&project, &command).kind != ERROR_RESULT_ERROR) return 1;
+    return 0;
+}
+
 int main(void) {
     const char *path = "/tmp/rohr-editor-core-test.json";
     EditorDocument document;
@@ -412,6 +484,7 @@ int main(void) {
     if(transform_commands_test() != 0) return 1;
     if(item_commands_test() != 0) return 1;
     if(property_commands_test() != 0) return 1;
+    if(relationship_commands_test() != 0) return 1;
 
     editor_document_destroy(&loaded);
     editor_document_destroy(&document);

@@ -349,6 +349,14 @@ static void editor_property_uint_set(EditorProject *project, EditorItemKind kind
     (void)editor_command_execute(project, &command);
 }
 
+static void editor_relationship_set(EditorProject *project,
+        EditorRelationshipKind kind, EditorObjectId object, uint32_t parent,
+        uint32_t item, uint32_t endpoint, uint32_t target) {
+    EditorCommand command = {.type = EDITOR_COMMAND_RELATIONSHIP_SET,
+        .data.relationship_set = {kind, object, parent, item, endpoint, target}};
+    (void)editor_command_execute(project, &command);
+}
+
 static bool editor_checkbox_label_left(const char *id, const TextAsset *label,
     UIRect bounds, bool *checked) {
     UIButtonResult interaction;
@@ -1936,8 +1944,9 @@ int main(void) {
                     if(result.button_hovered || result.hovered_index >= 0) {
                         editor_anchor_preview_set(&viewport_state, selected, preview);
                     }
-                    if(result.changed) (void)editor_project_joint_anchor_set(selected, joint, 0,
-                        result.selected_index == 0 ? 0 :
+                    if(result.changed) editor_relationship_set(&project,
+                        EDITOR_RELATIONSHIP_JOINT_ANCHOR, selected->id, 0,
+                        joint->id, 0, result.selected_index == 0 ? 0 :
                             selected->anchors[result.selected_index - 1].id);
                 }
                 {
@@ -1950,8 +1959,9 @@ int main(void) {
                     if(result.button_hovered || result.hovered_index >= 0) {
                         editor_anchor_preview_set(&viewport_state, selected, preview);
                     }
-                    if(result.changed) (void)editor_project_joint_anchor_set(selected, joint, 1,
-                        result.selected_index == 0 ? 0 :
+                    if(result.changed) editor_relationship_set(&project,
+                        EDITOR_RELATIONSHIP_JOINT_ANCHOR, selected->id, 0,
+                        joint->id, 1, result.selected_index == 0 ? 0 :
                             selected->anchors[result.selected_index - 1].id);
                 }
                 }
@@ -2115,8 +2125,9 @@ int main(void) {
                                 viewport_state.preview_rigid_body =
                                     selected->rigid_bodies[result.hovered_index - 1].id;
                             }
-                            if(result.changed) (void)editor_project_anchor_rigid_body_set(
-                                selected, anchor, result.selected_index == 0 ? 0 :
+                            if(result.changed) editor_relationship_set(&project,
+                                EDITOR_RELATIONSHIP_ANCHOR_RIGID_BODY, selected->id,
+                                0, anchor->id, 0, result.selected_index == 0 ? 0 :
                                     selected->rigid_bodies[result.selected_index - 1].id);
                         }
                         rohr_ui_label(&rotation_label,
@@ -2250,12 +2261,10 @@ int main(void) {
                         viewport_state.preview_rigid_body =
                             selected->rigid_bodies[result.hovered_index - 1].id;
                     }
-                    if(result.changed) {
-                        (void)editor_project_anchor_rigid_body_set(
-                            selected, anchor, result.selected_index == 0 ? 0 :
-                                selected->rigid_bodies[result.selected_index - 1].id);
-                        editor_project_anchor_constraints_apply(selected, anchor->id);
-                    }
+                    if(result.changed) editor_relationship_set(&project,
+                        EDITOR_RELATIONSHIP_ANCHOR_RIGID_BODY, selected->id, 0,
+                        anchor->id, 0, result.selected_index == 0 ? 0 :
+                            selected->rigid_bodies[result.selected_index - 1].id);
                 }
                 rohr_ui_label(&rotation_label,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 192.0f, 76.0f, 26.0f});
@@ -2712,10 +2721,14 @@ int main(void) {
                     if(b_result.button_hovered) viewport_state.preview_soft_node = beam->node_b;
                     else if(b_result.hovered_index > 0) viewport_state.preview_soft_node =
                         body->nodes[b_result.hovered_index - 1].id;
-                    if(a_result.changed) beam->node_a = a_result.selected_index == 0 ? 0 :
-                        body->nodes[a_result.selected_index - 1].id;
-                    if(b_result.changed) beam->node_b = b_result.selected_index == 0 ? 0 :
-                        body->nodes[b_result.selected_index - 1].id;
+                    if(a_result.changed) editor_relationship_set(&project,
+                        EDITOR_RELATIONSHIP_SOFT_BEAM_NODE, selected->id, body->id,
+                        beam->id, 0, a_result.selected_index == 0 ? 0 :
+                            body->nodes[a_result.selected_index - 1].id);
+                    if(b_result.changed) editor_relationship_set(&project,
+                        EDITOR_RELATIONSHIP_SOFT_BEAM_NODE, selected->id, body->id,
+                        beam->id, 1, b_result.selected_index == 0 ? 0 :
+                            body->nodes[b_result.selected_index - 1].id);
                 }
                 rohr_ui_label(&stiffness_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     196.0f, 90.0f, 26.0f});

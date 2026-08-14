@@ -22,7 +22,8 @@ typedef enum EditorCommandType {
     EDITOR_COMMAND_ITEM_ADD,
     EDITOR_COMMAND_ITEM_REMOVE,
     EDITOR_COMMAND_ITEM_RENAME,
-    EDITOR_COMMAND_PROPERTY_SET
+    EDITOR_COMMAND_PROPERTY_SET,
+    EDITOR_COMMAND_RELATIONSHIP_SET
 } EditorCommandType;
 
 typedef enum EditorItemKind {
@@ -108,6 +109,21 @@ typedef struct EditorPropertySetCommand {
     } value;
 } EditorPropertySetCommand;
 
+typedef enum EditorRelationshipKind {
+    EDITOR_RELATIONSHIP_JOINT_ANCHOR,
+    EDITOR_RELATIONSHIP_ANCHOR_RIGID_BODY,
+    EDITOR_RELATIONSHIP_SOFT_BEAM_NODE
+} EditorRelationshipKind;
+
+typedef struct EditorRelationshipSetCommand {
+    EditorRelationshipKind kind;
+    EditorObjectId object;
+    uint32_t parent;
+    uint32_t item;
+    uint32_t endpoint;
+    uint32_t target;
+} EditorRelationshipSetCommand;
+
 typedef enum EditorVisibilityKind {
     EDITOR_VISIBILITY_OBJECT,
     EDITOR_VISIBILITY_RIGID_BODY,
@@ -192,6 +208,7 @@ typedef struct EditorCommand {
         EditorItemRemoveCommand item_remove;
         EditorItemRenameCommand item_rename;
         EditorPropertySetCommand property_set;
+        EditorRelationshipSetCommand relationship_set;
     } data;
 } EditorCommand;
 

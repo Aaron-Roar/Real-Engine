@@ -605,6 +605,45 @@ property_invalid:
                 EDITOR_ERROR_INVALID_ARGUMENT,
                 "property is invalid for the target or value").result.error);
         }
+        case EDITOR_COMMAND_RELATIONSHIP_SET: {
+            const EditorRelationshipSetCommand *set =
+                &command->data.relationship_set;
+            EditorObject *object = editor_object_query_get(project, set->object);
+            if(object == NULL) return editor_command_not_found("object", set->object);
+            if(set->endpoint > 1) return editor_command_error(editor_result_error(
+                EDITOR_ERROR_INVALID_ARGUMENT,
+                "relationship endpoint must be 0 or 1").result.error);
+            if(set->kind == EDITOR_RELATIONSHIP_JOINT_ANCHOR) {
+                EditorJoint *joint = editor_command_joint_get(object, set->item);
+                if(joint == NULL) return editor_command_not_found("joint", set->item);
+                if(!editor_project_joint_anchor_set(object, joint, set->endpoint,
+                        set->target)) return editor_command_error(editor_result_error(
+                    EDITOR_ERROR_INVALID_ARGUMENT,
+                    "joint anchor relationship is invalid").result.error);
+            } else if(set->kind == EDITOR_RELATIONSHIP_ANCHOR_RIGID_BODY) {
+                EditorAnchor *anchor = editor_project_anchor_get(object, set->item);
+                if(anchor == NULL) return editor_command_not_found("anchor", set->item);
+                if(!editor_project_anchor_rigid_body_set(object, anchor, set->target))
+                    return editor_command_error(editor_result_error(
+                        EDITOR_ERROR_INVALID_ARGUMENT,
+                        "anchor rigid-body relationship is invalid").result.error);
+                editor_project_anchor_constraints_apply(object, anchor->id);
+            } else if(set->kind == EDITOR_RELATIONSHIP_SOFT_BEAM_NODE) {
+                EditorSoftBody *body = editor_command_soft_body_get(object, set->parent);
+                EditorSoftBeam *beam = editor_command_soft_beam_get(body, set->item);
+                if(beam == NULL) return editor_command_not_found("soft beam", set->item);
+                if(set->target != 0 &&
+                        editor_command_soft_node_get(body, set->target) == NULL)
+                    return editor_command_not_found("soft node", set->target);
+                if(set->endpoint == 0) beam->node_a = set->target;
+                else beam->node_b = set->target;
+            } else {
+                return editor_command_error(editor_result_error(
+                    EDITOR_ERROR_INVALID_ARGUMENT,
+                    "unknown relationship kind").result.error);
+            }
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+        }
     }
     return editor_command_error((EditorError){EDITOR_ERROR_INVALID_ARGUMENT,
         "unknown editor command"});
@@ -657,6 +696,14 @@ static bool editor_command_bool_parse(const char *text, bool *value) {
         return true;
     }
     return false;
+}
+
+static bool editor_command_optional_id_parse(const char *text, uint32_t *value) {
+    if(text != NULL && strcmp(text, "none") == 0) {
+        *value = 0;
+        return true;
+    }
+    return editor_command_uint_parse(text, value);
 }
 
 static const char *editor_command_navigation_modes[] = {
@@ -814,6 +861,38 @@ EditorResult editor_command_cli_parse(int count, char **arguments,
             return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
                 "invalid navigation set command");
         command->type = EDITOR_COMMAND_NAVIGATION_SET;
+        return editor_result_value(true);
+    }
+    if(strcmp(action, "connect") == 0) {
+        EditorRelationshipSetCommand *set = &command->data.relationship_set;
+        if(strcmp(domain, "joint") == 0 && count == 8 &&
+                editor_command_uint_parse(arguments[4], &set->object) &&
+                editor_command_uint_parse(arguments[5], &set->item) &&
+                (strcmp(arguments[6], "anchor-a") == 0 ||
+                    strcmp(arguments[6], "anchor-b") == 0) &&
+                editor_command_optional_id_parse(arguments[7], &set->target)) {
+            set->kind = EDITOR_RELATIONSHIP_JOINT_ANCHOR;
+            set->endpoint = strcmp(arguments[6], "anchor-b") == 0;
+        } else if(strcmp(domain, "anchor") == 0 && count == 8 &&
+                editor_command_uint_parse(arguments[4], &set->object) &&
+                editor_command_uint_parse(arguments[5], &set->item) &&
+                strcmp(arguments[6], "rigid-body") == 0 &&
+                editor_command_optional_id_parse(arguments[7], &set->target)) {
+            set->kind = EDITOR_RELATIONSHIP_ANCHOR_RIGID_BODY;
+        } else if(strcmp(domain, "soft-beam") == 0 && count == 9 &&
+                editor_command_uint_parse(arguments[4], &set->object) &&
+                editor_command_uint_parse(arguments[5], &set->parent) &&
+                editor_command_uint_parse(arguments[6], &set->item) &&
+                (strcmp(arguments[7], "node-a") == 0 ||
+                    strcmp(arguments[7], "node-b") == 0) &&
+                editor_command_optional_id_parse(arguments[8], &set->target)) {
+            set->kind = EDITOR_RELATIONSHIP_SOFT_BEAM_NODE;
+            set->endpoint = strcmp(arguments[7], "node-b") == 0;
+        } else {
+            return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                "invalid %s relationship command", domain);
+        }
+        command->type = EDITOR_COMMAND_RELATIONSHIP_SET;
         return editor_result_value(true);
     }
     if(strcmp(action, "set") == 0) {
@@ -1223,6 +1302,16 @@ EditorResult editor_command_cli_write(const EditorCommand *command,
         case EDITOR_COMMAND_PROPERTY_SET:
             domain = editor_command_item_domain_get(command->data.property_set.kind);
             break;
+        case EDITOR_COMMAND_RELATIONSHIP_SET:
+            if(command->data.relationship_set.kind ==
+                    EDITOR_RELATIONSHIP_JOINT_ANCHOR) domain = "joint";
+            else if(command->data.relationship_set.kind ==
+                    EDITOR_RELATIONSHIP_ANCHOR_RIGID_BODY) domain = "anchor";
+            else if(command->data.relationship_set.kind ==
+                    EDITOR_RELATIONSHIP_SOFT_BEAM_NODE) domain = "soft-beam";
+            else return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                "unknown relationship target");
+            break;
         default: return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
             "unknown editor command");
     }
@@ -1514,6 +1603,30 @@ EditorResult editor_command_cli_write(const EditorCommand *command,
             if(!editor_command_text_append(output, output_capacity, &used, value))
                 goto capacity_error;
             return editor_result_value(true);
+        }
+        case EDITOR_COMMAND_RELATIONSHIP_SET: {
+            const EditorRelationshipSetCommand *set =
+                &command->data.relationship_set;
+            const char *slot;
+            char target[32];
+            if(!editor_command_text_append(output, output_capacity, &used, "connect ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            if(set->target == 0) snprintf(target, sizeof(target), "none");
+            else snprintf(target, sizeof(target), "%u", set->target);
+            if(set->kind == EDITOR_RELATIONSHIP_JOINT_ANCHOR) {
+                slot = set->endpoint == 0 ? "anchor-a" : "anchor-b";
+                snprintf(values, sizeof(values), " %u %u %s %s", set->object,
+                    set->item, slot, target);
+            } else if(set->kind == EDITOR_RELATIONSHIP_ANCHOR_RIGID_BODY) {
+                snprintf(values, sizeof(values), " %u %u rigid-body %s", set->object,
+                    set->item, target);
+            } else if(set->kind == EDITOR_RELATIONSHIP_SOFT_BEAM_NODE) {
+                slot = set->endpoint == 0 ? "node-a" : "node-b";
+                snprintf(values, sizeof(values), " %u %u %u %s %s", set->object,
+                    set->parent, set->item, slot, target);
+            } else goto capacity_error;
+            break;
         }
     }
     if(!editor_command_text_append(output, output_capacity, &used, values))
