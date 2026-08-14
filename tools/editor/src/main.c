@@ -2758,18 +2758,25 @@ int main(void) {
                 &save_label, &open_label, &create_project_label, &cancel_label,
                 editor_window_width, WINDOW_HEIGHT);
             if(browser_result.submitted) {
-                bool opened = workspace_browser_action == EDITOR_WORKSPACE_BROWSER_NEW ?
-                    editor_workspace_create(&workspace, &project,
-                        browser_result.path, ROHR_ENGINE_SOURCE_DIR) :
-                    editor_workspace_load(&workspace, &project, browser_result.path);
+                EditorResult load_result = editor_result_value(true);
+                bool opened;
+                if(workspace_browser_action == EDITOR_WORKSPACE_BROWSER_NEW) {
+                    opened = editor_workspace_create(&workspace, &project,
+                        browser_result.path, ROHR_ENGINE_SOURCE_DIR);
+                } else {
+                    load_result = editor_workspace_load(
+                        &workspace, &project, browser_result.path);
+                    opened = !editor_result_check(load_result);
+                }
                 if(opened) {
                     saved_project_hash = editor_project_hash_get(&project);
                     editor_viewport_state_init(&viewport_state);
                     panel_scroll_offset = 0.0f;
                 } else {
-                    fprintf(stderr, "Could not %s project directory: %s\n",
-                        workspace_browser_action == EDITOR_WORKSPACE_BROWSER_NEW ?
-                            "create" : "load", browser_result.path);
+                    if(workspace_browser_action == EDITOR_WORKSPACE_BROWSER_LOAD)
+                        editor_result_stderr_print(load_result);
+                    else fprintf(stderr, "Could not create project directory: %s\n",
+                        browser_result.path);
                     file_browser.active = true;
                 }
                 if(opened) workspace_browser_action = EDITOR_WORKSPACE_BROWSER_NONE;

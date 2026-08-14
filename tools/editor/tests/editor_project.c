@@ -101,7 +101,8 @@ int main(void) {
                     "objects/project.rohr.json") != 0 ||
                 !editor_workspace_create(&workspace, &workspace_project,
                     fixture, "/engine/root") ||
-                !editor_workspace_load(&loaded_workspace, &loaded_project, fixture) ||
+                editor_result_check(editor_workspace_load(
+                    &loaded_workspace, &loaded_project, fixture)) ||
                 !loaded_workspace.open || strcmp(loaded_workspace.config.name,
                     "RohrEditorWorkspaceTest") != 0 ||
                 strcmp(loaded_workspace.config.engine_root, "/engine/root") != 0 ||
@@ -216,14 +217,16 @@ int main(void) {
             return 1;
         }
         snprintf(path, sizeof(path), "%s/objects", fixture);
-        if(!editor_workspace_load(&loaded_workspace, &loaded_project, path) ||
+        if(editor_result_check(editor_workspace_load(
+                    &loaded_workspace, &loaded_project, path)) ||
                 !loaded_workspace.open || loaded_project.object_count != 1) {
             fprintf(stderr, "nested workspace load failed: %s\n", path);
             workspace_fixture_remove(fixture);
             return 1;
         }
         snprintf(path, sizeof(path), "%s/project.rohr.json", fixture);
-        if(!editor_workspace_load(&loaded_workspace, &loaded_project, path) ||
+        if(editor_result_check(editor_workspace_load(
+                    &loaded_workspace, &loaded_project, path)) ||
                 !loaded_workspace.open || loaded_project.object_count != 1) {
             fprintf(stderr, "manifest workspace load failed: %s\n", path);
             workspace_fixture_remove(fixture);
@@ -454,7 +457,7 @@ int main(void) {
         EditorObject *loaded_object;
 
         if(!editor_project_save(&project, path) ||
-                !editor_project_load(&loaded, path)) return 1;
+                editor_result_check(editor_project_load(&loaded, path))) return 1;
         (void)remove(path);
         loaded_object = editor_project_selected_get(&loaded);
         if(loaded_object == NULL || loaded.object_count != project.object_count ||
@@ -501,6 +504,20 @@ int main(void) {
                     "front_point") != 0 ||
                 strcmp(loaded_object->rigid_bodies[0].hitboxes[0].line_names[0],
                     "upper_edge") != 0) return 1;
+    }
+
+    {
+        static EditorProject invalid_version_project;
+        const char *path = "editor_project_invalid_version.json";
+        EditorResult result;
+
+        if(!file_replace(path, "{\"format_version\":99}")) return 1;
+        result = editor_project_load(&invalid_version_project, path);
+        (void)remove(path);
+        if(!editor_result_check(result) ||
+                result.result.error.code != EDITOR_ERROR_SCHEMA_VERSION ||
+                strstr(result.result.error.message, "format_version 99") == NULL ||
+                strstr(result.result.error.message, "requires 1") == NULL) return 1;
     }
 
     editor_project_selection_clear(&project);

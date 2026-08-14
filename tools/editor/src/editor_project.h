@@ -2,6 +2,7 @@
 #define ROHR_EDITOR_PROJECT_H
 
 #include "rohr.h"
+#include "editor_error.h"
 
 #define EDITOR_OBJECT_MAX 64
 #define EDITOR_HITBOX_VERTEX_MIN 3
@@ -187,7 +188,7 @@ void editor_project_property_name_format(char *output, size_t capacity,
 bool editor_project_collision_mask_add(EditorProject *project, const char *name,
     size_t *index);
 bool editor_project_save(const EditorProject *project, const char *path);
-bool editor_project_load(EditorProject *project, const char *path);
+EditorResult editor_project_load(EditorProject *project, const char *path);
 EditorObject *editor_project_object_add(EditorProject *project, Position position);
 bool editor_project_object_remove(EditorProject *project, EditorObjectId id);
 EditorObject *editor_project_selected_get(EditorProject *project);

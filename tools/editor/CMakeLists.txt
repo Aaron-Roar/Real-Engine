@@ -1,5 +1,6 @@
 add_executable(rohr_editor
     src/editor_file_browser.c
+    src/editor_error.c
     src/editor_navigation.c
     src/editor_project.c
     src/editor_project_json.c
@@ -32,6 +33,7 @@ add_custom_command(TARGET rohr_editor POST_BUILD
 if(ROHR_BUILD_TESTS)
     add_executable(editor_project_test
         tests/editor_project.c
+        src/editor_error.c
         src/editor_project.c
         src/editor_project_json.c
         src/editor_workspace.c
@@ -45,6 +47,7 @@ if(ROHR_BUILD_TESTS)
 
     add_executable(editor_navigation_test
         tests/editor_navigation.c
+        src/editor_error.c
         src/editor_file_browser.c
         src/editor_navigation.c
         src/editor_project.c

@@ -779,26 +779,30 @@ bool editor_workspace_create(EditorWorkspace *workspace, EditorProject *project,
     return true;
 }
 
-bool editor_workspace_load(EditorWorkspace *workspace, EditorProject *project,
+EditorResult editor_workspace_load(EditorWorkspace *workspace, EditorProject *project,
     const char *directory) {
     EditorWorkspace loaded = {0};
     static EditorProject loaded_project;
     char path[EDITOR_WORKSPACE_PATH_MAX * 2];
     char root[EDITOR_WORKSPACE_PATH_MAX];
+    EditorResult result;
 
-    if(workspace == NULL || project == NULL) return false;
+    if(workspace == NULL || project == NULL || directory == NULL)
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "Workspace load received an invalid argument");
     if(!editor_workspace_root_find(root, sizeof(root), directory, &loaded)) {
-        fprintf(stderr, "Could not find project root from: %s\n", directory);
-        return false;
+        return editor_result_error(EDITOR_ERROR_PROJECT_ROOT_NOT_FOUND,
+            "Could not find a valid project manifest at or above: %s", directory);
     }
     if(!editor_workspace_path_join(path, sizeof(path), root,
-            loaded.config.editor_state_file) || !editor_project_load(&loaded_project, path)) {
-        fprintf(stderr, "Could not load project editor state from: %s\n", path);
-        return false;
-    }
+            loaded.config.editor_state_file))
+        return editor_result_error(EDITOR_ERROR_FILE_IO,
+            "Project editor-state path is too long under: %s", root);
+    result = editor_project_load(&loaded_project, path);
+    if(editor_result_check(result)) return result;
     *workspace = loaded;
     *project = loaded_project;
-    return true;
+    return editor_result_value(true);
 }
 
 void editor_workspace_close(EditorWorkspace *workspace, EditorProject *project) {

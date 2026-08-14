@@ -522,24 +522,48 @@ static bool editor_json_references_valid(EditorProject *project) {
     return project->selected == 0 || editor_project_selected_get(project) != NULL;
 }
 
-bool editor_project_load(EditorProject *project, const char *path) {
+EditorResult editor_project_load(EditorProject *project, const char *path) {
     static EditorProject loaded;
     yyjson_doc *document;
+    yyjson_read_err read_error = {0};
     yyjson_val *root;
     yyjson_val *objects;
     yyjson_val *collision_masks;
     uint32_t version;
-    bool success = false;
-    if(project == NULL || path == NULL || path[0] == '\0') return false;
-    document = yyjson_read_file(path, 0, NULL, NULL);
-    if(document == NULL) return false;
+    EditorResult result = editor_result_error(EDITOR_ERROR_SCHEMA_INVALID,
+        "Project editor state does not match the current schema: %s",
+        path == NULL ? "(null)" : path);
+    if(project == NULL || path == NULL || path[0] == '\0')
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "Project editor-state load received an invalid argument");
+    document = yyjson_read_file(path, 0, NULL, &read_error);
+    if(document == NULL) {
+        return editor_result_error(
+            read_error.code == YYJSON_READ_ERROR_FILE_OPEN ||
+                    read_error.code == YYJSON_READ_ERROR_FILE_READ ?
+                EDITOR_ERROR_FILE_IO : EDITOR_ERROR_JSON_PARSE,
+            "Could not parse project editor state '%s': %s at byte %zu",
+            path, read_error.msg == NULL ? "unknown JSON error" : read_error.msg,
+            read_error.pos);
+    }
     root = yyjson_doc_get_root(document);
     objects = yyjson_obj_get(root, "objects");
     collision_masks = yyjson_obj_get(root, "collision_masks");
     editor_project_init(&loaded);
-    if(!yyjson_is_obj(root) || !editor_json_uint(root, "format_version", &version) ||
-            version != EDITOR_PROJECT_FORMAT_VERSION ||
-            !editor_json_uint(root, "selected", &loaded.selected) || !yyjson_is_arr(objects) ||
+    if(!yyjson_is_obj(root)) goto done;
+    if(!editor_json_uint(root, "format_version", &version)) {
+        result = editor_result_error(EDITOR_ERROR_SCHEMA_VERSION,
+            "Project editor state '%s' is missing integer format_version; expected %u",
+            path, EDITOR_PROJECT_FORMAT_VERSION);
+        goto done;
+    }
+    if(version != EDITOR_PROJECT_FORMAT_VERSION) {
+        result = editor_result_error(EDITOR_ERROR_SCHEMA_VERSION,
+            "Project editor state '%s' uses format_version %u; this editor requires %u",
+            path, version, EDITOR_PROJECT_FORMAT_VERSION);
+        goto done;
+    }
+    if(!editor_json_uint(root, "selected", &loaded.selected) || !yyjson_is_arr(objects) ||
             yyjson_arr_size(objects) > EDITOR_OBJECT_MAX ||
             !editor_json_uint(root, "next_object_id", &loaded.next_id) ||
             !editor_json_uint(root, "next_vertex_id", &loaded.next_vertex_id) ||
@@ -605,10 +629,15 @@ bool editor_project_load(EditorProject *project, const char *path) {
                     &object->soft_body_items[j], &loaded)) goto done;
         if(loaded.next_id <= object->id) loaded.next_id = object->id + 1;
     }
-    if(!editor_json_references_valid(&loaded)) goto done;
+    if(!editor_json_references_valid(&loaded)) {
+        result = editor_result_error(EDITOR_ERROR_REFERENCE_INVALID,
+            "Project editor state '%s' contains an invalid entity, joint, beam, or collision-mask reference",
+            path);
+        goto done;
+    }
     *project = loaded;
-    success = true;
+    result = editor_result_value(true);
 done:
     yyjson_doc_free(document);
-    return success;
+    return result;
 }
