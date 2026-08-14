@@ -48,6 +48,12 @@ typedef struct RohrTerminalLineView {
     size_t cell_count;
 } RohrTerminalLineView;
 
+typedef struct RohrTerminalCursor {
+    size_t line_index;
+    size_t column;
+    bool visible;
+} RohrTerminalCursor;
+
 RohrTerminalConfig rohr_terminal_config_default_get(void);
 RohrTerminalResult rohr_terminal_create(RohrTerminal **terminal,
     const RohrTerminalConfig *config);
@@ -60,6 +66,7 @@ int rohr_terminal_exit_code_get(const RohrTerminal *terminal);
 size_t rohr_terminal_line_count_get(const RohrTerminal *terminal);
 RohrTerminalLineView rohr_terminal_line_get(const RohrTerminal *terminal,
     size_t index);
+RohrTerminalCursor rohr_terminal_cursor_get(const RohrTerminal *terminal);
 const char *rohr_terminal_error_message_get(const RohrTerminalResult *result);
 void rohr_terminal_destroy(RohrTerminal *terminal);
 

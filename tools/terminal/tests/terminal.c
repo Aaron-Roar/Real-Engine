@@ -28,7 +28,7 @@ int main(void) {
     RohrTerminalResult result;
     const char command[] =
         "printf 'removed-by-clear\\n\\033[?2004h\\033[H\\033[2Jterminal-test\\n'; "
-        "pwd; exit 7\n";
+        "pwd; printf '\\033[?25l\\033[4G'; exit 7\n";
     struct timespec delay = {.tv_nsec = 10000000};
 
     config.shell = "/bin/sh";
@@ -50,11 +50,12 @@ int main(void) {
         (void)nanosleep(&delay, NULL);
     }
     (void)rohr_terminal_update(terminal);
+    RohrTerminalCursor cursor = rohr_terminal_cursor_get(terminal);
     if(rohr_terminal_running_check(terminal) || rohr_terminal_exit_code_get(terminal) != 7 ||
             !terminal_line_contains(terminal, "terminal-test") ||
             !terminal_line_contains(terminal, "/tmp") ||
             terminal_line_contains(terminal, "removed-by-clear") ||
-            terminal_line_contains(terminal, "2004h")) {
+            terminal_line_contains(terminal, "2004h") || cursor.visible) {
         fprintf(stderr, "running=%d exit=%d lines=%zu terminal_test=%d cwd=%d\n",
             rohr_terminal_running_check(terminal), rohr_terminal_exit_code_get(terminal),
             rohr_terminal_line_count_get(terminal),

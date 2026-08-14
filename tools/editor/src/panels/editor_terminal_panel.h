@@ -13,6 +13,7 @@ typedef struct EditorTerminalPanel {
     bool focused;
     bool resizing;
     float height;
+    float cell_width;
     size_t scroll_offset;
 } EditorTerminalPanel;
 

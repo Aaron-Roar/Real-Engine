@@ -26,6 +26,10 @@ struct RohrTerminal {
     size_t line_capacity;
     size_t line_count;
     size_t line_first;
+    size_t cursor_line;
+    size_t cursor_column;
+    uint16_t rows;
+    bool cursor_visible;
     uint32_t foreground;
     uint32_t background;
     uint16_t attributes;
