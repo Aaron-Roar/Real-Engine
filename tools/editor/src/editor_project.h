@@ -15,7 +15,8 @@
 #define EDITOR_SOFT_NODE_MAX 64
 #define EDITOR_SOFT_BEAM_MAX 128
 #define EDITOR_COLLISION_MASK_MAX 64
-#define EDITOR_PROJECT_FORMAT_VERSION 3
+/* Pre-release project schemas remain version 1 until the editor format is stable. */
+#define EDITOR_PROJECT_FORMAT_VERSION 1
 
 typedef uint32_t EditorObjectId;
 typedef uint32_t EditorVertexId;
@@ -58,7 +59,13 @@ typedef struct EditorRigidBody {
     bool gravity_enabled;
     bool collision_enabled;
     bool particle;
+    bool particle_auto_fit;
     bool visible;
+    float particle_radius;
+    uint32_t particle_ring_color;
+    uint32_t particle_fill_color;
+    uint32_t border_color;
+    uint32_t surface_color;
     RohrCollisionCategoryMask collision_category;
     RohrCollisionCategoryMask collision_with;
     EditorHitbox hitboxes[EDITOR_BODY_HITBOX_MAX];
@@ -168,6 +175,7 @@ typedef struct EditorProject {
     EditorSoftBodyId next_soft_body_id;
     EditorSoftNodeId next_soft_node_id;
     EditorSoftBeamId next_soft_beam_id;
+    uint32_t next_soft_area_id;
     EditorObjectId selected;
 } EditorProject;
 

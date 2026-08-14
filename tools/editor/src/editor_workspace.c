@@ -68,6 +68,44 @@ static bool editor_workspace_directory_empty(const char *directory) {
         SDL_EnumerateDirectory(directory, editor_workspace_not_empty, &empty) && empty;
 }
 
+static bool editor_workspace_manifest_load(EditorWorkspace *workspace,
+    const char *directory);
+
+static bool editor_workspace_root_find(char *root, size_t capacity,
+        const char *selection, EditorWorkspace *workspace) {
+    SDL_PathInfo info;
+    size_t length;
+
+    if(root == NULL || capacity == 0 || selection == NULL || selection[0] == '\0' ||
+            workspace == NULL ||
+            snprintf(root, capacity, "%s", selection) >= (int)capacity) return false;
+    if(SDL_GetPathInfo(root, &info) && info.type == SDL_PATHTYPE_FILE) {
+        char *separator = strrchr(root, '/');
+#if defined(_WIN32)
+        char *backslash = strrchr(root, '\\');
+        if(backslash != NULL && (separator == NULL || backslash > separator))
+            separator = backslash;
+#endif
+        if(separator == NULL) return false;
+        *separator = '\0';
+    }
+    for(;;) {
+        if(editor_workspace_manifest_load(workspace, root)) return true;
+        length = strlen(root);
+        while(length > 1 && (root[length - 1] == '/' || root[length - 1] == '\\'))
+            root[--length] = '\0';
+        while(length > 0 && root[length - 1] != '/' && root[length - 1] != '\\')
+            length -= 1;
+        if(length == 0) return false;
+        if(length == 1) {
+            if(root[0] == '/') return false;
+            root[0] = '\0';
+            return false;
+        }
+        root[length - 1] = '\0';
+    }
+}
+
 static const EditorRigidBody *editor_workspace_body_get(
     const EditorObject *object, EditorRigidBodyId id) {
     if(object == NULL || id == 0) return NULL;
@@ -746,12 +784,18 @@ bool editor_workspace_load(EditorWorkspace *workspace, EditorProject *project,
     EditorWorkspace loaded = {0};
     static EditorProject loaded_project;
     char path[EDITOR_WORKSPACE_PATH_MAX * 2];
+    char root[EDITOR_WORKSPACE_PATH_MAX];
 
-    if(workspace == NULL || project == NULL ||
-            !editor_workspace_manifest_load(&loaded, directory) ||
-            !editor_workspace_path_join(path, sizeof(path), directory,
-                loaded.config.editor_state_file) ||
-            !editor_project_load(&loaded_project, path)) return false;
+    if(workspace == NULL || project == NULL) return false;
+    if(!editor_workspace_root_find(root, sizeof(root), directory, &loaded)) {
+        fprintf(stderr, "Could not find project root from: %s\n", directory);
+        return false;
+    }
+    if(!editor_workspace_path_join(path, sizeof(path), root,
+            loaded.config.editor_state_file) || !editor_project_load(&loaded_project, path)) {
+        fprintf(stderr, "Could not load project editor state from: %s\n", path);
+        return false;
+    }
     *workspace = loaded;
     *project = loaded_project;
     return true;

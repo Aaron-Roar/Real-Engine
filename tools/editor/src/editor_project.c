@@ -137,7 +137,8 @@ void editor_project_init(EditorProject *project) {
         .next_anchor_id = 1,
         .next_soft_body_id = 1,
         .next_soft_node_id = 1,
-        .next_soft_beam_id = 1
+        .next_soft_beam_id = 1,
+        .next_soft_area_id = 1
     };
 }
 
@@ -224,6 +225,11 @@ EditorRigidBody editor_project_rigid_body_default_get(void) {
         .restitution = 0.0f,
         .gravity_enabled = false,
         .collision_enabled = true,
+        .particle_auto_fit = true,
+        .particle_ring_color = UINT32_C(0x4a925fff),
+        .particle_fill_color = UINT32_C(0x4a925f40),
+        .border_color = UINT32_C(0xe6ebf4ff),
+        .surface_color = UINT32_C(0x66758c80),
         .collision_category = UINT64_C(1),
         .collision_with = UINT64_C(1),
         .visible = true

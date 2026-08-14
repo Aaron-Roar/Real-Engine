@@ -215,6 +215,20 @@ int main(void) {
             workspace_fixture_remove(fixture);
             return 1;
         }
+        snprintf(path, sizeof(path), "%s/objects", fixture);
+        if(!editor_workspace_load(&loaded_workspace, &loaded_project, path) ||
+                !loaded_workspace.open || loaded_project.object_count != 1) {
+            fprintf(stderr, "nested workspace load failed: %s\n", path);
+            workspace_fixture_remove(fixture);
+            return 1;
+        }
+        snprintf(path, sizeof(path), "%s/project.rohr.json", fixture);
+        if(!editor_workspace_load(&loaded_workspace, &loaded_project, path) ||
+                !loaded_workspace.open || loaded_project.object_count != 1) {
+            fprintf(stderr, "manifest workspace load failed: %s\n", path);
+            workspace_fixture_remove(fixture);
+            return 1;
+        }
         snprintf(path, sizeof(path), "%s/CMakeLists.txt", fixture);
         if(!file_contains(path,
                 "add_executable(${PROJECT_NAME} src/main.c") ||
@@ -268,6 +282,12 @@ int main(void) {
     }
     chassis->collision_category |= UINT64_C(1) << 1;
     chassis->particle = true;
+    chassis->particle_auto_fit = false;
+    chassis->particle_radius = 42.0f;
+    chassis->particle_ring_color = UINT32_C(0xff8800ff);
+    chassis->particle_fill_color = UINT32_C(0x22446680);
+    chassis->border_color = UINT32_C(0xabcdef12);
+    chassis->surface_color = UINT32_C(0x12345678);
     hitbox = &chassis->hitboxes[0];
     if(hitbox == NULL || !hitbox->visible || hitbox->vertex_count != 3) return 1;
     editor_project_property_name_format(hitbox->vertices[0].name,
@@ -469,6 +489,14 @@ int main(void) {
                 loaded_object->rigid_bodies[0].collision_category !=
                     (UINT64_C(1) | (UINT64_C(1) << 1)) ||
                 !loaded_object->rigid_bodies[0].particle ||
+                loaded_object->rigid_bodies[0].particle_auto_fit ||
+                fabsf(loaded_object->rigid_bodies[0].particle_radius - 42.0f) > 0.001f ||
+                loaded_object->rigid_bodies[0].particle_ring_color !=
+                    UINT32_C(0xff8800ff) ||
+                loaded_object->rigid_bodies[0].particle_fill_color !=
+                    UINT32_C(0x22446680) ||
+                loaded_object->rigid_bodies[0].border_color != UINT32_C(0xabcdef12) ||
+                loaded_object->rigid_bodies[0].surface_color != UINT32_C(0x12345678) ||
                 strcmp(loaded_object->rigid_bodies[0].hitboxes[0].vertices[0].name,
                     "front_point") != 0 ||
                 strcmp(loaded_object->rigid_bodies[0].hitboxes[0].line_names[0],

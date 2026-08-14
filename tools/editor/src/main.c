@@ -4,6 +4,8 @@
 #include "editor_file_browser.h"
 #include "editor_viewport.h"
 #include "editor_layout.h"
+#include "editor_navigation.h"
+#include "panels/editor_origin_panel.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -633,128 +635,12 @@ static bool editor_selected_delete(
     return false;
 }
 
-static bool editor_selected_open(
-    EditorProject *project,
-    EditorViewportState *viewport_state
-) {
-    EditorObject *selected;
-
-    if(project == NULL || viewport_state == NULL) return false;
-    selected = editor_project_selected_get(project);
-    if(selected == NULL) return false;
-    if(viewport_state->selection == EDITOR_SELECTION_OBJECT) {
-        editor_viewport_object_editor_enter(viewport_state);
-        return true;
-    }
-    if(viewport_state->selection == EDITOR_SELECTION_HITBOX &&
-            editor_selected_hitbox_get(selected, viewport_state) != NULL) {
-        editor_viewport_hitbox_editor_enter(viewport_state);
-        return true;
-    }
-    if(viewport_state->selection == EDITOR_SELECTION_RIGID_BODY &&
-            editor_selected_body_get(selected, viewport_state) != NULL) {
-        viewport_state->mode = EDITOR_VIEWPORT_RIGID_BODY;
-        return true;
-    }
-    if(viewport_state->selection == EDITOR_SELECTION_JOINT) {
-        viewport_state->mode = EDITOR_VIEWPORT_JOINT;
-        return true;
-    }
-    if(viewport_state->selection == EDITOR_SELECTION_ANCHOR &&
-            editor_project_anchor_get(selected, viewport_state->selected_anchor) != NULL) {
-        viewport_state->mode = EDITOR_VIEWPORT_ANCHOR;
-        return true;
-    }
-    if(viewport_state->selection == EDITOR_SELECTION_SOFT_BODY) {
-        viewport_state->mode = EDITOR_VIEWPORT_SOFT_BODY;
-        return true;
-    }
-    if(viewport_state->selection == EDITOR_SELECTION_SOFT_NODE) {
-        viewport_state->mode = EDITOR_VIEWPORT_SOFT_NODE;
-        return true;
-    }
-    if(viewport_state->selection == EDITOR_SELECTION_SOFT_BEAM) {
-        viewport_state->mode = EDITOR_VIEWPORT_SOFT_BEAM;
-        return true;
-    }
-    if(viewport_state->selection == EDITOR_SELECTION_VERTEX &&
-            editor_selected_hitbox_get(selected, viewport_state) != NULL &&
-            viewport_state->selected_vertex <
-                editor_selected_hitbox_get(selected, viewport_state)->vertex_count) {
-        editor_viewport_vertex_editor_enter(
-            viewport_state, viewport_state->selected_vertex);
-        return true;
-    }
-    if(viewport_state->selection == EDITOR_SELECTION_LINE &&
-            editor_selected_hitbox_get(selected, viewport_state) != NULL &&
-            viewport_state->selected_line <
-                editor_selected_hitbox_get(selected, viewport_state)->vertex_count) {
-        editor_viewport_line_editor_enter(viewport_state, viewport_state->selected_line);
-        return true;
-    }
-    return false;
-}
-
 static bool editor_open_item_delete(
     EditorProject *project,
     EditorViewportState *viewport_state
 ) {
-    if(viewport_state == NULL) return false;
-    if(viewport_state->mode == EDITOR_VIEWPORT_OBJECT) {
-        viewport_state->selection = EDITOR_SELECTION_OBJECT;
-    } else if(viewport_state->mode == EDITOR_VIEWPORT_RIGID_BODY) {
-        viewport_state->selection = EDITOR_SELECTION_RIGID_BODY;
-    } else if(viewport_state->mode == EDITOR_VIEWPORT_HITBOX) {
-        viewport_state->selection = EDITOR_SELECTION_HITBOX;
-    } else if(viewport_state->mode == EDITOR_VIEWPORT_VERTEX) {
-        viewport_state->selection = EDITOR_SELECTION_VERTEX;
-    } else if(viewport_state->mode == EDITOR_VIEWPORT_LINE) {
-        viewport_state->selection = EDITOR_SELECTION_LINE;
-    } else if(viewport_state->mode == EDITOR_VIEWPORT_JOINT) {
-        viewport_state->selection = EDITOR_SELECTION_JOINT;
-    } else if(viewport_state->mode == EDITOR_VIEWPORT_ANCHOR) {
-        viewport_state->selection = EDITOR_SELECTION_ANCHOR;
-    } else if(viewport_state->mode == EDITOR_VIEWPORT_SOFT_BODY) {
-        viewport_state->selection = EDITOR_SELECTION_SOFT_BODY;
-    } else if(viewport_state->mode == EDITOR_VIEWPORT_SOFT_NODE) {
-        viewport_state->selection = EDITOR_SELECTION_SOFT_NODE;
-    } else if(viewport_state->mode == EDITOR_VIEWPORT_SOFT_BEAM) {
-        viewport_state->selection = EDITOR_SELECTION_SOFT_BEAM;
-    } else {
-        return false;
-    }
+    if(!editor_navigation_open_item_selection_set(viewport_state)) return false;
     return editor_selected_delete(project, viewport_state);
-}
-
-static void editor_current_selection_clear(
-    EditorProject *project,
-    EditorViewportState *viewport_state
-) {
-    if(project == NULL || viewport_state == NULL) return;
-    if(viewport_state->mode == EDITOR_VIEWPORT_HIERARCHY) {
-        editor_project_selection_clear(project);
-        viewport_state->selection = EDITOR_SELECTION_NONE;
-    } else if(viewport_state->mode == EDITOR_VIEWPORT_OBJECT) {
-        viewport_state->selection = EDITOR_SELECTION_OBJECT;
-    } else if(viewport_state->mode == EDITOR_VIEWPORT_RIGID_BODY) {
-        viewport_state->selection = EDITOR_SELECTION_RIGID_BODY;
-    } else if(viewport_state->mode == EDITOR_VIEWPORT_HITBOX) {
-        viewport_state->selection = EDITOR_SELECTION_HITBOX;
-    } else if(viewport_state->mode == EDITOR_VIEWPORT_VERTEX) {
-        viewport_state->selection = EDITOR_SELECTION_VERTEX;
-    } else if(viewport_state->mode == EDITOR_VIEWPORT_LINE) {
-        viewport_state->selection = EDITOR_SELECTION_LINE;
-    } else if(viewport_state->mode == EDITOR_VIEWPORT_JOINT) {
-        viewport_state->selection = EDITOR_SELECTION_JOINT;
-    } else if(viewport_state->mode == EDITOR_VIEWPORT_ANCHOR) {
-        viewport_state->selection = EDITOR_SELECTION_ANCHOR;
-    } else if(viewport_state->mode == EDITOR_VIEWPORT_SOFT_BODY) {
-        viewport_state->selection = EDITOR_SELECTION_SOFT_BODY;
-    } else if(viewport_state->mode == EDITOR_VIEWPORT_SOFT_NODE) {
-        viewport_state->selection = EDITOR_SELECTION_SOFT_NODE;
-    } else if(viewport_state->mode == EDITOR_VIEWPORT_SOFT_BEAM) {
-        viewport_state->selection = EDITOR_SELECTION_SOFT_BEAM;
-    }
 }
 
 int main(void) {
@@ -884,6 +770,7 @@ int main(void) {
     EditorViewportState viewport_state;
     EditorFileBrowser file_browser;
     EditorWorkspace workspace = {0};
+    EditorOriginPanel origin_panel = {0};
     EditorWorkspaceBrowserAction workspace_browser_action =
         EDITOR_WORKSPACE_BROWSER_NONE;
     char startup_directory[EDITOR_FILE_BROWSER_PATH_MAX] = {0};
@@ -1027,7 +914,8 @@ int main(void) {
             !editor_text_create(&font, "Name", &name_label) ||
             !editor_text_create(&font, "", &x_field) ||
             !editor_text_create(&font, "", &y_field) ||
-            !editor_text_create(&font, "", &length_field)) goto fail;
+            !editor_text_create(&font, "", &length_field) ||
+            !editor_origin_panel_create(&origin_panel, &font)) goto fail;
     for(uint32_t i = 0; i < EDITOR_HITBOX_VERTEX_MAX; i += 1) {
         char name[32];
         snprintf(name, sizeof(name), "vertex_%u", i + 1);
@@ -1105,7 +993,7 @@ int main(void) {
                 if(right) (void)editor_viewport_selection_nudge(
                     &viewport_state, &project, (Vec2D){1.0f, 0.0f});
                 if(enter && viewport_state.selection != EDITOR_SELECTION_NONE) {
-                    (void)editor_selected_open(&project, &viewport_state);
+                    (void)editor_navigation_selected_open(&project, &viewport_state);
                 }
             } else {
                 bool moved = false;
@@ -1125,7 +1013,7 @@ int main(void) {
                 }
                 if(enter && !rohr_ui_navigation_activate() &&
                         viewport_state.selection != EDITOR_SELECTION_NONE) {
-                    (void)editor_selected_open(&project, &viewport_state);
+                    (void)editor_navigation_selected_open(&project, &viewport_state);
                 }
                 if(moved) {
                     UIRect focused;
@@ -1194,53 +1082,13 @@ int main(void) {
         viewport_state.preview_soft_node = 0;
         field_editing = false;
         if(viewport_state.mode == EDITOR_VIEWPORT_ORIGIN) {
-            EditorObject *selected = editor_project_selected_get(&project);
-            Position position = {0};
-            UIFieldResult x_result;
-            UIFieldResult y_result;
-            bool valid = false;
-            if(selected != NULL && viewport_state.selected_origin_kind ==
-                    EDITOR_ORIGIN_RIGID_BODY) {
-                EditorRigidBody *body = editor_selected_body_get(selected, &viewport_state);
-                if(body != NULL) {
-                    position = body->position;
-                    valid = true;
-                }
-            } else if(selected != NULL && viewport_state.selected_origin_kind ==
-                    EDITOR_ORIGIN_SOFT_BODY) {
-                EditorSoftBody *body = editor_selected_soft_body_get(
-                    selected, &viewport_state);
-                if(body != NULL) {
-                    position = body->position;
-                    valid = true;
-                }
-            }
-            if(valid) {
-                rohr_ui_label(&origin_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
-                    42.0f, EDITOR_TOOLS_WIDTH - 20.0f, 30.0f});
-                rohr_ui_label(&x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
-                    122.0f, 50.0f, 26.0f});
-                x_result = rohr_ui_field("editor.origin.x",
-                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &position.x},
-                    &x_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 60.0f, 122.0f,
-                        EDITOR_TOOLS_WIDTH - 70.0f, 26.0f}, NULL);
-                rohr_ui_label(&y_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
-                    158.0f, 50.0f, 26.0f});
-                y_result = rohr_ui_field("editor.origin.y",
-                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &position.y},
-                    &y_field, (UIRect){EDITOR_VIEWPORT_WIDTH + 60.0f, 158.0f,
-                        EDITOR_TOOLS_WIDTH - 70.0f, 26.0f}, NULL);
-                if(x_result.changed || y_result.changed) {
-                    if(viewport_state.selected_origin_kind == EDITOR_ORIGIN_RIGID_BODY) {
-                        (void)editor_project_rigid_body_origin_set(selected,
-                            editor_selected_body_get(selected, &viewport_state), position);
-                    } else {
-                        (void)editor_project_soft_body_origin_set(
-                            editor_selected_soft_body_get(selected, &viewport_state), position);
-                    }
-                }
-                field_editing = x_result.active || y_result.active;
-            }
+            field_editing = editor_origin_panel_draw(&origin_panel,
+                &(EditorPanelContext){
+                    .project = &project,
+                    .navigation = &viewport_state,
+                    .x = EDITOR_VIEWPORT_WIDTH,
+                    .width = EDITOR_TOOLS_WIDTH
+                });
         } else if(viewport_state.mode == EDITOR_VIEWPORT_RIGID_BODY) {
             EditorObject *selected = editor_project_selected_get(&project);
             EditorRigidBody *body = editor_selected_body_get(selected, &viewport_state);
@@ -1465,7 +1313,7 @@ int main(void) {
                             if(result.clicked || result.focus_changed) {
                                 viewport_state.selection = EDITOR_SELECTION_HITBOX;
                                 viewport_state.selected_hitbox = box->id;
-                                if(result.double_clicked) (void)editor_selected_open(
+                                if(result.double_clicked) (void)editor_navigation_selected_open(
                                     &project, &viewport_state);
                             }
                         }
@@ -1526,7 +1374,7 @@ int main(void) {
                         viewport_state.selection = EDITOR_SELECTION_VERTEX;
                         viewport_state.selected_vertex = i;
                         if(result.double_clicked) {
-                            (void)editor_selected_open(&project, &viewport_state);
+                            (void)editor_navigation_selected_open(&project, &viewport_state);
                         }
                     }
                 }
@@ -1553,7 +1401,7 @@ int main(void) {
                             viewport_state.selection = EDITOR_SELECTION_LINE;
                             viewport_state.selected_line = i;
                             if(result.double_clicked) {
-                                (void)editor_selected_open(&project, &viewport_state);
+                                (void)editor_navigation_selected_open(&project, &viewport_state);
                             }
                         }
                     }
@@ -1841,7 +1689,7 @@ int main(void) {
                     if(result.clicked || result.focus_changed) {
                         viewport_state.selection = EDITOR_SELECTION_ANCHOR;
                         viewport_state.selected_anchor = anchor->id;
-                        if(result.double_clicked) (void)editor_selected_open(
+                        if(result.double_clicked) (void)editor_navigation_selected_open(
                             &project, &viewport_state);
                     }
                 }
@@ -2219,7 +2067,7 @@ int main(void) {
                             if(result.clicked || result.focus_changed) {
                                 viewport_state.selection = EDITOR_SELECTION_SOFT_NODE;
                                 viewport_state.selected_soft_node = node->id;
-                                if(result.double_clicked) (void)editor_selected_open(
+                                if(result.double_clicked) (void)editor_navigation_selected_open(
                                     &project, &viewport_state);
                             }
                         }
@@ -2247,7 +2095,7 @@ int main(void) {
                             if(result.clicked || result.focus_changed) {
                                 viewport_state.selection = EDITOR_SELECTION_SOFT_BEAM;
                                 viewport_state.selected_soft_beam = beam->id;
-                                if(result.double_clicked) (void)editor_selected_open(
+                                if(result.double_clicked) (void)editor_navigation_selected_open(
                                     &project, &viewport_state);
                             }
                         }
@@ -2559,7 +2407,7 @@ int main(void) {
                         if(result.clicked || result.focus_changed) {
                             viewport_state.selection = EDITOR_SELECTION_RIGID_BODY;
                             viewport_state.selected_rigid_body = body->id;
-                            if(result.double_clicked) (void)editor_selected_open(
+                            if(result.double_clicked) (void)editor_navigation_selected_open(
                                 &project, &viewport_state);
                         }
                     }
@@ -2586,7 +2434,7 @@ int main(void) {
                         if(result.clicked || result.focus_changed) {
                             viewport_state.selection = EDITOR_SELECTION_JOINT;
                             viewport_state.selected_joint = joint->id;
-                            if(result.double_clicked) (void)editor_selected_open(
+                            if(result.double_clicked) (void)editor_navigation_selected_open(
                                 &project, &viewport_state);
                         }
                     }
@@ -2613,7 +2461,7 @@ int main(void) {
                         if(result.clicked || result.focus_changed) {
                             viewport_state.selection = EDITOR_SELECTION_SOFT_BODY;
                             viewport_state.selected_soft_body = body->id;
-                            if(result.double_clicked) (void)editor_selected_open(
+                            if(result.double_clicked) (void)editor_navigation_selected_open(
                                 &project, &viewport_state);
                         }
                     }
@@ -2678,7 +2526,7 @@ int main(void) {
                     (void)editor_project_object_select(&project, object->id);
                     viewport_state.selection = EDITOR_SELECTION_OBJECT;
                     if(object_result.double_clicked) {
-                        (void)editor_selected_open(&project, &viewport_state);
+                        (void)editor_navigation_selected_open(&project, &viewport_state);
                     }
                 }
             }
@@ -2922,8 +2770,9 @@ int main(void) {
                     fprintf(stderr, "Could not %s project directory: %s\n",
                         workspace_browser_action == EDITOR_WORKSPACE_BROWSER_NEW ?
                             "create" : "load", browser_result.path);
+                    file_browser.active = true;
                 }
-                workspace_browser_action = EDITOR_WORKSPACE_BROWSER_NONE;
+                if(opened) workspace_browser_action = EDITOR_WORKSPACE_BROWSER_NONE;
             } else if(browser_result.cancelled) {
                 workspace_browser_action = EDITOR_WORKSPACE_BROWSER_NONE;
             }
@@ -2950,7 +2799,7 @@ int main(void) {
 
             if(mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_PRESSED &&
                     !ui_consumed && !viewport_consumed && !panel_resizing) {
-                editor_current_selection_clear(&project, &viewport_state);
+                editor_navigation_current_selection_clear(&project, &viewport_state);
             }
         }
         rohr_ui_frame_end();
@@ -2963,6 +2812,7 @@ int main(void) {
         rohr_graphics_show();
     }
 
+    editor_origin_panel_destroy(&origin_panel);
     rohr_graphics_text_destroy(&stiffness_label);
     rohr_graphics_text_destroy(&rotation_global_label);
     rohr_graphics_text_destroy(&rotation_body_label);
@@ -3093,6 +2943,7 @@ int main(void) {
     return 0;
 
 fail:
+    editor_origin_panel_destroy(&origin_panel);
     rohr_graphics_text_destroy(&stiffness_label);
     rohr_graphics_text_destroy(&rotation_global_label);
     rohr_graphics_text_destroy(&rotation_body_label);
