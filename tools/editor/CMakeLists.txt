@@ -1,7 +1,6 @@
 add_executable(rohr_editor_gui
     src/editor_file_browser.c
     src/editor_navigation.c
-    src/editor_workspace.c
     src/editor_viewport.c
     src/panels/editor_origin_panel.c
     src/panels/editor_terminal_panel.c
@@ -32,7 +31,6 @@ add_custom_command(TARGET rohr_editor_gui POST_BUILD
 if(ROHR_BUILD_TESTS)
     add_executable(editor_project_test
         tests/editor_project.c
-        src/editor_workspace.c
     )
     target_include_directories(editor_project_test PRIVATE src ${PROJECT_SOURCE_DIR}/lib)
     target_link_libraries(editor_project_test PRIVATE rohr_engine rohr_editor_core)

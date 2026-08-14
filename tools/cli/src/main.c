@@ -1,5 +1,6 @@
 #include "editor_command.h"
 #include "editor_document.h"
+#include "editor_workspace.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -11,7 +12,11 @@ static int cli_error(EditorResult result) {
 
 static void cli_usage_print(void) {
     puts("usage:\n"
-        "  rohr project validate <project.rohr.json>\n"
+        "  rohr project create <directory> <engine-root>\n"
+        "  rohr project load <directory>\n"
+        "  rohr project validate <directory>\n"
+        "  rohr project save <directory>\n"
+        "  rohr project generate-c <directory>\n"
         "  rohr object list <project.rohr.json>\n"
         "  rohr object add <project.rohr.json> <name> [x y]\n"
         "  rohr object rename <project.rohr.json> <id> <name>\n"
@@ -39,6 +44,53 @@ static void cli_usage_print(void) {
         "  rohr navigation set <project.rohr.json> <mode> <selection> <object>\n"
         "      <rigid-body> <hitbox> <joint> <anchor> <soft-body> <soft-node>\n"
         "      <soft-beam> <line> <vertex> <origin-kind>");
+}
+
+static int cli_project_command(int count, char **arguments) {
+    static EditorProject project;
+    EditorWorkspace workspace = {0};
+    EditorWorkspaceCommand command = {0};
+    EditorResult result;
+    const char *action;
+    if(count < 4) {
+        cli_usage_print();
+        return 1;
+    }
+    action = arguments[2];
+    if(strlen(arguments[3]) >= sizeof(command.directory))
+        return cli_error(editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "Project directory path is too long"));
+    snprintf(command.directory, sizeof(command.directory), "%s", arguments[3]);
+    if(strcmp(action, "create") == 0) {
+        if(count != 5 || strlen(arguments[4]) >= sizeof(command.engine_root)) {
+            cli_usage_print();
+            return 1;
+        }
+        command.type = EDITOR_WORKSPACE_COMMAND_CREATE;
+        snprintf(command.engine_root, sizeof(command.engine_root), "%s", arguments[4]);
+    } else {
+        EditorWorkspaceCommand load = {.type = EDITOR_WORKSPACE_COMMAND_LOAD};
+        if(count != 4) {
+            cli_usage_print();
+            return 1;
+        }
+        snprintf(load.directory, sizeof(load.directory), "%s", arguments[3]);
+        result = editor_workspace_command_execute(&workspace, &project, &load);
+        if(editor_result_check(result)) return cli_error(result);
+        if(strcmp(action, "validate") == 0 || strcmp(action, "load") == 0) {
+            puts(strcmp(action, "validate") == 0 ? "valid" : "loaded");
+            return 0;
+        }
+        if(strcmp(action, "save") == 0) command.type = EDITOR_WORKSPACE_COMMAND_SAVE;
+        else if(strcmp(action, "generate-c") == 0)
+            command.type = EDITOR_WORKSPACE_COMMAND_GENERATE_C;
+        else {
+            cli_usage_print();
+            return 1;
+        }
+    }
+    result = editor_workspace_command_execute(&workspace, &project, &command);
+    return editor_result_check(result) ? cli_error(result) : 0;
 }
 
 static int cli_object_command(int count, char **arguments) {
@@ -78,17 +130,8 @@ static int cli_object_command(int count, char **arguments) {
 }
 
 int main(int count, char **arguments) {
-    if(count == 4 && strcmp(arguments[1], "project") == 0 &&
-            strcmp(arguments[2], "validate") == 0) {
-        EditorDocument document;
-        EditorResult result;
-        result = editor_document_create(&document);
-        if(editor_result_check(result)) return cli_error(result);
-        result = editor_document_load(&document, arguments[3]);
-        if(editor_result_check(result)) return cli_error(result);
-        puts("valid");
-        return 0;
-    }
+    if(count >= 2 && strcmp(arguments[1], "project") == 0)
+        return cli_project_command(count, arguments);
     if(count >= 2 && (strcmp(arguments[1], "object") == 0 ||
             strcmp(arguments[1], "rigid-body") == 0 ||
             strcmp(arguments[1], "hitbox") == 0 ||

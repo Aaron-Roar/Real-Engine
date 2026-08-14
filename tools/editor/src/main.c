@@ -62,6 +62,19 @@ static void editor_operation_command_write(const EditorCommand *editor_command,
     editor_terminal_panel_operation_write(editor_operation_terminal, command);
 }
 
+static EditorResult editor_workspace_operation_execute(EditorWorkspace *workspace,
+        EditorProject *project, const EditorWorkspaceCommand *workspace_command) {
+    EditorResult result = editor_workspace_command_execute(
+        workspace, project, workspace_command);
+    char command[3072];
+    if(!editor_result_check(result) && editor_operation_terminal != NULL &&
+            editor_operation_enabled != NULL && *editor_operation_enabled &&
+            !editor_result_check(editor_workspace_command_cli_write(
+                workspace_command, command, sizeof(command))))
+        editor_terminal_panel_operation_write(editor_operation_terminal, command);
+    return result;
+}
+
 static EditorNavigationState editor_navigation_state_get(
         const EditorProject *project, const EditorViewportState *state) {
     if(project == NULL || state == NULL) return (EditorNavigationState){0};
@@ -3181,7 +3194,13 @@ int main(void) {
                 (void)editor_file_browser_open(&file_browser,
                     EDITOR_FILE_BROWSER_DIRECTORY, startup_directory, &font);
             } else if(file_menu.changed && file_menu.selected_index == 2) {
-                if(workspace.open && editor_workspace_save(&workspace, &project)) {
+                EditorWorkspaceCommand command = {
+                    .type = EDITOR_WORKSPACE_COMMAND_SAVE};
+                snprintf(command.directory, sizeof(command.directory), "%s",
+                    workspace.directory);
+                if(workspace.open && !editor_result_check(
+                        editor_workspace_operation_execute(&workspace, &project,
+                            &command))) {
                     saved_project_hash = editor_project_hash_get(&project);
                 }
             } else if(file_menu.changed && file_menu.selected_index == 3) {
@@ -3209,7 +3228,12 @@ int main(void) {
                     build_bounds, NULL);
                 if(build_menu.changed && build_menu.selected_index == 0 &&
                         workspace.open) {
-                    (void)editor_workspace_c_generate(&workspace, &project);
+                    EditorWorkspaceCommand command = {
+                        .type = EDITOR_WORKSPACE_COMMAND_GENERATE_C};
+                    snprintf(command.directory, sizeof(command.directory), "%s",
+                        workspace.directory);
+                    (void)editor_workspace_operation_execute(
+                        &workspace, &project, &command);
                 }
             }
             {
@@ -3250,7 +3274,12 @@ int main(void) {
             if(rohr_ui_button("editor.close.save", &save_label,
                     (UIRect){dialog.x + 18.0f, dialog.y + 102.0f,
                         120.0f, 36.0f}, NULL).clicked) {
-                if(editor_workspace_save(&workspace, &project)) {
+                EditorWorkspaceCommand command = {
+                    .type = EDITOR_WORKSPACE_COMMAND_SAVE};
+                snprintf(command.directory, sizeof(command.directory), "%s",
+                    workspace.directory);
+                if(!editor_result_check(editor_workspace_operation_execute(
+                        &workspace, &project, &command))) {
                     if(close_action == EDITOR_CLOSE_PROGRAM) {
                         running = false;
                     } else {
@@ -3313,13 +3342,26 @@ int main(void) {
             if(browser_result.submitted) {
                 EditorResult load_result = editor_result_value(true);
                 bool opened;
-                if(workspace_browser_action == EDITOR_WORKSPACE_BROWSER_NEW) {
-                    load_result = editor_workspace_create(&workspace, &project,
-                        browser_result.path, ROHR_ENGINE_SOURCE_DIR);
+                EditorWorkspaceCommand command = {0};
+                if(strlen(browser_result.path) >= sizeof(command.directory)) {
+                    load_result = editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                        "Project directory path is too long: %s", browser_result.path);
+                    opened = false;
+                } else if(workspace_browser_action == EDITOR_WORKSPACE_BROWSER_NEW) {
+                    memcpy(command.directory, browser_result.path,
+                        strlen(browser_result.path) + 1);
+                    command.type = EDITOR_WORKSPACE_COMMAND_CREATE;
+                    snprintf(command.engine_root, sizeof(command.engine_root), "%s",
+                        ROHR_ENGINE_SOURCE_DIR);
+                    load_result = editor_workspace_operation_execute(
+                        &workspace, &project, &command);
                     opened = !editor_result_check(load_result);
                 } else {
-                    load_result = editor_workspace_load(
-                        &workspace, &project, browser_result.path);
+                    memcpy(command.directory, browser_result.path,
+                        strlen(browser_result.path) + 1);
+                    command.type = EDITOR_WORKSPACE_COMMAND_LOAD;
+                    load_result = editor_workspace_operation_execute(
+                        &workspace, &project, &command);
                     opened = !editor_result_check(load_result);
                 }
                 if(opened) {

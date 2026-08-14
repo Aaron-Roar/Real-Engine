@@ -89,20 +89,43 @@ int main(void) {
         EditorWorkspace workspace = {0};
         EditorWorkspace loaded_workspace = {0};
         EditorWorkspaceConfig defaults = editor_workspace_config_default_get();
+        EditorWorkspaceCommand workspace_command = {0};
         const char *fixture = "/tmp/rohr_editor_workspace_test";
         SDL_PathInfo info;
         char path[2048];
+        char cli_command[4096];
 
         workspace_fixture_remove(fixture);
+        workspace_command.type = EDITOR_WORKSPACE_COMMAND_CREATE;
+        snprintf(workspace_command.directory, sizeof(workspace_command.directory),
+            "%s", fixture);
+        snprintf(workspace_command.engine_root, sizeof(workspace_command.engine_root),
+            "%s", "/engine/root");
+        if(editor_result_check(editor_workspace_command_execute(
+                    &workspace, &workspace_project, &workspace_command)) ||
+                editor_result_check(editor_workspace_command_cli_write(
+                    &workspace_command, cli_command, sizeof(cli_command))) ||
+                strstr(cli_command, "project create") == NULL) {
+            workspace_fixture_remove(fixture);
+            return 1;
+        }
+        workspace_command = (EditorWorkspaceCommand){
+            .type = EDITOR_WORKSPACE_COMMAND_LOAD};
+        snprintf(workspace_command.directory, sizeof(workspace_command.directory),
+            "%s", fixture);
+        if(editor_result_check(editor_workspace_command_execute(
+                    &loaded_workspace, &loaded_project, &workspace_command)) ||
+                editor_result_check(editor_workspace_command_cli_write(
+                    &workspace_command, cli_command, sizeof(cli_command))) ||
+                strstr(cli_command, "project load") == NULL) {
+            workspace_fixture_remove(fixture);
+            return 1;
+        }
         if(defaults.format_version != EDITOR_WORKSPACE_FORMAT_VERSION ||
                 strcmp(defaults.source_directory, "src") != 0 ||
                 strcmp(defaults.generated_directory, "src/generated") != 0 ||
                 strcmp(defaults.editor_state_file,
                     "objects/project.rohr.json") != 0 ||
-                editor_result_check(editor_workspace_create(
-                    &workspace, &workspace_project, fixture, "/engine/root")) ||
-                editor_result_check(editor_workspace_load(
-                    &loaded_workspace, &loaded_project, fixture)) ||
                 !loaded_workspace.open || strcmp(loaded_workspace.config.name,
                     "RohrEditorWorkspaceTest") != 0 ||
                 strcmp(loaded_workspace.config.engine_root, "/engine/root") != 0 ||
@@ -186,10 +209,25 @@ int main(void) {
                 return 1;
             }
         }
-        if(!editor_workspace_save(&loaded_workspace, &loaded_project) ||
+        workspace_command.type = EDITOR_WORKSPACE_COMMAND_SAVE;
+        snprintf(workspace_command.directory, sizeof(workspace_command.directory),
+            "%s", fixture);
+        if(editor_result_check(editor_workspace_command_execute(
+                    &loaded_workspace, &loaded_project, &workspace_command)) ||
+                editor_result_check(editor_workspace_command_cli_write(
+                    &workspace_command, cli_command, sizeof(cli_command))) ||
+                strstr(cli_command, "project save") == NULL ||
                 !file_contains(path, "5.00000000f") ||
-                file_contains(path, "7.00000000f") ||
-                !editor_workspace_c_generate(&loaded_workspace, &loaded_project) ||
+                file_contains(path, "7.00000000f")) {
+            workspace_fixture_remove(fixture);
+            return 1;
+        }
+        workspace_command.type = EDITOR_WORKSPACE_COMMAND_GENERATE_C;
+        if(editor_result_check(editor_workspace_command_execute(
+                    &loaded_workspace, &loaded_project, &workspace_command)) ||
+                editor_result_check(editor_workspace_command_cli_write(
+                    &workspace_command, cli_command, sizeof(cli_command))) ||
+                strstr(cli_command, "project generate-c") == NULL ||
                 !file_contains(path, "7.00000000f") ||
                 !file_contains(path, "ROHR_PARTICLE") ||
                 !file_contains(path, "generated_world_anchor_create") ||

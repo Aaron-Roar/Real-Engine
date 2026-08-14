@@ -854,3 +854,83 @@ void editor_workspace_close(EditorWorkspace *workspace, EditorProject *project) 
     if(workspace != NULL) *workspace = (EditorWorkspace){0};
     editor_project_init(project);
 }
+
+EditorResult editor_workspace_command_execute(EditorWorkspace *workspace,
+        EditorProject *project, const EditorWorkspaceCommand *command) {
+    if(workspace == NULL || project == NULL || command == NULL)
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "Workspace command requires a workspace, project, and command");
+    switch(command->type) {
+        case EDITOR_WORKSPACE_COMMAND_CREATE:
+            return editor_workspace_create(workspace, project, command->directory,
+                command->engine_root);
+        case EDITOR_WORKSPACE_COMMAND_LOAD:
+            return editor_workspace_load(workspace, project, command->directory);
+        case EDITOR_WORKSPACE_COMMAND_SAVE:
+            if(!editor_workspace_save(workspace, project))
+                return editor_result_error(EDITOR_ERROR_FILE_IO,
+                    "Could not save project workspace: %s", workspace->directory);
+            return editor_result_value(true);
+        case EDITOR_WORKSPACE_COMMAND_GENERATE_C:
+            if(!editor_workspace_c_generate(workspace, project))
+                return editor_result_error(EDITOR_ERROR_FILE_IO,
+                    "Could not generate project C source: %s", workspace->directory);
+            return editor_result_value(true);
+    }
+    return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+        "Unknown workspace command");
+}
+
+static bool editor_workspace_command_text_append(char *output, size_t capacity,
+        size_t *used, const char *text) {
+    size_t length = strlen(text);
+    if(*used >= capacity || length >= capacity - *used) return false;
+    memcpy(output + *used, text, length);
+    *used += length;
+    output[*used] = '\0';
+    return true;
+}
+
+static bool editor_workspace_command_shell_append(char *output, size_t capacity,
+        size_t *used, const char *text) {
+    if(!editor_workspace_command_text_append(output, capacity, used, "'")) return false;
+    for(const char *at = text; *at != '\0'; at += 1) {
+        char character[2] = {*at, '\0'};
+        if(!editor_workspace_command_text_append(output, capacity, used,
+                *at == '\'' ? "'\\''" : character)) return false;
+    }
+    return editor_workspace_command_text_append(output, capacity, used, "'");
+}
+
+EditorResult editor_workspace_command_cli_write(const EditorWorkspaceCommand *command,
+        char *output, size_t output_capacity) {
+    const char *action;
+    size_t used = 0;
+    if(command == NULL || output == NULL || output_capacity == 0 ||
+            command->directory[0] == '\0')
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "Workspace command serialization received an invalid argument");
+    if(command->type == EDITOR_WORKSPACE_COMMAND_CREATE) action = "create ";
+    else if(command->type == EDITOR_WORKSPACE_COMMAND_LOAD) action = "load ";
+    else if(command->type == EDITOR_WORKSPACE_COMMAND_SAVE) action = "save ";
+    else if(command->type == EDITOR_WORKSPACE_COMMAND_GENERATE_C) action = "generate-c ";
+    else return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+        "Unknown workspace command");
+    output[0] = '\0';
+    if(!editor_workspace_command_text_append(output, output_capacity, &used,
+            "editor-cli project ") ||
+            !editor_workspace_command_text_append(output, output_capacity, &used,
+                action) ||
+            !editor_workspace_command_shell_append(output, output_capacity, &used,
+                command->directory)) goto capacity_error;
+    if(command->type == EDITOR_WORKSPACE_COMMAND_CREATE) {
+        if(command->engine_root[0] == '\0' ||
+                !editor_workspace_command_text_append(output, output_capacity, &used, " ") ||
+                !editor_workspace_command_shell_append(output, output_capacity, &used,
+                    command->engine_root)) goto capacity_error;
+    }
+    return editor_result_value(true);
+capacity_error:
+    return editor_result_error(EDITOR_ERROR_CAPACITY,
+        "Workspace CLI command output buffer is too small");
+}
