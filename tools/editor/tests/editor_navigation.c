@@ -97,6 +97,14 @@ int main(void) {
     state.mode = EDITOR_VIEWPORT_HIERARCHY;
     if(editor_navigation_open_item_selection_set(&state)) return 1;
 
+    state.mode = EDITOR_VIEWPORT_ANCHOR;
+    state.selection = EDITOR_SELECTION_ANCHOR;
+    state.selected_anchor = anchor->id;
+    editor_viewport_back(&state);
+    if(state.mode != EDITOR_VIEWPORT_OBJECT ||
+            state.selection != EDITOR_SELECTION_NONE ||
+            state.selected_anchor != 0) return 1;
+
     snprintf(browser.directory, sizeof(browser.directory), "/projects");
     if(!editor_file_browser_directory_path_get(&browser, path, sizeof(path)) ||
             strcmp(path, "/projects") != 0) return 1;

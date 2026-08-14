@@ -353,8 +353,9 @@ void editor_viewport_back(EditorViewportState *state) {
         state->mode = EDITOR_VIEWPORT_RIGID_BODY;
         state->selection = EDITOR_SELECTION_RIGID_BODY;
     } else if(state->mode == EDITOR_VIEWPORT_ANCHOR) {
-        state->mode = EDITOR_VIEWPORT_JOINT;
-        state->selection = EDITOR_SELECTION_ANCHOR;
+        state->mode = EDITOR_VIEWPORT_OBJECT;
+        state->selection = EDITOR_SELECTION_NONE;
+        state->selected_anchor = 0;
     } else if(state->mode == EDITOR_VIEWPORT_RIGID_BODY ||
             state->mode == EDITOR_VIEWPORT_JOINT ||
             state->mode == EDITOR_VIEWPORT_SOFT_BODY) {
