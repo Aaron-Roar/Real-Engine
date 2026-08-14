@@ -18,6 +18,6 @@ if(ROHR_BUILD_TESTS)
     add_executable(editor_core_test tests/editor_core.c)
     target_link_libraries(editor_core_test PRIVATE rohr_editor_core)
     set_target_properties(editor_core_test PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+        RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
     add_test(NAME editor_core COMMAND editor_core_test)
 endif()

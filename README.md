@@ -146,13 +146,13 @@ cmake --build --preset linux --parallel
 Build all examples with development settings:
 
 ```sh
-cmake --build build --target examples --parallel
+cmake --build build/cmake/linux --target examples --parallel
 ```
 
 Build one example from the engine root:
 
 ```sh
-cmake --build build --target pong
+cmake --build build/cmake/linux --target pong
 ```
 
 From inside any example project, configure and build Debug or Release with local presets:
@@ -168,7 +168,7 @@ cmake --build --preset release --parallel
 List every available target:
 
 ```sh
-cmake --build build --target help
+cmake --build build/cmake/linux --target help
 ```
 
 Build and run the tests:
@@ -181,7 +181,7 @@ ctest --preset linux
 Clean compiled engine-development outputs while preserving configuration:
 
 ```sh
-cmake --build build --target clean
+cmake --build build/cmake/linux --target clean
 ```
 
 Recreate the engine-development configuration when the cache needs resetting:
@@ -241,7 +241,7 @@ Readable Markdown docs are committed in the repo:
 Generate the Doxygen docs with:
 
 ```sh
-cmake --build build --target docs
+cmake --build build/cmake/linux --target docs
 ```
 
 The generated HTML is written to:
@@ -255,7 +255,7 @@ Documentation source lives in `docs/`, and API comments live mainly in `include/
 For a movable standalone README preview, run:
 
 ```sh
-cmake --build build --target static_readme
+cmake --build build/cmake/linux --target static_readme
 ```
 
 That writes `build/static/readme.html` and stages linked video assets under

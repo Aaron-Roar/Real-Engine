@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.20)
 
 project(rohr_engine LANGUAGES C)
 
+set(ROHR_BUILD_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}" CACHE PATH
+    "Directory for user-facing Rohr build artifacts")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${ROHR_BUILD_OUTPUT_DIRECTORY}/lib")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${ROHR_BUILD_OUTPUT_DIRECTORY}/lib")
+
 option(ROHR_BUILD_EXAMPLES "Build Rohr example programs" ON)
 option(ROHR_BUILD_TESTS "Build Rohr tests" ON)
 option(ROHR_BUILD_EDITOR "Build Rohr Editor" ON)
@@ -158,7 +163,7 @@ if(ROHR_BUILD_TESTS)
     target_link_libraries(engine_lifecycle_test PRIVATE rohr_engine)
     set_target_properties(engine_lifecycle_test
         PROPERTIES
-            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests
+            RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests
     )
 
     add_test(NAME engine_lifecycle COMMAND engine_lifecycle_test)
@@ -167,69 +172,69 @@ if(ROHR_BUILD_TESTS)
     target_link_libraries(controller_mappings_test PRIVATE rohr_engine)
     set_target_properties(controller_mappings_test
         PROPERTIES
-            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests
+            RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests
     )
     add_test(NAME controller_mappings COMMAND controller_mappings_test)
 
     add_executable(cameras_test tests/cameras.c)
     target_link_libraries(cameras_test PRIVATE rohr_engine)
-    set_target_properties(cameras_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+    set_target_properties(cameras_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
     add_test(NAME cameras COMMAND cameras_test)
 
     add_executable(timing_test tests/timing.c)
     target_link_libraries(timing_test PRIVATE rohr_engine)
-    set_target_properties(timing_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+    set_target_properties(timing_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
     add_test(NAME timing COMMAND timing_test)
 
     add_executable(ui_field_test tests/ui_field.c)
     target_link_libraries(ui_field_test PRIVATE rohr_engine)
-    set_target_properties(ui_field_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+    set_target_properties(ui_field_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
     add_test(NAME ui_field COMMAND ui_field_test)
 
     add_executable(joints_test tests/joints.c)
     target_link_libraries(joints_test PRIVATE rohr_engine)
-    set_target_properties(joints_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+    set_target_properties(joints_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
     add_test(NAME joints COMMAND joints_test)
 
     add_executable(soft_body_test tests/soft_body.c)
     target_link_libraries(soft_body_test PRIVATE rohr_engine)
-    set_target_properties(soft_body_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+    set_target_properties(soft_body_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
     add_test(NAME soft_body COMMAND soft_body_test)
 
     add_executable(collision_sensor_test tests/collision_sensor.c)
     target_include_directories(collision_sensor_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(collision_sensor_test PRIVATE rohr_engine)
-    set_target_properties(collision_sensor_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+    set_target_properties(collision_sensor_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
     add_test(NAME collision_sensor COMMAND collision_sensor_test)
 
     add_executable(entity_pair_set_test tests/entity_pair_set.c)
     target_include_directories(entity_pair_set_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(entity_pair_set_test PRIVATE rohr_engine)
-    set_target_properties(entity_pair_set_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+    set_target_properties(entity_pair_set_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
     add_test(NAME entity_pair_set COMMAND entity_pair_set_test)
 
     add_executable(aabb_tree_test tests/aabb_tree.c)
     target_include_directories(aabb_tree_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(aabb_tree_test PRIVATE rohr_engine)
-    set_target_properties(aabb_tree_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+    set_target_properties(aabb_tree_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
     add_test(NAME aabb_tree COMMAND aabb_tree_test)
 
     add_executable(physics_interaction_set_test tests/physics_interaction_set.c)
     target_include_directories(physics_interaction_set_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(physics_interaction_set_test PRIVATE rohr_engine)
-    set_target_properties(physics_interaction_set_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+    set_target_properties(physics_interaction_set_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
     add_test(NAME physics_interaction_set COMMAND physics_interaction_set_test)
 
     add_executable(constraint_solver_test tests/constraint_solver.c)
     target_include_directories(constraint_solver_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(constraint_solver_test PRIVATE rohr_engine)
-    set_target_properties(constraint_solver_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+    set_target_properties(constraint_solver_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
     add_test(NAME constraint_solver COMMAND constraint_solver_test)
 
     add_executable(contact_manifold_test tests/contact_manifold.c)
     target_include_directories(contact_manifold_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(contact_manifold_test PRIVATE rohr_engine)
-    set_target_properties(contact_manifold_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+    set_target_properties(contact_manifold_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
     add_test(NAME contact_manifold COMMAND contact_manifold_test)
 
     add_executable(component_registry_test
@@ -238,7 +243,7 @@ if(ROHR_BUILD_TESTS)
     target_link_libraries(component_registry_test PRIVATE rohr_tools)
     set_target_properties(component_registry_test
         PROPERTIES
-            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests
+            RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests
     )
 
     add_test(
@@ -247,7 +252,7 @@ if(ROHR_BUILD_TESTS)
     )
 
     set(ROHR_GENERATED_COMPONENT_FIXTURE_DIR
-        ${CMAKE_BINARY_DIR}/tests/generated_components
+        ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests/generated_components
     )
     set(ROHR_GENERATED_COMPONENT_HEADER
         ${ROHR_GENERATED_COMPONENT_FIXTURE_DIR}/game_components.h
@@ -288,7 +293,7 @@ if(ROHR_BUILD_TESTS)
     target_link_libraries(generated_components_test PRIVATE rohr_engine)
     set_target_properties(generated_components_test
         PROPERTIES
-            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests
+            RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests
     )
 
     add_test(NAME generated_components COMMAND generated_components_test)
@@ -297,7 +302,7 @@ if(ROHR_BUILD_TESTS)
         COMMAND
             ${CMAKE_COMMAND}
             -DGENERATOR=$<TARGET_FILE:component_fixture_generator>
-            -DOUTPUT_DIRECTORY=${CMAKE_BINARY_DIR}/tests/deterministic_components
+            -DOUTPUT_DIRECTORY=${ROHR_BUILD_OUTPUT_DIRECTORY}/tests/deterministic_components
             -P ${CMAKE_SOURCE_DIR}/tests/check_component_generation.cmake
     )
 

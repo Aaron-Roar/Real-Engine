@@ -20,6 +20,6 @@ if(ROHR_BUILD_TESTS AND UNIX)
     add_executable(rohr_terminal_test tests/terminal.c)
     target_link_libraries(rohr_terminal_test PRIVATE rohr_terminal)
     set_target_properties(rohr_terminal_test PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+        RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
     add_test(NAME rohr_terminal COMMAND rohr_terminal_test)
 endif()
