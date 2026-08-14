@@ -478,6 +478,133 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
             snprintf(name, EDITOR_OBJECT_NAME_MAX, "%s", formatted);
             return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
         }
+        case EDITOR_COMMAND_PROPERTY_SET: {
+            const EditorPropertySetCommand *set = &command->data.property_set;
+            EditorObject *object = editor_object_query_get(project, set->object);
+            if(object == NULL) return editor_command_not_found("object", set->object);
+            if(set->kind == EDITOR_ITEM_RIGID_BODY) {
+                EditorRigidBody *body = editor_project_rigid_body_get(object, set->item);
+                if(body == NULL) return editor_command_not_found("rigid body", set->item);
+                if(set->property == EDITOR_PROPERTY_MASS &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number >= 0.0f) body->mass_value = set->value.number;
+                else if(set->property == EDITOR_PROPERTY_FRICTION &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number >= 0.0f) body->friction = set->value.number;
+                else if(set->property == EDITOR_PROPERTY_RESTITUTION &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number >= 0.0f && set->value.number <= 1.0f)
+                    body->restitution = set->value.number;
+                else if(set->property == EDITOR_PROPERTY_GRAVITY &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_BOOL)
+                    body->gravity_enabled = set->value.boolean;
+                else if(set->property == EDITOR_PROPERTY_STATIC &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_BOOL)
+                    body->static_body = set->value.boolean;
+                else if(set->property == EDITOR_PROPERTY_ROTATION_LOCKED &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_BOOL)
+                    body->rotation_locked = set->value.boolean;
+                else if(set->property == EDITOR_PROPERTY_COLLISION &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_BOOL) {
+                    body->collision_enabled = set->value.boolean;
+                    if(!body->collision_enabled) body->particle = false;
+                } else if(set->property == EDITOR_PROPERTY_PARTICLE &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_BOOL &&
+                        (!set->value.boolean || body->collision_enabled))
+                    body->particle = set->value.boolean;
+                else goto property_invalid;
+            } else if(set->kind == EDITOR_ITEM_VERTEX) {
+                EditorRigidBody *body = editor_project_rigid_body_get(object, set->parent);
+                EditorHitbox *hitbox = editor_project_hitbox_get(body, set->item);
+                EditorVertex *vertex = NULL;
+                if(hitbox != NULL) for(uint32_t i = 0; i < hitbox->vertex_count; i += 1)
+                    if(hitbox->vertices[i].id == set->index) vertex = &hitbox->vertices[i];
+                if(vertex == NULL) return editor_command_not_found("vertex", set->index);
+                if(set->property != EDITOR_PROPERTY_POSITION_LOCKED ||
+                        set->value_kind != EDITOR_PROPERTY_VALUE_BOOL) goto property_invalid;
+                vertex->position_locked = set->value.boolean;
+            } else if(set->kind == EDITOR_ITEM_LINE) {
+                EditorRigidBody *body = editor_project_rigid_body_get(object, set->parent);
+                EditorHitbox *hitbox = editor_project_hitbox_get(body, set->item);
+                if(set->property != EDITOR_PROPERTY_LINE_LENGTH ||
+                        set->value_kind != EDITOR_PROPERTY_VALUE_FLOAT ||
+                        set->value.number < 0.0f ||
+                        !editor_project_hitbox_line_length_set(hitbox, set->index,
+                            set->value.number)) goto property_invalid;
+            } else if(set->kind == EDITOR_ITEM_JOINT) {
+                EditorJoint *joint = editor_command_joint_get(object, set->item);
+                if(joint == NULL) return editor_command_not_found("joint", set->item);
+                if(set->property == EDITOR_PROPERTY_VISUAL_SIZE &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number >= 0.25f && set->value.number <= 3.0f)
+                    joint->visual_size = set->value.number;
+                else if(set->property == EDITOR_PROPERTY_JOINT_KIND &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_UINT &&
+                        set->value.integer <= (uint32_t)EDITOR_JOINT_SPRING) {
+                    if(!editor_project_joint_kind_set(object, joint,
+                            (EditorJointKind)set->value.integer)) goto property_invalid;
+                } else if(set->property == EDITOR_PROPERTY_REST_LENGTH &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number >= 0.0f) joint->rest_length = set->value.number;
+                else if(set->property == EDITOR_PROPERTY_STIFFNESS &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number >= 0.0f) joint->stiffness = set->value.number;
+                else if(set->property == EDITOR_PROPERTY_DAMPING &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number >= 0.0f) joint->damping = set->value.number;
+                else goto property_invalid;
+            } else if(set->kind == EDITOR_ITEM_ANCHOR) {
+                EditorAnchor *anchor = editor_project_anchor_get(object, set->item);
+                bool success = false;
+                if(anchor == NULL) return editor_command_not_found("anchor", set->item);
+                if(set->property == EDITOR_PROPERTY_POSITION_FOLLOWS_BODY &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_BOOL)
+                    success = editor_project_anchor_position_lock_set(object, anchor,
+                        set->value.boolean);
+                else if(set->property == EDITOR_PROPERTY_ROTATION_FOLLOWS_BODY &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_BOOL)
+                    success = editor_project_anchor_rotation_lock_set(object, anchor,
+                        set->value.boolean);
+                if(!success) goto property_invalid;
+            } else if(set->kind == EDITOR_ITEM_SOFT_NODE) {
+                EditorSoftBody *body = editor_command_soft_body_get(object, set->parent);
+                EditorSoftNode *node = editor_command_soft_node_get(body, set->item);
+                if(node == NULL) return editor_command_not_found("soft node", set->item);
+                if(set->property == EDITOR_PROPERTY_MASS &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number >= 0.0f) node->node_mass = set->value.number;
+                else if(set->property == EDITOR_PROPERTY_FRICTION &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number >= 0.0f) node->friction = set->value.number;
+                else if(set->property == EDITOR_PROPERTY_RESTITUTION &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number >= 0.0f && set->value.number <= 1.0f)
+                    node->restitution = set->value.number;
+                else if(set->property == EDITOR_PROPERTY_GRAVITY &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_BOOL)
+                    node->gravity_enabled = set->value.boolean;
+                else if(set->property == EDITOR_PROPERTY_COLLISION &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_BOOL)
+                    node->collision_enabled = set->value.boolean;
+                else goto property_invalid;
+            } else if(set->kind == EDITOR_ITEM_SOFT_BEAM) {
+                EditorSoftBody *body = editor_command_soft_body_get(object, set->parent);
+                EditorSoftBeam *beam = editor_command_soft_beam_get(body, set->item);
+                if(beam == NULL) return editor_command_not_found("soft beam", set->item);
+                if(set->property == EDITOR_PROPERTY_STIFFNESS &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number >= 0.0f) beam->stiffness = set->value.number;
+                else if(set->property == EDITOR_PROPERTY_DAMPING &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number >= 0.0f) beam->damping = set->value.number;
+                else goto property_invalid;
+            } else goto property_invalid;
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+property_invalid:
+            return editor_command_error(editor_result_error(
+                EDITOR_ERROR_INVALID_ARGUMENT,
+                "property is invalid for the target or value").result.error);
+        }
     }
     return editor_command_error((EditorError){EDITOR_ERROR_INVALID_ARGUMENT,
         "unknown editor command"});
@@ -589,6 +716,64 @@ static const char *editor_command_item_domain_get(EditorItemKind kind) {
     return NULL;
 }
 
+static bool editor_command_property_parse(const char *name,
+        EditorPropertyKind *property, EditorPropertyValueKind *value_kind) {
+    if(name == NULL || property == NULL || value_kind == NULL) return false;
+#define EDITOR_FLOAT_PROPERTY(text, value) \
+    if(strcmp(name, text) == 0) { *property = value; \
+        *value_kind = EDITOR_PROPERTY_VALUE_FLOAT; return true; }
+#define EDITOR_BOOL_PROPERTY(text, value) \
+    if(strcmp(name, text) == 0) { *property = value; \
+        *value_kind = EDITOR_PROPERTY_VALUE_BOOL; return true; }
+    EDITOR_FLOAT_PROPERTY("mass", EDITOR_PROPERTY_MASS)
+    EDITOR_FLOAT_PROPERTY("friction", EDITOR_PROPERTY_FRICTION)
+    EDITOR_FLOAT_PROPERTY("restitution", EDITOR_PROPERTY_RESTITUTION)
+    EDITOR_FLOAT_PROPERTY("visual-size", EDITOR_PROPERTY_VISUAL_SIZE)
+    EDITOR_FLOAT_PROPERTY("rest-length", EDITOR_PROPERTY_REST_LENGTH)
+    EDITOR_FLOAT_PROPERTY("stiffness", EDITOR_PROPERTY_STIFFNESS)
+    EDITOR_FLOAT_PROPERTY("damping", EDITOR_PROPERTY_DAMPING)
+    EDITOR_FLOAT_PROPERTY("length", EDITOR_PROPERTY_LINE_LENGTH)
+    EDITOR_BOOL_PROPERTY("gravity", EDITOR_PROPERTY_GRAVITY)
+    EDITOR_BOOL_PROPERTY("static", EDITOR_PROPERTY_STATIC)
+    EDITOR_BOOL_PROPERTY("rotation-locked", EDITOR_PROPERTY_ROTATION_LOCKED)
+    EDITOR_BOOL_PROPERTY("collision", EDITOR_PROPERTY_COLLISION)
+    EDITOR_BOOL_PROPERTY("particle", EDITOR_PROPERTY_PARTICLE)
+    EDITOR_BOOL_PROPERTY("position-locked", EDITOR_PROPERTY_POSITION_LOCKED)
+    EDITOR_BOOL_PROPERTY("position-follows-body", EDITOR_PROPERTY_POSITION_FOLLOWS_BODY)
+    EDITOR_BOOL_PROPERTY("rotation-follows-body", EDITOR_PROPERTY_ROTATION_FOLLOWS_BODY)
+#undef EDITOR_FLOAT_PROPERTY
+#undef EDITOR_BOOL_PROPERTY
+    if(strcmp(name, "kind") == 0) {
+        *property = EDITOR_PROPERTY_JOINT_KIND;
+        *value_kind = EDITOR_PROPERTY_VALUE_UINT;
+        return true;
+    }
+    return false;
+}
+
+static const char *editor_command_property_name_get(EditorPropertyKind property) {
+    switch(property) {
+        case EDITOR_PROPERTY_MASS: return "mass";
+        case EDITOR_PROPERTY_FRICTION: return "friction";
+        case EDITOR_PROPERTY_RESTITUTION: return "restitution";
+        case EDITOR_PROPERTY_GRAVITY: return "gravity";
+        case EDITOR_PROPERTY_STATIC: return "static";
+        case EDITOR_PROPERTY_ROTATION_LOCKED: return "rotation-locked";
+        case EDITOR_PROPERTY_COLLISION: return "collision";
+        case EDITOR_PROPERTY_PARTICLE: return "particle";
+        case EDITOR_PROPERTY_POSITION_LOCKED: return "position-locked";
+        case EDITOR_PROPERTY_VISUAL_SIZE: return "visual-size";
+        case EDITOR_PROPERTY_JOINT_KIND: return "kind";
+        case EDITOR_PROPERTY_REST_LENGTH: return "rest-length";
+        case EDITOR_PROPERTY_STIFFNESS: return "stiffness";
+        case EDITOR_PROPERTY_DAMPING: return "damping";
+        case EDITOR_PROPERTY_POSITION_FOLLOWS_BODY: return "position-follows-body";
+        case EDITOR_PROPERTY_ROTATION_FOLLOWS_BODY: return "rotation-follows-body";
+        case EDITOR_PROPERTY_LINE_LENGTH: return "length";
+    }
+    return NULL;
+}
+
 EditorResult editor_command_cli_parse(int count, char **arguments,
         const char **document_path, EditorCommand *command) {
     const char *domain;
@@ -630,6 +815,50 @@ EditorResult editor_command_cli_parse(int count, char **arguments,
                 "invalid navigation set command");
         command->type = EDITOR_COMMAND_NAVIGATION_SET;
         return editor_result_value(true);
+    }
+    if(strcmp(action, "set") == 0) {
+        EditorPropertySetCommand *set = &command->data.property_set;
+        bool nested;
+        bool indexed;
+        int property_index;
+        int value_index;
+        if(!editor_command_item_kind_parse(domain, &set->kind)) goto property_parse_invalid;
+        nested = set->kind == EDITOR_ITEM_SOFT_NODE ||
+            set->kind == EDITOR_ITEM_SOFT_BEAM;
+        indexed = set->kind == EDITOR_ITEM_VERTEX || set->kind == EDITOR_ITEM_LINE;
+        if((nested && count != 9) || (indexed && count != 10) ||
+                (!nested && !indexed && count != 8) ||
+                !editor_command_uint_parse(arguments[4], &set->object))
+            goto property_parse_invalid;
+        if(nested || indexed) {
+            if(!editor_command_uint_parse(arguments[5], &set->parent) ||
+                    !editor_command_uint_parse(arguments[6], &set->item))
+                goto property_parse_invalid;
+        } else if(!editor_command_uint_parse(arguments[5], &set->item)) {
+            goto property_parse_invalid;
+        }
+        if(indexed && !editor_command_uint_parse(arguments[7], &set->index))
+            goto property_parse_invalid;
+        property_index = indexed ? 8 : nested ? 7 : 6;
+        value_index = property_index + 1;
+        if(!editor_command_property_parse(arguments[property_index],
+                &set->property, &set->value_kind)) goto property_parse_invalid;
+        if(set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT) {
+            if(!editor_command_float_parse(arguments[value_index], &set->value.number))
+                goto property_parse_invalid;
+        } else if(set->value_kind == EDITOR_PROPERTY_VALUE_BOOL) {
+            if(!editor_command_bool_parse(arguments[value_index], &set->value.boolean))
+                goto property_parse_invalid;
+        } else {
+            const char *kinds[] = {"revolute", "weld", "spring"};
+            if(!editor_command_named_uint_parse(arguments[value_index], kinds, 3,
+                    &set->value.integer)) goto property_parse_invalid;
+        }
+        command->type = EDITOR_COMMAND_PROPERTY_SET;
+        return editor_result_value(true);
+property_parse_invalid:
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "invalid %s property command", domain);
     }
     if(strcmp(domain, "object") != 0 && (strcmp(action, "add") == 0 ||
             strcmp(action, "delete") == 0 || strcmp(action, "rename") == 0)) {
@@ -991,6 +1220,9 @@ EditorResult editor_command_cli_write(const EditorCommand *command,
         case EDITOR_COMMAND_ITEM_RENAME:
             domain = editor_command_item_domain_get(command->data.item_rename.kind);
             break;
+        case EDITOR_COMMAND_PROPERTY_SET:
+            domain = editor_command_item_domain_get(command->data.property_set.kind);
+            break;
         default: return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
             "unknown editor command");
     }
@@ -1246,6 +1478,42 @@ EditorResult editor_command_cli_write(const EditorCommand *command,
             else snprintf(values, sizeof(values), " %u %u %s", item->object,
                 item->item, item->name);
             break;
+        }
+        case EDITOR_COMMAND_PROPERTY_SET: {
+            const EditorPropertySetCommand *set = &command->data.property_set;
+            const char *property = editor_command_property_name_get(set->property);
+            const char *boolean;
+            char value[64];
+            if(property == NULL ||
+                    !editor_command_text_append(output, output_capacity, &used, "set ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            if(set->kind == EDITOR_ITEM_SOFT_NODE || set->kind == EDITOR_ITEM_SOFT_BEAM)
+                snprintf(values, sizeof(values), " %u %u %u", set->object,
+                    set->parent, set->item);
+            else if(set->kind == EDITOR_ITEM_VERTEX || set->kind == EDITOR_ITEM_LINE)
+                snprintf(values, sizeof(values), " %u %u %u %u", set->object,
+                    set->parent, set->item, set->index);
+            else snprintf(values, sizeof(values), " %u %u", set->object, set->item);
+            if(!editor_command_text_append(output, output_capacity, &used, values) ||
+                    !editor_command_text_append(output, output_capacity, &used, " ") ||
+                    !editor_command_text_append(output, output_capacity, &used, property) ||
+                    !editor_command_text_append(output, output_capacity, &used, " "))
+                goto capacity_error;
+            if(set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT)
+                snprintf(value, sizeof(value), "%.9g", set->value.number);
+            else if(set->value_kind == EDITOR_PROPERTY_VALUE_BOOL) {
+                boolean = set->value.boolean ? "true" : "false";
+                snprintf(value, sizeof(value), "%s", boolean);
+            } else {
+                const char *kinds[] = {"revolute", "weld", "spring"};
+                if(set->value.integer > (uint32_t)EDITOR_JOINT_SPRING)
+                    goto capacity_error;
+                snprintf(value, sizeof(value), "%s", kinds[set->value.integer]);
+            }
+            if(!editor_command_text_append(output, output_capacity, &used, value))
+                goto capacity_error;
+            return editor_result_value(true);
         }
     }
     if(!editor_command_text_append(output, output_capacity, &used, values))

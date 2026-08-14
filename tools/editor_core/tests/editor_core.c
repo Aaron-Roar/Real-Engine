@@ -239,6 +239,98 @@ static int item_commands_test(void) {
     return 0;
 }
 
+static int property_commands_test(void) {
+    static EditorProject project;
+    EditorObject *object;
+    EditorRigidBody *rigid_body;
+    EditorHitbox *hitbox;
+    EditorJoint *joint;
+    EditorAnchor *anchor;
+    EditorSoftBody *soft_body;
+    EditorSoftNode *node;
+    EditorSoftNode *second_node;
+    EditorSoftBeam *beam;
+    EditorCommand command;
+    EditorCommand parsed;
+    const char *path;
+    char cli_text[512];
+    char *node_arguments[] = {"editor-cli", "soft-node", "set",
+        "project.rohr.json", "1", "1", "1", "friction", "0.75"};
+    char *joint_arguments[] = {"editor-cli", "joint", "set",
+        "project.rohr.json", "1", "1", "kind", "weld"};
+
+    editor_project_init(&project);
+    object = editor_project_object_add(&project, (Position){0});
+    rigid_body = editor_project_rigid_body_add(&project, object);
+    hitbox = rigid_body == NULL ? NULL : &rigid_body->hitboxes[0];
+    joint = editor_project_joint_add(&project, object, EDITOR_JOINT_SPRING);
+    anchor = editor_project_anchor_add(&project, object, (Position){1.0f, 2.0f},
+        rigid_body == NULL ? 0 : rigid_body->id);
+    soft_body = editor_project_soft_body_add(&project, object);
+    node = editor_project_soft_node_add(&project, soft_body, (Position){0});
+    second_node = editor_project_soft_node_add(&project, soft_body,
+        (Position){2.0f, 0.0f});
+    beam = editor_project_soft_beam_add(&project, soft_body,
+        node == NULL ? 0 : node->id, second_node == NULL ? 0 : second_node->id);
+    if(object == NULL || rigid_body == NULL || hitbox == NULL || joint == NULL ||
+            anchor == NULL || soft_body == NULL || node == NULL ||
+            second_node == NULL || beam == NULL) return 1;
+#define PROPERTY_SET(target_kind, target_parent, target_item, target_index, \
+        property_kind, property_value_kind, member, property_value) do { \
+    command = (EditorCommand){.type = EDITOR_COMMAND_PROPERTY_SET, \
+        .data.property_set = {.kind = target_kind, .object = object->id, \
+            .parent = target_parent, .item = target_item, .index = target_index, \
+            .property = property_kind, .value_kind = property_value_kind}}; \
+    command.data.property_set.value.member = property_value; \
+    if(editor_command_execute(&project, &command).kind != ERROR_RESULT_VALUE || \
+            editor_result_check(editor_command_cli_write(&command, \
+                "project.rohr.json", cli_text, sizeof(cli_text)))) return 1; \
+} while(0)
+    PROPERTY_SET(EDITOR_ITEM_RIGID_BODY, 0, rigid_body->id, 0,
+        EDITOR_PROPERTY_MASS, EDITOR_PROPERTY_VALUE_FLOAT, number, 5.0f);
+    PROPERTY_SET(EDITOR_ITEM_RIGID_BODY, 0, rigid_body->id, 0,
+        EDITOR_PROPERTY_COLLISION, EDITOR_PROPERTY_VALUE_BOOL, boolean, true);
+    PROPERTY_SET(EDITOR_ITEM_RIGID_BODY, 0, rigid_body->id, 0,
+        EDITOR_PROPERTY_PARTICLE, EDITOR_PROPERTY_VALUE_BOOL, boolean, true);
+    PROPERTY_SET(EDITOR_ITEM_VERTEX, rigid_body->id, hitbox->id,
+        hitbox->vertices[0].id, EDITOR_PROPERTY_POSITION_LOCKED,
+        EDITOR_PROPERTY_VALUE_BOOL, boolean, true);
+    PROPERTY_SET(EDITOR_ITEM_LINE, rigid_body->id, hitbox->id, 0,
+        EDITOR_PROPERTY_LINE_LENGTH, EDITOR_PROPERTY_VALUE_FLOAT, number, 3.0f);
+    PROPERTY_SET(EDITOR_ITEM_JOINT, 0, joint->id, 0,
+        EDITOR_PROPERTY_STIFFNESS, EDITOR_PROPERTY_VALUE_FLOAT, number, 12.0f);
+    PROPERTY_SET(EDITOR_ITEM_JOINT, 0, joint->id, 0,
+        EDITOR_PROPERTY_JOINT_KIND, EDITOR_PROPERTY_VALUE_UINT, integer,
+        EDITOR_JOINT_WELD);
+    PROPERTY_SET(EDITOR_ITEM_ANCHOR, 0, anchor->id, 0,
+        EDITOR_PROPERTY_POSITION_FOLLOWS_BODY, EDITOR_PROPERTY_VALUE_BOOL,
+        boolean, false);
+    PROPERTY_SET(EDITOR_ITEM_SOFT_NODE, soft_body->id, node->id, 0,
+        EDITOR_PROPERTY_FRICTION, EDITOR_PROPERTY_VALUE_FLOAT, number, 0.75f);
+    PROPERTY_SET(EDITOR_ITEM_SOFT_BEAM, soft_body->id, beam->id, 0,
+        EDITOR_PROPERTY_DAMPING, EDITOR_PROPERTY_VALUE_FLOAT, number, 0.25f);
+#undef PROPERTY_SET
+    if(rigid_body->mass_value != 5.0f || !rigid_body->particle ||
+            !hitbox->vertices[0].position_locked || joint->kind != EDITOR_JOINT_WELD ||
+            joint->stiffness != 12.0f || anchor->position_follows_body ||
+            node->friction != 0.75f || beam->damping != 0.25f) return 1;
+    if(editor_result_check(editor_command_cli_parse(9, node_arguments,
+                &path, &parsed)) || parsed.type != EDITOR_COMMAND_PROPERTY_SET ||
+            parsed.data.property_set.property != EDITOR_PROPERTY_FRICTION ||
+            parsed.data.property_set.value.number != 0.75f ||
+            editor_result_check(editor_command_cli_parse(8, joint_arguments,
+                &path, &parsed)) || parsed.data.property_set.value.integer !=
+                EDITOR_JOINT_WELD) return 1;
+    command = (EditorCommand){.type = EDITOR_COMMAND_PROPERTY_SET,
+        .data.property_set = {.kind = EDITOR_ITEM_RIGID_BODY,
+            .object = object->id, .item = rigid_body->id,
+            .property = EDITOR_PROPERTY_RESTITUTION,
+            .value_kind = EDITOR_PROPERTY_VALUE_FLOAT,
+            .value.number = 2.0f}};
+    if(editor_command_execute(&project, &command).kind != ERROR_RESULT_ERROR) return 1;
+    return 0;
+}
+
 int main(void) {
     const char *path = "/tmp/rohr-editor-core-test.json";
     EditorDocument document;
@@ -319,6 +411,7 @@ int main(void) {
             strstr(cli_text, "object add") == NULL) return 1;
     if(transform_commands_test() != 0) return 1;
     if(item_commands_test() != 0) return 1;
+    if(property_commands_test() != 0) return 1;
 
     editor_document_destroy(&loaded);
     editor_document_destroy(&document);

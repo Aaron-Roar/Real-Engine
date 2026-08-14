@@ -21,7 +21,8 @@ typedef enum EditorCommandType {
     EDITOR_COMMAND_NAVIGATION_SET,
     EDITOR_COMMAND_ITEM_ADD,
     EDITOR_COMMAND_ITEM_REMOVE,
-    EDITOR_COMMAND_ITEM_RENAME
+    EDITOR_COMMAND_ITEM_RENAME,
+    EDITOR_COMMAND_PROPERTY_SET
 } EditorCommandType;
 
 typedef enum EditorItemKind {
@@ -65,6 +66,47 @@ typedef struct EditorItemRenameCommand {
     uint32_t index;
     char name[EDITOR_OBJECT_NAME_MAX];
 } EditorItemRenameCommand;
+
+typedef enum EditorPropertyKind {
+    EDITOR_PROPERTY_MASS,
+    EDITOR_PROPERTY_FRICTION,
+    EDITOR_PROPERTY_RESTITUTION,
+    EDITOR_PROPERTY_GRAVITY,
+    EDITOR_PROPERTY_STATIC,
+    EDITOR_PROPERTY_ROTATION_LOCKED,
+    EDITOR_PROPERTY_COLLISION,
+    EDITOR_PROPERTY_PARTICLE,
+    EDITOR_PROPERTY_POSITION_LOCKED,
+    EDITOR_PROPERTY_VISUAL_SIZE,
+    EDITOR_PROPERTY_JOINT_KIND,
+    EDITOR_PROPERTY_REST_LENGTH,
+    EDITOR_PROPERTY_STIFFNESS,
+    EDITOR_PROPERTY_DAMPING,
+    EDITOR_PROPERTY_POSITION_FOLLOWS_BODY,
+    EDITOR_PROPERTY_ROTATION_FOLLOWS_BODY,
+    EDITOR_PROPERTY_LINE_LENGTH
+} EditorPropertyKind;
+
+typedef enum EditorPropertyValueKind {
+    EDITOR_PROPERTY_VALUE_FLOAT,
+    EDITOR_PROPERTY_VALUE_BOOL,
+    EDITOR_PROPERTY_VALUE_UINT
+} EditorPropertyValueKind;
+
+typedef struct EditorPropertySetCommand {
+    EditorItemKind kind;
+    EditorObjectId object;
+    uint32_t parent;
+    uint32_t item;
+    uint32_t index;
+    EditorPropertyKind property;
+    EditorPropertyValueKind value_kind;
+    union {
+        float number;
+        bool boolean;
+        uint32_t integer;
+    } value;
+} EditorPropertySetCommand;
 
 typedef enum EditorVisibilityKind {
     EDITOR_VISIBILITY_OBJECT,
@@ -149,6 +191,7 @@ typedef struct EditorCommand {
         EditorItemAddCommand item_add;
         EditorItemRemoveCommand item_remove;
         EditorItemRenameCommand item_rename;
+        EditorPropertySetCommand property_set;
     } data;
 } EditorCommand;
 

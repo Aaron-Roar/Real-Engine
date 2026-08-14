@@ -28,6 +28,8 @@ static void cli_usage_print(void) {
         "  rohr viewport coordinates <project.rohr.json> <local|world>\n"
         "  rohr <target> visibility <project.rohr.json> <object> [parent] [item] <true|false>\n"
         "    targets: object, rigid-body, hitbox, joint, anchor, soft-body, soft-node, soft-beam\n"
+        "  rohr <target> set <project.rohr.json> <object> [parent] <item> [index] <property> <value>\n"
+        "    targets: rigid-body, joint, anchor, soft-node, soft-beam, vertex, line\n"
         "  rohr navigation set <project.rohr.json> <mode> <selection> <object>\n"
         "      <rigid-body> <hitbox> <joint> <anchor> <soft-body> <soft-node>\n"
         "      <soft-beam> <line> <vertex> <origin-kind>");
