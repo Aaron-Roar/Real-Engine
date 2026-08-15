@@ -1,5 +1,6 @@
 add_executable(rohr_editor_gui
     src/editor_file_browser.c
+    src/editor_history.c
     src/editor_navigation.c
     src/editor_viewport.c
     src/panels/editor_origin_panel.c
@@ -52,4 +53,16 @@ if(ROHR_BUILD_TESTS)
         RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests
     )
     add_test(NAME editor_navigation COMMAND editor_navigation_test)
+
+    add_executable(editor_history_test
+        tests/editor_history.c
+        src/editor_history.c
+    )
+    target_include_directories(editor_history_test PRIVATE
+        src ${PROJECT_SOURCE_DIR}/lib)
+    target_link_libraries(editor_history_test PRIVATE rohr_engine rohr_editor_core)
+    set_target_properties(editor_history_test PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests
+    )
+    add_test(NAME editor_history COMMAND editor_history_test)
 endif()

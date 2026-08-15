@@ -2,6 +2,7 @@
 #include "editor_project.h"
 #include "editor_workspace.h"
 #include "editor_file_browser.h"
+#include "editor_history.h"
 #include "editor_viewport.h"
 #include "editor_layout.h"
 #include "editor_navigation.h"
@@ -49,6 +50,7 @@ static EditorTerminalPanel *editor_operation_terminal;
 static const EditorWorkspace *editor_operation_workspace;
 static const EditorProject *editor_operation_project;
 static bool *editor_operation_enabled;
+static EditorHistory *editor_operation_history;
 
 static void editor_operation_command_write(const EditorCommand *editor_command,
         const EditorCommandResult *result, void *context) {
@@ -62,6 +64,12 @@ static void editor_operation_command_write(const EditorCommand *editor_command,
             editor_operation_workspace->config.editor_state_file,
             command, sizeof(command)))) return;
     editor_terminal_panel_operation_write(editor_operation_terminal, command);
+}
+
+static void editor_operation_command_executed(const EditorCommand *editor_command,
+        const EditorCommandResult *result, void *context) {
+    editor_history_command_record(editor_operation_history, editor_command);
+    editor_operation_command_write(editor_command, result, context);
 }
 
 static EditorResult editor_workspace_operation_execute(EditorWorkspace *workspace,
@@ -836,6 +844,9 @@ int main(void) {
     FontAsset font = {0};
     TextAsset hitbox_editor_label = {0};
     TextAsset file_label = {0};
+    TextAsset edit_label = {0};
+    TextAsset undo_label = {0};
+    TextAsset redo_label = {0};
     TextAsset build_label = {0};
     TextAsset generate_c_label = {0};
     TextAsset world_view_label = {0};
@@ -961,6 +972,7 @@ int main(void) {
     EditorWorkspace workspace = {0};
     EditorOriginPanel origin_panel = {0};
     EditorTerminalPanel terminal_panel = {0};
+    EditorHistory history = {0};
     EditorWorkspaceBrowserAction workspace_browser_action =
         EDITOR_WORKSPACE_BROWSER_NONE;
     char startup_directory[EDITOR_FILE_BROWSER_PATH_MAX] = {0};
@@ -980,8 +992,10 @@ int main(void) {
     editor_operation_workspace = &workspace;
     editor_operation_project = &project;
     editor_operation_enabled = &terminal_editor_operations;
-    editor_command_executed_callback_set(editor_operation_command_write, NULL);
     editor_project_init(&project);
+    if(!editor_history_init(&history, &project)) goto fail;
+    editor_operation_history = &history;
+    editor_command_executed_callback_set(editor_operation_command_executed, NULL);
     saved_project_hash = editor_project_hash_get(&project);
     editor_viewport_state_init(&viewport_state);
     editor_navigation_state_apply(&project, &viewport_state, &project.navigation);
@@ -1024,6 +1038,9 @@ int main(void) {
     }
     if(!editor_text_create(&font, "Hitbox Editor", &hitbox_editor_label) ||
             !editor_text_create(&font, "File", &file_label) ||
+            !editor_text_create(&font, "Edit", &edit_label) ||
+            !editor_text_create(&font, "Undo    Ctrl+Z", &undo_label) ||
+            !editor_text_create(&font, "Redo    Ctrl+Y", &redo_label) ||
             !editor_text_create(&font, "Build", &build_label) ||
             !editor_text_create(&font, "Generate C", &generate_c_label) ||
             !editor_text_create(&font, "World", &world_view_label) ||
@@ -1162,6 +1179,26 @@ int main(void) {
             }
         }
         editor_terminal_panel_update(&terminal_panel);
+        editor_history_continuous_set(&history, field_editing ||
+            mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_PRESSED ||
+            mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_DOWN);
+        if(workspace.open && !field_editing &&
+                !editor_terminal_panel_focused_check(&terminal_panel) &&
+                !file_browser.active && close_action == EDITOR_CLOSE_NONE &&
+                (SDL_GetModState() & SDL_KMOD_CTRL) != 0) {
+            bool restored = false;
+            if(rohr_controller_key_pressed_get(&keyboard, SDLK_Z)) {
+                if((SDL_GetModState() & SDL_KMOD_SHIFT) != 0)
+                    restored = editor_history_redo(&history);
+                else restored = editor_history_undo(&history);
+            } else if(rohr_controller_key_pressed_get(&keyboard, SDLK_Y)) {
+                restored = editor_history_redo(&history);
+            }
+            if(restored) {
+                editor_navigation_state_apply(
+                    &project, &viewport_state, &project.navigation);
+            }
+        }
         if(file_browser.active &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             if(!editor_file_browser_selection_clear(&file_browser)) {
@@ -3185,6 +3222,7 @@ int main(void) {
             const TextAsset *build_options[] = {
                 &generate_c_label
             };
+            const TextAsset *edit_options[] = {&undo_label, &redo_label};
             const TextAsset *settings_options[] = {
                 &preferences_label
             };
@@ -3193,6 +3231,7 @@ int main(void) {
                 &exit_label
             };
             const TextAsset *build_texts[] = {&build_label, &generate_c_label};
+            const TextAsset *edit_texts[] = {&edit_label, &undo_label, &redo_label};
             const TextAsset *view_texts[] = {
                 &view_label, &reset_view_label, &grid_label, &terminal_label
             };
@@ -3211,6 +3250,7 @@ int main(void) {
                 (UIRect){menu_x, 3.0f, 0.0f, 0.0f}, file_texts,
                 sizeof(file_texts) / sizeof(file_texts[0]), menu_components);
             UIRect build_bounds;
+            UIRect edit_bounds;
             UIRect view_bounds;
             UIRect settings_bounds;
             UIRect terminal_bounds;
@@ -3227,6 +3267,10 @@ int main(void) {
                     "[ ] Show build operations");
 
             menu_x += file_bounds.width + 4.0f;
+            edit_bounds = rohr_ui_component_bounds_get(
+                (UIRect){menu_x, 3.0f, 0.0f, 0.0f}, edit_texts,
+                sizeof(edit_texts) / sizeof(edit_texts[0]), menu_components);
+            menu_x += edit_bounds.width + 4.0f;
             build_bounds = rohr_ui_component_bounds_get(
                 (UIRect){menu_x, 3.0f, 0.0f, 0.0f}, build_texts,
                 sizeof(build_texts) / sizeof(build_texts[0]), menu_components);
@@ -3268,6 +3312,7 @@ int main(void) {
                 if(editor_project_hash_get(&project) == saved_project_hash) {
                     editor_terminal_panel_project_close(&terminal_panel);
                     editor_workspace_close(&workspace, &project);
+                    editor_history_reset(&history);
                     saved_project_hash = editor_project_hash_get(&project);
                     editor_viewport_state_init(&viewport_state);
                     panel_scroll_offset = 0.0f;
@@ -3281,6 +3326,19 @@ int main(void) {
                 } else {
                     close_action = EDITOR_CLOSE_PROGRAM;
                 }
+            }
+            {
+                UIDropdownResult edit_menu = rohr_ui_menu("editor.menu.edit",
+                    &edit_label, edit_options,
+                    sizeof(edit_options) / sizeof(edit_options[0]),
+                    edit_bounds, NULL);
+                bool restored = false;
+                if(edit_menu.changed && edit_menu.selected_index == 0)
+                    restored = editor_history_undo(&history);
+                else if(edit_menu.changed && edit_menu.selected_index == 1)
+                    restored = editor_history_redo(&history);
+                if(restored) editor_navigation_state_apply(
+                    &project, &viewport_state, &project.navigation);
             }
             {
                 UIDropdownResult build_menu = rohr_ui_menu("editor.menu.build",
@@ -3346,6 +3404,7 @@ int main(void) {
                     } else {
                         editor_terminal_panel_project_close(&terminal_panel);
                         editor_workspace_close(&workspace, &project);
+                        editor_history_reset(&history);
                         saved_project_hash = editor_project_hash_get(&project);
                         editor_viewport_state_init(&viewport_state);
                         panel_scroll_offset = 0.0f;
@@ -3361,6 +3420,7 @@ int main(void) {
                 } else {
                     editor_terminal_panel_project_close(&terminal_panel);
                     editor_workspace_close(&workspace, &project);
+                    editor_history_reset(&history);
                     saved_project_hash = editor_project_hash_get(&project);
                     editor_viewport_state_init(&viewport_state);
                     panel_scroll_offset = 0.0f;
@@ -3426,6 +3486,7 @@ int main(void) {
                     opened = !editor_result_check(load_result);
                 }
                 if(opened) {
+                    editor_history_reset(&history);
                     saved_project_hash = editor_project_hash_get(&project);
                     editor_viewport_state_init(&viewport_state);
                     editor_navigation_state_apply(
@@ -3485,6 +3546,9 @@ int main(void) {
                 (void)editor_command_execute(&project, &command);
             }
         }
+        editor_history_continuous_set(&history, field_editing ||
+            mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_PRESSED ||
+            mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_DOWN);
         rohr_ui_frame_end();
         if(!file_browser.active) {
             (void)rohr_graphics_screen_rect_draw(
@@ -3495,6 +3559,9 @@ int main(void) {
         rohr_graphics_show();
     }
 
+    editor_command_executed_callback_set(NULL, NULL);
+    editor_operation_history = NULL;
+    editor_history_destroy(&history);
     editor_terminal_panel_destroy(&terminal_panel);
     editor_origin_panel_destroy(&origin_panel);
     rohr_graphics_text_destroy(&stiffness_label);
@@ -3623,6 +3690,9 @@ int main(void) {
         rohr_graphics_text_destroy(&collision_mask_labels[i]);
     }
     rohr_graphics_text_destroy(&file_label);
+    rohr_graphics_text_destroy(&redo_label);
+    rohr_graphics_text_destroy(&undo_label);
+    rohr_graphics_text_destroy(&edit_label);
     rohr_graphics_text_destroy(&file_browser_field);
     editor_file_browser_destroy(&file_browser);
     rohr_graphics_font_destroy(&font);
@@ -3632,6 +3702,9 @@ int main(void) {
     return 0;
 
 fail:
+    editor_command_executed_callback_set(NULL, NULL);
+    editor_operation_history = NULL;
+    editor_history_destroy(&history);
     editor_terminal_panel_destroy(&terminal_panel);
     editor_origin_panel_destroy(&origin_panel);
     rohr_graphics_text_destroy(&stiffness_label);
@@ -3760,6 +3833,9 @@ fail:
         rohr_graphics_text_destroy(&collision_mask_labels[i]);
     }
     rohr_graphics_text_destroy(&file_label);
+    rohr_graphics_text_destroy(&redo_label);
+    rohr_graphics_text_destroy(&undo_label);
+    rohr_graphics_text_destroy(&edit_label);
     rohr_graphics_text_destroy(&file_browser_field);
     editor_file_browser_destroy(&file_browser);
     rohr_graphics_font_destroy(&font);
