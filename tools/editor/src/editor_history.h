@@ -16,6 +16,7 @@ typedef struct EditorHistory {
     size_t redo_count;
     bool continuous;
     bool continuous_recorded;
+    bool recorded_since_continuous_update;
 } EditorHistory;
 
 bool editor_history_init(EditorHistory *history, EditorProject *project);

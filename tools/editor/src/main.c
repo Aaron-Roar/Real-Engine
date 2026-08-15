@@ -3,6 +3,7 @@
 #include "editor_workspace.h"
 #include "editor_file_browser.h"
 #include "editor_history.h"
+#include "editor_shortcuts.h"
 #include "editor_viewport.h"
 #include "editor_layout.h"
 #include "editor_navigation.h"
@@ -1166,6 +1167,17 @@ int main(void) {
         rohr_controller_key_states_update(&keyboard);
         rohr_controller_mouse_states_update(&mouse);
         while((event = rohr_engine_event_poll()).type != 0) {
+            EditorHistoryShortcutResult shortcut =
+                editor_history_shortcut_handle(&event, workspace.open, &history);
+            if(shortcut.consumed) {
+                if(shortcut.restored) {
+                    rohr_ui_field_focus_clear();
+                    field_editing = false;
+                    editor_navigation_state_apply(
+                        &project, &viewport_state, &project.navigation);
+                }
+                continue;
+            }
             bool terminal_consumed = editor_terminal_panel_event_add(&terminal_panel,
                 &event, EDITOR_VIEWPORT_WIDTH, EDITOR_VIEWPORT_BOTTOM);
             if(event.type == SDL_EVENT_MOUSE_WHEEL && !terminal_consumed)
@@ -1190,23 +1202,6 @@ int main(void) {
         editor_history_continuous_set(&history, field_editing ||
             mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_PRESSED ||
             mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_DOWN);
-        if(workspace.open && !field_editing &&
-                !editor_terminal_panel_focused_check(&terminal_panel) &&
-                !file_browser.active && close_action == EDITOR_CLOSE_NONE &&
-                (SDL_GetModState() & SDL_KMOD_CTRL) != 0) {
-            bool restored = false;
-            if(rohr_controller_key_pressed_get(&keyboard, SDLK_Z)) {
-                if((SDL_GetModState() & SDL_KMOD_SHIFT) != 0)
-                    restored = editor_history_redo(&history);
-                else restored = editor_history_undo(&history);
-            } else if(rohr_controller_key_pressed_get(&keyboard, SDLK_Y)) {
-                restored = editor_history_redo(&history);
-            }
-            if(restored) {
-                editor_navigation_state_apply(
-                    &project, &viewport_state, &project.navigation);
-            }
-        }
         if(file_browser.active &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             if(!editor_file_browser_selection_clear(&file_browser)) {

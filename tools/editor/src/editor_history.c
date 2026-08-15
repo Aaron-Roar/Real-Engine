@@ -162,6 +162,7 @@ void editor_history_reset(EditorHistory *history) {
     history->pending = NULL;
     history->continuous = false;
     history->continuous_recorded = false;
+    history->recorded_since_continuous_update = false;
 }
 
 void editor_history_command_begin(EditorHistory *history,
@@ -195,6 +196,7 @@ void editor_history_command_finish(EditorHistory *history,
             if(entry != NULL && editor_history_stack_push(history->undo,
                     &history->undo_count, entry)) {
                 editor_history_stack_clear(history->redo, &history->redo_count);
+                history->recorded_since_continuous_update = true;
                 if(history->continuous) history->continuous_recorded = true;
             } else if(entry != NULL) {
                 editor_history_entry_destroy(entry);
@@ -207,8 +209,12 @@ void editor_history_command_finish(EditorHistory *history,
 
 void editor_history_continuous_set(EditorHistory *history, bool continuous) {
     if(history == NULL) return;
+    if(!history->continuous && continuous &&
+            history->recorded_since_continuous_update)
+        history->continuous_recorded = true;
     if(history->continuous && !continuous) history->continuous_recorded = false;
     history->continuous = continuous;
+    history->recorded_since_continuous_update = false;
 }
 
 static bool editor_history_restore(EditorHistory *history,
@@ -227,6 +233,7 @@ static bool editor_history_restore(EditorHistory *history,
     }
     history->continuous = false;
     history->continuous_recorded = false;
+    history->recorded_since_continuous_update = false;
     return true;
 }
 

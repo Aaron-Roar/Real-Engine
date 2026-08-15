@@ -436,6 +436,13 @@ void ui_field_event_add(const SDL_Event *event) {
     ui_event_add(event);
 }
 
+void ui_field_focus_clear(void) {
+    ui_context.field_id = 0;
+    ui_context.field_select_all = false;
+    ui_context.field_edit[0] = '\0';
+    ui_context.field_cursor = 0;
+}
+
 static void ui_field_binding_display_set(UIFieldBinding binding, TextAsset *display) {
     char value[UI_FIELD_EDIT_MAX] = {0};
 

@@ -1,6 +1,7 @@
 #include "editor_command.h"
 
 #include <errno.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -138,6 +139,11 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
                     return editor_command_error(editor_result_error(
                         EDITOR_ERROR_INVALID_ARGUMENT, "vertex %u is locked",
                         command->data.vertex_position.vertex).result.error);
+                if(fabsf(hitbox->vertices[i].position.x -
+                            command->data.vertex_position.position.x) <= 0.0001f &&
+                        fabsf(hitbox->vertices[i].position.y -
+                            command->data.vertex_position.position.y) <= 0.0001f)
+                    return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
                 hitbox->vertices[i].position = command->data.vertex_position.position;
                 return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
             }

@@ -201,6 +201,7 @@ UIRect ui_component_bounds_get(UIRect bounds, const TextAsset *const *texts,
     size_t text_count, UIComponentConfig config);
 void ui_event_add(const SDL_Event *event);
 void ui_field_event_add(const SDL_Event *event);
+void ui_field_focus_clear(void);
 UIFieldResult ui_field(const char *id, UIFieldBinding binding,
     TextAsset *display, UIRect bounds, const UIButtonStyle *style);
 

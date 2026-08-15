@@ -617,8 +617,12 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                 primary_button == MOUSE_BUTTON_STATE_PRESSED)) {
         if(hitbox->vertices[state->dragged_vertex].position_locked) return true;
         {
-            Position local = {pointer.x - object->position.x - body->position.x,
-                pointer.y - object->position.y - body->position.y};
+            Position local = {
+                pointer.x - state->drag_offset.x - object->position.x -
+                    body->position.x,
+                pointer.y - state->drag_offset.y - object->position.y -
+                    body->position.y
+            };
             float cosine = cosf(-body->rotation);
             float sine = sinf(-body->rotation);
             EditorVertex *vertex = &hitbox->vertices[state->dragged_vertex];
@@ -890,7 +894,11 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
             state->selection = EDITOR_SELECTION_VERTEX;
             state->selected_vertex = i;
             editor_viewport_vertex_editor_enter(state, i);
-            if(!hitbox->vertices[i].position_locked) state->dragged_vertex = (int)i;
+            if(!hitbox->vertices[i].position_locked) {
+                state->dragged_vertex = (int)i;
+                state->drag_offset = (Vec2D){pointer.x - vertex.x,
+                    pointer.y - vertex.y};
+            }
             return true;
         }
         for(uint32_t i = 0; i < hitbox->vertex_count; i += 1) {
