@@ -130,9 +130,8 @@ with Escape, or loses focus.
 
 Triangle modes are equilateral, isosceles, and scalene. Equilateral height is
 derived from width, isosceles centers its apex using editable width and height,
-and scalene uses the same fields with a deterministic asymmetric apex. Width and
-length independently control the square tool, so unequal values produce a
-rectangle.
+and scalene adds an editable horizontal apex offset. Width and length
+independently control the square tool, so unequal values produce a rectangle.
 
 Rigid bodies expose mass, friction, restitution, gravity, motion type, rotation
 locking, colors, and collision filtering. Collision filtering has two sets:

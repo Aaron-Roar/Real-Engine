@@ -68,8 +68,9 @@ static int auto_shape_test(void) {
     triangle.triangle_kind = EDITOR_AUTO_TRIANGLE_SCALENE;
     triangle.width = 8.0f;
     triangle.height = 6.0f;
+    triangle.apex_offset = 1.5f;
     if(editor_result_check(editor_auto_shape_hitbox_apply(&hitbox, &triangle)) ||
-            !position_near(hitbox.vertices[0].position, -2.0f, -3.0f) ||
+            !position_near(hitbox.vertices[0].position, 1.5f, -3.0f) ||
             !position_near(hitbox.vertices[1].position, 4.0f, 3.0f) ||
             !position_near(hitbox.vertices[2].position, -4.0f, 3.0f)) return 1;
     return 0;
@@ -89,7 +90,7 @@ static int auto_shape_command_test(void) {
     char output[1024];
     char *arguments[] = {"editor-cli", "--soft-body", "cloth",
         "--object", "ShapeObject", "--property", "auto-shape",
-        "circle", "isosceles", "100", "100", "25"};
+        "circle", "isosceles", "100", "100", "25", "0"};
 
     editor_project_init(&project);
     object = editor_project_object_add(&project, (Position){0});

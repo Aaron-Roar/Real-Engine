@@ -1237,6 +1237,7 @@ int main(void) {
     TextAsset scalene_label = {0};
     TextAsset width_label = {0};
     TextAsset height_label = {0};
+    TextAsset apex_offset_label = {0};
     TextAsset file_label = {0};
     TextAsset edit_label = {0};
     TextAsset undo_label = {0};
@@ -1399,6 +1400,7 @@ int main(void) {
     bool auto_shape_picker_open = false;
     bool auto_shape_first_field_was_active = false;
     bool auto_shape_second_field_was_active = false;
+    bool auto_shape_third_field_was_active = false;
     EditorAutoShapeConfig auto_shape_config = {
         .kind = EDITOR_AUTO_SHAPE_CIRCLE,
         .triangle_kind = EDITOR_AUTO_TRIANGLE_ISOSCELES,
@@ -1470,6 +1472,7 @@ int main(void) {
             !editor_text_create(&font, "Scalene", &scalene_label) ||
             !editor_text_create(&font, "Width", &width_label) ||
             !editor_text_create(&font, "Height", &height_label) ||
+            !editor_text_create(&font, "Apex X", &apex_offset_label) ||
             !editor_text_create(&font, "File", &file_label) ||
             !editor_text_create(&font, "Edit", &edit_label) ||
             !editor_text_create(&font, "Undo    Ctrl+Z", &undo_label) ||
@@ -2317,6 +2320,7 @@ int main(void) {
                         viewport_state.selection = EDITOR_SELECTION_HITBOX;
                         auto_shape_first_field_was_active = false;
                         auto_shape_second_field_was_active = false;
+                        auto_shape_third_field_was_active = false;
                         auto_shape_picker_open = false;
                     }
                 }
@@ -2324,9 +2328,11 @@ int main(void) {
         } else if(viewport_state.mode == EDITOR_VIEWPORT_AUTO_SHAPE) {
             UIFieldResult first_result = {0};
             UIFieldResult second_result = {0};
+            UIFieldResult third_result = {0};
             bool non_field_changed = false;
             bool first_active;
             bool second_active;
+            bool third_active;
             bool commit;
 
             rohr_ui_label(auto_shape_config.kind == EDITOR_AUTO_SHAPE_TRIANGLE ?
@@ -2381,19 +2387,33 @@ int main(void) {
                             (EditorAutoTriangleKind)triangle_result.selected_index;
                         non_field_changed = true;
                     }
+                    if(auto_shape_config.triangle_kind == EDITOR_AUTO_TRIANGLE_SCALENE) {
+                        rohr_ui_label(&apex_offset_label,
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 202.0f,
+                                80.0f, 28.0f});
+                        third_result = rohr_ui_field("editor.auto_shape.apex_offset",
+                            (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                                .number = &auto_shape_config.apex_offset}, &length_field,
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 94.0f, 202.0f,
+                                EDITOR_TOOLS_WIDTH - 104.0f, 28.0f}, NULL);
+                    }
                 }
             }
             first_active = first_result.active && !first_result.submitted;
             second_active = second_result.active && !second_result.submitted;
+            third_active = third_result.active && !third_result.submitted;
             commit = non_field_changed ||
                 (auto_shape_first_field_was_active && !first_active) ||
                 (auto_shape_second_field_was_active && !second_active) ||
-                first_result.submitted || second_result.submitted;
+                (auto_shape_third_field_was_active && !third_active) ||
+                first_result.submitted || second_result.submitted ||
+                third_result.submitted;
             if(commit) (void)editor_auto_shape_apply(&project, &viewport_state,
                 viewport_state.auto_shape_parent_mode, auto_shape_config);
             auto_shape_first_field_was_active = first_active;
             auto_shape_second_field_was_active = second_active;
-            field_editing = first_active || second_active;
+            auto_shape_third_field_was_active = third_active;
+            field_editing = first_active || second_active || third_active;
         } else if(viewport_state.mode == EDITOR_VIEWPORT_VERTEX) {
             EditorObject *selected = editor_project_selected_get(&project);
             EditorRigidBody *body = editor_selected_body_get(selected, &viewport_state);
@@ -3310,6 +3330,7 @@ int main(void) {
                         viewport_state.selection = EDITOR_SELECTION_SOFT_BODY;
                         auto_shape_first_field_was_active = false;
                         auto_shape_second_field_was_active = false;
+                        auto_shape_third_field_was_active = false;
                         auto_shape_picker_open = false;
                     }
                 }
@@ -4592,6 +4613,7 @@ int main(void) {
     rohr_graphics_text_destroy(&add_hitbox_label);
     rohr_graphics_text_destroy(&add_object_label);
     rohr_graphics_text_destroy(&none_label);
+    rohr_graphics_text_destroy(&apex_offset_label);
     rohr_graphics_text_destroy(&height_label);
     rohr_graphics_text_destroy(&width_label);
     rohr_graphics_text_destroy(&scalene_label);
@@ -4762,6 +4784,7 @@ fail:
     rohr_graphics_text_destroy(&add_hitbox_label);
     rohr_graphics_text_destroy(&add_object_label);
     rohr_graphics_text_destroy(&none_label);
+    rohr_graphics_text_destroy(&apex_offset_label);
     rohr_graphics_text_destroy(&height_label);
     rohr_graphics_text_destroy(&width_label);
     rohr_graphics_text_destroy(&scalene_label);

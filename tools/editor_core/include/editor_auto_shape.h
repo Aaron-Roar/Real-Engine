@@ -21,6 +21,7 @@ typedef struct EditorAutoShapeConfig {
     float width;
     float height;
     float radius;
+    float apex_offset;
 } EditorAutoShapeConfig;
 
 EditorResult editor_auto_shape_positions_get(const EditorAutoShapeConfig *config,

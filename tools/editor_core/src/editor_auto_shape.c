@@ -56,8 +56,12 @@ EditorResult editor_auto_shape_positions_get(const EditorAutoShapeConfig *config
             if(!editor_auto_shape_positive_finite_check(height))
                 return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
                     "triangle height must be greater than zero");
-            if(config->triangle_kind == EDITOR_AUTO_TRIANGLE_SCALENE)
-                apex_x = -width * 0.25f;
+            if(config->triangle_kind == EDITOR_AUTO_TRIANGLE_SCALENE) {
+                if(!isfinite(config->apex_offset))
+                    return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                        "scalene apex offset must be finite");
+                apex_x = config->apex_offset;
+            }
             corners[0] = (Position){apex_x, -height * 0.5f};
             corners[1] = (Position){width * 0.5f, height * 0.5f};
             corners[2] = (Position){-width * 0.5f, height * 0.5f};

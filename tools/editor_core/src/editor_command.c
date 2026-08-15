@@ -1590,7 +1590,7 @@ visibility_invalid:
             strcmp(action, "auto-shape") == 0) {
         bool hitbox = strcmp(domain, "hitbox") == 0;
         int base = hitbox ? 7 : 6;
-        if(count != base + 5 ||
+        if(count != base + 6 ||
                 !editor_command_uint_parse(arguments[4],
                     &command->data.auto_shape.object) ||
                 !editor_command_uint_parse(arguments[5],
@@ -1606,7 +1606,9 @@ visibility_invalid:
                 !editor_command_float_parse(arguments[base + 3],
                     &command->data.auto_shape.config.height) ||
                 !editor_command_float_parse(arguments[base + 4],
-                    &command->data.auto_shape.config.radius))
+                    &command->data.auto_shape.config.radius) ||
+                !editor_command_float_parse(arguments[base + 5],
+                    &command->data.auto_shape.config.apex_offset))
             return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
                 "invalid %s auto-shape command", domain);
         command->type = EDITOR_COMMAND_AUTO_SHAPE;
@@ -1866,20 +1868,22 @@ EditorResult editor_command_cli_write(const EditorCommand *command,
                         document_path)) goto capacity_error;
             if(command->data.auto_shape.kind == EDITOR_ITEM_HITBOX)
                 snprintf(values, sizeof(values),
-                    " %u %u %u %s %s %.9g %.9g %.9g",
+                    " %u %u %u %s %s %.9g %.9g %.9g %.9g",
                     command->data.auto_shape.object,
                     command->data.auto_shape.parent,
                     command->data.auto_shape.item, shape, triangle,
                     command->data.auto_shape.config.width,
                     command->data.auto_shape.config.height,
-                    command->data.auto_shape.config.radius);
+                    command->data.auto_shape.config.radius,
+                    command->data.auto_shape.config.apex_offset);
             else snprintf(values, sizeof(values),
-                " %u %u %s %s %.9g %.9g %.9g",
+                " %u %u %s %s %.9g %.9g %.9g %.9g",
                 command->data.auto_shape.object,
                 command->data.auto_shape.item, shape, triangle,
                 command->data.auto_shape.config.width,
                 command->data.auto_shape.config.height,
-                command->data.auto_shape.config.radius);
+                command->data.auto_shape.config.radius,
+                command->data.auto_shape.config.apex_offset);
             break;
         }
         case EDITOR_COMMAND_RIGID_BODY_ORIGIN:
