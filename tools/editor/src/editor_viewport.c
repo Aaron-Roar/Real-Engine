@@ -486,6 +486,14 @@ bool editor_viewport_selection_contains(const EditorViewportState *state,
     return false;
 }
 
+bool editor_viewport_selection_homogeneous_check(const EditorViewportState *state) {
+    if(state == NULL || state->selected_item_count == 0) return false;
+    for(size_t i = 1; i < state->selected_item_count; i += 1)
+        if(state->selected_items[i].kind != state->selected_items[0].kind)
+            return false;
+    return true;
+}
+
 bool editor_viewport_selection_ref_get(const EditorProject *project,
         const EditorViewportState *state, EditorSelectionRef *selection) {
     const EditorObject *object = NULL;
@@ -659,6 +667,361 @@ bool editor_viewport_selection_set(EditorProject *project,
     state->selected_items[state->selected_item_count] = selection;
     state->selected_item_count += 1;
     return editor_viewport_selection_primary_apply(project, state, selection);
+}
+
+typedef struct EditorMarqueeBounds {
+    float left;
+    float right;
+    float bottom;
+    float top;
+    bool valid;
+} EditorMarqueeBounds;
+
+static void editor_marquee_bounds_point_add(EditorMarqueeBounds *bounds,
+        Position point) {
+    if(!bounds->valid) {
+        *bounds = (EditorMarqueeBounds){point.x, point.x, point.y, point.y, true};
+        return;
+    }
+    bounds->left = fminf(bounds->left, point.x);
+    bounds->right = fmaxf(bounds->right, point.x);
+    bounds->bottom = fminf(bounds->bottom, point.y);
+    bounds->top = fmaxf(bounds->top, point.y);
+}
+
+static bool editor_marquee_bounds_overlap(EditorMarqueeBounds first,
+        EditorMarqueeBounds second) {
+    return first.valid && second.valid && first.left <= second.right &&
+        first.right >= second.left && first.bottom <= second.top &&
+        first.top >= second.bottom;
+}
+
+static bool editor_marquee_selection_add(EditorViewportState *state,
+        EditorSelectionRef selection) {
+    EditorSelectionRef *items;
+    size_t capacity;
+    if(state->selected_item_count > 0 &&
+            state->selected_items[0].kind != selection.kind) return true;
+    if(editor_viewport_selection_contains(state, selection)) return true;
+    if(state->selected_item_count < state->selected_item_capacity) {
+        state->selected_items[state->selected_item_count++] = selection;
+        return true;
+    }
+    capacity = state->selected_item_capacity == 0 ? 8 :
+        state->selected_item_capacity * 2;
+    items = realloc(state->selected_items, capacity * sizeof(*items));
+    if(items == NULL) return false;
+    state->selected_items = items;
+    state->selected_item_capacity = capacity;
+    state->selected_items[state->selected_item_count++] = selection;
+    return true;
+}
+
+static EditorMarqueeBounds editor_marquee_rigid_body_bounds_get(
+        const EditorObject *object, const EditorRigidBody *body) {
+    EditorMarqueeBounds bounds = {0};
+    for(size_t box_index = 0; box_index < body->hitbox_count; box_index += 1) {
+        const EditorHitbox *hitbox = &body->hitboxes[box_index];
+        if(!hitbox->visible) continue;
+        for(uint32_t i = 0; i < hitbox->vertex_count; i += 1)
+            editor_marquee_bounds_point_add(&bounds,
+                editor_hitbox_vertex_world_get(object, body, hitbox, i));
+    }
+    if(body->particle && body->particle_radius > 0.0f) {
+        Position center = editor_particle_center_world_get(object, body);
+        editor_marquee_bounds_point_add(&bounds, (Position){
+            center.x - body->particle_radius, center.y - body->particle_radius});
+        editor_marquee_bounds_point_add(&bounds, (Position){
+            center.x + body->particle_radius, center.y + body->particle_radius});
+    }
+    return bounds;
+}
+
+static EditorMarqueeBounds editor_marquee_soft_body_bounds_get(
+        const EditorObject *object, const EditorSoftBody *body) {
+    EditorMarqueeBounds bounds = {0};
+    for(size_t i = 0; i < body->node_count; i += 1)
+        if(body->nodes[i].visible) editor_marquee_bounds_point_add(&bounds,
+            editor_soft_node_world_get(object, body, &body->nodes[i]));
+    return bounds;
+}
+
+static EditorMarqueeBounds editor_marquee_object_bounds_get(
+        const EditorObject *object) {
+    EditorMarqueeBounds bounds = {0};
+    for(size_t i = 0; i < object->rigid_body_count; i += 1) {
+        EditorMarqueeBounds child = editor_marquee_rigid_body_bounds_get(
+            object, &object->rigid_bodies[i]);
+        if(child.valid) {
+            editor_marquee_bounds_point_add(&bounds,
+                (Position){child.left, child.bottom});
+            editor_marquee_bounds_point_add(&bounds,
+                (Position){child.right, child.top});
+        }
+    }
+    for(size_t i = 0; i < object->soft_body_count; i += 1) {
+        EditorMarqueeBounds child = editor_marquee_soft_body_bounds_get(
+            object, &object->soft_body_items[i]);
+        if(child.valid) {
+            editor_marquee_bounds_point_add(&bounds,
+                (Position){child.left, child.bottom});
+            editor_marquee_bounds_point_add(&bounds,
+                (Position){child.right, child.top});
+        }
+    }
+    for(size_t i = 0; i < object->anchor_count; i += 1)
+        if(object->anchors[i].visible) editor_marquee_bounds_point_add(&bounds,
+            editor_anchor_world_get(object, &object->anchors[i]));
+    return bounds;
+}
+
+void editor_viewport_marquee_begin(EditorViewportState *state, Position pointer) {
+    if(state == NULL) return;
+    state->marquee_active = true;
+    state->marquee_start = pointer;
+    state->marquee_end = pointer;
+}
+
+void editor_viewport_marquee_update(EditorViewportState *state, Position pointer) {
+    if(state == NULL || !state->marquee_active) return;
+    state->marquee_end = pointer;
+}
+
+static void editor_marquee_body_children_add(EditorViewportState *state,
+        const EditorObject *object, EditorMarqueeBounds marquee) {
+    for(size_t i = 0; i < object->rigid_body_count; i += 1) {
+        const EditorRigidBody *body = &object->rigid_bodies[i];
+        if(body->visible && editor_marquee_bounds_overlap(marquee,
+                editor_marquee_rigid_body_bounds_get(object, body)))
+            (void)editor_marquee_selection_add(state,
+                (EditorSelectionRef){EDITOR_SELECTION_RIGID_BODY,
+                    object->id, 0, 0, body->id});
+    }
+    for(size_t i = 0; i < object->soft_body_count; i += 1) {
+        const EditorSoftBody *body = &object->soft_body_items[i];
+        if(body->visible && editor_marquee_bounds_overlap(marquee,
+                editor_marquee_soft_body_bounds_get(object, body)))
+            (void)editor_marquee_selection_add(state,
+                (EditorSelectionRef){EDITOR_SELECTION_SOFT_BODY,
+                    object->id, 0, 0, body->id});
+    }
+    for(size_t i = 0; i < object->anchor_count; i += 1) {
+        const EditorAnchor *anchor = &object->anchors[i];
+        Position world = editor_anchor_world_get(object, anchor);
+        EditorMarqueeBounds point = {world.x - 5.0f, world.x + 5.0f,
+            world.y - 5.0f, world.y + 5.0f, true};
+        if(anchor->visible && editor_marquee_bounds_overlap(marquee, point))
+            (void)editor_marquee_selection_add(state,
+                (EditorSelectionRef){EDITOR_SELECTION_ANCHOR,
+                    object->id, 0, 0, anchor->id});
+    }
+    for(size_t i = 0; i < object->joint_count; i += 1) {
+        const EditorJoint *joint = &object->joint_items[i];
+        const EditorAnchor *a = NULL;
+        const EditorAnchor *b = NULL;
+        EditorMarqueeBounds bounds = {0};
+        for(size_t anchor_index = 0; anchor_index < object->anchor_count;
+                anchor_index += 1) {
+            if(object->anchors[anchor_index].id == joint->anchor_a)
+                a = &object->anchors[anchor_index];
+            if(object->anchors[anchor_index].id == joint->anchor_b)
+                b = &object->anchors[anchor_index];
+        }
+        if(!joint->visible || a == NULL || b == NULL) continue;
+        editor_marquee_bounds_point_add(&bounds, editor_anchor_world_get(object, a));
+        editor_marquee_bounds_point_add(&bounds, editor_anchor_world_get(object, b));
+        if(editor_marquee_bounds_overlap(marquee, bounds))
+            (void)editor_marquee_selection_add(state,
+                (EditorSelectionRef){EDITOR_SELECTION_JOINT,
+                    object->id, 0, 0, joint->id});
+    }
+}
+
+static const EditorSoftNode *editor_marquee_soft_node_get(
+        const EditorSoftBody *body, EditorSoftNodeId id) {
+    for(size_t i = 0; i < body->node_count; i += 1)
+        if(body->nodes[i].id == id) return &body->nodes[i];
+    return NULL;
+}
+
+static void editor_marquee_soft_children_add(EditorViewportState *state,
+        const EditorObject *object, const EditorSoftBody *body,
+        EditorMarqueeBounds marquee) {
+    for(size_t i = 0; i < body->node_count; i += 1) {
+        const EditorSoftNode *node = &body->nodes[i];
+        Position world = editor_soft_node_world_get(object, body, node);
+        EditorMarqueeBounds bounds = {world.x - node->radius,
+            world.x + node->radius, world.y - node->radius,
+            world.y + node->radius, true};
+        if(node->visible && editor_marquee_bounds_overlap(marquee, bounds))
+            (void)editor_marquee_selection_add(state,
+                (EditorSelectionRef){EDITOR_SELECTION_SOFT_NODE,
+                    object->id, body->id, 0, node->id});
+    }
+    for(size_t i = 0; i < body->beam_count; i += 1) {
+        const EditorSoftBeam *beam = &body->beams[i];
+        const EditorSoftNode *a = editor_marquee_soft_node_get(body, beam->node_a);
+        const EditorSoftNode *b = editor_marquee_soft_node_get(body, beam->node_b);
+        EditorMarqueeBounds bounds = {0};
+        if(!beam->visible || a == NULL || b == NULL) continue;
+        editor_marquee_bounds_point_add(&bounds,
+            editor_soft_node_world_get(object, body, a));
+        editor_marquee_bounds_point_add(&bounds,
+            editor_soft_node_world_get(object, body, b));
+        if(editor_marquee_bounds_overlap(marquee, bounds))
+            (void)editor_marquee_selection_add(state,
+                (EditorSelectionRef){EDITOR_SELECTION_SOFT_BEAM,
+                    object->id, body->id, 0, beam->id});
+    }
+    for(size_t i = 0; i < body->area_count; i += 1) {
+        const EditorSoftArea *area = &body->areas[i];
+        EditorMarqueeBounds bounds = {0};
+        if(!area->visible) continue;
+        for(size_t node_index = 0; node_index < area->node_count; node_index += 1) {
+            const EditorSoftNode *node = editor_marquee_soft_node_get(
+                body, area->nodes[node_index]);
+            if(node != NULL) editor_marquee_bounds_point_add(&bounds,
+                editor_soft_node_world_get(object, body, node));
+        }
+        if(editor_marquee_bounds_overlap(marquee, bounds))
+            (void)editor_marquee_selection_add(state,
+                (EditorSelectionRef){EDITOR_SELECTION_SOFT_AREA,
+                    object->id, body->id, 0, area->id});
+    }
+}
+
+bool editor_viewport_marquee_finish(EditorViewportState *state,
+        EditorProject *project, Position pointer) {
+    EditorObject *object;
+    EditorViewportMode starting_mode;
+    Position first;
+    Position second;
+    EditorMarqueeBounds marquee;
+    if(state == NULL || project == NULL || !state->marquee_active) return false;
+    state->marquee_end = pointer;
+    state->marquee_active = false;
+    starting_mode = state->mode;
+    object = editor_project_selected_get(project);
+    editor_view_transform_set(project, state, object);
+    first = editor_view_screen_to_world(state->marquee_start);
+    second = editor_view_screen_to_world(state->marquee_end);
+    marquee = (EditorMarqueeBounds){fminf(first.x, second.x),
+        fmaxf(first.x, second.x), fminf(first.y, second.y),
+        fmaxf(first.y, second.y), true};
+    editor_viewport_selection_clear(state);
+    if(state->mode == EDITOR_VIEWPORT_HIERARCHY) {
+        for(size_t i = 0; i < project->object_count; i += 1) {
+            EditorObject *candidate = &project->objects[i];
+            if(candidate->visible && editor_marquee_bounds_overlap(marquee,
+                    editor_marquee_object_bounds_get(candidate)))
+                (void)editor_marquee_selection_add(state,
+                    (EditorSelectionRef){EDITOR_SELECTION_OBJECT,
+                        candidate->id, 0, 0, candidate->id});
+        }
+    } else if(object != NULL && state->mode == EDITOR_VIEWPORT_OBJECT) {
+        editor_marquee_body_children_add(state, object, marquee);
+    } else if(object != NULL) {
+        EditorHierarchySelection kind = state->selection;
+        if(kind == EDITOR_SELECTION_RIGID_BODY ||
+                state->mode == EDITOR_VIEWPORT_RIGID_BODY) {
+            for(size_t i = 0; i < object->rigid_body_count; i += 1) {
+                EditorRigidBody *body = &object->rigid_bodies[i];
+                if(body->visible && editor_marquee_bounds_overlap(marquee,
+                        editor_marquee_rigid_body_bounds_get(object, body)))
+                    (void)editor_marquee_selection_add(state,
+                        (EditorSelectionRef){EDITOR_SELECTION_RIGID_BODY,
+                            object->id, 0, 0, body->id});
+            }
+        } else if(state->mode == EDITOR_VIEWPORT_HITBOX ||
+                state->mode == EDITOR_VIEWPORT_VERTEX ||
+                state->mode == EDITOR_VIEWPORT_LINE) {
+            EditorRigidBody *body = editor_selected_body_get(object, state);
+            EditorHitbox *hitbox = editor_selected_hitbox_get(object, state);
+            if(body != NULL && hitbox != NULL) {
+                for(uint32_t i = 0; i < hitbox->vertex_count; i += 1) {
+                    Position a = editor_hitbox_vertex_world_get(object, body,
+                        hitbox, i);
+                    Position b = editor_hitbox_vertex_world_get(object, body,
+                        hitbox, (i + 1) % hitbox->vertex_count);
+                    EditorMarqueeBounds point = {a.x - 5.0f, a.x + 5.0f,
+                        a.y - 5.0f, a.y + 5.0f, true};
+                    EditorMarqueeBounds line = {fminf(a.x, b.x), fmaxf(a.x, b.x),
+                        fminf(a.y, b.y), fmaxf(a.y, b.y), true};
+                    if(editor_marquee_bounds_overlap(marquee, point))
+                        (void)editor_marquee_selection_add(state,
+                            (EditorSelectionRef){EDITOR_SELECTION_VERTEX,
+                                object->id, body->id, hitbox->id,
+                                hitbox->vertices[i].id});
+                    if(editor_marquee_bounds_overlap(marquee, line))
+                        (void)editor_marquee_selection_add(state,
+                            (EditorSelectionRef){EDITOR_SELECTION_LINE,
+                                object->id, body->id, hitbox->id, i});
+                }
+            }
+        } else if(kind == EDITOR_SELECTION_ANCHOR ||
+                state->mode == EDITOR_VIEWPORT_ANCHOR) {
+            for(size_t i = 0; i < object->anchor_count; i += 1) {
+                Position world = editor_anchor_world_get(object, &object->anchors[i]);
+                EditorMarqueeBounds point = {world.x - 5.0f, world.x + 5.0f,
+                    world.y - 5.0f, world.y + 5.0f, true};
+                if(object->anchors[i].visible &&
+                        editor_marquee_bounds_overlap(marquee, point))
+                    (void)editor_marquee_selection_add(state,
+                        (EditorSelectionRef){EDITOR_SELECTION_ANCHOR,
+                            object->id, 0, 0, object->anchors[i].id});
+            }
+        } else if(state->mode == EDITOR_VIEWPORT_JOINT) {
+            for(size_t i = 0; i < object->joint_count; i += 1) {
+                EditorJoint *joint = &object->joint_items[i];
+                EditorAnchor *a = editor_project_anchor_get(object, joint->anchor_a);
+                EditorAnchor *b = editor_project_anchor_get(object, joint->anchor_b);
+                EditorMarqueeBounds bounds = {0};
+                if(!joint->visible || a == NULL || b == NULL) continue;
+                editor_marquee_bounds_point_add(&bounds,
+                    editor_anchor_world_get(object, a));
+                editor_marquee_bounds_point_add(&bounds,
+                    editor_anchor_world_get(object, b));
+                if(editor_marquee_bounds_overlap(marquee, bounds))
+                    (void)editor_marquee_selection_add(state,
+                        (EditorSelectionRef){EDITOR_SELECTION_JOINT,
+                            object->id, 0, 0, joint->id});
+            }
+        } else if(state->selected_soft_body != 0) {
+            EditorSoftBody *body = NULL;
+            for(size_t i = 0; i < object->soft_body_count; i += 1)
+                if(object->soft_body_items[i].id == state->selected_soft_body)
+                    body = &object->soft_body_items[i];
+            if(body != NULL)
+                editor_marquee_soft_children_add(state, object, body, marquee);
+        }
+    }
+    if(state->selected_item_count > 0) {
+        EditorSelectionRef primary =
+            state->selected_items[state->selected_item_count - 1];
+        if(!editor_viewport_selection_primary_apply(project, state, primary))
+            return false;
+        if(starting_mode == EDITOR_VIEWPORT_OBJECT) {
+            switch(primary.kind) {
+                case EDITOR_SELECTION_RIGID_BODY:
+                case EDITOR_SELECTION_PARTICLE:
+                    state->mode = EDITOR_VIEWPORT_RIGID_BODY;
+                    break;
+                case EDITOR_SELECTION_JOINT:
+                    state->mode = EDITOR_VIEWPORT_JOINT;
+                    break;
+                case EDITOR_SELECTION_ANCHOR:
+                    state->mode = EDITOR_VIEWPORT_ANCHOR;
+                    break;
+                case EDITOR_SELECTION_SOFT_BODY:
+                    state->mode = EDITOR_VIEWPORT_SOFT_BODY;
+                    break;
+                default: break;
+            }
+        }
+        return true;
+    }
+    state->selection = EDITOR_SELECTION_NONE;
+    return true;
 }
 
 void editor_viewport_hitbox_editor_enter(EditorViewportState *state) {
@@ -1984,10 +2347,27 @@ void editor_viewport_draw(const EditorProject *project, const EditorViewportStat
             editor_viewport_object_draw(&project->objects[i], state,
                 project->objects[i].id == project->selected);
         }
-        return;
+    } else {
+        editor_viewport_particle_fills_draw(selected);
+        editor_viewport_object_draw(selected, state, true);
     }
-    editor_viewport_particle_fills_draw(selected);
-    editor_viewport_object_draw(selected, state, true);
+    if(state->marquee_active) {
+        float left = fminf(state->marquee_start.x, state->marquee_end.x);
+        float right = fmaxf(state->marquee_start.x, state->marquee_end.x);
+        float top = fminf(state->marquee_start.y, state->marquee_end.y);
+        float bottom = fmaxf(state->marquee_start.y, state->marquee_end.y);
+        Color fill = {90, 145, 225, 42};
+        Color border = {145, 190, 255, 255};
+        (void)rohr_graphics_screen_rect_draw(left, top, right - left,
+            bottom - top, fill);
+        (void)rohr_graphics_screen_rect_draw(left, top, right - left, 1.0f, border);
+        (void)rohr_graphics_screen_rect_draw(left, bottom - 1.0f,
+            right - left, 1.0f, border);
+        (void)rohr_graphics_screen_rect_draw(left, top, 1.0f,
+            bottom - top, border);
+        (void)rohr_graphics_screen_rect_draw(right - 1.0f, top, 1.0f,
+            bottom - top, border);
+    }
 }
 
 bool editor_viewport_selection_nudge(EditorViewportState *state,

@@ -64,9 +64,12 @@ typedef struct EditorViewportState {
     bool dragged_origin;
     bool camera_panning;
     bool camera_pan_with_primary;
+    bool marquee_active;
     bool selection_modifier;
     Vec2D drag_offset;
     Position camera_pointer;
+    Position marquee_start;
+    Position marquee_end;
     float rotation_pointer_offset;
     EditorViewportMode mode;
     EditorHierarchySelection selection;
@@ -103,8 +106,13 @@ bool editor_viewport_selection_ref_get(const EditorProject *project,
     const EditorViewportState *state, EditorSelectionRef *selection);
 bool editor_viewport_selection_contains(const EditorViewportState *state,
     EditorSelectionRef selection);
+bool editor_viewport_selection_homogeneous_check(const EditorViewportState *state);
 bool editor_viewport_selection_set(EditorProject *project,
     EditorViewportState *state, EditorSelectionRef selection, bool additive);
+void editor_viewport_marquee_begin(EditorViewportState *state, Position pointer);
+void editor_viewport_marquee_update(EditorViewportState *state, Position pointer);
+bool editor_viewport_marquee_finish(EditorViewportState *state,
+    EditorProject *project, Position pointer);
 void editor_viewport_hitbox_editor_enter(EditorViewportState *state);
 void editor_viewport_object_editor_enter(EditorViewportState *state);
 void editor_viewport_hitbox_editor_exit(EditorViewportState *state);

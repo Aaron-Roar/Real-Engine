@@ -158,6 +158,34 @@ int main(void) {
     if(!editor_file_browser_directory_path_get(&browser, path, sizeof(path)) ||
             strcmp(path, "/projects/game/assets") != 0) return 1;
     {
+        Position center = {EDITOR_VIEWPORT_WIDTH * 0.5f,
+            EDITOR_MENU_HEIGHT +
+                (EDITOR_VIEWPORT_BOTTOM - EDITOR_MENU_HEIGHT) * 0.5f};
+        state.mode = EDITOR_VIEWPORT_RIGID_BODY;
+        state.selection = EDITOR_SELECTION_RIGID_BODY;
+        state.selected_rigid_body = body->id;
+        if(!editor_project_object_select(&project, object->id)) return 1;
+        editor_viewport_marquee_begin(&state,
+            (Position){center.x - 100.0f, center.y - 100.0f});
+        editor_viewport_marquee_update(&state,
+            (Position){center.x + 100.0f, center.y + 100.0f});
+        if(!state.marquee_active ||
+                !editor_viewport_marquee_finish(&state, &project,
+                    (Position){center.x + 100.0f, center.y + 100.0f}) ||
+                state.marquee_active || state.selected_item_count != 2 ||
+                !editor_viewport_selection_homogeneous_check(&state)) return 1;
+        state.mode = EDITOR_VIEWPORT_OBJECT;
+        state.selection = EDITOR_SELECTION_NONE;
+        editor_viewport_marquee_begin(&state,
+            (Position){center.x - 100.0f, center.y - 100.0f});
+        if(!editor_viewport_marquee_finish(&state, &project,
+                    (Position){center.x + 100.0f, center.y + 100.0f}) ||
+                state.selected_item_count != 2 ||
+                state.selected_items[0].kind != EDITOR_SELECTION_RIGID_BODY ||
+                state.mode != EDITOR_VIEWPORT_RIGID_BODY ||
+                !editor_viewport_selection_homogeneous_check(&state)) return 1;
+    }
+    {
         EditorSelectionRef first = {EDITOR_SELECTION_RIGID_BODY,
             object->id, 0, 0, body->id};
         EditorSelectionRef second = {EDITOR_SELECTION_RIGID_BODY,

@@ -178,7 +178,8 @@ static const EditorBulkProperty *editor_bulk_properties_get(
 
 float editor_bulk_panel_content_height_get(const EditorViewportState *state) {
     size_t count = 0;
-    if(state == NULL || state->selected_item_count < 2) return 0.0f;
+    if(state == NULL || state->selected_item_count < 2 ||
+            !editor_viewport_selection_homogeneous_check(state)) return 0.0f;
     (void)editor_bulk_properties_get(state->selected_items[0].kind, &count);
     return 150.0f + (float)count * 36.0f;
 }
@@ -578,6 +579,7 @@ bool editor_bulk_panel_draw(EditorBulkPanel *panel, EditorProject *project,
     bool editing = false;
     if(panel == NULL || project == NULL || state == NULL || history == NULL ||
             state->selected_item_count < 2) return false;
+    if(!editor_viewport_selection_homogeneous_check(state)) return false;
     properties = editor_bulk_properties_get(state->selected_items[0].kind,
         &property_count);
     if(properties == NULL || property_count > EDITOR_BULK_PROPERTY_MAX) return false;

@@ -1872,7 +1872,8 @@ int main(void) {
         viewport_state.preview_anchor = 0;
         viewport_state.preview_soft_node = 0;
         field_editing = false;
-        if(viewport_state.selected_item_count > 1) {
+        if(viewport_state.selected_item_count > 1 &&
+                editor_viewport_selection_homogeneous_check(&viewport_state)) {
             EditorBulkColorContext bulk_color = {.picker = &color_picker,
                 .project = &project, .state = &viewport_state,
                 .history = &history};
@@ -4572,7 +4573,15 @@ int main(void) {
             bool pan_modifier =
                 rohr_controller_key_down_get(&keyboard, SDLK_LCTRL) ||
                 rohr_controller_key_down_get(&keyboard, SDLK_RCTRL);
-            if(viewport_state.mode == EDITOR_VIEWPORT_AUTO_SHAPE) {
+            if(viewport_state.marquee_active) {
+                viewport_consumed = true;
+                if(mouse.button_states[MOUSE_BUTTON_LEFT] ==
+                        MOUSE_BUTTON_STATE_RELEASED) {
+                    pointer_selection_handled = editor_viewport_marquee_finish(
+                        &viewport_state, &project, pointer);
+                }
+                else editor_viewport_marquee_update(&viewport_state, pointer);
+            } else if(viewport_state.mode == EDITOR_VIEWPORT_AUTO_SHAPE) {
                 viewport_consumed = editor_viewport_auto_shape_update(
                     &viewport_state, &project, &auto_shape_config, pointer,
                     mouse.button_states[MOUSE_BUTTON_LEFT],
@@ -4619,6 +4628,7 @@ int main(void) {
             if(mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_PRESSED &&
                     !ui_consumed && !viewport_consumed && !panel_resizing) {
                 editor_navigation_current_selection_clear(&project, &viewport_state);
+                editor_viewport_marquee_begin(&viewport_state, pointer);
             }
         }
         if(workspace.open) {
