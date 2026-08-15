@@ -45,6 +45,14 @@ typedef enum EditorOriginKind {
     EDITOR_ORIGIN_SOFT_BODY
 } EditorOriginKind;
 
+typedef struct EditorSelectionRef {
+    EditorHierarchySelection kind;
+    EditorObjectId object;
+    uint32_t parent;
+    uint32_t container;
+    uint32_t item;
+} EditorSelectionRef;
+
 typedef struct EditorViewportState {
     int dragged_vertex;
     bool dragged_body;
@@ -56,6 +64,7 @@ typedef struct EditorViewportState {
     bool dragged_origin;
     bool camera_panning;
     bool camera_pan_with_primary;
+    bool selection_modifier;
     Vec2D drag_offset;
     Position camera_pointer;
     float rotation_pointer_offset;
@@ -82,9 +91,20 @@ typedef struct EditorViewportState {
     EditorRigidBodyId preview_rigid_body;
     EditorAnchorId preview_anchor;
     EditorSoftNodeId preview_soft_node;
+    EditorSelectionRef *selected_items;
+    size_t selected_item_count;
+    size_t selected_item_capacity;
 } EditorViewportState;
 
 void editor_viewport_state_init(EditorViewportState *state);
+void editor_viewport_state_destroy(EditorViewportState *state);
+void editor_viewport_selection_clear(EditorViewportState *state);
+bool editor_viewport_selection_ref_get(const EditorProject *project,
+    const EditorViewportState *state, EditorSelectionRef *selection);
+bool editor_viewport_selection_contains(const EditorViewportState *state,
+    EditorSelectionRef selection);
+bool editor_viewport_selection_set(EditorProject *project,
+    EditorViewportState *state, EditorSelectionRef selection, bool additive);
 void editor_viewport_hitbox_editor_enter(EditorViewportState *state);
 void editor_viewport_object_editor_enter(EditorViewportState *state);
 void editor_viewport_hitbox_editor_exit(EditorViewportState *state);

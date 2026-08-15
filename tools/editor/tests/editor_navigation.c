@@ -1,6 +1,7 @@
 #include "editor_file_browser.h"
 #include "editor_navigation.h"
 #include "editor_layout.h"
+#include "panels/editor_bulk_panel.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -21,6 +22,7 @@ int main(void) {
     static EditorProject project;
     EditorObject *object;
     EditorRigidBody *body;
+    EditorRigidBody *body_b;
     EditorHitbox *hitbox;
     EditorAnchor *anchor;
     EditorJoint *joint;
@@ -28,14 +30,17 @@ int main(void) {
     EditorSoftNode *node_a;
     EditorSoftNode *node_b;
     EditorSoftBeam *beam;
-    EditorViewportState state;
+    EditorViewportState state = {0};
+    EditorHistory history;
     EditorFileBrowser browser = {.mode = EDITOR_FILE_BROWSER_DIRECTORY};
     char path[EDITOR_FILE_BROWSER_PATH_MAX];
 
     editor_project_init(&project);
+    if(!editor_history_init(&history, &project)) return 1;
     object = editor_project_object_add(&project, (Position){0});
     body = editor_project_rigid_body_add(&project, object);
-    if(object == NULL || body == NULL) return 1;
+    body_b = editor_project_rigid_body_add(&project, object);
+    if(object == NULL || body == NULL || body_b == NULL) return 1;
     anchor = editor_project_anchor_add(&project, object, (Position){0}, body->id);
     joint = editor_project_joint_add(&project, object, EDITOR_JOINT_SPRING);
     soft_body = editor_project_soft_body_add(&project, object);
@@ -48,6 +53,27 @@ int main(void) {
     if(beam == NULL) return 1;
     hitbox = &body->hitboxes[0];
     editor_viewport_state_init(&state);
+
+    {
+        EditorSelectionRef first = {EDITOR_SELECTION_RIGID_BODY,
+            object->id, 0, 0, body->id};
+        EditorSelectionRef second = {EDITOR_SELECTION_RIGID_BODY,
+            object->id, 0, 0, body_b->id};
+        EditorSelectionRef mixed = {EDITOR_SELECTION_SOFT_BODY,
+            object->id, 0, 0, soft_body->id};
+        if(!editor_viewport_selection_set(&project, &state, first, false) ||
+                !editor_viewport_selection_set(&project, &state, second, true) ||
+                state.selected_item_count != 2 ||
+                !editor_viewport_selection_contains(&state, first) ||
+                !editor_viewport_selection_contains(&state, second)) return 1;
+        if(!editor_viewport_selection_set(&project, &state, second, true) ||
+                state.selected_item_count != 1 ||
+                state.selected_rigid_body != body->id) return 1;
+        if(!editor_viewport_selection_set(&project, &state, mixed, true) ||
+                state.selected_item_count != 1 ||
+                state.selection != EDITOR_SELECTION_SOFT_BODY) return 1;
+        editor_viewport_selection_clear(&state);
+    }
 
     if(!navigation_mode_open_check(&project, &state, EDITOR_SELECTION_OBJECT,
                 EDITOR_VIEWPORT_OBJECT)) return 1;
@@ -131,5 +157,36 @@ int main(void) {
     browser.preview_selected_directory = true;
     if(!editor_file_browser_directory_path_get(&browser, path, sizeof(path)) ||
             strcmp(path, "/projects/game/assets") != 0) return 1;
+    {
+        EditorSelectionRef first = {EDITOR_SELECTION_RIGID_BODY,
+            object->id, 0, 0, body->id};
+        EditorSelectionRef second = {EDITOR_SELECTION_RIGID_BODY,
+            object->id, 0, 0, body_b->id};
+        EditorPropertySetCommand mass_property = {
+            .property = EDITOR_PROPERTY_MASS,
+            .value_kind = EDITOR_PROPERTY_VALUE_FLOAT,
+            .value.number = 7.0f
+        };
+        if(!editor_viewport_selection_set(&project, &state, first, false) ||
+                !editor_viewport_selection_set(&project, &state, second, true) ||
+                !editor_bulk_property_set(&project, &state, &history,
+                    &mass_property) ||
+                body->mass_value != 7.0f || body_b->mass_value != 7.0f ||
+                history.undo_count != 1 || !editor_history_undo(&history) ||
+                body->mass_value == 7.0f || body_b->mass_value == 7.0f ||
+                !editor_history_redo(&history) || body->mass_value != 7.0f ||
+                body_b->mass_value != 7.0f)
+            return 1;
+        editor_history_reset(&history);
+        if(
+                !editor_navigation_multi_selection_delete(
+                    &project, &state, &history) ||
+                object->rigid_body_count != 0 || history.undo_count != 1 ||
+                !editor_history_undo(&history) || object->rigid_body_count != 2 ||
+                !editor_history_redo(&history) || object->rigid_body_count != 0)
+            return 1;
+    }
+    editor_history_destroy(&history);
+    editor_viewport_state_destroy(&state);
     return 0;
 }

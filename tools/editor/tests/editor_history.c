@@ -54,7 +54,7 @@ int main(void) {
     EditorCommand command = {.type = EDITOR_COMMAND_ITEM_ADD,
         .data.item_add = {.kind = EDITOR_ITEM_OBJECT}};
     EditorCommandResult result;
-    EditorViewportState viewport;
+    EditorViewportState viewport = {0};
 
     editor_project_init(&project);
     assert(editor_history_init(&history, &project));
@@ -354,6 +354,34 @@ int main(void) {
         assert(history.undo_count == undo_count);
     }
 
+    {
+        EditorObject *second = editor_project_object_add(&project, (Position){0});
+        EditorObjectId first_id = project.objects[0].id;
+        EditorObjectId second_id;
+        assert(second != NULL);
+        second_id = second->id;
+        editor_history_reset(&history);
+        assert(editor_history_transaction_begin(&history));
+        command = (EditorCommand){.type = EDITOR_COMMAND_OBJECT_POSITION,
+            .data.object_position = {.object = first_id,
+                .position = {10.0f, 20.0f}}};
+        result = editor_command_execute(&project, &command);
+        assert(result.kind == ERROR_RESULT_VALUE);
+        command.data.object_position.object = second_id;
+        command.data.object_position.position = (Position){30.0f, 40.0f};
+        result = editor_command_execute(&project, &command);
+        assert(result.kind == ERROR_RESULT_VALUE);
+        assert(editor_history_transaction_end(&history));
+        assert(history.undo_count == 1);
+        assert(editor_history_undo(&history));
+        assert(project.objects[0].position.x == 0.0f);
+        assert(project.objects[1].position.x == 0.0f);
+        assert(editor_history_redo(&history));
+        assert(project.objects[0].position.x == 10.0f);
+        assert(project.objects[1].position.x == 30.0f);
+    }
+
+    editor_viewport_state_destroy(&viewport);
     editor_history_destroy(&history);
     return 0;
 }

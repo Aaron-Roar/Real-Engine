@@ -10,6 +10,7 @@ typedef struct EditorHistoryEntry EditorHistoryEntry;
 typedef struct EditorHistory {
     EditorProject *project;
     EditorProject *pending;
+    EditorProject *transaction_before;
     EditorHistoryEntry *undo[EDITOR_HISTORY_CAPACITY];
     EditorHistoryEntry *redo[EDITOR_HISTORY_CAPACITY];
     size_t undo_count;
@@ -17,6 +18,7 @@ typedef struct EditorHistory {
     bool continuous;
     bool continuous_recorded;
     bool recorded_since_continuous_update;
+    bool transaction_active;
 } EditorHistory;
 
 bool editor_history_init(EditorHistory *history, EditorProject *project);
@@ -27,6 +29,9 @@ void editor_history_command_begin(EditorHistory *history,
 void editor_history_command_finish(EditorHistory *history,
     const EditorCommand *command, const EditorCommandResult *result);
 void editor_history_continuous_set(EditorHistory *history, bool continuous);
+bool editor_history_transaction_begin(EditorHistory *history);
+bool editor_history_transaction_end(EditorHistory *history);
+void editor_history_transaction_cancel(EditorHistory *history);
 bool editor_history_undo(EditorHistory *history);
 bool editor_history_redo(EditorHistory *history);
 bool editor_history_undo_check(const EditorHistory *history);

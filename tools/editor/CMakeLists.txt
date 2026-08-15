@@ -4,6 +4,7 @@ add_executable(rohr_editor_gui
     src/editor_shortcuts.c
     src/editor_navigation.c
     src/editor_viewport.c
+    src/panels/editor_bulk_panel.c
     src/panels/editor_origin_panel.c
     src/panels/editor_terminal_panel.c
     src/main.c
@@ -44,8 +45,10 @@ if(ROHR_BUILD_TESTS)
     add_executable(editor_navigation_test
         tests/editor_navigation.c
         src/editor_file_browser.c
+        src/editor_history.c
         src/editor_navigation.c
         src/editor_viewport.c
+        src/panels/editor_bulk_panel.c
     )
     target_include_directories(editor_navigation_test PRIVATE
         src ${PROJECT_SOURCE_DIR}/lib)

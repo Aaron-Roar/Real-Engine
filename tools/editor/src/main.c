@@ -10,6 +10,7 @@
 #include "editor_command.h"
 #include "editor_object_commands.h"
 #include "panels/editor_origin_panel.h"
+#include "panels/editor_bulk_panel.h"
 #include "panels/editor_terminal_panel.h"
 
 #include <math.h>
@@ -55,6 +56,8 @@ typedef struct EditorColorPicker {
     uint32_t parent;
     uint32_t item;
     EditorPropertyKind property;
+    EditorViewportState *bulk_state;
+    EditorHistory *bulk_history;
     float hue;
     float saturation;
     float value;
@@ -153,6 +156,13 @@ static void editor_navigation_state_apply(EditorProject *project,
     state->selected_soft_node = navigation->soft_node;
     state->selected_soft_beam = navigation->soft_beam;
     state->selected_origin_kind = (EditorOriginKind)navigation->origin_kind;
+}
+
+static bool editor_selection_path_check(const EditorViewportState *state,
+        EditorHierarchySelection kind, EditorObjectId object, uint32_t parent,
+        uint32_t container, uint32_t item) {
+    return editor_viewport_selection_contains(state,
+        (EditorSelectionRef){kind, object, parent, container, item});
 }
 
 static void editor_window_layout_sync(void) {
@@ -355,6 +365,14 @@ static void editor_color_picker_commit(EditorColorPicker *picker) {
     picker->open = false;
     if(picker->project == NULL || value == picker->original) return;
     *picker->target = picker->original;
+    if(picker->bulk_state != NULL && picker->bulk_history != NULL) {
+        EditorPropertySetCommand property = {.property = picker->property,
+            .value_kind = EDITOR_PROPERTY_VALUE_UINT, .value.integer = value};
+        (void)editor_bulk_property_set(picker->project, picker->bulk_state,
+            picker->bulk_history, &property);
+        *picker->target = value;
+        return;
+    }
     command = (EditorCommand){.type = EDITOR_COMMAND_PROPERTY_SET,
         .data.property_set = {picker->kind, picker->object, picker->parent,
             picker->item, 0, picker->property, EDITOR_PROPERTY_VALUE_UINT,
@@ -377,9 +395,28 @@ static void editor_color_picker_open(EditorColorPicker *picker, uint32_t *target
     picker->parent = parent;
     picker->item = item;
     picker->property = property;
+    picker->bulk_state = NULL;
+    picker->bulk_history = NULL;
     editor_color_rgb_to_hsv(*target, &picker->hue, &picker->saturation, &picker->value);
     picker->opacity = (float)(*target & 0xff) * 100.0f / 255.0f;
     editor_hex_color_format(picker->hex, *target);
+}
+
+typedef struct EditorBulkColorContext {
+    EditorColorPicker *picker;
+    EditorProject *project;
+    EditorViewportState *state;
+    EditorHistory *history;
+} EditorBulkColorContext;
+
+static void editor_bulk_color_picker_open(void *context, uint32_t *color,
+        EditorPropertyKind property) {
+    EditorBulkColorContext *bulk = context;
+    if(bulk == NULL || bulk->picker == NULL) return;
+    editor_color_picker_open(bulk->picker, color, bulk->project,
+        EDITOR_ITEM_OBJECT, 0, 0, 0, property);
+    bulk->picker->bulk_state = bulk->state;
+    bulk->picker->bulk_history = bulk->history;
 }
 
 static bool editor_point_in_rect(Position point, UIRect bounds) {
@@ -974,7 +1011,7 @@ static EditorSoftBeam *editor_soft_area_beam_get(EditorSoftBody *body,
     return NULL;
 }
 
-static bool editor_selected_delete(
+static bool editor_single_selected_delete(
     EditorProject *project,
     EditorViewportState *viewport_state
 ) {
@@ -1213,6 +1250,22 @@ static bool editor_selected_delete(
     return false;
 }
 
+static bool editor_selected_delete(EditorProject *project,
+        EditorViewportState *viewport_state) {
+    bool removed;
+    EditorSelectionRef fallback;
+    if(project == NULL || viewport_state == NULL) return false;
+    if(viewport_state->selected_item_count > 1)
+        return editor_navigation_multi_selection_delete(project, viewport_state,
+            editor_operation_history);
+    removed = editor_single_selected_delete(project, viewport_state);
+    if(!removed) return false;
+    editor_viewport_selection_clear(viewport_state);
+    if(editor_viewport_selection_ref_get(project, viewport_state, &fallback))
+        (void)editor_viewport_selection_set(project, viewport_state, fallback, false);
+    return true;
+}
+
 static bool editor_open_item_delete(
     EditorProject *project,
     EditorViewportState *viewport_state
@@ -1380,10 +1433,11 @@ int main(void) {
     ViewportId viewport = 0;
     static EditorProject project;
     uint64_t saved_project_hash;
-    EditorViewportState viewport_state;
+    EditorViewportState viewport_state = {0};
     EditorFileBrowser file_browser;
     EditorWorkspace workspace = {0};
     EditorOriginPanel origin_panel = {0};
+    EditorBulkPanel bulk_panel = {0};
     EditorTerminalPanel terminal_panel = {0};
     EditorHistory history = {0};
     EditorWorkspaceBrowserAction workspace_browser_action =
@@ -1585,6 +1639,7 @@ int main(void) {
             !editor_text_create(&font, "", &y_field) ||
             !editor_text_create(&font, "", &length_field) ||
             !editor_origin_panel_create(&origin_panel, &font) ||
+            !editor_bulk_panel_create(&bulk_panel, &font) ||
             !editor_terminal_panel_create(&terminal_panel, &font)) goto fail;
     if(!editor_text_create(&font, "#FFFFFFFF", &color_picker_hex_field) ||
             !editor_text_create(&font, "100.0", &color_picker_opacity_field) ||
@@ -1602,6 +1657,10 @@ int main(void) {
         editor_project_particle_auto_fit_update(&project);
         EditorNavigationState navigation_before = editor_navigation_state_get(
             &project, &viewport_state);
+        EditorSelectionRef prior_pointer_selection = {0};
+        bool prior_pointer_selection_valid = editor_viewport_selection_ref_get(
+            &project, &viewport_state, &prior_pointer_selection);
+        bool pointer_selection_handled = false;
         EDITOR_VIEWPORT_BOTTOM = editor_terminal_panel_viewport_bottom_get(
             &terminal_panel);
         viewport_wheel_y = 0.0f;
@@ -1665,7 +1724,10 @@ int main(void) {
         } else if(!field_editing &&
                 !editor_terminal_panel_focused_check(&terminal_panel) &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
-            if(editor_viewport_hitbox_editor_active_get(&viewport_state)) {
+            if(viewport_state.selected_item_count > 1) {
+                editor_viewport_selection_clear(&viewport_state);
+                viewport_state.selection = EDITOR_SELECTION_NONE;
+            } else if(editor_viewport_hitbox_editor_active_get(&viewport_state)) {
                 editor_viewport_back(&viewport_state);
             } else if(viewport_state.mode == EDITOR_VIEWPORT_HIERARCHY &&
                     viewport_state.selection == EDITOR_SELECTION_OBJECT) {
@@ -1803,13 +1865,21 @@ int main(void) {
         panel_scroll_offset = rohr_ui_scroll_region_begin("editor.tools.scroll",
             (UIRect){EDITOR_VIEWPORT_WIDTH, EDITOR_MENU_HEIGHT,
                 EDITOR_TOOLS_WIDTH, WINDOW_HEIGHT - EDITOR_MENU_HEIGHT},
-            editor_panel_content_height_get(&project, &viewport_state),
+            fmaxf(editor_panel_content_height_get(&project, &viewport_state),
+                editor_bulk_panel_content_height_get(&viewport_state)),
             panel_scroll_offset, 42.0f).offset;
         viewport_state.preview_rigid_body = 0;
         viewport_state.preview_anchor = 0;
         viewport_state.preview_soft_node = 0;
         field_editing = false;
-        if(viewport_state.mode == EDITOR_VIEWPORT_ORIGIN) {
+        if(viewport_state.selected_item_count > 1) {
+            EditorBulkColorContext bulk_color = {.picker = &color_picker,
+                .project = &project, .state = &viewport_state,
+                .history = &history};
+            field_editing = editor_bulk_panel_draw(&bulk_panel, &project,
+                &viewport_state, &history, EDITOR_VIEWPORT_WIDTH,
+                EDITOR_TOOLS_WIDTH, editor_bulk_color_picker_open, &bulk_color);
+        } else if(viewport_state.mode == EDITOR_VIEWPORT_ORIGIN) {
             field_editing = editor_origin_panel_draw(&origin_panel,
                 &(EditorPanelContext){
                     .project = &project,
@@ -2175,8 +2245,11 @@ int main(void) {
                                 box->id, box->visible);
                             result = rohr_ui_button(id, &body_hitbox_labels[i],
                                 (UIRect){row_x + 32.0f, y, row_width - 32.0f, 26.0f},
-                                viewport_state.selection == EDITOR_SELECTION_HITBOX &&
-                                    viewport_state.selected_hitbox == box->id ?
+                                (viewport_state.selection == EDITOR_SELECTION_HITBOX &&
+                                    viewport_state.selected_hitbox == box->id) ||
+                                    editor_selection_path_check(&viewport_state,
+                                        EDITOR_SELECTION_HITBOX, selected->id,
+                                        body->id, 0, box->id) ?
                                     &selected_style : NULL);
                             if(result.clicked || result.focus_changed) {
                                 viewport_state.selection = EDITOR_SELECTION_HITBOX;
@@ -2244,8 +2317,11 @@ int main(void) {
                     char id[64];
                     float y = 138.0f + (float)i * 27.0f;
                     UIButtonStyle selected_style = editor_selected_button_style_get();
-                    const UIButtonStyle *style = viewport_state.selection ==
-                        EDITOR_SELECTION_VERTEX && viewport_state.selected_vertex == i ?
+                    const UIButtonStyle *style = (viewport_state.selection ==
+                        EDITOR_SELECTION_VERTEX && viewport_state.selected_vertex == i) ||
+                        editor_selection_path_check(&viewport_state,
+                            EDITOR_SELECTION_VERTEX, selected->id, body->id,
+                            hitbox->id, hitbox->vertices[i].id) ?
                         &selected_style : NULL;
                     UIButtonResult result;
                     if(!editor_named_text_sync(&font, hitbox->vertices[i].name,
@@ -2270,8 +2346,11 @@ int main(void) {
                     for(uint32_t i = 0; i < hitbox->vertex_count; i += 1) {
                         char id[64];
                         UIButtonStyle selected_style = editor_selected_button_style_get();
-                        const UIButtonStyle *style = viewport_state.selection ==
-                            EDITOR_SELECTION_LINE && viewport_state.selected_line == i ?
+                        const UIButtonStyle *style = (viewport_state.selection ==
+                            EDITOR_SELECTION_LINE && viewport_state.selected_line == i) ||
+                            editor_selection_path_check(&viewport_state,
+                                EDITOR_SELECTION_LINE, selected->id, body->id,
+                                hitbox->id, i) ?
                             &selected_style : NULL;
                         UIButtonResult result;
                         if(!editor_named_text_sync(&font, hitbox->line_names[i],
@@ -2759,7 +2838,10 @@ int main(void) {
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f,
                                 270.0f + (float)(i - anchor_start) * 27.0f,
                                 EDITOR_TOOLS_WIDTH - 48.0f, 23.0f},
-                            viewport_state.selected_anchor == anchor->id ?
+                            (viewport_state.selected_anchor == anchor->id) ||
+                                editor_selection_path_check(&viewport_state,
+                                    EDITOR_SELECTION_ANCHOR, selected->id,
+                                    0, 0, anchor->id) ?
                                 &selected_style : NULL);
                     if(result.clicked || result.focus_changed) {
                         viewport_state.selection = EDITOR_SELECTION_ANCHOR;
@@ -3241,8 +3323,11 @@ int main(void) {
                             UIButtonResult result = rohr_ui_button(id, &soft_node_labels[i],
                                 (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, y,
                                     EDITOR_TOOLS_WIDTH - 48.0f, 24.0f},
-                                viewport_state.selection == EDITOR_SELECTION_SOFT_NODE &&
-                                    viewport_state.selected_soft_node == node->id ?
+                                (viewport_state.selection == EDITOR_SELECTION_SOFT_NODE &&
+                                    viewport_state.selected_soft_node == node->id) ||
+                                    editor_selection_path_check(&viewport_state,
+                                        EDITOR_SELECTION_SOFT_NODE, selected->id,
+                                        body->id, 0, node->id) ?
                                     &selected_style : NULL);
                             if(result.clicked || result.focus_changed) {
                                 viewport_state.selection = EDITOR_SELECTION_SOFT_NODE;
@@ -3270,8 +3355,11 @@ int main(void) {
                             UIButtonResult result = rohr_ui_button(id, &soft_beam_labels[i],
                                 (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, y,
                                     EDITOR_TOOLS_WIDTH - 48.0f, 24.0f},
-                                viewport_state.selection == EDITOR_SELECTION_SOFT_BEAM &&
-                                    viewport_state.selected_soft_beam == beam->id ?
+                                (viewport_state.selection == EDITOR_SELECTION_SOFT_BEAM &&
+                                    viewport_state.selected_soft_beam == beam->id) ||
+                                    editor_selection_path_check(&viewport_state,
+                                        EDITOR_SELECTION_SOFT_BEAM, selected->id,
+                                        body->id, 0, beam->id) ?
                                     &selected_style : NULL);
                             if(result.clicked || result.focus_changed) {
                                 viewport_state.selection = EDITOR_SELECTION_SOFT_BEAM;
@@ -3299,8 +3387,11 @@ int main(void) {
                             UIButtonResult result = rohr_ui_button(id, &soft_area_labels[i],
                                 (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, y,
                                     EDITOR_TOOLS_WIDTH - 48.0f, 24.0f},
-                                viewport_state.selection == EDITOR_SELECTION_SOFT_AREA &&
-                                    viewport_state.selected_soft_area == area->id ?
+                                (viewport_state.selection == EDITOR_SELECTION_SOFT_AREA &&
+                                    viewport_state.selected_soft_area == area->id) ||
+                                    editor_selection_path_check(&viewport_state,
+                                        EDITOR_SELECTION_SOFT_AREA, selected->id,
+                                        body->id, 0, area->id) ?
                                     &selected_style : NULL);
                             if(result.clicked || result.focus_changed) {
                                 viewport_state.selection = EDITOR_SELECTION_SOFT_AREA;
@@ -3922,8 +4013,11 @@ int main(void) {
                         result = rohr_ui_button(id, &rigid_body_labels[i],
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 42.0f, y,
                                 EDITOR_TOOLS_WIDTH - 50.0f, 26.0f},
-                            viewport_state.selection == EDITOR_SELECTION_RIGID_BODY &&
-                                viewport_state.selected_rigid_body == body->id ?
+                            (viewport_state.selection == EDITOR_SELECTION_RIGID_BODY &&
+                                viewport_state.selected_rigid_body == body->id) ||
+                                editor_selection_path_check(&viewport_state,
+                                    EDITOR_SELECTION_RIGID_BODY, selected->id,
+                                    0, 0, body->id) ?
                                 &selected_style : NULL);
                         if(result.clicked || result.focus_changed) {
                             viewport_state.selection = EDITOR_SELECTION_RIGID_BODY;
@@ -3950,8 +4044,11 @@ int main(void) {
                         result = rohr_ui_button(id, &joint_labels[i],
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 42.0f, y,
                                 EDITOR_TOOLS_WIDTH - 50.0f, 26.0f},
-                            viewport_state.selection == EDITOR_SELECTION_JOINT &&
-                                viewport_state.selected_joint == joint->id ?
+                            (viewport_state.selection == EDITOR_SELECTION_JOINT &&
+                                viewport_state.selected_joint == joint->id) ||
+                                editor_selection_path_check(&viewport_state,
+                                    EDITOR_SELECTION_JOINT, selected->id,
+                                    0, 0, joint->id) ?
                                 &selected_style : NULL);
                         if(result.clicked || result.focus_changed) {
                             viewport_state.selection = EDITOR_SELECTION_JOINT;
@@ -3978,8 +4075,11 @@ int main(void) {
                         result = rohr_ui_button(id, &soft_body_labels[i],
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 42.0f, y,
                                 EDITOR_TOOLS_WIDTH - 50.0f, 26.0f},
-                            viewport_state.selection == EDITOR_SELECTION_SOFT_BODY &&
-                                viewport_state.selected_soft_body == body->id ?
+                            (viewport_state.selection == EDITOR_SELECTION_SOFT_BODY &&
+                                viewport_state.selected_soft_body == body->id) ||
+                                editor_selection_path_check(&viewport_state,
+                                    EDITOR_SELECTION_SOFT_BODY, selected->id,
+                                    0, 0, body->id) ?
                                 &selected_style : NULL);
                         if(result.clicked || result.focus_changed) {
                             viewport_state.selection = EDITOR_SELECTION_SOFT_BODY;
@@ -4050,8 +4150,11 @@ int main(void) {
                     object->visible);
                 {
                     UIButtonStyle selected_style = editor_selected_button_style_get();
-                    const UIButtonStyle *style = viewport_state.selection ==
-                            EDITOR_SELECTION_OBJECT && project.selected == object->id ?
+                    const UIButtonStyle *style = (viewport_state.selection ==
+                            EDITOR_SELECTION_OBJECT && project.selected == object->id) ||
+                            editor_selection_path_check(&viewport_state,
+                                EDITOR_SELECTION_OBJECT, object->id,
+                                0, 0, object->id) ?
                         &selected_style : NULL;
                 object_result = rohr_ui_button(
                     object_button_id, &object_name_labels[i],
@@ -4476,11 +4579,41 @@ int main(void) {
                     mouse.button_states[MOUSE_BUTTON_MIDDLE], pan_modifier,
                     viewport_wheel_y, ui_consumed);
             } else {
+                bool control_select_press = pan_modifier &&
+                    mouse.button_states[MOUSE_BUTTON_LEFT] ==
+                        MOUSE_BUTTON_STATE_PRESSED;
+                viewport_state.selection_modifier = control_select_press;
                 viewport_consumed = editor_viewport_update(
                     &viewport_state, &project, pointer,
                     mouse.button_states[MOUSE_BUTTON_LEFT],
-                    mouse.button_states[MOUSE_BUTTON_MIDDLE], pan_modifier,
+                    mouse.button_states[MOUSE_BUTTON_MIDDLE],
+                    control_select_press ? false : pan_modifier,
                     viewport_wheel_y, ui_consumed);
+                if(control_select_press && !viewport_consumed)
+                    viewport_consumed = editor_viewport_update(
+                        &viewport_state, &project, pointer,
+                        mouse.button_states[MOUSE_BUTTON_LEFT],
+                        mouse.button_states[MOUSE_BUTTON_MIDDLE], true,
+                        viewport_wheel_y, ui_consumed);
+                viewport_state.selection_modifier = false;
+            }
+
+            if(mouse.button_states[MOUSE_BUTTON_LEFT] ==
+                        MOUSE_BUTTON_STATE_PRESSED &&
+                    !ui_consumed && viewport_consumed &&
+                    !viewport_state.camera_panning &&
+                    viewport_state.mode != EDITOR_VIEWPORT_AUTO_SHAPE) {
+                EditorSelectionRef selection;
+                if(editor_viewport_selection_ref_get(
+                        &project, &viewport_state, &selection)) {
+                    if(pan_modifier && viewport_state.selected_item_count == 0 &&
+                            prior_pointer_selection_valid)
+                        (void)editor_viewport_selection_set(&project, &viewport_state,
+                            prior_pointer_selection, false);
+                    (void)editor_viewport_selection_set(&project, &viewport_state,
+                        selection, pan_modifier);
+                    pointer_selection_handled = true;
+                }
             }
 
             if(mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_PRESSED &&
@@ -4491,6 +4624,37 @@ int main(void) {
         if(workspace.open) {
             EditorNavigationState navigation_after = editor_navigation_state_get(
                 &project, &viewport_state);
+            bool selection_changed = navigation_before.selection !=
+                    navigation_after.selection ||
+                navigation_before.object != navigation_after.object ||
+                navigation_before.rigid_body != navigation_after.rigid_body ||
+                navigation_before.hitbox != navigation_after.hitbox ||
+                navigation_before.joint != navigation_after.joint ||
+                navigation_before.anchor != navigation_after.anchor ||
+                navigation_before.soft_body != navigation_after.soft_body ||
+                navigation_before.soft_node != navigation_after.soft_node ||
+                navigation_before.soft_beam != navigation_after.soft_beam ||
+                navigation_before.selected_line != navigation_after.selected_line ||
+                navigation_before.selected_vertex != navigation_after.selected_vertex;
+            if(selection_changed && !pointer_selection_handled) {
+                EditorSelectionRef selection;
+                bool additive = mouse.button_states[MOUSE_BUTTON_LEFT] ==
+                        MOUSE_BUTTON_STATE_PRESSED &&
+                    (
+                    rohr_controller_key_down_get(&keyboard, SDLK_LCTRL) ||
+                    rohr_controller_key_down_get(&keyboard, SDLK_RCTRL));
+                if(editor_viewport_selection_ref_get(
+                        &project, &viewport_state, &selection)) {
+                    if(additive && viewport_state.selected_item_count == 0 &&
+                            prior_pointer_selection_valid)
+                        (void)editor_viewport_selection_set(&project, &viewport_state,
+                            prior_pointer_selection, false);
+                    (void)editor_viewport_selection_set(
+                        &project, &viewport_state, selection, additive);
+                    navigation_after = editor_navigation_state_get(
+                        &project, &viewport_state);
+                }
+            }
             if(memcmp(&navigation_before, &navigation_after,
                     sizeof(navigation_after)) != 0) {
                 EditorCommand command = {.type = EDITOR_COMMAND_NAVIGATION_SET,
@@ -4515,8 +4679,10 @@ int main(void) {
     editor_command_executing_callback_set(NULL, NULL);
     editor_command_finished_callback_set(NULL, NULL);
     editor_operation_history = NULL;
+    editor_viewport_state_destroy(&viewport_state);
     editor_history_destroy(&history);
     editor_terminal_panel_destroy(&terminal_panel);
+    editor_bulk_panel_destroy(&bulk_panel);
     editor_origin_panel_destroy(&origin_panel);
     rohr_graphics_text_destroy(&stiffness_label);
     rohr_graphics_text_destroy(&rotation_global_label);
@@ -4686,8 +4852,10 @@ fail:
     editor_command_executing_callback_set(NULL, NULL);
     editor_command_finished_callback_set(NULL, NULL);
     editor_operation_history = NULL;
+    editor_viewport_state_destroy(&viewport_state);
     editor_history_destroy(&history);
     editor_terminal_panel_destroy(&terminal_panel);
+    editor_bulk_panel_destroy(&bulk_panel);
     editor_origin_panel_destroy(&origin_panel);
     rohr_graphics_text_destroy(&stiffness_label);
     rohr_graphics_text_destroy(&rotation_global_label);

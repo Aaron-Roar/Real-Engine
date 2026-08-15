@@ -3,6 +3,8 @@
 #include "editor_layout.h"
 
 #include <math.h>
+#include <stdlib.h>
+#include <string.h>
 
 static Position editor_view_origin;
 static float editor_view_scale = 1.0f;
@@ -454,7 +456,209 @@ static EditorHitbox *editor_selected_hitbox_get(EditorObject *object,
 
 void editor_viewport_state_init(EditorViewportState *state) {
     if(state == NULL) return;
+    free(state->selected_items);
     *state = (EditorViewportState){.dragged_vertex = -1};
+}
+
+void editor_viewport_state_destroy(EditorViewportState *state) {
+    if(state == NULL) return;
+    free(state->selected_items);
+    *state = (EditorViewportState){0};
+}
+
+void editor_viewport_selection_clear(EditorViewportState *state) {
+    if(state == NULL) return;
+    state->selected_item_count = 0;
+}
+
+static bool editor_selection_ref_equal(EditorSelectionRef first,
+        EditorSelectionRef second) {
+    return first.kind == second.kind && first.object == second.object &&
+        first.parent == second.parent && first.container == second.container &&
+        first.item == second.item;
+}
+
+bool editor_viewport_selection_contains(const EditorViewportState *state,
+        EditorSelectionRef selection) {
+    if(state == NULL) return false;
+    for(size_t i = 0; i < state->selected_item_count; i += 1)
+        if(editor_selection_ref_equal(state->selected_items[i], selection)) return true;
+    return false;
+}
+
+bool editor_viewport_selection_ref_get(const EditorProject *project,
+        const EditorViewportState *state, EditorSelectionRef *selection) {
+    const EditorObject *object = NULL;
+    const EditorRigidBody *body = NULL;
+    const EditorHitbox *hitbox = NULL;
+    if(project == NULL || state == NULL || selection == NULL ||
+            state->selection == EDITOR_SELECTION_NONE) return false;
+    for(size_t i = 0; i < project->object_count; i += 1)
+        if(project->objects[i].id == project->selected) object = &project->objects[i];
+    *selection = (EditorSelectionRef){.kind = state->selection,
+        .object = project->selected};
+    switch(state->selection) {
+        case EDITOR_SELECTION_OBJECT:
+            selection->item = project->selected;
+            return selection->item != 0;
+        case EDITOR_SELECTION_RIGID_BODY:
+        case EDITOR_SELECTION_PARTICLE:
+            selection->item = state->selected_rigid_body;
+            return selection->item != 0;
+        case EDITOR_SELECTION_HITBOX:
+            selection->parent = state->selected_rigid_body;
+            selection->item = state->selected_hitbox;
+            return selection->item != 0;
+        case EDITOR_SELECTION_VERTEX:
+            if(object != NULL)
+                for(size_t i = 0; i < object->rigid_body_count; i += 1)
+                    if(object->rigid_bodies[i].id == state->selected_rigid_body)
+                        body = &object->rigid_bodies[i];
+            if(body != NULL)
+                for(size_t i = 0; i < body->hitbox_count; i += 1)
+                    if(body->hitboxes[i].id == state->selected_hitbox)
+                        hitbox = &body->hitboxes[i];
+            if(hitbox == NULL || state->selected_vertex >= hitbox->vertex_count)
+                return false;
+            selection->parent = state->selected_rigid_body;
+            selection->container = state->selected_hitbox;
+            selection->item = hitbox->vertices[state->selected_vertex].id;
+            return true;
+        case EDITOR_SELECTION_LINE:
+            selection->parent = state->selected_rigid_body;
+            selection->container = state->selected_hitbox;
+            selection->item = state->selected_line;
+            return true;
+        case EDITOR_SELECTION_JOINT:
+            selection->item = state->selected_joint;
+            return selection->item != 0;
+        case EDITOR_SELECTION_ANCHOR:
+            selection->item = state->selected_anchor;
+            return selection->item != 0;
+        case EDITOR_SELECTION_SOFT_BODY:
+            selection->item = state->selected_soft_body;
+            return selection->item != 0;
+        case EDITOR_SELECTION_SOFT_NODE:
+            selection->parent = state->selected_soft_body;
+            selection->item = state->selected_soft_node;
+            return selection->item != 0;
+        case EDITOR_SELECTION_SOFT_BEAM:
+            selection->parent = state->selected_soft_body;
+            selection->item = state->selected_soft_beam;
+            return selection->item != 0;
+        case EDITOR_SELECTION_SOFT_AREA:
+            selection->parent = state->selected_soft_body;
+            selection->item = state->selected_soft_area;
+            return selection->item != 0;
+        case EDITOR_SELECTION_ORIGIN:
+            selection->parent = state->selected_origin_kind;
+            selection->item = state->selected_origin_kind == EDITOR_ORIGIN_RIGID_BODY ?
+                state->selected_rigid_body : state->selected_soft_body;
+            return selection->item != 0;
+        default:
+            return false;
+    }
+}
+
+static bool editor_viewport_selection_primary_apply(EditorProject *project,
+        EditorViewportState *state, EditorSelectionRef selection) {
+    EditorObject *object;
+    if(project == NULL || state == NULL || selection.object == 0 ||
+            !editor_project_object_select(project, selection.object)) return false;
+    object = editor_project_selected_get(project);
+    state->selection = selection.kind;
+    switch(selection.kind) {
+        case EDITOR_SELECTION_OBJECT: break;
+        case EDITOR_SELECTION_RIGID_BODY:
+        case EDITOR_SELECTION_PARTICLE:
+            state->selected_rigid_body = selection.item;
+            break;
+        case EDITOR_SELECTION_HITBOX:
+            state->selected_rigid_body = selection.parent;
+            state->selected_hitbox = selection.item;
+            break;
+        case EDITOR_SELECTION_VERTEX: {
+            EditorRigidBody *body = editor_project_rigid_body_get(object,
+                selection.parent);
+            EditorHitbox *hitbox = body == NULL ? NULL :
+                editor_project_hitbox_get(body, selection.container);
+            if(hitbox == NULL) return false;
+            state->selected_rigid_body = selection.parent;
+            state->selected_hitbox = selection.container;
+            for(uint32_t i = 0; i < hitbox->vertex_count; i += 1)
+                if(hitbox->vertices[i].id == selection.item) {
+                    state->selected_vertex = i;
+                    return true;
+                }
+            return false;
+        }
+        case EDITOR_SELECTION_LINE:
+            state->selected_rigid_body = selection.parent;
+            state->selected_hitbox = selection.container;
+            state->selected_line = selection.item;
+            break;
+        case EDITOR_SELECTION_JOINT: state->selected_joint = selection.item; break;
+        case EDITOR_SELECTION_ANCHOR: state->selected_anchor = selection.item; break;
+        case EDITOR_SELECTION_SOFT_BODY:
+            state->selected_soft_body = selection.item;
+            break;
+        case EDITOR_SELECTION_SOFT_NODE:
+            state->selected_soft_body = selection.parent;
+            state->selected_soft_node = selection.item;
+            break;
+        case EDITOR_SELECTION_SOFT_BEAM:
+            state->selected_soft_body = selection.parent;
+            state->selected_soft_beam = selection.item;
+            break;
+        case EDITOR_SELECTION_SOFT_AREA:
+            state->selected_soft_body = selection.parent;
+            state->selected_soft_area = selection.item;
+            break;
+        case EDITOR_SELECTION_ORIGIN:
+            state->selected_origin_kind = (EditorOriginKind)selection.parent;
+            if(state->selected_origin_kind == EDITOR_ORIGIN_RIGID_BODY)
+                state->selected_rigid_body = selection.item;
+            else state->selected_soft_body = selection.item;
+            break;
+        default: return false;
+    }
+    return true;
+}
+
+bool editor_viewport_selection_set(EditorProject *project,
+        EditorViewportState *state, EditorSelectionRef selection, bool additive) {
+    size_t existing = SIZE_MAX;
+    if(project == NULL || state == NULL || selection.kind == EDITOR_SELECTION_NONE)
+        return false;
+    for(size_t i = 0; i < state->selected_item_count; i += 1)
+        if(editor_selection_ref_equal(state->selected_items[i], selection)) existing = i;
+    if(!additive || (state->selected_item_count > 0 &&
+            state->selected_items[0].kind != selection.kind)) {
+        state->selected_item_count = 0;
+        existing = SIZE_MAX;
+    } else if(existing != SIZE_MAX) {
+        memmove(&state->selected_items[existing], &state->selected_items[existing + 1],
+            (state->selected_item_count - existing - 1) * sizeof(*state->selected_items));
+        state->selected_item_count -= 1;
+        if(state->selected_item_count == 0) {
+            state->selection = EDITOR_SELECTION_NONE;
+            return true;
+        }
+        return editor_viewport_selection_primary_apply(project, state,
+            state->selected_items[state->selected_item_count - 1]);
+    }
+    if(state->selected_item_count == state->selected_item_capacity) {
+        size_t capacity = state->selected_item_capacity == 0 ? 8 :
+            state->selected_item_capacity * 2;
+        EditorSelectionRef *items = realloc(state->selected_items,
+            capacity * sizeof(*items));
+        if(items == NULL) return false;
+        state->selected_items = items;
+        state->selected_item_capacity = capacity;
+    }
+    state->selected_items[state->selected_item_count] = selection;
+    state->selected_item_count += 1;
+    return editor_viewport_selection_primary_apply(project, state, selection);
 }
 
 void editor_viewport_hitbox_editor_enter(EditorViewportState *state) {
@@ -466,6 +670,7 @@ void editor_viewport_hitbox_editor_enter(EditorViewportState *state) {
 
 void editor_viewport_object_editor_enter(EditorViewportState *state) {
     if(state == NULL) return;
+    editor_viewport_selection_clear(state);
     state->mode = EDITOR_VIEWPORT_OBJECT;
     state->selection = EDITOR_SELECTION_NONE;
     state->selected_rigid_body = 0;
@@ -515,6 +720,7 @@ void editor_viewport_vertex_editor_enter(EditorViewportState *state, uint32_t ve
 
 void editor_viewport_back(EditorViewportState *state) {
     if(state == NULL) return;
+    editor_viewport_selection_clear(state);
     if(state->mode == EDITOR_VIEWPORT_AUTO_SHAPE) {
         state->mode = state->auto_shape_parent_mode;
         state->selection = state->mode == EDITOR_VIEWPORT_HITBOX ?
@@ -1059,7 +1265,11 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                 state->last_viewport_click_object == object->id &&
                 state->last_viewport_click_index == body->id &&
                 now - state->last_viewport_click_at <= 400;
-            if(editing || double_clicked) {
+            if(state->selection_modifier) {
+                state->selection = EDITOR_SELECTION_ORIGIN;
+                state->selected_origin_kind = EDITOR_ORIGIN_RIGID_BODY;
+                state->last_viewport_click_selection = EDITOR_SELECTION_NONE;
+            } else if(editing || double_clicked) {
                 state->selection = EDITOR_SELECTION_ORIGIN;
                 state->selected_origin_kind = EDITOR_ORIGIN_RIGID_BODY;
                 state->mode = EDITOR_VIEWPORT_ORIGIN;
@@ -1099,7 +1309,11 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                 state->last_viewport_click_object == object->id &&
                 state->last_viewport_click_index == soft_body->id &&
                 now - state->last_viewport_click_at <= 400;
-            if(editing || double_clicked) {
+            if(state->selection_modifier) {
+                state->selection = EDITOR_SELECTION_ORIGIN;
+                state->selected_origin_kind = EDITOR_ORIGIN_SOFT_BODY;
+                state->last_viewport_click_selection = EDITOR_SELECTION_NONE;
+            } else if(editing || double_clicked) {
                 state->selection = EDITOR_SELECTION_ORIGIN;
                 state->selected_origin_kind = EDITOR_ORIGIN_SOFT_BODY;
                 state->mode = EDITOR_VIEWPORT_ORIGIN;
@@ -1250,6 +1464,12 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                     return true;
                 }
                 state->selected_soft_body = soft_body->id;
+                if(state->selection_modifier) {
+                    state->selection = EDITOR_SELECTION_SOFT_NODE;
+                    state->selected_soft_node = node->id;
+                    state->last_viewport_click_selection = EDITOR_SELECTION_NONE;
+                    return true;
+                }
                 {
                     Uint64 now = SDL_GetTicks();
                     bool double_clicked = state->last_viewport_click_selection ==
@@ -1291,6 +1511,12 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                         editor_soft_node_world_get(object, soft_body, a),
                         editor_soft_node_world_get(object, soft_body, b)) > 36.0f) continue;
                 state->selected_soft_body = soft_body->id;
+                if(state->selection_modifier) {
+                    state->selection = EDITOR_SELECTION_SOFT_BEAM;
+                    state->selected_soft_beam = beam->id;
+                    state->last_viewport_click_selection = EDITOR_SELECTION_NONE;
+                    return true;
+                }
                 {
                     Uint64 now = SDL_GetTicks();
                     bool double_clicked = state->last_viewport_click_selection ==
@@ -1338,6 +1564,13 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                 }
                 if(state->soft_area_candidate_count > 0) {
                     EditorSoftAreaId area_id = state->soft_area_candidates[0];
+                    if(state->selection_modifier) {
+                        state->selection = EDITOR_SELECTION_SOFT_AREA;
+                        state->selected_soft_body = soft_body->id;
+                        state->selected_soft_area = area_id;
+                        state->last_viewport_click_selection = EDITOR_SELECTION_NONE;
+                        return true;
+                    }
                     Uint64 now = SDL_GetTicks();
                     bool double_clicked = state->last_viewport_click_selection ==
                         EDITOR_SELECTION_SOFT_AREA &&
@@ -1467,12 +1700,21 @@ static void editor_viewport_particle_fills_draw(const EditorObject *object) {
     }
 }
 
+static bool editor_viewport_path_selected(const EditorViewportState *state,
+        EditorHierarchySelection kind, EditorObjectId object, uint32_t parent,
+        uint32_t container, uint32_t item) {
+    return editor_viewport_selection_contains(state,
+        (EditorSelectionRef){kind, object, parent, container, item});
+}
+
 static void editor_viewport_object_draw(const EditorObject *object,
     const EditorViewportState *state, bool object_selected) {
     bool object_highlighted;
     if(object == NULL || state == NULL || !object->visible) return;
-    object_highlighted = state->mode == EDITOR_VIEWPORT_HIERARCHY &&
-        state->selection == EDITOR_SELECTION_OBJECT && object_selected;
+    object_highlighted = (state->mode == EDITOR_VIEWPORT_HIERARCHY &&
+        state->selection == EDITOR_SELECTION_OBJECT && object_selected) ||
+        editor_viewport_path_selected(state, EDITOR_SELECTION_OBJECT,
+            object->id, 0, 0, object->id);
 
     for(size_t body_index = 0; body_index < object->rigid_body_count; body_index += 1) {
         const EditorRigidBody *body = &object->rigid_bodies[body_index];
@@ -1483,7 +1725,11 @@ static void editor_viewport_object_draw(const EditorObject *object,
             bool selected_hitbox = selected_body && state->selected_hitbox == hitbox->id;
             Color base = object_highlighted || state->preview_rigid_body == body->id ||
                     (state->selection == EDITOR_SELECTION_RIGID_BODY && selected_body) ||
-                    (state->selection == EDITOR_SELECTION_HITBOX && selected_hitbox) ?
+                    (state->selection == EDITOR_SELECTION_HITBOX && selected_hitbox) ||
+                    editor_viewport_path_selected(state,
+                        EDITOR_SELECTION_RIGID_BODY, object->id, 0, 0, body->id) ||
+                    editor_viewport_path_selected(state, EDITOR_SELECTION_HITBOX,
+                        object->id, body->id, 0, hitbox->id) ?
                 (Color){255, 215, 70, 255} : graphics_color_hex_create(body->border_color);
             if(!hitbox->visible) continue;
             editor_hitbox_filled_draw(object, body, hitbox,
@@ -1492,17 +1738,25 @@ static void editor_viewport_object_draw(const EditorObject *object,
                 Position start = editor_hitbox_vertex_world_get(object, body, hitbox, i);
                 Position end = editor_hitbox_vertex_world_get(
                     object, body, hitbox, (i + 1) % hitbox->vertex_count);
-                Color edge = selected_hitbox && state->selection == EDITOR_SELECTION_LINE &&
-                        state->selected_line == i ? (Color){255, 215, 70, 255} : base;
+                bool multi_line = editor_viewport_path_selected(state,
+                    EDITOR_SELECTION_LINE, object->id, body->id, hitbox->id, i);
+                bool multi_vertex = editor_viewport_path_selected(state,
+                    EDITOR_SELECTION_VERTEX, object->id, body->id, hitbox->id,
+                    hitbox->vertices[i].id);
+                Color edge = (selected_hitbox &&
+                        state->selection == EDITOR_SELECTION_LINE &&
+                        state->selected_line == i) || multi_line ?
+                    (Color){255, 215, 70, 255} : base;
                 editor_line_draw(start, end, edge);
-                if(selected_hitbox && (state->selection == EDITOR_SELECTION_HITBOX ||
+                if((selected_hitbox && (state->selection == EDITOR_SELECTION_HITBOX ||
                         state->selection == EDITOR_SELECTION_VERTEX ||
                         state->selection == EDITOR_SELECTION_LINE ||
                         (state->mode == EDITOR_VIEWPORT_AUTO_SHAPE &&
                             state->auto_shape_parent_mode ==
-                                EDITOR_VIEWPORT_HITBOX))) {
-                    Color point = state->selection == EDITOR_SELECTION_VERTEX &&
-                            state->selected_vertex == i ? (Color){255, 215, 70, 255} :
+                                EDITOR_VIEWPORT_HITBOX))) || multi_vertex) {
+                    Color point = (state->selection == EDITOR_SELECTION_VERTEX &&
+                            state->selected_vertex == i) || multi_vertex ?
+                            (Color){255, 215, 70, 255} :
                         (state->mode == EDITOR_VIEWPORT_AUTO_SHAPE &&
                             state->dragged_vertex == (int)i) ?
                             (Color){255, 215, 70, 255} :
@@ -1522,7 +1776,9 @@ static void editor_viewport_object_draw(const EditorObject *object,
         center = editor_particle_center_world_get(object, body);
         ring = object_highlighted ||
                 (state->selection == EDITOR_SELECTION_PARTICLE &&
-                    state->selected_rigid_body == body->id) ?
+                    state->selected_rigid_body == body->id) ||
+                editor_viewport_path_selected(state, EDITOR_SELECTION_PARTICLE,
+                    object->id, 0, 0, body->id) ?
             (Color){255, 215, 70, 255} :
             graphics_color_hex_create(body->particle_ring_color);
         editor_circle_dotted_draw(center, body->particle_radius, ring);
@@ -1563,6 +1819,8 @@ static void editor_viewport_object_draw(const EditorObject *object,
         const EditorSoftBody *body = &object->soft_body_items[soft_index];
         bool selected_body = state->selection == EDITOR_SELECTION_SOFT_BODY &&
             state->selected_soft_body == body->id;
+        selected_body = selected_body || editor_viewport_path_selected(state,
+            EDITOR_SELECTION_SOFT_BODY, object->id, 0, 0, body->id);
         const EditorSoftArea *selected_area = NULL;
         if(state->selection == EDITOR_SELECTION_SOFT_AREA &&
                 state->selected_soft_body == body->id) {
@@ -1590,6 +1848,13 @@ static void editor_viewport_object_draw(const EditorObject *object,
             editor_soft_area_filled_draw(
                 object, body, selected_area, (Color){255, 215, 70, 72});
         }
+        for(size_t area_index = 0; area_index < body->area_count; area_index += 1) {
+            const EditorSoftArea *area = &body->areas[area_index];
+            if(area->visible && editor_viewport_path_selected(state,
+                    EDITOR_SELECTION_SOFT_AREA, object->id, body->id, 0, area->id))
+                editor_soft_area_filled_draw(
+                    object, body, area, (Color){255, 215, 70, 72});
+        }
         for(size_t beam_index = 0; beam_index < body->beam_count; beam_index += 1) {
             const EditorSoftBeam *beam = &body->beams[beam_index];
             const EditorSoftNode *a = NULL;
@@ -1608,7 +1873,10 @@ static void editor_viewport_object_draw(const EditorObject *object,
                 object_highlighted || selected_body ||
                     (state->selection == EDITOR_SELECTION_SOFT_BEAM &&
                     state->selected_soft_body == body->id &&
-                    state->selected_soft_beam == beam->id) || selected_area_edge ?
+                    state->selected_soft_beam == beam->id) ||
+                    editor_viewport_path_selected(state,
+                        EDITOR_SELECTION_SOFT_BEAM, object->id, body->id, 0,
+                        beam->id) || selected_area_edge ?
                     (Color){255, 215, 70, 255} : graphics_color_hex_create(
                         beam->color_overridden ? beam->color : body->beam_color));
             }
@@ -1622,6 +1890,9 @@ static void editor_viewport_object_draw(const EditorObject *object,
                     (state->selection == EDITOR_SELECTION_SOFT_NODE &&
                     state->selected_soft_body == body->id &&
                     state->selected_soft_node == node->id) ||
+                    editor_viewport_path_selected(state,
+                        EDITOR_SELECTION_SOFT_NODE, object->id, body->id, 0,
+                        node->id) ||
                     state->preview_soft_node == node->id ?
                     (Color){255, 215, 70, 255} : graphics_color_hex_create(
                         node->color_overridden ? node->color : body->node_color));
@@ -1668,7 +1939,9 @@ static void editor_viewport_object_draw(const EditorObject *object,
             editor_anchor_world_get(object, a), editor_anchor_world_get(object, b),
             fmaxf(0.1f, joint->visual_size),
             object_highlighted || (state->selection == EDITOR_SELECTION_JOINT &&
-                state->selected_joint == joint->id) ?
+                state->selected_joint == joint->id) ||
+                editor_viewport_path_selected(state, EDITOR_SELECTION_JOINT,
+                    object->id, 0, 0, joint->id) ?
                 (Color){255, 215, 70, 255} : (Color){220, 120, 210, 255});
     }
     for(size_t i = 0; i < object->anchor_count; i += 1) {
@@ -1687,7 +1960,10 @@ static void editor_viewport_object_draw(const EditorObject *object,
         editor_quad_draw(editor_anchor_world_get(object, anchor),
             9.0f, 9.0f, rotation + 0.78539816339f,
             object_highlighted || (state->selection == EDITOR_SELECTION_ANCHOR &&
-                state->selected_anchor == anchor->id) || state->preview_anchor == anchor->id ?
+                state->selected_anchor == anchor->id) ||
+                editor_viewport_path_selected(state, EDITOR_SELECTION_ANCHOR,
+                    object->id, 0, 0, anchor->id) ||
+                state->preview_anchor == anchor->id ?
                 (Color){255, 215, 70, 255} : (Color){235, 150, 215, 255});
     }
 }

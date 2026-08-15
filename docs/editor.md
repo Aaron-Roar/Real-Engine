@@ -80,6 +80,8 @@ generated fields and identifiers.
 The right column shows the hierarchy or the editor for the current item:
 
 - Single-click selects an item.
+- `Ctrl` + click toggles items of the same type in a multi-selection. Selecting
+  another type replaces the current selection.
 - Double-click opens its editor.
 - `Enter` opens the selected item.
 - `Escape` returns to the parent editor. At the root it deselects the object.
@@ -92,11 +94,19 @@ Selection is shared between the hierarchy and viewport. Selecting an authored
 item highlights its viewport representation. Clicking an empty viewport or
 column background clears the current selection without jumping to the root.
 
+When multiple items are selected, the column shows their shared property menu.
+Its fields start empty: leaving a field empty preserves each item's current
+value, while submitting a value applies it to every selected item. Bulk edits
+and bulk deletion are atomic, so one `Ctrl+Z` or `Ctrl+Y` restores the complete
+operation. Boolean bulk fields accept `true`, `false`, `1`, or `0`; color fields
+accept six- or eight-digit hexadecimal colors.
+
 ## Viewport controls
 
 - Left drag moves the selected draggable item.
 - Right drag pans the camera.
-- `Ctrl` + left drag also pans, for trackpads and one-button pointing devices.
+- `Ctrl` + left drag beginning on empty viewport space also pans, for trackpads
+  and one-button pointing devices. `Ctrl` + click on an item toggles selection.
 - Mouse wheel zooms around the pointer.
 - Arrow keys nudge the selected viewport item when the pointer is in the viewport.
 - **World/Local** changes only the camera reference; it does not modify project data.

@@ -690,6 +690,12 @@ static int property_commands_test(void) {
     PROPERTY_SET(EDITOR_ITEM_RIGID_BODY, 0, rigid_body->id, 0,
         EDITOR_PROPERTY_PARTICLE, EDITOR_PROPERTY_VALUE_BOOL, boolean, true);
     PROPERTY_SET(EDITOR_ITEM_RIGID_BODY, 0, rigid_body->id, 0,
+        EDITOR_PROPERTY_PARTICLE_RADIUS, EDITOR_PROPERTY_VALUE_FLOAT,
+        number, 14.0f);
+    PROPERTY_SET(EDITOR_ITEM_RIGID_BODY, 0, rigid_body->id, 0,
+        EDITOR_PROPERTY_PARTICLE_AUTO_FIT, EDITOR_PROPERTY_VALUE_BOOL,
+        boolean, false);
+    PROPERTY_SET(EDITOR_ITEM_RIGID_BODY, 0, rigid_body->id, 0,
         EDITOR_PROPERTY_OUTLINE_COLOR, EDITOR_PROPERTY_VALUE_UINT, integer,
         UINT32_C(0x11223344));
     PROPERTY_SET(EDITOR_ITEM_VERTEX, rigid_body->id, hitbox->id,
@@ -707,14 +713,18 @@ static int property_commands_test(void) {
         boolean, false);
     PROPERTY_SET(EDITOR_ITEM_SOFT_NODE, soft_body->id, node->id, 0,
         EDITOR_PROPERTY_FRICTION, EDITOR_PROPERTY_VALUE_FLOAT, number, 0.75f);
+    PROPERTY_SET(EDITOR_ITEM_SOFT_NODE, soft_body->id, node->id, 0,
+        EDITOR_PROPERTY_NODE_RADIUS, EDITOR_PROPERTY_VALUE_FLOAT, number, 9.0f);
     PROPERTY_SET(EDITOR_ITEM_SOFT_BEAM, soft_body->id, beam->id, 0,
         EDITOR_PROPERTY_DAMPING, EDITOR_PROPERTY_VALUE_FLOAT, number, 0.25f);
 #undef PROPERTY_SET
     if(rigid_body->mass_value != 5.0f || !rigid_body->particle ||
+            rigid_body->particle_radius != 14.0f || rigid_body->particle_auto_fit ||
             rigid_body->border_color != UINT32_C(0x11223344) ||
             !hitbox->vertices[0].position_locked || joint->kind != EDITOR_JOINT_WELD ||
             joint->stiffness != 12.0f || anchor->position_follows_body ||
-            node->friction != 0.75f || beam->damping != 0.25f) return 1;
+            node->friction != 0.75f || node->radius != 9.0f ||
+            beam->damping != 0.25f) return 1;
     if(editor_result_check(editor_command_cli_parse(9, node_arguments,
                 &path, &parsed)) || parsed.type != EDITOR_COMMAND_PROPERTY_SET ||
             parsed.data.property_set.property != EDITOR_PROPERTY_FRICTION ||

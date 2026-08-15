@@ -151,6 +151,7 @@ void editor_history_destroy(EditorHistory *history) {
     editor_history_stack_clear(history->undo, &history->undo_count);
     editor_history_stack_clear(history->redo, &history->redo_count);
     free(history->pending);
+    free(history->transaction_before);
     memset(history, 0, sizeof(*history));
 }
 
@@ -160,6 +161,9 @@ void editor_history_reset(EditorHistory *history) {
     editor_history_stack_clear(history->redo, &history->redo_count);
     free(history->pending);
     history->pending = NULL;
+    free(history->transaction_before);
+    history->transaction_before = NULL;
+    history->transaction_active = false;
     history->continuous = false;
     history->continuous_recorded = false;
     history->recorded_since_continuous_update = false;
@@ -168,6 +172,7 @@ void editor_history_reset(EditorHistory *history) {
 void editor_history_command_begin(EditorHistory *history,
         const EditorProject *project, const EditorCommand *command) {
     if(history == NULL) return;
+    if(history->transaction_active) return;
     free(history->pending);
     history->pending = NULL;
     if(project == NULL || !editor_history_command_record_check(command)) return;
@@ -180,6 +185,7 @@ void editor_history_command_finish(EditorHistory *history,
         const EditorCommand *command, const EditorCommandResult *result) {
     EditorHistoryEntry *entry = NULL;
     if(history == NULL || history->project == NULL) return;
+    if(history->transaction_active) return;
     if(history->pending != NULL && command != NULL && result != NULL &&
             result->kind == ERROR_RESULT_VALUE) {
         if(history->continuous && history->continuous_recorded &&
@@ -215,6 +221,48 @@ void editor_history_continuous_set(EditorHistory *history, bool continuous) {
     if(history->continuous && !continuous) history->continuous_recorded = false;
     history->continuous = continuous;
     history->recorded_since_continuous_update = false;
+}
+
+bool editor_history_transaction_begin(EditorHistory *history) {
+    if(history == NULL || history->project == NULL || history->transaction_active)
+        return false;
+    history->transaction_before = malloc(sizeof(*history->transaction_before));
+    if(history->transaction_before == NULL) return false;
+    memcpy(history->transaction_before, history->project,
+        sizeof(*history->transaction_before));
+    history->transaction_active = true;
+    return true;
+}
+
+bool editor_history_transaction_end(EditorHistory *history) {
+    EditorHistoryEntry *entry;
+    if(history == NULL || history->project == NULL ||
+            !history->transaction_active || history->transaction_before == NULL)
+        return false;
+    entry = editor_history_entry_create(history->transaction_before, history->project);
+    free(history->transaction_before);
+    history->transaction_before = NULL;
+    history->transaction_active = false;
+    if(entry == NULL) return true;
+    if(!editor_history_stack_push(history->undo, &history->undo_count, entry)) {
+        editor_history_entry_destroy(entry);
+        return false;
+    }
+    editor_history_stack_clear(history->redo, &history->redo_count);
+    history->continuous = false;
+    history->continuous_recorded = false;
+    history->recorded_since_continuous_update = false;
+    return true;
+}
+
+void editor_history_transaction_cancel(EditorHistory *history) {
+    if(history == NULL) return;
+    if(history->project != NULL && history->transaction_before != NULL)
+        memcpy(history->project, history->transaction_before,
+            sizeof(*history->project));
+    free(history->transaction_before);
+    history->transaction_before = NULL;
+    history->transaction_active = false;
 }
 
 static bool editor_history_restore(EditorHistory *history,

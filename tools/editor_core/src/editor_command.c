@@ -686,6 +686,13 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
                         set->value_kind == EDITOR_PROPERTY_VALUE_BOOL &&
                         (!set->value.boolean || body->collision_enabled))
                     body->particle = set->value.boolean;
+                else if(set->property == EDITOR_PROPERTY_PARTICLE_RADIUS &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number > 0.0f)
+                    body->particle_radius = set->value.number;
+                else if(set->property == EDITOR_PROPERTY_PARTICLE_AUTO_FIT &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_BOOL)
+                    body->particle_auto_fit = set->value.boolean;
                 else if(set->property == EDITOR_PROPERTY_OUTLINE_COLOR &&
                         set->value_kind == EDITOR_PROPERTY_VALUE_UINT)
                     body->border_color = set->value.integer;
@@ -784,6 +791,10 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
                 else if(set->property == EDITOR_PROPERTY_COLLISION &&
                         set->value_kind == EDITOR_PROPERTY_VALUE_BOOL)
                     node->collision_enabled = set->value.boolean;
+                else if(set->property == EDITOR_PROPERTY_NODE_RADIUS &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number > 0.0f)
+                    node->radius = set->value.number;
                 else if(set->property == EDITOR_PROPERTY_COLOR &&
                         set->value_kind == EDITOR_PROPERTY_VALUE_UINT) {
                     node->color = set->value.integer;
@@ -1095,11 +1106,14 @@ static bool editor_command_property_parse(const char *name,
     EDITOR_FLOAT_PROPERTY("stiffness", EDITOR_PROPERTY_STIFFNESS)
     EDITOR_FLOAT_PROPERTY("damping", EDITOR_PROPERTY_DAMPING)
     EDITOR_FLOAT_PROPERTY("length", EDITOR_PROPERTY_LINE_LENGTH)
+    EDITOR_FLOAT_PROPERTY("particle-radius", EDITOR_PROPERTY_PARTICLE_RADIUS)
+    EDITOR_FLOAT_PROPERTY("node-radius", EDITOR_PROPERTY_NODE_RADIUS)
     EDITOR_BOOL_PROPERTY("gravity", EDITOR_PROPERTY_GRAVITY)
     EDITOR_BOOL_PROPERTY("static", EDITOR_PROPERTY_STATIC)
     EDITOR_BOOL_PROPERTY("rotation-locked", EDITOR_PROPERTY_ROTATION_LOCKED)
     EDITOR_BOOL_PROPERTY("collision", EDITOR_PROPERTY_COLLISION)
     EDITOR_BOOL_PROPERTY("particle", EDITOR_PROPERTY_PARTICLE)
+    EDITOR_BOOL_PROPERTY("particle-auto-fit", EDITOR_PROPERTY_PARTICLE_AUTO_FIT)
     EDITOR_BOOL_PROPERTY("position-locked", EDITOR_PROPERTY_POSITION_LOCKED)
     EDITOR_BOOL_PROPERTY("position-follows-body", EDITOR_PROPERTY_POSITION_FOLLOWS_BODY)
     EDITOR_BOOL_PROPERTY("rotation-follows-body", EDITOR_PROPERTY_ROTATION_FOLLOWS_BODY)
@@ -1135,6 +1149,9 @@ static const char *editor_command_property_name_get(EditorPropertyKind property)
         case EDITOR_PROPERTY_ROTATION_LOCKED: return "rotation-locked";
         case EDITOR_PROPERTY_COLLISION: return "collision";
         case EDITOR_PROPERTY_PARTICLE: return "particle";
+        case EDITOR_PROPERTY_PARTICLE_RADIUS: return "particle-radius";
+        case EDITOR_PROPERTY_PARTICLE_AUTO_FIT: return "particle-auto-fit";
+        case EDITOR_PROPERTY_NODE_RADIUS: return "node-radius";
         case EDITOR_PROPERTY_POSITION_LOCKED: return "position-locked";
         case EDITOR_PROPERTY_VISUAL_SIZE: return "visual-size";
         case EDITOR_PROPERTY_JOINT_KIND: return "kind";
