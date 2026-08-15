@@ -252,10 +252,18 @@ typedef struct EditorCommandResult {
 
 typedef void (*EditorCommandExecuted)(const EditorCommand *command,
     const EditorCommandResult *result, void *context);
+typedef void (*EditorCommandExecuting)(const EditorProject *project,
+    const EditorCommand *command, void *context);
+typedef void (*EditorCommandFinished)(const EditorCommand *command,
+    const EditorCommandResult *result, void *context);
 
 EditorCommandResult editor_command_execute(EditorProject *project,
     const EditorCommand *command);
 void editor_command_executed_callback_set(EditorCommandExecuted callback,
+    void *context);
+void editor_command_executing_callback_set(EditorCommandExecuting callback,
+    void *context);
+void editor_command_finished_callback_set(EditorCommandFinished callback,
     void *context);
 EditorResult editor_command_cli_parse(int count, char **arguments,
     const char **document_path, EditorCommand *command);

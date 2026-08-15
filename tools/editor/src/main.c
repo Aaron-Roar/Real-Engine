@@ -66,10 +66,16 @@ static void editor_operation_command_write(const EditorCommand *editor_command,
     editor_terminal_panel_operation_write(editor_operation_terminal, command);
 }
 
-static void editor_operation_command_executed(const EditorCommand *editor_command,
+static void editor_operation_command_executing(const EditorProject *project,
+        const EditorCommand *command, void *context) {
+    (void)context;
+    editor_history_command_begin(editor_operation_history, project, command);
+}
+
+static void editor_operation_command_finished(const EditorCommand *command,
         const EditorCommandResult *result, void *context) {
-    editor_history_command_record(editor_operation_history, editor_command);
-    editor_operation_command_write(editor_command, result, context);
+    (void)context;
+    editor_history_command_finish(editor_operation_history, command, result);
 }
 
 static EditorResult editor_workspace_operation_execute(EditorWorkspace *workspace,
@@ -995,7 +1001,9 @@ int main(void) {
     editor_project_init(&project);
     if(!editor_history_init(&history, &project)) goto fail;
     editor_operation_history = &history;
-    editor_command_executed_callback_set(editor_operation_command_executed, NULL);
+    editor_command_executing_callback_set(editor_operation_command_executing, NULL);
+    editor_command_executed_callback_set(editor_operation_command_write, NULL);
+    editor_command_finished_callback_set(editor_operation_command_finished, NULL);
     saved_project_hash = editor_project_hash_get(&project);
     editor_viewport_state_init(&viewport_state);
     editor_navigation_state_apply(&project, &viewport_state, &project.navigation);
@@ -3560,6 +3568,8 @@ int main(void) {
     }
 
     editor_command_executed_callback_set(NULL, NULL);
+    editor_command_executing_callback_set(NULL, NULL);
+    editor_command_finished_callback_set(NULL, NULL);
     editor_operation_history = NULL;
     editor_history_destroy(&history);
     editor_terminal_panel_destroy(&terminal_panel);
@@ -3703,6 +3713,8 @@ int main(void) {
 
 fail:
     editor_command_executed_callback_set(NULL, NULL);
+    editor_command_executing_callback_set(NULL, NULL);
+    editor_command_finished_callback_set(NULL, NULL);
     editor_operation_history = NULL;
     editor_history_destroy(&history);
     editor_terminal_panel_destroy(&terminal_panel);

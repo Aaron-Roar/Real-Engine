@@ -7,6 +7,10 @@
 
 static EditorCommandExecuted editor_command_executed_callback;
 static void *editor_command_executed_context;
+static EditorCommandExecuting editor_command_executing_callback;
+static void *editor_command_executing_context;
+static EditorCommandFinished editor_command_finished_callback;
+static void *editor_command_finished_context;
 
 static EditorCommandResult editor_command_error(EditorError error) {
     return (EditorCommandResult){.kind = ERROR_RESULT_ERROR,
@@ -760,10 +764,16 @@ property_invalid:
 
 EditorCommandResult editor_command_execute(EditorProject *project,
         const EditorCommand *command) {
+    if(editor_command_executing_callback != NULL)
+        editor_command_executing_callback(project, command,
+            editor_command_executing_context);
     EditorCommandResult result = editor_command_execute_internal(project, command);
     if(result.kind == ERROR_RESULT_VALUE && editor_command_executed_callback != NULL)
         editor_command_executed_callback(command, &result,
             editor_command_executed_context);
+    if(editor_command_finished_callback != NULL)
+        editor_command_finished_callback(command, &result,
+            editor_command_finished_context);
     return result;
 }
 
@@ -771,6 +781,18 @@ void editor_command_executed_callback_set(EditorCommandExecuted callback,
         void *context) {
     editor_command_executed_callback = callback;
     editor_command_executed_context = context;
+}
+
+void editor_command_executing_callback_set(EditorCommandExecuting callback,
+        void *context) {
+    editor_command_executing_callback = callback;
+    editor_command_executing_context = context;
+}
+
+void editor_command_finished_callback_set(EditorCommandFinished callback,
+        void *context) {
+    editor_command_finished_callback = callback;
+    editor_command_finished_context = context;
 }
 
 static bool editor_command_uint_parse(const char *text, uint32_t *value) {
