@@ -111,7 +111,18 @@ static bool editor_cmake_command_get(char *output, size_t capacity,
 #if defined(_WIN32)
     if(_fullpath(absolute, project_directory, sizeof(absolute)) == NULL) return false;
 #else
-    if(realpath(project_directory, absolute) == NULL) return false;
+    {
+        char *resolved = realpath(project_directory, NULL);
+        size_t length;
+        if(resolved == NULL) return false;
+        length = strlen(resolved);
+        if(length >= sizeof(absolute)) {
+            free(resolved);
+            return false;
+        }
+        memcpy(absolute, resolved, length + 1);
+        free(resolved);
+    }
 #endif
     if(!editor_terminal_path_quote(source, sizeof(source), absolute))
         return false;
@@ -1496,7 +1507,7 @@ int main(void) {
     bool field_editing = false;
     bool panel_resizing = false;
     bool terminal_resizing = false;
-    bool terminal_editor_operations = false;
+    bool terminal_editor_operations = true;
     bool terminal_build_operations = false;
     bool collision_category_open = false;
     bool collide_with_open = false;
@@ -1691,6 +1702,7 @@ int main(void) {
             !editor_origin_panel_create(&origin_panel, &font) ||
             !editor_bulk_panel_create(&bulk_panel, &font) ||
             !editor_terminal_panel_create(&terminal_panel, &font)) goto fail;
+    terminal_panel.visible = true;
     if(!editor_text_create(&font, "#FFFFFFFF", &color_picker_hex_field) ||
             !editor_text_create(&font, "100.0", &color_picker_opacity_field) ||
             !editor_text_create(&font, "Opacity %", &opacity_label)) goto fail;
