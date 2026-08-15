@@ -119,6 +119,10 @@ static EditorResult editor_cli_selectors_parse(int count, char **arguments,
     return editor_result_value(true);
 }
 
+static bool editor_cli_selector_present(const EditorCliSelector *selector) {
+    return selector != NULL && (selector->name != NULL || selector->id_set);
+}
+
 static bool editor_cli_name_equal(const char *stored, const char *requested,
         bool object_name) {
     char formatted[EDITOR_OBJECT_NAME_MAX];
@@ -301,6 +305,76 @@ EditorResult editor_command_cli_named_parse(const EditorProject *project,
     normalized[normalized_count++] = arguments[1];
     normalized[normalized_count++] = arguments[2];
     normalized[normalized_count++] = arguments[3];
+    if(strcmp(domain, "navigation") == 0 && strcmp(action, "set") == 0) {
+        uint32_t joint_id = 0, anchor_id = 0, soft_body_id = 0;
+        uint32_t node_id = 0, beam_id = 0, line_id = 0, vertex_id = 0;
+        if(rest_count != 3) return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "Navigation set requires mode, selection, and origin kind");
+        if(editor_cli_selector_present(&selectors.object)) {
+            result = editor_cli_object_resolve(project, &selectors.object, &object_id);
+            if(editor_result_check(result)) return result;
+            object = editor_cli_object_get(project, object_id);
+            if(object == NULL) return editor_result_error(EDITOR_ERROR_NOT_FOUND,
+                "Object ID %u was not found", object_id);
+        }
+        if(editor_cli_selector_present(&selectors.body)) {
+            result = editor_cli_body_resolve(object, &selectors.body, &body_id);
+            if(editor_result_check(result)) return result;
+            body = editor_project_rigid_body_get(object, body_id);
+        }
+        if(editor_cli_selector_present(&selectors.hitbox)) {
+            result = editor_cli_hitbox_resolve(body, &selectors.hitbox, &hitbox_id);
+            if(editor_result_check(result)) return result;
+            hitbox = editor_project_hitbox_get(body, hitbox_id);
+        }
+#define RESOLVE_OPTIONAL(selector, call, output) do { \
+    if(editor_cli_selector_present(&(selector))) { result = (call); \
+        if(editor_result_check(result)) return result; } \
+} while(0)
+        RESOLVE_OPTIONAL(selectors.joint,
+            editor_cli_joint_resolve(object, &selectors.joint, &joint_id), joint_id);
+        RESOLVE_OPTIONAL(selectors.anchor,
+            editor_cli_anchor_resolve(object, &selectors.anchor, &anchor_id), anchor_id);
+        RESOLVE_OPTIONAL(selectors.soft_body,
+            editor_cli_soft_body_resolve(object, &selectors.soft_body, &soft_body_id),
+            soft_body_id);
+        soft_body = editor_cli_soft_body_get(object, soft_body_id);
+        RESOLVE_OPTIONAL(selectors.node,
+            editor_cli_node_resolve(soft_body, &selectors.node, &node_id), node_id);
+        RESOLVE_OPTIONAL(selectors.beam,
+            editor_cli_beam_resolve(soft_body, &selectors.beam, &beam_id), beam_id);
+        RESOLVE_OPTIONAL(selectors.line,
+            editor_cli_line_resolve(hitbox, &selectors.line, &line_id), line_id);
+        RESOLVE_OPTIONAL(selectors.vertex,
+            editor_cli_vertex_resolve(hitbox, &selectors.vertex, &vertex_id), vertex_id);
+#undef RESOLVE_OPTIONAL
+        if(!editor_cli_argument_push(normalized, &normalized_count, rest[0]) ||
+                !editor_cli_argument_push(normalized, &normalized_count, rest[1]) ||
+                !editor_cli_id_push(normalized, &normalized_count, id_buffers,
+                    &id_buffer_count, object_id) ||
+                !editor_cli_id_push(normalized, &normalized_count, id_buffers,
+                    &id_buffer_count, body_id) ||
+                !editor_cli_id_push(normalized, &normalized_count, id_buffers,
+                    &id_buffer_count, hitbox_id) ||
+                !editor_cli_id_push(normalized, &normalized_count, id_buffers,
+                    &id_buffer_count, joint_id) ||
+                !editor_cli_id_push(normalized, &normalized_count, id_buffers,
+                    &id_buffer_count, anchor_id) ||
+                !editor_cli_id_push(normalized, &normalized_count, id_buffers,
+                    &id_buffer_count, soft_body_id) ||
+                !editor_cli_id_push(normalized, &normalized_count, id_buffers,
+                    &id_buffer_count, node_id) ||
+                !editor_cli_id_push(normalized, &normalized_count, id_buffers,
+                    &id_buffer_count, beam_id) ||
+                !editor_cli_id_push(normalized, &normalized_count, id_buffers,
+                    &id_buffer_count, line_id) ||
+                !editor_cli_id_push(normalized, &normalized_count, id_buffers,
+                    &id_buffer_count, vertex_id) ||
+                !editor_cli_argument_push(normalized, &normalized_count, rest[2]))
+            goto capacity_error;
+        return editor_command_cli_parse(normalized_count, normalized,
+            document_path, command);
+    }
     if(needs_object) {
         result = editor_cli_object_resolve(project, &selectors.object, &object_id);
         if(editor_result_check(result)) return result;
@@ -483,6 +557,14 @@ static bool editor_cli_selector_write(char *output, size_t capacity, size_t *use
         editor_cli_token_append(output, capacity, used, id_text);
 }
 
+static bool editor_cli_id_selector_write(char *output, size_t capacity,
+        size_t *used, const char *id_flag, uint32_t id) {
+    char id_text[16];
+    snprintf(id_text, sizeof(id_text), "%u", id);
+    return editor_cli_token_append(output, capacity, used, id_flag) &&
+        editor_cli_token_append(output, capacity, used, id_text);
+}
+
 static const char *editor_cli_object_name_get(const EditorProject *project,
         uint32_t id, size_t *matches) {
     const char *name = NULL;
@@ -636,6 +718,54 @@ EditorResult editor_command_cli_named_write(const EditorProject *project,
     for(size_t i = 0; i < 4; i += 1)
         if(!editor_cli_token_append(output, output_capacity, &used, tokens[i]))
             goto capacity_error;
+    if(strcmp(domain, "navigation") == 0 && strcmp(action, "set") == 0) {
+        uint32_t values[10] = {0};
+        if(token_count != 17) return editor_result_error(
+            EDITOR_ERROR_INVALID_ARGUMENT, "Invalid serialized navigation command");
+        for(size_t i = 0; i < 10; i += 1)
+            if(!editor_cli_uint_parse(tokens[6 + i], &values[i]))
+                return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                    "Invalid serialized navigation selector");
+        if(!editor_cli_token_append(output, output_capacity, &used, tokens[4]) ||
+                !editor_cli_token_append(output, output_capacity, &used, tokens[5]) ||
+                !editor_cli_token_append(output, output_capacity, &used, tokens[16]))
+            goto capacity_error;
+        object = values[0];
+        if(object != 0) {
+            if(!editor_cli_hierarchy_selector_write(project, output, output_capacity,
+                    &used, "object", object, 0, object)) goto capacity_error;
+        }
+        if(values[1] != 0 && !editor_cli_hierarchy_selector_write(project, output,
+                output_capacity, &used, "body", object, 0, values[1]))
+            goto capacity_error;
+        if(values[2] != 0 && !editor_cli_hierarchy_selector_write(project, output,
+                output_capacity, &used, "hitbox", object, values[1], values[2]))
+            goto capacity_error;
+        if(values[3] != 0 && !editor_cli_hierarchy_selector_write(project, output,
+                output_capacity, &used, "joint", object, 0, values[3]))
+            goto capacity_error;
+        if(values[4] != 0 && !editor_cli_hierarchy_selector_write(project, output,
+                output_capacity, &used, "anchor", object, 0, values[4]))
+            goto capacity_error;
+        if(values[5] != 0 && !editor_cli_hierarchy_selector_write(project, output,
+                output_capacity, &used, "soft-body", object, 0, values[5]))
+            goto capacity_error;
+        if(values[6] != 0 && !editor_cli_hierarchy_selector_write(project, output,
+                output_capacity, &used, "node", object, values[5], values[6]))
+            goto capacity_error;
+        if(values[7] != 0 && !editor_cli_hierarchy_selector_write(project, output,
+                output_capacity, &used, "beam", object, values[5], values[7]))
+            goto capacity_error;
+        if(strcmp(tokens[5], "line") == 0 &&
+                !editor_cli_hitbox_item_selector_write(project, output,
+                    output_capacity, &used, "line", object, values[1], values[2],
+                    values[8])) goto capacity_error;
+        if(strcmp(tokens[5], "vertex") == 0 &&
+                !editor_cli_hitbox_item_selector_write(project, output,
+                    output_capacity, &used, "vertex", object, values[1], values[2],
+                    values[9])) goto capacity_error;
+        return editor_result_value(true);
+    }
 
 #define READ_ID(index, target) do { if(!editor_cli_token_id_get(tokens, token_count, \
     (index), &(target))) return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT, \
@@ -648,23 +778,43 @@ EditorResult editor_command_cli_named_write(const EditorProject *project,
             strcmp(domain, "collision-mask") != 0 &&
             !(strcmp(domain, "object") == 0 && strcmp(action, "add") == 0)) {
         READ_ID(4, object);
-        WRITE_SELECTOR("object", object, 0, object);
+        if(strcmp(domain, "object") == 0 && strcmp(action, "rename") == 0) {
+            if(!editor_cli_id_selector_write(output, output_capacity, &used,
+                    "--object-id", object)) goto capacity_error;
+        } else WRITE_SELECTOR("object", object, 0, object);
     }
     if(strcmp(domain, "rigid-body") == 0 && strcmp(action, "add") != 0) {
-        READ_ID(5, item); WRITE_SELECTOR("body", object, 0, item);
+        READ_ID(5, item);
+        if(strcmp(action, "rename") == 0) {
+            if(!editor_cli_id_selector_write(output, output_capacity, &used,
+                    "--body-id", item)) goto capacity_error;
+        } else WRITE_SELECTOR("body", object, 0, item);
     } else if(strcmp(domain, "hitbox") == 0) {
         READ_ID(5, parent); WRITE_SELECTOR("body", object, 0, parent);
         if(strcmp(action, "add") != 0) {
-            READ_ID(6, item); WRITE_SELECTOR("hitbox", object, parent, item);
+            READ_ID(6, item);
+            if(strcmp(action, "rename") == 0) {
+                if(!editor_cli_id_selector_write(output, output_capacity, &used,
+                        "--hitbox-id", item)) goto capacity_error;
+            } else WRITE_SELECTOR("hitbox", object, parent, item);
         }
     } else if(strcmp(domain, "vertex") == 0 || strcmp(domain, "line") == 0) {
         READ_ID(5, parent); WRITE_SELECTOR("body", object, 0, parent);
         READ_ID(6, hitbox); WRITE_SELECTOR("hitbox", object, parent, hitbox);
         READ_ID(7, item);
-        if(!editor_cli_hitbox_item_selector_write(project, output, output_capacity,
-                &used, domain, object, parent, hitbox, item)) goto capacity_error;
+        if(strcmp(action, "rename") == 0) {
+            if(!editor_cli_id_selector_write(output, output_capacity, &used,
+                    strcmp(domain, "line") == 0 ? "--line-index" : "--vertex-id",
+                    item)) goto capacity_error;
+        } else if(!editor_cli_hitbox_item_selector_write(project, output,
+                output_capacity, &used, domain, object, parent, hitbox, item))
+            goto capacity_error;
     } else if(strcmp(domain, "joint") == 0 && strcmp(action, "add") != 0) {
-        READ_ID(5, item); WRITE_SELECTOR("joint", object, 0, item);
+        READ_ID(5, item);
+        if(strcmp(action, "rename") == 0) {
+            if(!editor_cli_id_selector_write(output, output_capacity, &used,
+                    "--joint-id", item)) goto capacity_error;
+        } else WRITE_SELECTOR("joint", object, 0, item);
         if(strcmp(action, "connect") == 0) {
             if(strcmp(tokens[7], "none") == 0) { item = 0; skip[7] = true; }
             else READ_ID(7, item);
@@ -674,7 +824,11 @@ EditorResult editor_command_cli_named_write(const EditorProject *project,
         if(strcmp(action, "add") == 0) {
             READ_ID(5, item); WRITE_SELECTOR("body", object, 0, item);
         } else {
-            READ_ID(5, item); WRITE_SELECTOR("anchor", object, 0, item);
+            READ_ID(5, item);
+            if(strcmp(action, "rename") == 0) {
+                if(!editor_cli_id_selector_write(output, output_capacity, &used,
+                        "--anchor-id", item)) goto capacity_error;
+            } else WRITE_SELECTOR("anchor", object, 0, item);
             if(strcmp(action, "connect") == 0) {
                 if(strcmp(tokens[7], "none") == 0) { item = 0; skip[7] = true; }
                 else READ_ID(7, item);
@@ -682,12 +836,20 @@ EditorResult editor_command_cli_named_write(const EditorProject *project,
             }
         }
     } else if(strcmp(domain, "soft-body") == 0 && strcmp(action, "add") != 0) {
-        READ_ID(5, item); WRITE_SELECTOR("soft-body", object, 0, item);
+        READ_ID(5, item);
+        if(strcmp(action, "rename") == 0) {
+            if(!editor_cli_id_selector_write(output, output_capacity, &used,
+                    "--soft-body-id", item)) goto capacity_error;
+        } else WRITE_SELECTOR("soft-body", object, 0, item);
     } else if(strcmp(domain, "soft-node") == 0 || strcmp(domain, "soft-beam") == 0) {
         READ_ID(5, parent); WRITE_SELECTOR("soft-body", object, 0, parent);
         if(strcmp(domain, "soft-node") == 0) {
             if(strcmp(action, "add") != 0) {
-                READ_ID(6, item); WRITE_SELECTOR("node", object, parent, item);
+                READ_ID(6, item);
+                if(strcmp(action, "rename") == 0) {
+                    if(!editor_cli_id_selector_write(output, output_capacity, &used,
+                            "--node-id", item)) goto capacity_error;
+                } else WRITE_SELECTOR("node", object, parent, item);
             }
         } else if(strcmp(action, "add") == 0) {
             READ_ID(6, item);
@@ -699,7 +861,11 @@ EditorResult editor_command_cli_named_write(const EditorProject *project,
                     output_capacity, &used, "node-b", object, parent, item))
                 goto capacity_error;
         } else {
-            READ_ID(6, item); WRITE_SELECTOR("beam", object, parent, item);
+            READ_ID(6, item);
+            if(strcmp(action, "rename") == 0) {
+                if(!editor_cli_id_selector_write(output, output_capacity, &used,
+                        "--beam-id", item)) goto capacity_error;
+            } else WRITE_SELECTOR("beam", object, parent, item);
             if(strcmp(action, "connect") == 0) {
                 if(strcmp(tokens[8], "none") == 0) { item = 0; skip[8] = true; }
                 else READ_ID(8, item);

@@ -310,62 +310,86 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
             const EditorItemKind kind = command->data.item_add.kind;
             EditorObject *object;
             uint32_t created = 0;
+            const char *created_name = NULL;
             if(kind == EDITOR_ITEM_OBJECT) {
                 EditorObjectIdResult result = editor_object_command_add(project,
                     &(EditorObjectAddArgs){command->data.item_add.name,
                         command->data.item_add.position});
+                EditorCommandResult command_result;
+                EditorObject *created_object;
                 if(result.kind == ERROR_RESULT_ERROR)
                     return editor_command_error(result.result.error);
-                return (EditorCommandResult){.kind = ERROR_RESULT_VALUE,
-                    .result.object = result.result.value};
+                command_result = (EditorCommandResult){.kind = ERROR_RESULT_VALUE,
+                    .result.object = result.result.value,
+                    .created = {.valid = true, .kind = EDITOR_ITEM_OBJECT,
+                        .object = result.result.value, .item = result.result.value}};
+                created_object = editor_object_query_get(project, result.result.value);
+                if(created_object != NULL) snprintf(command_result.created.name,
+                    sizeof(command_result.created.name), "%s", created_object->name);
+                return command_result;
             }
             object = editor_object_query_get(project, command->data.item_add.object);
             if(object == NULL) return editor_command_not_found("object",
                 command->data.item_add.object);
             if(kind == EDITOR_ITEM_RIGID_BODY) {
                 EditorRigidBody *value = editor_project_rigid_body_add(project, object);
-                if(value != NULL) created = value->id;
+                if(value != NULL) { created = value->id; created_name = value->name; }
             } else if(kind == EDITOR_ITEM_HITBOX) {
                 EditorRigidBody *body = editor_project_rigid_body_get(object,
                     command->data.item_add.parent);
                 EditorHitbox *value = editor_project_hitbox_add(project, body);
-                if(value != NULL) created = value->id;
+                if(value != NULL) { created = value->id; created_name = value->name; }
             } else if(kind == EDITOR_ITEM_JOINT && command->data.item_add.option <=
                     (uint32_t)EDITOR_JOINT_SPRING) {
                 EditorJoint *value = editor_project_joint_add(project, object,
                     (EditorJointKind)command->data.item_add.option);
-                if(value != NULL) created = value->id;
+                if(value != NULL) { created = value->id; created_name = value->name; }
             } else if(kind == EDITOR_ITEM_ANCHOR) {
                 EditorAnchor *value = editor_project_anchor_add(project, object,
                     command->data.item_add.position, command->data.item_add.parent);
-                if(value != NULL) created = value->id;
+                if(value != NULL) { created = value->id; created_name = value->name; }
             } else if(kind == EDITOR_ITEM_SOFT_BODY) {
                 EditorSoftBody *value = editor_project_soft_body_add(project, object);
-                if(value != NULL) created = value->id;
+                if(value != NULL) { created = value->id; created_name = value->name; }
             } else if(kind == EDITOR_ITEM_SOFT_NODE) {
                 EditorSoftBody *body = editor_command_soft_body_get(object,
                     command->data.item_add.parent);
                 EditorSoftNode *value = editor_project_soft_node_add(project, body,
                     command->data.item_add.position);
-                if(value != NULL) created = value->id;
+                if(value != NULL) { created = value->id; created_name = value->name; }
             } else if(kind == EDITOR_ITEM_SOFT_BEAM) {
                 EditorSoftBody *body = editor_command_soft_body_get(object,
                     command->data.item_add.parent);
                 EditorSoftBeam *value = editor_project_soft_beam_add(project, body,
                     command->data.item_add.first, command->data.item_add.second);
-                if(value != NULL) created = value->id;
+                if(value != NULL) { created = value->id; created_name = value->name; }
             } else if(kind == EDITOR_ITEM_VERTEX) {
                 EditorRigidBody *body = editor_project_rigid_body_get(object,
                     command->data.item_add.parent);
                 EditorHitbox *hitbox = editor_project_hitbox_get(body,
                     command->data.item_add.first);
                 if(editor_project_hitbox_vertex_insert(project, hitbox,
-                        command->data.item_add.index)) created = project->next_vertex_id - 1;
+                        command->data.item_add.index)) {
+                    created = project->next_vertex_id - 1;
+                    if(hitbox != NULL) for(uint32_t i = 0; i < hitbox->vertex_count; i += 1)
+                        if(hitbox->vertices[i].id == created)
+                            created_name = hitbox->vertices[i].name;
+                }
             }
             if(created == 0) return editor_command_error(editor_result_error(
                 EDITOR_ERROR_CAPACITY, "could not add editor item").result.error);
-            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE,
-                .result.object = created};
+            {
+                EditorCommandResult result = {.kind = ERROR_RESULT_VALUE,
+                    .result.object = created,
+                    .created = {.valid = true, .kind = kind,
+                        .object = command->data.item_add.object,
+                        .parent = command->data.item_add.parent,
+                        .container = command->data.item_add.first,
+                        .item = created}};
+                if(created_name != NULL) snprintf(result.created.name,
+                    sizeof(result.created.name), "%s", created_name);
+                return result;
+            }
         }
         case EDITOR_COMMAND_ITEM_REMOVE: {
             const EditorItemKind kind = command->data.item_remove.kind;
@@ -721,7 +745,8 @@ EditorCommandResult editor_command_execute(EditorProject *project,
         const EditorCommand *command) {
     EditorCommandResult result = editor_command_execute_internal(project, command);
     if(result.kind == ERROR_RESULT_VALUE && editor_command_executed_callback != NULL)
-        editor_command_executed_callback(command, editor_command_executed_context);
+        editor_command_executed_callback(command, &result,
+            editor_command_executed_context);
     return result;
 }
 

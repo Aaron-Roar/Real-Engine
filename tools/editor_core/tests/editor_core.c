@@ -5,6 +5,37 @@
 #include <stdio.h>
 #include <string.h>
 
+static EditorCommandResult observed_creation;
+
+static void creation_observe(const EditorCommand *command,
+        const EditorCommandResult *result, void *context) {
+    (void)command;
+    (void)context;
+    if(result != NULL) observed_creation = *result;
+}
+
+static int creation_result_test(void) {
+    static EditorProject project;
+    EditorObject *object;
+    EditorCommand command;
+    EditorCommandResult result;
+    editor_project_init(&project);
+    object = editor_project_object_add(&project, (Position){0});
+    if(object == NULL) return 1;
+    command = (EditorCommand){.type = EDITOR_COMMAND_ITEM_ADD,
+        .data.item_add = {.kind = EDITOR_ITEM_RIGID_BODY, .object = object->id}};
+    observed_creation = (EditorCommandResult){0};
+    editor_command_executed_callback_set(creation_observe, NULL);
+    result = editor_command_execute(&project, &command);
+    editor_command_executed_callback_set(NULL, NULL);
+    if(result.kind != ERROR_RESULT_VALUE || !result.created.valid ||
+            result.created.kind != EDITOR_ITEM_RIGID_BODY ||
+            result.created.object != object->id || result.created.item == 0 ||
+            result.created.name[0] == '\0' || !observed_creation.created.valid ||
+            observed_creation.created.item != result.created.item) return 1;
+    return 0;
+}
+
 static int named_selector_commands_test(void) {
     static EditorProject project;
     EditorObject *object;
@@ -67,6 +98,15 @@ static int named_selector_commands_test(void) {
         &path, &command);
     if(!editor_result_check(result) ||
             result.result.error.code != EDITOR_ERROR_NOT_FOUND) return 1;
+    command = (EditorCommand){.type = EDITOR_COMMAND_ITEM_RENAME,
+        .data.item_rename = {.kind = EDITOR_ITEM_RIGID_BODY,
+            .object = object->id, .item = body->id}};
+    snprintf(command.data.item_rename.name,
+        sizeof(command.data.item_rename.name), "renamed_body");
+    result = editor_command_cli_named_write(&project, &command,
+        "project.rohr.json", cli_text, sizeof(cli_text));
+    if(editor_result_check(result) || strstr(cli_text, "--object FastCar") == NULL ||
+            strstr(cli_text, "--body-id ") == NULL) return 1;
     {
         EditorRigidBody *duplicate = editor_project_rigid_body_add(&project, object);
         if(duplicate == NULL) return 1;
@@ -76,6 +116,13 @@ static int named_selector_commands_test(void) {
         if(!editor_result_check(result) ||
                 result.result.error.code != EDITOR_ERROR_INVALID_ARGUMENT ||
                 strstr(result.result.error.message, "--body-id") == NULL) return 1;
+        command = (EditorCommand){.type = EDITOR_COMMAND_NAVIGATION_SET,
+            .data.navigation = {.mode = 2, .selection = 2,
+                .object = object->id, .rigid_body = body->id}};
+        result = editor_command_cli_named_write(&project, &command,
+            "project.rohr.json", cli_text, sizeof(cli_text));
+        if(editor_result_check(result) || strstr(cli_text, "--object FastCar") == NULL ||
+                strstr(cli_text, "--body-id ") == NULL) return 1;
     }
     return 0;
 }
@@ -167,6 +214,10 @@ static int transform_commands_test(void) {
         char *navigation_arguments[] = {"editor-cli", "navigation", "set",
             "project.rohr.json", "hitbox", "hitbox", "1", "1", "1", "0",
             "0", "0", "0", "0", "0", "0", "none"};
+        char *named_navigation_arguments[] = {"editor-cli", "navigation", "set",
+            "project.rohr.json", "hitbox", "hitbox", "none",
+            "--object", object->name, "--body", rigid_body->name,
+            "--hitbox", hitbox->name};
         if(editor_command_execute(&project, &navigation).kind != ERROR_RESULT_VALUE ||
                 project.navigation.mode != 3 || project.selected != object->id ||
                 editor_result_check(editor_command_cli_write(&navigation,
@@ -176,6 +227,16 @@ static int transform_commands_test(void) {
                 parsed.type != EDITOR_COMMAND_NAVIGATION_SET ||
                 parsed.data.navigation.mode != 3 ||
                 parsed.data.navigation.hitbox != 1) return 1;
+        if(editor_result_check(editor_command_cli_named_write(&project, &navigation,
+                    "project.rohr.json", cli_text, sizeof(cli_text))) ||
+                strstr(cli_text, "--object ") == NULL ||
+                strstr(cli_text, "--body ") == NULL ||
+                strstr(cli_text, "--hitbox ") == NULL ||
+                editor_result_check(editor_command_cli_named_parse(&project, 13,
+                    named_navigation_arguments, &parsed_path, &parsed)) ||
+                parsed.data.navigation.object != object->id ||
+                parsed.data.navigation.rigid_body != rigid_body->id ||
+                parsed.data.navigation.hitbox != hitbox->id) return 1;
     }
     {
         EditorCommand visibility[] = {
@@ -625,6 +686,7 @@ int main(void) {
     if(editor_result_check(result) ||
             strstr(cli_text, "'a project'\\''s/state.json'") == NULL ||
             strstr(cli_text, "object add") == NULL) return 1;
+    if(creation_result_test() != 0) return 1;
     if(transform_commands_test() != 0) return 1;
     if(item_commands_test() != 0) return 1;
     if(property_commands_test() != 0) return 1;

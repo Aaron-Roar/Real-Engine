@@ -51,8 +51,9 @@ static const EditorProject *editor_operation_project;
 static bool *editor_operation_enabled;
 
 static void editor_operation_command_write(const EditorCommand *editor_command,
-        void *context) {
+        const EditorCommandResult *result, void *context) {
     char command[3072];
+    (void)result;
     (void)context;
     if(editor_operation_terminal == NULL || editor_operation_workspace == NULL ||
             editor_operation_enabled == NULL || !*editor_operation_enabled ||

@@ -239,9 +239,19 @@ typedef struct EditorCommandResult {
         EditorObjectId object;
         EditorError error;
     } result;
+    struct {
+        bool valid;
+        EditorItemKind kind;
+        EditorObjectId object;
+        uint32_t parent;
+        uint32_t container;
+        uint32_t item;
+        char name[EDITOR_OBJECT_NAME_MAX];
+    } created;
 } EditorCommandResult;
 
-typedef void (*EditorCommandExecuted)(const EditorCommand *command, void *context);
+typedef void (*EditorCommandExecuted)(const EditorCommand *command,
+    const EditorCommandResult *result, void *context);
 
 EditorCommandResult editor_command_execute(EditorProject *project,
     const EditorCommand *command);
