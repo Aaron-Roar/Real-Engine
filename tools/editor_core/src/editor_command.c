@@ -378,6 +378,23 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
             }
             if(created == 0) return editor_command_error(editor_result_error(
                 EDITOR_ERROR_CAPACITY, "could not add editor item").result.error);
+            if(command->data.item_add.name[0] != '\0') {
+                EditorCommand rename = {.type = EDITOR_COMMAND_ITEM_RENAME,
+                    .data.item_rename = {.kind = kind,
+                        .object = command->data.item_add.object,
+                        .parent = command->data.item_add.parent,
+                        .item = created,
+                        .index = kind == EDITOR_ITEM_VERTEX ? created :
+                            command->data.item_add.index}};
+                EditorCommandResult renamed;
+                if(kind == EDITOR_ITEM_VERTEX || kind == EDITOR_ITEM_LINE)
+                    rename.data.item_rename.item = command->data.item_add.first;
+                snprintf(rename.data.item_rename.name,
+                    sizeof(rename.data.item_rename.name), "%s",
+                    command->data.item_add.name);
+                renamed = editor_command_execute_internal(project, &rename);
+                if(renamed.kind == ERROR_RESULT_ERROR) return renamed;
+            }
             {
                 EditorCommandResult result = {.kind = ERROR_RESULT_VALUE,
                     .result.object = created,

@@ -53,13 +53,12 @@ static bool *editor_operation_enabled;
 static void editor_operation_command_write(const EditorCommand *editor_command,
         const EditorCommandResult *result, void *context) {
     char command[3072];
-    (void)result;
     (void)context;
     if(editor_operation_terminal == NULL || editor_operation_workspace == NULL ||
             editor_operation_enabled == NULL || !*editor_operation_enabled ||
             !editor_operation_workspace->open || editor_command == NULL) return;
-    if(editor_result_check(editor_command_cli_named_write(editor_operation_project,
-            editor_command,
+    if(editor_result_check(editor_command_cli_standard_write(editor_operation_project,
+            editor_command, result,
             editor_operation_workspace->config.editor_state_file,
             command, sizeof(command)))) return;
     editor_terminal_panel_operation_write(editor_operation_terminal, command);

@@ -36,6 +36,72 @@ static int creation_result_test(void) {
     return 0;
 }
 
+static int standard_cli_commands_test(void) {
+    static EditorProject project;
+    EditorObject *object;
+    EditorRigidBody *body;
+    EditorCommand command;
+    EditorCommand add;
+    EditorCommandResult added;
+    EditorResult result;
+    const char *path;
+    char output[1024];
+    char *transform[] = {"editor-cli", "--body", "car_body", "--project",
+        "project.rohr.json", "--object", "FastCar", "--property", "transform",
+        "10", "20", "0.5"};
+    char *mass_arguments[] = {"editor-cli", "--property", "mass", "5",
+        "--body", "car_body"};
+    char *add_body[] = {"editor-cli", "--object", "FastCar", "--body",
+        "new_frame", "add"};
+    char *position[] = {"editor-cli", "--body", "car_body", "--property",
+        "position", "30", "40"};
+    char *rotation[] = {"editor-cli", "--body", "car_body", "--property",
+        "rotation", "1.25"};
+    editor_project_init(&project);
+    object = editor_project_object_add(&project, (Position){0});
+    body = editor_project_rigid_body_add(&project, object);
+    if(object == NULL || body == NULL) return 1;
+    snprintf(object->name, sizeof(object->name), "FastCar");
+    snprintf(body->name, sizeof(body->name), "car_body");
+    body->position = (Position){2.0f, 3.0f};
+    body->rotation = 0.75f;
+    result = editor_command_cli_standard_parse(&project, 12, transform, &path, &command);
+    if(editor_result_check(result) || strcmp(path, "project.rohr.json") != 0 ||
+            command.type != EDITOR_COMMAND_RIGID_BODY_TRANSFORM ||
+            command.data.rigid_body_transform.object != object->id ||
+            command.data.rigid_body_transform.body != body->id) return 1;
+    result = editor_command_cli_standard_write(&project, &command, NULL,
+        "project.rohr.json", output, sizeof(output));
+    if(editor_result_check(result) || strstr(output, "rigid-body") != NULL ||
+            strstr(output, "transform project") != NULL ||
+            strstr(output, "--property transform 10 20 0.5") == NULL) return 1;
+    /* --property is terminal: selectors must precede it. */
+    result = editor_command_cli_standard_parse(&project, 6, mass_arguments,
+        &path, &command);
+    if(!editor_result_check(result)) return 1;
+    result = editor_command_cli_standard_parse(&project, 7, position,
+        &path, &command);
+    if(editor_result_check(result) || command.type != EDITOR_COMMAND_RIGID_BODY_TRANSFORM ||
+            command.data.rigid_body_transform.position.x != 30.0f ||
+            command.data.rigid_body_transform.rotation != 0.75f) return 1;
+    result = editor_command_cli_standard_parse(&project, 6, rotation,
+        &path, &command);
+    if(editor_result_check(result) || command.data.rigid_body_transform.position.x != 2.0f ||
+            command.data.rigid_body_transform.rotation != 1.25f) return 1;
+    result = editor_command_cli_standard_parse(&project, 6, add_body, &path, &add);
+    if(editor_result_check(result) || add.type != EDITOR_COMMAND_ITEM_ADD ||
+            strcmp(add.data.item_add.name, "new_frame") != 0) return 1;
+    added = editor_command_execute(&project, &add);
+    if(added.kind != ERROR_RESULT_VALUE || !added.created.valid ||
+            strcmp(added.created.name, "new_frame") != 0) return 1;
+    result = editor_command_cli_standard_write(&project, &add, &added,
+        "project.rohr.json", output, sizeof(output));
+    if(editor_result_check(result) || strstr(output, "editor-cli --project") != output ||
+            strstr(output, "--object FastCar") == NULL ||
+            strstr(output, "--body new_frame add") == NULL) return 1;
+    return 0;
+}
+
 static int named_selector_commands_test(void) {
     static EditorProject project;
     EditorObject *object;
@@ -725,6 +791,7 @@ int main(void) {
             strstr(cli_text, "'a project'\\''s/state.json'") == NULL ||
             strstr(cli_text, "object add") == NULL) return 1;
     if(creation_result_test() != 0) return 1;
+    if(standard_cli_commands_test() != 0) return 1;
     if(transform_commands_test() != 0) return 1;
     if(item_commands_test() != 0) return 1;
     if(property_commands_test() != 0) return 1;
