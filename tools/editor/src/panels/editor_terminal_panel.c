@@ -174,6 +174,22 @@ void editor_terminal_panel_operation_write(EditorTerminalPanel *panel,
     panel->scroll_offset = 0;
 }
 
+bool editor_terminal_panel_command_execute(EditorTerminalPanel *panel,
+        const char *command) {
+    RohrTerminalResult result;
+    if(panel == NULL || panel->terminal == NULL || command == NULL ||
+            command[0] == '\0') return false;
+    result = rohr_terminal_input_write(panel->terminal, command, strlen(command));
+    if(result.success) result = rohr_terminal_input_write(panel->terminal, "\r", 1);
+    if(!result.success) {
+        fprintf(stderr, "Terminal command failed: %s\n",
+            rohr_terminal_error_message_get(&result));
+        return false;
+    }
+    panel->scroll_offset = 0;
+    return true;
+}
+
 float editor_terminal_panel_viewport_bottom_get(const EditorTerminalPanel *panel) {
     if(panel == NULL || !panel->visible) return WINDOW_HEIGHT;
     return WINDOW_HEIGHT - panel->height;

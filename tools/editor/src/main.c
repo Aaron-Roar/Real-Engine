@@ -75,6 +75,54 @@ static const EditorProject *editor_operation_project;
 static bool *editor_operation_enabled;
 static EditorHistory *editor_operation_history;
 
+static bool editor_terminal_path_quote(char *output, size_t capacity,
+        const char *path) {
+    size_t used = 0;
+    if(output == NULL || capacity < 3 || path == NULL || path[0] == '\0')
+        return false;
+    output[used++] = '"';
+    for(size_t i = 0; path[i] != '\0'; i += 1) {
+#if defined(_WIN32)
+        if(path[i] == '"') return false;
+#else
+        if(path[i] == '\\' || path[i] == '"' || path[i] == '$' ||
+                path[i] == '`') {
+            if(used + 1 >= capacity) return false;
+            output[used++] = '\\';
+        }
+#endif
+        if(used + 1 >= capacity) return false;
+        output[used++] = path[i];
+    }
+    if(used + 2 > capacity) return false;
+    output[used++] = '"';
+    output[used] = '\0';
+    return true;
+}
+
+static bool editor_cmake_command_get(char *output, size_t capacity,
+        const char *project_directory, bool configure) {
+    char absolute[EDITOR_WORKSPACE_PATH_MAX * 2];
+    char source[EDITOR_WORKSPACE_PATH_MAX * 2];
+    char build_path[EDITOR_WORKSPACE_PATH_MAX * 2];
+    char build[EDITOR_WORKSPACE_PATH_MAX * 2];
+    int count;
+    if(output == NULL || project_directory == NULL) return false;
+#if defined(_WIN32)
+    if(_fullpath(absolute, project_directory, sizeof(absolute)) == NULL) return false;
+#else
+    if(realpath(project_directory, absolute) == NULL) return false;
+#endif
+    if(!editor_terminal_path_quote(source, sizeof(source), absolute))
+        return false;
+    count = snprintf(build_path, sizeof(build_path), "%s/build", absolute);
+    if(count < 0 || (size_t)count >= sizeof(build_path) ||
+            !editor_terminal_path_quote(build, sizeof(build), build_path)) return false;
+    count = configure ? snprintf(output, capacity, "cmake -S %s -B %s", source, build) :
+        snprintf(output, capacity, "cmake --build %s", build);
+    return count >= 0 && (size_t)count < capacity;
+}
+
 static void editor_operation_command_write(const EditorCommand *editor_command,
         const EditorCommandResult *result, void *context) {
     char command[3072];
@@ -1297,6 +1345,7 @@ int main(void) {
     TextAsset redo_label = {0};
     TextAsset build_label = {0};
     TextAsset generate_c_label = {0};
+    TextAsset compile_label = {0};
     TextAsset world_view_label = {0};
     TextAsset local_view_label = {0};
     TextAsset collision_label = {0};
@@ -1533,6 +1582,7 @@ int main(void) {
             !editor_text_create(&font, "Redo    Ctrl+Y", &redo_label) ||
             !editor_text_create(&font, "Build", &build_label) ||
             !editor_text_create(&font, "Generate C", &generate_c_label) ||
+            !editor_text_create(&font, "Compile", &compile_label) ||
             !editor_text_create(&font, "World", &world_view_label) ||
             !editor_text_create(&font, "Local", &local_view_label) ||
             !editor_text_create(&font, "Collision", &collision_label) ||
@@ -4253,7 +4303,7 @@ int main(void) {
                 &terminal_build_operations_label
             };
             const TextAsset *build_options[] = {
-                &generate_c_label
+                &generate_c_label, &compile_label
             };
             const TextAsset *edit_options[] = {&undo_label, &redo_label};
             const TextAsset *settings_options[] = {
@@ -4263,7 +4313,8 @@ int main(void) {
                 &file_label, &new_label, &open_label, &save_label, &close_label,
                 &exit_label
             };
-            const TextAsset *build_texts[] = {&build_label, &generate_c_label};
+            const TextAsset *build_texts[] = {
+                &build_label, &generate_c_label, &compile_label};
             const TextAsset *edit_texts[] = {&edit_label, &undo_label, &redo_label};
             const TextAsset *view_texts[] = {
                 &view_label, &reset_view_label, &grid_label, &terminal_label
@@ -4386,6 +4437,13 @@ int main(void) {
                         workspace.directory);
                     (void)editor_workspace_operation_execute(
                         &workspace, &project, &command);
+                } else if(build_menu.changed && build_menu.selected_index == 1 &&
+                        workspace.open) {
+                    char cmake_command[EDITOR_WORKSPACE_PATH_MAX * 4];
+                    if(editor_cmake_command_get(cmake_command,
+                            sizeof(cmake_command), workspace.directory, false))
+                        (void)editor_terminal_panel_command_execute(
+                            &terminal_panel, cmake_command);
                 }
             }
             {
@@ -4527,6 +4585,13 @@ int main(void) {
                     panel_scroll_offset = 0.0f;
                     (void)editor_terminal_panel_project_open(
                         &terminal_panel, workspace.directory);
+                    if(command.type == EDITOR_WORKSPACE_COMMAND_CREATE) {
+                        char cmake_command[EDITOR_WORKSPACE_PATH_MAX * 4];
+                        if(editor_cmake_command_get(cmake_command,
+                                sizeof(cmake_command), workspace.directory, true))
+                            (void)editor_terminal_panel_command_execute(
+                                &terminal_panel, cmake_command);
+                    }
                     if(terminal_editor_operations) {
                         char cli_command[3072];
                         if(!editor_result_check(editor_workspace_command_cli_write(
@@ -4827,6 +4892,7 @@ int main(void) {
     rohr_graphics_text_destroy(&settings_label);
     rohr_graphics_text_destroy(&view_label);
     rohr_graphics_text_destroy(&generate_c_label);
+    rohr_graphics_text_destroy(&compile_label);
     rohr_graphics_text_destroy(&build_label);
     rohr_graphics_text_destroy(&local_view_label);
     rohr_graphics_text_destroy(&world_view_label);
@@ -5000,6 +5066,7 @@ fail:
     rohr_graphics_text_destroy(&settings_label);
     rohr_graphics_text_destroy(&view_label);
     rohr_graphics_text_destroy(&generate_c_label);
+    rohr_graphics_text_destroy(&compile_label);
     rohr_graphics_text_destroy(&build_label);
     rohr_graphics_text_destroy(&local_view_label);
     rohr_graphics_text_destroy(&world_view_label);
