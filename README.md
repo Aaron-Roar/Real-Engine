@@ -225,6 +225,13 @@ ctest --preset windows
 Use `windows-release` for an optimized build or `windows-examples` to build
 only the examples. SDL3, SDL3_image, SDL3_ttf, and FreeType are compiled from
 the vendored sources; no separate SDL installation or vcpkg setup is needed.
+The editor terminal uses the Windows ConPTY API and requires Windows 10 version
+1809 or newer.
+
+Linux hosts with a MinGW-w64 toolchain can configure the Windows compile check
+with `cmake --preset windows-cross` and build it with
+`cmake --build --preset windows-cross --parallel`. Cross-built test executables
+must still be run on Windows; CTest cannot execute them directly on Linux.
 
 Games include `rohr.h` and link the `rohr_engine` CMake target. Build-time
 component generators include `rohr_tools.h` and link the `rohr_tools` target.

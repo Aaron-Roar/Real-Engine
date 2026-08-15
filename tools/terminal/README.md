@@ -9,9 +9,10 @@ release it with `rohr_terminal_destroy()`. `rohr_terminal_update()` performs
 non-blocking output collection and should be called once per application frame.
 Line views remain valid until the next update or destruction.
 
-The Linux backend runs the configured shell through a PTY. The child shell alone
-uses `working_directory`; all editor paths remain explicit. Windows currently
-builds an unsupported-platform backend pending ConPTY support.
+The Linux backend runs the configured shell through a PTY. The Windows backend
+runs `%COMSPEC%` (normally `cmd.exe`) through ConPTY and therefore requires
+Windows 10 version 1809 or newer. Only the child shell uses `working_directory`;
+all editor paths remain explicit on both platforms.
 
 Current terminal interpretation supports UTF-8, bounded line scrollback, basic
 SGR colors and attributes, command input, and Ctrl+C. Full cursor-addressed and

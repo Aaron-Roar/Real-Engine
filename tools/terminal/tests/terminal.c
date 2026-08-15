@@ -5,6 +5,11 @@
 #include <string.h>
 #include <time.h>
 
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 static bool terminal_line_contains(const RohrTerminal *terminal, const char *text) {
     size_t text_length = strlen(text);
     for(size_t line_index = 0; line_index < rohr_terminal_line_count_get(terminal);
@@ -65,14 +70,23 @@ int main(void) {
     RohrTerminal *terminal = NULL;
     RohrTerminalConfig config = rohr_terminal_config_default_get();
     RohrTerminalResult result;
+#if defined(_WIN32)
+    const char command[] = "echo terminal-test & exit 7\r\n";
+#else
     const char command[] =
         "printf 'removed-by-clear\\n\\033[?2004h\\033[H\\033[2Jterminal-test\\n'; "
         "pwd; printf '\\033[?25l\\033[4G'; exit 7\n";
     struct timespec delay = {.tv_nsec = 10000000};
+#endif
 
     if(!emulator_test()) return 1;
+#if defined(_WIN32)
+    config.shell = NULL;
+    config.working_directory = NULL;
+#else
     config.shell = "/bin/sh";
     config.working_directory = "/tmp";
+#endif
     config.scrollback_lines = 16;
     result = rohr_terminal_create(&terminal, &config);
     if(!result.success || terminal == NULL) return 1;
@@ -87,15 +101,25 @@ int main(void) {
             rohr_terminal_destroy(terminal);
             return 1;
         }
+#if defined(_WIN32)
+        Sleep(10);
+#else
         (void)nanosleep(&delay, NULL);
+#endif
     }
     (void)rohr_terminal_update(terminal);
     RohrTerminalCursor cursor = rohr_terminal_cursor_get(terminal);
+#if defined(_WIN32)
+    (void)cursor;
+#endif
     if(rohr_terminal_running_check(terminal) || rohr_terminal_exit_code_get(terminal) != 7 ||
             !terminal_line_contains(terminal, "terminal-test") ||
+#if !defined(_WIN32)
             !terminal_line_contains(terminal, "/tmp") ||
             terminal_line_contains(terminal, "removed-by-clear") ||
-            terminal_line_contains(terminal, "2004h") || cursor.visible) {
+            terminal_line_contains(terminal, "2004h") || cursor.visible ||
+#endif
+            false) {
         fprintf(stderr, "running=%d exit=%d lines=%zu terminal_test=%d cwd=%d\n",
             rohr_terminal_running_check(terminal), rohr_terminal_exit_code_get(terminal),
             rohr_terminal_line_count_get(terminal),

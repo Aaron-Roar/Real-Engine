@@ -40,6 +40,24 @@
         "ROHR_BUILD_EXAMPLES": "ON",
         "ROHR_BUILD_TESTS": "ON"
       }
+    },
+    {
+      "name": "windows-cross",
+      "displayName": "Windows x64 cross-compile from Linux",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/cmake/windows-cross",
+      "condition": {
+        "type": "notEquals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/mingw-w64.cmake",
+        "ROHR_BUILD_OUTPUT_DIRECTORY": "${sourceDir}/build/windows-cross",
+        "ROHR_BUILD_EXAMPLES": "ON",
+        "ROHR_BUILD_TESTS": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -78,6 +96,10 @@
       "configurePreset": "windows",
       "configuration": "Debug",
       "targets": ["rohr_tests"]
+    },
+    {
+      "name": "windows-cross",
+      "configurePreset": "windows-cross"
     }
   ],
   "testPresets": [

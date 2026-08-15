@@ -16,7 +16,7 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(rohr_terminal PRIVATE util)
 endif()
 
-if(ROHR_BUILD_TESTS AND UNIX)
+if(ROHR_BUILD_TESTS)
     add_executable(rohr_terminal_test tests/terminal.c)
     target_link_libraries(rohr_terminal_test PRIVATE rohr_terminal)
     set_target_properties(rohr_terminal_test PROPERTIES
