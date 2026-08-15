@@ -58,6 +58,13 @@ static int named_selector_commands_test(void) {
     char *missing_arguments[] = {"editor-cli", "rigid-body", "transform",
         "project.rohr.json", "--object", "FastCar", "--body", "missing",
         "0", "0", "0"};
+    char *global_body_arguments[] = {"editor-cli", "rigid-body", "transform",
+        "project.rohr.json", "--body", "car_body", "10", "20", "0.5"};
+    char *reordered_arguments[] = {"editor-cli", "rigid-body", "transform",
+        "project.rohr.json", "--body", "car_body", "--object", "FastCar",
+        "10", "20", "0.5"};
+    char *global_vertex_arguments[] = {"editor-cli", "vertex", "position",
+        "project.rohr.json", "--vertex", "vertex_1", "3", "4"};
 
     editor_project_init(&project);
     object = editor_project_object_add(&project, (Position){0});
@@ -74,6 +81,20 @@ static int named_selector_commands_test(void) {
     if(editor_result_check(result) || command.type != EDITOR_COMMAND_RIGID_BODY_TRANSFORM ||
             command.data.rigid_body_transform.object != object->id ||
             command.data.rigid_body_transform.body != body->id) return 1;
+    result = editor_command_cli_named_parse(&project, 9, global_body_arguments,
+        &path, &command);
+    if(editor_result_check(result) || command.data.rigid_body_transform.object != object->id ||
+            command.data.rigid_body_transform.body != body->id) return 1;
+    result = editor_command_cli_named_parse(&project, 11, reordered_arguments,
+        &path, &command);
+    if(editor_result_check(result) || command.data.rigid_body_transform.object != object->id ||
+            command.data.rigid_body_transform.body != body->id) return 1;
+    result = editor_command_cli_named_parse(&project, 8, global_vertex_arguments,
+        &path, &command);
+    if(editor_result_check(result) || command.data.vertex_position.object != object->id ||
+            command.data.vertex_position.body != body->id ||
+            command.data.vertex_position.hitbox != hitbox->id ||
+            command.data.vertex_position.vertex != hitbox->vertices[0].id) return 1;
     result = editor_command_cli_named_write(&project, &command,
         "project.rohr.json", cli_text, sizeof(cli_text));
     if(editor_result_check(result) || strstr(cli_text, "--object FastCar") == NULL ||
@@ -98,6 +119,23 @@ static int named_selector_commands_test(void) {
         &path, &command);
     if(!editor_result_check(result) ||
             result.result.error.code != EDITOR_ERROR_NOT_FOUND) return 1;
+    {
+        EditorObject *other = editor_project_object_add(&project, (Position){0});
+        EditorRigidBody *other_body = editor_project_rigid_body_add(&project, other);
+        if(other == NULL || other_body == NULL) return 1;
+        snprintf(other->name, sizeof(other->name), "OtherCar");
+        snprintf(other_body->name, sizeof(other_body->name), "car_body");
+        result = editor_command_cli_named_parse(&project, 9, global_body_arguments,
+            &path, &command);
+        if(!editor_result_check(result) ||
+                result.result.error.code != EDITOR_ERROR_INVALID_ARGUMENT ||
+                strstr(result.result.error.message, "--object") == NULL) return 1;
+        result = editor_command_cli_named_parse(&project, 11, reordered_arguments,
+            &path, &command);
+        if(editor_result_check(result) ||
+                command.data.rigid_body_transform.object != object->id) return 1;
+        if(editor_result_check(editor_object_command_remove(&project, other->id))) return 1;
+    }
     command = (EditorCommand){.type = EDITOR_COMMAND_ITEM_RENAME,
         .data.item_rename = {.kind = EDITOR_ITEM_RIGID_BODY,
             .object = object->id, .item = body->id}};

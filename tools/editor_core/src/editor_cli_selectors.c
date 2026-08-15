@@ -256,6 +256,124 @@ static EditorResult editor_cli_line_resolve(EditorHitbox *hitbox,
         found, matches, output);
 }
 
+static bool editor_cli_selector_matches(const EditorCliSelector *selector,
+        const char *name, uint32_t id, bool object_name) {
+    if(!editor_cli_selector_present(selector)) return true;
+    if(selector->id_set) return selector->id == id;
+    return editor_cli_name_equal(name, selector->name, object_name);
+}
+
+static bool editor_cli_hitbox_matches(const EditorHitbox *hitbox,
+        const EditorCliSelectors *selectors) {
+    if(hitbox == NULL || !editor_cli_selector_matches(&selectors->hitbox,
+            hitbox->name, hitbox->id, false)) return false;
+    if(editor_cli_selector_present(&selectors->vertex)) {
+        bool found = false;
+        for(uint32_t i = 0; i < hitbox->vertex_count; i += 1)
+            if(editor_cli_selector_matches(&selectors->vertex,
+                    hitbox->vertices[i].name, hitbox->vertices[i].id, false)) found = true;
+        if(!found) return false;
+    }
+    if(editor_cli_selector_present(&selectors->line)) {
+        bool found = false;
+        for(uint32_t i = 0; i < hitbox->vertex_count; i += 1)
+            if(editor_cli_selector_matches(&selectors->line,
+                    hitbox->line_names[i], i, false)) found = true;
+        if(!found) return false;
+    }
+    return true;
+}
+
+static bool editor_cli_body_matches(const EditorRigidBody *body,
+        const EditorCliSelectors *selectors) {
+    if(body == NULL || !editor_cli_selector_matches(&selectors->body,
+            body->name, body->id, false)) return false;
+    if(editor_cli_selector_present(&selectors->hitbox) ||
+            editor_cli_selector_present(&selectors->vertex) ||
+            editor_cli_selector_present(&selectors->line)) {
+        for(size_t i = 0; i < body->hitbox_count; i += 1)
+            if(editor_cli_hitbox_matches(&body->hitboxes[i], selectors)) return true;
+        return false;
+    }
+    return true;
+}
+
+static bool editor_cli_soft_body_matches(const EditorSoftBody *body,
+        const EditorCliSelectors *selectors) {
+    if(body == NULL || !editor_cli_selector_matches(&selectors->soft_body,
+            body->name, body->id, false)) return false;
+    if(editor_cli_selector_present(&selectors->node)) {
+        bool found = false;
+        for(size_t i = 0; i < body->node_count; i += 1)
+            if(editor_cli_selector_matches(&selectors->node,
+                    body->nodes[i].name, body->nodes[i].id, false)) found = true;
+        if(!found) return false;
+    }
+    if(editor_cli_selector_present(&selectors->beam)) {
+        bool found = false;
+        for(size_t i = 0; i < body->beam_count; i += 1)
+            if(editor_cli_selector_matches(&selectors->beam,
+                    body->beams[i].name, body->beams[i].id, false)) found = true;
+        if(!found) return false;
+    }
+    return true;
+}
+
+static bool editor_cli_object_matches(const EditorObject *object,
+        const EditorCliSelectors *selectors) {
+    if(!editor_cli_selector_matches(&selectors->object,
+            object->name, object->id, true)) return false;
+    if(editor_cli_selector_present(&selectors->body) ||
+            editor_cli_selector_present(&selectors->hitbox) ||
+            editor_cli_selector_present(&selectors->vertex) ||
+            editor_cli_selector_present(&selectors->line)) {
+        bool found = false;
+        for(size_t i = 0; i < object->rigid_body_count; i += 1)
+            if(editor_cli_body_matches(&object->rigid_bodies[i], selectors)) found = true;
+        if(!found) return false;
+    }
+#define MATCH_OBJECT_CHILD(selector, count, items) do { \
+    if(editor_cli_selector_present(&(selector))) { bool found = false; \
+        for(size_t i = 0; i < (count); i += 1) \
+            if(editor_cli_selector_matches(&(selector), (items)[i].name, \
+                    (items)[i].id, false)) found = true; \
+        if(!found) return false; \
+    } \
+} while(0)
+    MATCH_OBJECT_CHILD(selectors->joint, object->joint_count, object->joint_items);
+    MATCH_OBJECT_CHILD(selectors->anchor, object->anchor_count, object->anchors);
+#undef MATCH_OBJECT_CHILD
+    if(editor_cli_selector_present(&selectors->soft_body) ||
+            editor_cli_selector_present(&selectors->node) ||
+            editor_cli_selector_present(&selectors->beam)) {
+        bool found = false;
+        for(size_t i = 0; i < object->soft_body_count; i += 1)
+            if(editor_cli_soft_body_matches(&object->soft_body_items[i], selectors))
+                found = true;
+        if(!found) return false;
+    }
+    return true;
+}
+
+static EditorResult editor_cli_global_context_resolve(const EditorProject *project,
+        EditorCliSelectors *selectors) {
+    uint32_t object_id = 0;
+    size_t matches = 0;
+    if(!editor_cli_selector_present(&selectors->object)) {
+        for(size_t i = 0; i < project->object_count; i += 1)
+            if(editor_cli_object_matches(&project->objects[i], selectors)) {
+                object_id = project->objects[i].id; matches += 1;
+            }
+        if(matches == 0) return editor_result_error(EDITOR_ERROR_NOT_FOUND,
+            "No object contains the requested selector hierarchy");
+        if(matches > 1) return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "Selector hierarchy is ambiguous; add --object or --object-id");
+        selectors->object.id = object_id;
+        selectors->object.id_set = true;
+    }
+    return editor_result_value(true);
+}
+
 static bool editor_cli_argument_push(char **normalized, int *count, char *value) {
     if(*count >= EDITOR_CLI_ARGUMENT_MAX) return false;
     normalized[(*count)++] = value;
@@ -376,11 +494,42 @@ EditorResult editor_command_cli_named_parse(const EditorProject *project,
             document_path, command);
     }
     if(needs_object) {
+        result = editor_cli_global_context_resolve(project, &selectors);
+        if(editor_result_check(result)) return result;
         result = editor_cli_object_resolve(project, &selectors.object, &object_id);
         if(editor_result_check(result)) return result;
         object = editor_cli_object_get(project, object_id);
         if(object == NULL) return editor_result_error(EDITOR_ERROR_NOT_FOUND,
             "Object ID %u was not found", object_id);
+        if(!editor_cli_selector_present(&selectors.body) &&
+                (editor_cli_selector_present(&selectors.hitbox) ||
+                 editor_cli_selector_present(&selectors.vertex) ||
+                 editor_cli_selector_present(&selectors.line))) {
+            size_t matches = 0;
+            for(size_t i = 0; i < object->rigid_body_count; i += 1)
+                if(editor_cli_body_matches(&object->rigid_bodies[i], &selectors)) {
+                    selectors.body.id = object->rigid_bodies[i].id; matches += 1;
+                }
+            if(matches != 1) return editor_result_error(matches == 0 ?
+                EDITOR_ERROR_NOT_FOUND : EDITOR_ERROR_INVALID_ARGUMENT,
+                matches == 0 ? "No rigid body contains the requested selector" :
+                    "Selector is ambiguous; add --body or --body-id");
+            selectors.body.id_set = true;
+        }
+        if(!editor_cli_selector_present(&selectors.soft_body) &&
+                (editor_cli_selector_present(&selectors.node) ||
+                 editor_cli_selector_present(&selectors.beam))) {
+            size_t matches = 0;
+            for(size_t i = 0; i < object->soft_body_count; i += 1)
+                if(editor_cli_soft_body_matches(&object->soft_body_items[i], &selectors)) {
+                    selectors.soft_body.id = object->soft_body_items[i].id; matches += 1;
+                }
+            if(matches != 1) return editor_result_error(matches == 0 ?
+                EDITOR_ERROR_NOT_FOUND : EDITOR_ERROR_INVALID_ARGUMENT,
+                matches == 0 ? "No soft body contains the requested selector" :
+                    "Selector is ambiguous; add --soft-body or --soft-body-id");
+            selectors.soft_body.id_set = true;
+        }
         if(!editor_cli_id_push(normalized, &normalized_count, id_buffers,
                 &id_buffer_count, object_id)) goto capacity_error;
     }
@@ -408,6 +557,20 @@ EditorResult editor_command_cli_named_parse(const EditorProject *project,
         result = editor_cli_body_resolve(object, &selectors.body, &body_id);
         if(editor_result_check(result)) return result;
         body = editor_project_rigid_body_get(object, body_id);
+        if(!editor_cli_selector_present(&selectors.hitbox) &&
+                (editor_cli_selector_present(&selectors.vertex) ||
+                 editor_cli_selector_present(&selectors.line))) {
+            size_t matches = 0;
+            for(size_t i = 0; body != NULL && i < body->hitbox_count; i += 1)
+                if(editor_cli_hitbox_matches(&body->hitboxes[i], &selectors)) {
+                    selectors.hitbox.id = body->hitboxes[i].id; matches += 1;
+                }
+            if(matches != 1) return editor_result_error(matches == 0 ?
+                EDITOR_ERROR_NOT_FOUND : EDITOR_ERROR_INVALID_ARGUMENT,
+                matches == 0 ? "No hitbox contains the requested selector" :
+                    "Selector is ambiguous; add --hitbox or --hitbox-id");
+            selectors.hitbox.id_set = true;
+        }
         result = editor_cli_hitbox_resolve(body, &selectors.hitbox, &hitbox_id);
         if(editor_result_check(result)) return result;
         hitbox = editor_project_hitbox_get(body, hitbox_id);
