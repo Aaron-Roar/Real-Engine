@@ -33,6 +33,23 @@ static void editor_auto_shape_polygon_get(const Position *corners,
     }
 }
 
+static bool editor_auto_shape_corner_get(size_t corner_count, size_t point_count,
+        size_t point_index, size_t *corner_index) {
+    size_t edge_segments[4] = {1, 1, 1, 1};
+    size_t at = 0;
+    if(point_count < corner_count || point_index >= point_count) return false;
+    for(size_t i = corner_count; i < point_count; i += 1)
+        edge_segments[(i - corner_count) % corner_count] += 1;
+    for(size_t corner = 0; corner < corner_count; corner += 1) {
+        if(point_index == at) {
+            if(corner_index != NULL) *corner_index = corner;
+            return true;
+        }
+        at += edge_segments[corner];
+    }
+    return false;
+}
+
 EditorResult editor_auto_shape_positions_get(const EditorAutoShapeConfig *config,
         Position *output_positions, size_t position_count) {
     Position corners[4];
@@ -128,4 +145,59 @@ EditorResult editor_auto_shape_soft_body_apply(EditorSoftBody *body,
     for(size_t i = 0; i < body->node_count; i += 1)
         body->nodes[i].position = output_positions[i];
     return editor_result_value(true);
+}
+
+bool editor_auto_shape_control_check(const EditorAutoShapeConfig *config,
+        size_t point_count, size_t point_index) {
+    if(config == NULL || point_index >= point_count) return false;
+    if(config->kind == EDITOR_AUTO_SHAPE_CIRCLE) return point_count >= 3;
+    if(config->kind == EDITOR_AUTO_SHAPE_RECTANGLE)
+        return editor_auto_shape_corner_get(4, point_count, point_index, NULL);
+    if(config->kind == EDITOR_AUTO_SHAPE_TRIANGLE)
+        return editor_auto_shape_corner_get(3, point_count, point_index, NULL);
+    return false;
+}
+
+EditorResult editor_auto_shape_control_set(EditorAutoShapeConfig *config,
+        size_t point_count, size_t point_index, Position position) {
+    size_t corner = 0;
+    const float minimum = 0.001f;
+    if(config == NULL || !isfinite(position.x) || !isfinite(position.y))
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "auto shape control requires a finite position");
+    if(config->kind == EDITOR_AUTO_SHAPE_CIRCLE) {
+        if(!editor_auto_shape_control_check(config, point_count, point_index))
+            return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                "circle point is not a shape control");
+        config->radius = fmaxf(minimum, hypotf(position.x, position.y));
+        return editor_result_value(true);
+    }
+    if(config->kind == EDITOR_AUTO_SHAPE_RECTANGLE) {
+        if(!editor_auto_shape_corner_get(4, point_count, point_index, NULL))
+            return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                "rectangle point is not a corner control");
+        config->width = fmaxf(minimum, fabsf(position.x) * 2.0f);
+        config->height = fmaxf(minimum, fabsf(position.y) * 2.0f);
+        return editor_result_value(true);
+    }
+    if(config->kind == EDITOR_AUTO_SHAPE_TRIANGLE) {
+        if(!editor_auto_shape_corner_get(3, point_count, point_index, &corner))
+            return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                "triangle point is not a corner control");
+        if(config->triangle_kind == EDITOR_AUTO_TRIANGLE_EQUILATERAL) {
+            if(corner == 0)
+                config->width = fmaxf(minimum,
+                    fabsf(position.y) * 4.0f / sqrtf(3.0f));
+            else config->width = fmaxf(minimum, fabsf(position.x) * 2.0f);
+            return editor_result_value(true);
+        }
+        config->height = fmaxf(minimum, fabsf(position.y) * 2.0f);
+        if(corner == 0) {
+            if(config->triangle_kind == EDITOR_AUTO_TRIANGLE_SCALENE)
+                config->apex_offset = position.x;
+        } else config->width = fmaxf(minimum, fabsf(position.x) * 2.0f);
+        return editor_result_value(true);
+    }
+    return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+        "unknown auto shape kind");
 }

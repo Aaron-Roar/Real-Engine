@@ -73,6 +73,36 @@ static int auto_shape_test(void) {
             !position_near(hitbox.vertices[0].position, 1.5f, -3.0f) ||
             !position_near(hitbox.vertices[1].position, 4.0f, 3.0f) ||
             !position_near(hitbox.vertices[2].position, -4.0f, 3.0f)) return 1;
+
+    hitbox.vertex_count = 5;
+    rectangle.width = 8.0f;
+    rectangle.height = 4.0f;
+    if(!editor_auto_shape_control_check(&rectangle, 5, 0) ||
+            editor_auto_shape_control_check(&rectangle, 5, 1) ||
+            !editor_auto_shape_control_check(&rectangle, 5, 2) ||
+            editor_result_check(editor_auto_shape_control_set(
+                &rectangle, 5, 3, (Position){6.0f, 4.0f})) ||
+            !position_near((Position){rectangle.width, rectangle.height},
+                12.0f, 8.0f) ||
+            editor_result_check(editor_auto_shape_hitbox_apply(
+                &hitbox, &rectangle)) ||
+            !position_near(hitbox.vertices[3].position, 6.0f, 4.0f)) return 1;
+
+    if(!editor_auto_shape_control_check(&circle, 6, 4) ||
+            editor_result_check(editor_auto_shape_control_set(
+                &circle, 6, 4, (Position){3.0f, 4.0f})) ||
+            fabsf(circle.radius - 5.0f) > 0.001f) return 1;
+
+    triangle.triangle_kind = EDITOR_AUTO_TRIANGLE_SCALENE;
+    if(!editor_auto_shape_control_check(&triangle, 5, 0) ||
+            editor_auto_shape_control_check(&triangle, 5, 1) ||
+            !editor_auto_shape_control_check(&triangle, 5, 2) ||
+            editor_auto_shape_control_check(&triangle, 5, 3) ||
+            !editor_auto_shape_control_check(&triangle, 5, 4) ||
+            editor_result_check(editor_auto_shape_control_set(
+                &triangle, 5, 0, (Position){2.0f, -5.0f})) ||
+            fabsf(triangle.height - 10.0f) > 0.001f ||
+            fabsf(triangle.apex_offset - 2.0f) > 0.001f) return 1;
     return 0;
 }
 

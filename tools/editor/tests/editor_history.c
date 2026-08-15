@@ -228,6 +228,89 @@ int main(void) {
         shortcut_apply(&history, SDLK_Y);
         assert(fabsf(hitbox->vertices[0].position.y + 30.0f) < 0.001f);
     }
+    editor_history_reset(&history);
+    editor_viewport_state_init(&viewport);
+    viewport.mode = EDITOR_VIEWPORT_AUTO_SHAPE;
+    viewport.auto_shape_parent_mode = EDITOR_VIEWPORT_HITBOX;
+    viewport.selection = EDITOR_SELECTION_HITBOX;
+    viewport.selected_rigid_body = body->id;
+    viewport.selected_hitbox = hitbox->id;
+    {
+        EditorAutoShapeConfig config = {
+            .kind = EDITOR_AUTO_SHAPE_CIRCLE, .radius = 30.0f
+        };
+        Position grab = test_world_to_screen((Position){
+            project.objects[0].position.x + body->position.x,
+            project.objects[0].position.y + body->position.y - config.radius});
+        editor_history_continuous_set(&history, true);
+        assert(editor_viewport_auto_shape_update(&viewport, &project, &config,
+            grab, MOUSE_BUTTON_STATE_PRESSED, MOUSE_BUTTON_STATE_UP,
+            false, 0.0f, false));
+        grab.y += 20.0f;
+        assert(editor_viewport_auto_shape_update(&viewport, &project, &config,
+            grab, MOUSE_BUTTON_STATE_DOWN, MOUSE_BUTTON_STATE_UP,
+            false, 0.0f, false));
+        editor_history_continuous_set(&history, false);
+        assert(fabsf(config.radius - 50.0f) < 0.001f);
+        assert(fabsf(hitbox->vertices[0].position.y + 50.0f) < 0.001f);
+        for(size_t i = 0; i < hitbox->vertex_count; i += 1) {
+            float radius = hypotf(hitbox->vertices[i].position.x,
+                hitbox->vertices[i].position.y);
+            assert(fabsf(radius - 50.0f) < 0.001f);
+        }
+        assert(history.undo_count == 1);
+        shortcut_apply(&history, SDLK_Z);
+        assert(fabsf(hitbox->vertices[0].position.y + 30.0f) < 0.001f);
+        shortcut_apply(&history, SDLK_Y);
+        assert(fabsf(hitbox->vertices[0].position.y + 50.0f) < 0.001f);
+    }
+
+    assert(editor_project_soft_node_add(&project, soft_body,
+        (Position){0.0f, 0.0f}) != NULL);
+    assert(editor_project_soft_node_add(&project, soft_body,
+        (Position){0.0f, 0.0f}) != NULL);
+    {
+        EditorAutoShapeConfig config = {
+            .kind = EDITOR_AUTO_SHAPE_CIRCLE, .radius = 40.0f
+        };
+        command = (EditorCommand){.type = EDITOR_COMMAND_AUTO_SHAPE,
+            .data.auto_shape = {.kind = EDITOR_ITEM_SOFT_BODY,
+                .object = project.objects[0].id, .item = soft_body->id,
+                .config = config}};
+        result = editor_command_execute(&project, &command);
+        assert(result.kind == ERROR_RESULT_VALUE);
+        editor_history_reset(&history);
+        editor_viewport_state_init(&viewport);
+        viewport.mode = EDITOR_VIEWPORT_AUTO_SHAPE;
+        viewport.auto_shape_parent_mode = EDITOR_VIEWPORT_SOFT_BODY;
+        viewport.selection = EDITOR_SELECTION_SOFT_BODY;
+        viewport.selected_soft_body = soft_body->id;
+        {
+            Position grab = test_world_to_screen((Position){
+                project.objects[0].position.x + soft_body->position.x,
+                project.objects[0].position.y + soft_body->position.y - config.radius});
+            editor_history_continuous_set(&history, true);
+            assert(editor_viewport_auto_shape_update(&viewport, &project, &config,
+                grab, MOUSE_BUTTON_STATE_PRESSED, MOUSE_BUTTON_STATE_UP,
+                false, 0.0f, false));
+            grab.y += 10.0f;
+            assert(editor_viewport_auto_shape_update(&viewport, &project, &config,
+                grab, MOUSE_BUTTON_STATE_DOWN, MOUSE_BUTTON_STATE_UP,
+                false, 0.0f, false));
+            editor_history_continuous_set(&history, false);
+            assert(fabsf(config.radius - 50.0f) < 0.001f);
+            for(size_t i = 0; i < soft_body->node_count; i += 1) {
+                float radius = hypotf(soft_body->nodes[i].position.x,
+                    soft_body->nodes[i].position.y);
+                assert(fabsf(radius - 50.0f) < 0.001f);
+            }
+            assert(history.undo_count == 1);
+            shortcut_apply(&history, SDLK_Z);
+            assert(fabsf(soft_body->nodes[0].position.y + 40.0f) < 0.001f);
+            shortcut_apply(&history, SDLK_Y);
+            assert(fabsf(soft_body->nodes[0].position.y + 50.0f) < 0.001f);
+        }
+    }
     editor_command_executing_callback_set(NULL, NULL);
     editor_command_finished_callback_set(NULL, NULL);
     callback_history = NULL;

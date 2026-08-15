@@ -128,6 +128,13 @@ Choosing a shape applies it immediately using the displayed defaults. Editing a
 parameter reapplies the shape when that field is submitted with Enter, exited
 with Escape, or loses focus.
 
+While its shape editor remains open, the geometry stays constrained. Dragging
+a circle point changes its radius. Dragging a square corner changes its width
+and height. Triangle corners change the dimensions allowed by the selected
+triangle type; a scalene apex also changes its apex offset. Additional points
+distributed along polygon edges are derived points and cannot be dragged
+independently.
+
 Triangle modes are equilateral, isosceles, and scalene. Equilateral height is
 derived from width, isosceles centers its apex using editable width and height,
 and scalene adds an editable horizontal apex offset. Width and length

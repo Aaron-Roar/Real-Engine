@@ -2,6 +2,7 @@
 #define ROHR_EDITOR_VIEWPORT_H
 
 #include "editor_project.h"
+#include "editor_auto_shape.h"
 
 typedef enum EditorViewportMode {
     EDITOR_VIEWPORT_HIERARCHY,
@@ -101,6 +102,10 @@ bool editor_viewport_update(
     float wheel_y,
     bool pointer_consumed
 );
+bool editor_viewport_auto_shape_update(EditorViewportState *state,
+    EditorProject *project, EditorAutoShapeConfig *config, Position pointer,
+    MouseButtonState primary_button, MouseButtonState pan_button,
+    bool pan_modifier, float wheel_y, bool pointer_consumed);
 void editor_viewport_draw(
     const EditorProject *project,
     const EditorViewportState *state

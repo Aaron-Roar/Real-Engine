@@ -30,5 +30,9 @@ EditorResult editor_auto_shape_hitbox_apply(EditorHitbox *hitbox,
     const EditorAutoShapeConfig *config);
 EditorResult editor_auto_shape_soft_body_apply(EditorSoftBody *body,
     const EditorAutoShapeConfig *config);
+bool editor_auto_shape_control_check(const EditorAutoShapeConfig *config,
+    size_t point_count, size_t point_index);
+EditorResult editor_auto_shape_control_set(EditorAutoShapeConfig *config,
+    size_t point_count, size_t point_index, Position position);
 
 #endif

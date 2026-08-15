@@ -658,6 +658,129 @@ static bool editor_object_visual_point_contains(const EditorObject *object,
     return false;
 }
 
+static Position editor_auto_shape_rigid_local_get(const EditorObject *object,
+        const EditorRigidBody *body, Position world) {
+    Position local = {world.x - object->position.x - body->position.x,
+        world.y - object->position.y - body->position.y};
+    float cosine = cosf(-body->rotation);
+    float sine = sinf(-body->rotation);
+    return (Position){local.x * cosine - local.y * sine,
+        local.x * sine + local.y * cosine};
+}
+
+static Position editor_auto_shape_soft_local_get(const EditorObject *object,
+        const EditorSoftBody *body, Position world) {
+    Position local = {world.x - object->position.x - body->position.x,
+        world.y - object->position.y - body->position.y};
+    float cosine = cosf(-body->rotation);
+    float sine = sinf(-body->rotation);
+    return (Position){local.x * cosine - local.y * sine,
+        local.x * sine + local.y * cosine};
+}
+
+bool editor_viewport_auto_shape_update(EditorViewportState *state,
+        EditorProject *project, EditorAutoShapeConfig *config, Position pointer,
+        MouseButtonState primary_button, MouseButtonState pan_button,
+        bool pan_modifier, float wheel_y, bool pointer_consumed) {
+    EditorObject *object;
+    Position world_pointer;
+
+    if(state == NULL || project == NULL || config == NULL) return false;
+    if(wheel_y != 0.0f || pan_button != MOUSE_BUTTON_STATE_UP ||
+            state->camera_panning ||
+            (pan_modifier && primary_button != MOUSE_BUTTON_STATE_UP))
+        return editor_viewport_update(state, project, pointer, primary_button,
+            pan_button, pan_modifier, wheel_y, pointer_consumed);
+    if(primary_button == MOUSE_BUTTON_STATE_RELEASED) {
+        state->dragged_vertex = -1;
+        return false;
+    }
+    if(pointer_consumed || pointer.x < 0.0f ||
+            pointer.x >= EDITOR_VIEWPORT_WIDTH) return false;
+    object = editor_project_selected_get(project);
+    if(object == NULL) return false;
+    editor_view_transform_set(project, state, object);
+    world_pointer = editor_view_screen_to_world(pointer);
+
+    if(state->auto_shape_parent_mode == EDITOR_VIEWPORT_HITBOX) {
+        EditorRigidBody *body = editor_selected_body_get(object, state);
+        EditorHitbox *hitbox = editor_selected_hitbox_get(object, state);
+        if(body == NULL || hitbox == NULL || !body->visible || !hitbox->visible)
+            return false;
+        if(state->dragged_vertex >= 0 &&
+                primary_button == MOUSE_BUTTON_STATE_DOWN) {
+            Position desired = {world_pointer.x - state->drag_offset.x,
+                world_pointer.y - state->drag_offset.y};
+            EditorResult adjusted = editor_auto_shape_control_set(config,
+                hitbox->vertex_count, (size_t)state->dragged_vertex,
+                editor_auto_shape_rigid_local_get(object, body, desired));
+            EditorCommand command;
+            if(editor_result_check(adjusted)) return true;
+            command = (EditorCommand){.type = EDITOR_COMMAND_AUTO_SHAPE,
+                .data.auto_shape = {.kind = EDITOR_ITEM_HITBOX,
+                    .object = object->id, .parent = body->id, .item = hitbox->id,
+                    .config = *config}};
+            (void)editor_command_execute(project, &command);
+            return true;
+        }
+        if(primary_button != MOUSE_BUTTON_STATE_PRESSED) return false;
+        for(size_t i = 0; i < hitbox->vertex_count; i += 1) {
+            Position control;
+            Vec2D delta;
+            if(hitbox->vertices[i].position_locked ||
+                    !editor_auto_shape_control_check(config,
+                        hitbox->vertex_count, i)) continue;
+            control = editor_hitbox_vertex_world_get(object, body, hitbox, (uint32_t)i);
+            delta = (Vec2D){world_pointer.x - control.x, world_pointer.y - control.y};
+            if(delta.x * delta.x + delta.y * delta.y >
+                    100.0f / (editor_view_scale * editor_view_scale)) continue;
+            state->dragged_vertex = (int)i;
+            state->drag_offset = (Vec2D){world_pointer.x - control.x,
+                world_pointer.y - control.y};
+            return true;
+        }
+        return false;
+    }
+    if(state->auto_shape_parent_mode == EDITOR_VIEWPORT_SOFT_BODY) {
+        EditorSoftBody *body = NULL;
+        for(size_t i = 0; i < object->soft_body_count; i += 1)
+            if(object->soft_body_items[i].id == state->selected_soft_body)
+                body = &object->soft_body_items[i];
+        if(body == NULL || !body->visible) return false;
+        if(state->dragged_vertex >= 0 && primary_button == MOUSE_BUTTON_STATE_DOWN) {
+            Position desired = {world_pointer.x - state->drag_offset.x,
+                world_pointer.y - state->drag_offset.y};
+            EditorResult adjusted = editor_auto_shape_control_set(config,
+                body->node_count, (size_t)state->dragged_vertex,
+                editor_auto_shape_soft_local_get(object, body, desired));
+            EditorCommand command;
+            if(editor_result_check(adjusted)) return true;
+            command = (EditorCommand){.type = EDITOR_COMMAND_AUTO_SHAPE,
+                .data.auto_shape = {.kind = EDITOR_ITEM_SOFT_BODY,
+                    .object = object->id, .item = body->id, .config = *config}};
+            (void)editor_command_execute(project, &command);
+            return true;
+        }
+        if(primary_button != MOUSE_BUTTON_STATE_PRESSED) return false;
+        for(size_t i = 0; i < body->node_count; i += 1) {
+            Position control;
+            Vec2D delta;
+            if(!body->nodes[i].visible || !editor_auto_shape_control_check(
+                    config, body->node_count, i)) continue;
+            control = editor_soft_node_world_get(object, body, &body->nodes[i]);
+            delta = (Vec2D){world_pointer.x - control.x, world_pointer.y - control.y};
+            if(delta.x * delta.x + delta.y * delta.y >
+                    100.0f / (editor_view_scale * editor_view_scale)) continue;
+            state->dragged_vertex = (int)i;
+            state->selected_soft_node = body->nodes[i].id;
+            state->drag_offset = (Vec2D){world_pointer.x - control.x,
+                world_pointer.y - control.y};
+            return true;
+        }
+    }
+    return false;
+}
+
 bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
     Position pointer, MouseButtonState primary_button,
     MouseButtonState pan_button, bool pan_modifier, float wheel_y,
@@ -1374,9 +1497,15 @@ static void editor_viewport_object_draw(const EditorObject *object,
                 editor_line_draw(start, end, edge);
                 if(selected_hitbox && (state->selection == EDITOR_SELECTION_HITBOX ||
                         state->selection == EDITOR_SELECTION_VERTEX ||
-                        state->selection == EDITOR_SELECTION_LINE)) {
+                        state->selection == EDITOR_SELECTION_LINE ||
+                        (state->mode == EDITOR_VIEWPORT_AUTO_SHAPE &&
+                            state->auto_shape_parent_mode ==
+                                EDITOR_VIEWPORT_HITBOX))) {
                     Color point = state->selection == EDITOR_SELECTION_VERTEX &&
                             state->selected_vertex == i ? (Color){255, 215, 70, 255} :
+                        (state->mode == EDITOR_VIEWPORT_AUTO_SHAPE &&
+                            state->dragged_vertex == (int)i) ?
+                            (Color){255, 215, 70, 255} :
                         (hitbox->vertices[i].position_locked ?
                             (Color){245, 165, 70, 255} : (Color){235, 240, 248, 255});
                     editor_quad_draw(start, 10.0f, 10.0f, 0.0f, point);
@@ -1411,6 +1540,8 @@ static void editor_viewport_object_draw(const EditorObject *object,
                     state->mode == EDITOR_VIEWPORT_HITBOX ||
                     state->mode == EDITOR_VIEWPORT_LINE ||
                     state->mode == EDITOR_VIEWPORT_VERTEX ||
+                    (state->mode == EDITOR_VIEWPORT_AUTO_SHAPE &&
+                        state->auto_shape_parent_mode == EDITOR_VIEWPORT_HITBOX) ||
                     (state->mode == EDITOR_VIEWPORT_ORIGIN &&
                         state->selected_origin_kind == EDITOR_ORIGIN_RIGID_BODY) ||
                     state->selection == EDITOR_SELECTION_RIGID_BODY)) {
@@ -1499,6 +1630,8 @@ static void editor_viewport_object_draw(const EditorObject *object,
 
     if(state->mode == EDITOR_VIEWPORT_SOFT_BODY ||
             state->mode == EDITOR_VIEWPORT_SOFT_NODE ||
+            (state->mode == EDITOR_VIEWPORT_AUTO_SHAPE &&
+                state->auto_shape_parent_mode == EDITOR_VIEWPORT_SOFT_BODY) ||
             (state->mode == EDITOR_VIEWPORT_ORIGIN &&
                 state->selected_origin_kind == EDITOR_ORIGIN_SOFT_BODY)) {
         for(size_t i = 0; i < object->soft_body_count; i += 1) {

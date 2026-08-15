@@ -4465,16 +4465,23 @@ int main(void) {
                 rohr_ui_pointer_consumed_get() ||
                 pointer.y < EDITOR_MENU_HEIGHT ||
                 pointer.y >= EDITOR_VIEWPORT_BOTTOM;
-            bool viewport_consumed = editor_viewport_update(
-                &viewport_state,
-                &project,
-                pointer,
-                mouse.button_states[MOUSE_BUTTON_LEFT],
-                mouse.button_states[MOUSE_BUTTON_MIDDLE],
+            bool viewport_consumed;
+            bool pan_modifier =
                 rohr_controller_key_down_get(&keyboard, SDLK_LCTRL) ||
-                    rohr_controller_key_down_get(&keyboard, SDLK_RCTRL),
-                viewport_wheel_y,
-                ui_consumed);
+                rohr_controller_key_down_get(&keyboard, SDLK_RCTRL);
+            if(viewport_state.mode == EDITOR_VIEWPORT_AUTO_SHAPE) {
+                viewport_consumed = editor_viewport_auto_shape_update(
+                    &viewport_state, &project, &auto_shape_config, pointer,
+                    mouse.button_states[MOUSE_BUTTON_LEFT],
+                    mouse.button_states[MOUSE_BUTTON_MIDDLE], pan_modifier,
+                    viewport_wheel_y, ui_consumed);
+            } else {
+                viewport_consumed = editor_viewport_update(
+                    &viewport_state, &project, pointer,
+                    mouse.button_states[MOUSE_BUTTON_LEFT],
+                    mouse.button_states[MOUSE_BUTTON_MIDDLE], pan_modifier,
+                    viewport_wheel_y, ui_consumed);
+            }
 
             if(mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_PRESSED &&
                     !ui_consumed && !viewport_consumed && !panel_resizing) {
