@@ -21,6 +21,7 @@ typedef struct EditorCliSelectors {
     EditorCliSelector soft_body;
     EditorCliSelector node;
     EditorCliSelector beam;
+    EditorCliSelector area;
     EditorCliSelector vertex;
     EditorCliSelector line;
     EditorCliSelector node_a;
@@ -73,6 +74,8 @@ static EditorCliSelector *editor_cli_selector_flag_get(EditorCliSelectors *selec
         {"--node-id", &selectors->node, true},
         {"--beam", &selectors->beam, false},
         {"--beam-id", &selectors->beam, true},
+        {"--area", &selectors->area, false},
+        {"--area-id", &selectors->area, true},
         {"--vertex", &selectors->vertex, false},
         {"--vertex-id", &selectors->vertex, true},
         {"--line", &selectors->line, false},
@@ -200,6 +203,8 @@ EDITOR_CLI_RESOLVE_FUNCTION(editor_cli_node_resolve, EditorSoftBody,
     node_count, nodes, "Soft node", "--node-id")
 EDITOR_CLI_RESOLVE_FUNCTION(editor_cli_beam_resolve, EditorSoftBody,
     beam_count, beams, "Soft beam", "--beam-id")
+EDITOR_CLI_RESOLVE_FUNCTION(editor_cli_area_resolve, EditorSoftBody,
+    area_count, areas, "Soft area", "--area-id")
 #undef EDITOR_CLI_RESOLVE_FUNCTION
 
 static EditorResult editor_cli_hitbox_resolve(EditorRigidBody *body,
@@ -316,6 +321,13 @@ static bool editor_cli_soft_body_matches(const EditorSoftBody *body,
                     body->beams[i].name, body->beams[i].id, false)) found = true;
         if(!found) return false;
     }
+    if(editor_cli_selector_present(&selectors->area)) {
+        bool found = false;
+        for(size_t i = 0; i < body->area_count; i += 1)
+            if(editor_cli_selector_matches(&selectors->area,
+                    body->areas[i].name, body->areas[i].id, false)) found = true;
+        if(!found) return false;
+    }
     return true;
 }
 
@@ -345,7 +357,8 @@ static bool editor_cli_object_matches(const EditorObject *object,
 #undef MATCH_OBJECT_CHILD
     if(editor_cli_selector_present(&selectors->soft_body) ||
             editor_cli_selector_present(&selectors->node) ||
-            editor_cli_selector_present(&selectors->beam)) {
+            editor_cli_selector_present(&selectors->beam) ||
+            editor_cli_selector_present(&selectors->area)) {
         bool found = false;
         for(size_t i = 0; i < object->soft_body_count; i += 1)
             if(editor_cli_soft_body_matches(&object->soft_body_items[i], selectors))
@@ -518,7 +531,8 @@ EditorResult editor_command_cli_named_parse(const EditorProject *project,
         }
         if(!editor_cli_selector_present(&selectors.soft_body) &&
                 (editor_cli_selector_present(&selectors.node) ||
-                 editor_cli_selector_present(&selectors.beam))) {
+                 editor_cli_selector_present(&selectors.beam) ||
+                 editor_cli_selector_present(&selectors.area))) {
             size_t matches = 0;
             for(size_t i = 0; i < object->soft_body_count; i += 1)
                 if(editor_cli_soft_body_matches(&object->soft_body_items[i], &selectors)) {
@@ -612,7 +626,8 @@ EditorResult editor_command_cli_named_parse(const EditorProject *project,
         if(strcmp(action, "add") != 0)
             RESOLVE_AND_PUSH(editor_cli_soft_body_resolve(
                 object, &selectors.soft_body, &item_id));
-    } else if(strcmp(domain, "soft-node") == 0 || strcmp(domain, "soft-beam") == 0) {
+    } else if(strcmp(domain, "soft-node") == 0 || strcmp(domain, "soft-beam") == 0 ||
+            strcmp(domain, "soft-area") == 0) {
         result = editor_cli_soft_body_resolve(object, &selectors.soft_body, &body_id);
         if(editor_result_check(result)) return result;
         soft_body = editor_cli_soft_body_get(object, body_id);
@@ -622,6 +637,9 @@ EditorResult editor_command_cli_named_parse(const EditorProject *project,
             if(strcmp(action, "add") != 0)
                 RESOLVE_AND_PUSH(editor_cli_node_resolve(
                     soft_body, &selectors.node, &item_id));
+        } else if(strcmp(domain, "soft-area") == 0) {
+            RESOLVE_AND_PUSH(editor_cli_area_resolve(
+                soft_body, &selectors.area, &item_id));
         } else if(strcmp(action, "add") == 0) {
             RESOLVE_AND_PUSH(editor_cli_node_resolve(
                 soft_body, &selectors.node_a, &item_id));
@@ -795,18 +813,25 @@ static bool editor_cli_hierarchy_selector_write(const EditorProject *project,
         if(soft_body != NULL && strcmp(kind, "node") == 0)
             for(size_t i = 0; i < soft_body->node_count; i += 1)
                 if(soft_body->nodes[i].id == id) name = soft_body->nodes[i].name;
+        else if(soft_body != NULL && strcmp(kind, "area") == 0)
+            for(size_t i = 0; i < soft_body->area_count; i += 1)
+                if(soft_body->areas[i].id == id) name = soft_body->areas[i].name;
         else if(soft_body != NULL) for(size_t i = 0; i < soft_body->beam_count; i += 1)
             if(soft_body->beams[i].id == id) name = soft_body->beams[i].name;
         if(name != NULL && soft_body != NULL) {
-            size_t count = strcmp(kind, "node") == 0 ? soft_body->node_count : soft_body->beam_count;
+            size_t count = strcmp(kind, "node") == 0 ? soft_body->node_count :
+                strcmp(kind, "area") == 0 ? soft_body->area_count : soft_body->beam_count;
             for(size_t i = 0; i < count; i += 1) {
                 const char *candidate = strcmp(kind, "node") == 0 ?
-                    soft_body->nodes[i].name : soft_body->beams[i].name;
+                    soft_body->nodes[i].name : strcmp(kind, "area") == 0 ?
+                    soft_body->areas[i].name : soft_body->beams[i].name;
                 if(strcmp(candidate, name) == 0) matches += 1;
             }
         }
-        name_flag = strcmp(kind, "node") == 0 ? "--node" : "--beam";
-        id_flag = strcmp(kind, "node") == 0 ? "--node-id" : "--beam-id";
+        name_flag = strcmp(kind, "node") == 0 ? "--node" :
+            strcmp(kind, "area") == 0 ? "--area" : "--beam";
+        id_flag = strcmp(kind, "node") == 0 ? "--node-id" :
+            strcmp(kind, "area") == 0 ? "--area-id" : "--beam-id";
     }
     return editor_cli_selector_write(output, capacity, used,
         name_flag, id_flag, name, id, matches);
@@ -1004,7 +1029,8 @@ EditorResult editor_command_cli_named_write(const EditorProject *project,
             if(!editor_cli_id_selector_write(output, output_capacity, &used,
                     "--soft-body-id", item)) goto capacity_error;
         } else WRITE_SELECTOR("soft-body", object, 0, item);
-    } else if(strcmp(domain, "soft-node") == 0 || strcmp(domain, "soft-beam") == 0) {
+    } else if(strcmp(domain, "soft-node") == 0 || strcmp(domain, "soft-beam") == 0 ||
+            strcmp(domain, "soft-area") == 0) {
         READ_ID(5, parent); WRITE_SELECTOR("soft-body", object, 0, parent);
         if(strcmp(domain, "soft-node") == 0) {
             if(strcmp(action, "add") != 0) {
@@ -1014,6 +1040,9 @@ EditorResult editor_command_cli_named_write(const EditorProject *project,
                             "--node-id", item)) goto capacity_error;
                 } else WRITE_SELECTOR("node", object, parent, item);
             }
+        } else if(strcmp(domain, "soft-area") == 0) {
+            READ_ID(6, item);
+            WRITE_SELECTOR("area", object, parent, item);
         } else if(strcmp(action, "add") == 0) {
             READ_ID(6, item);
             if(!editor_cli_node_endpoint_selector_write(project, output,

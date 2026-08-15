@@ -619,6 +619,29 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
                         set->value_kind == EDITOR_PROPERTY_VALUE_BOOL &&
                         (!set->value.boolean || body->collision_enabled))
                     body->particle = set->value.boolean;
+                else if(set->property == EDITOR_PROPERTY_OUTLINE_COLOR &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_UINT)
+                    body->border_color = set->value.integer;
+                else if(set->property == EDITOR_PROPERTY_SURFACE_COLOR &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_UINT)
+                    body->surface_color = set->value.integer;
+                else if(set->property == EDITOR_PROPERTY_PARTICLE_RING_COLOR &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_UINT)
+                    body->particle_ring_color = set->value.integer;
+                else if(set->property == EDITOR_PROPERTY_PARTICLE_FILL_COLOR &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_UINT)
+                    body->particle_fill_color = set->value.integer;
+                else goto property_invalid;
+            } else if(set->kind == EDITOR_ITEM_SOFT_BODY) {
+                EditorSoftBody *body = editor_command_soft_body_get(object, set->item);
+                if(body == NULL) return editor_command_not_found("soft body", set->item);
+                if(set->value_kind != EDITOR_PROPERTY_VALUE_UINT) goto property_invalid;
+                if(set->property == EDITOR_PROPERTY_NODE_COLOR)
+                    body->node_color = set->value.integer;
+                else if(set->property == EDITOR_PROPERTY_BEAM_COLOR)
+                    body->beam_color = set->value.integer;
+                else if(set->property == EDITOR_PROPERTY_AREA_COLOR)
+                    body->area_color = set->value.integer;
                 else goto property_invalid;
             } else if(set->kind == EDITOR_ITEM_VERTEX) {
                 EditorRigidBody *body = editor_project_rigid_body_get(object, set->parent);
@@ -694,6 +717,11 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
                 else if(set->property == EDITOR_PROPERTY_COLLISION &&
                         set->value_kind == EDITOR_PROPERTY_VALUE_BOOL)
                     node->collision_enabled = set->value.boolean;
+                else if(set->property == EDITOR_PROPERTY_COLOR &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_UINT) {
+                    node->color = set->value.integer;
+                    node->color_overridden = true;
+                }
                 else goto property_invalid;
             } else if(set->kind == EDITOR_ITEM_SOFT_BEAM) {
                 EditorSoftBody *body = editor_command_soft_body_get(object, set->parent);
@@ -705,7 +733,23 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
                 else if(set->property == EDITOR_PROPERTY_DAMPING &&
                         set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
                         set->value.number >= 0.0f) beam->damping = set->value.number;
+                else if(set->property == EDITOR_PROPERTY_COLOR &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_UINT) {
+                    beam->color = set->value.integer;
+                    beam->color_overridden = true;
+                }
                 else goto property_invalid;
+            } else if(set->kind == EDITOR_ITEM_SOFT_AREA) {
+                EditorSoftBody *body = editor_command_soft_body_get(object, set->parent);
+                EditorSoftArea *area = NULL;
+                if(body != NULL) for(size_t i = 0; i < body->area_count; i += 1)
+                    if(body->areas[i].id == set->item) area = &body->areas[i];
+                if(area == NULL) return editor_command_not_found("soft area", set->item);
+                if(set->property != EDITOR_PROPERTY_COLOR ||
+                        set->value_kind != EDITOR_PROPERTY_VALUE_UINT)
+                    goto property_invalid;
+                area->color = set->value.integer;
+                area->color_overridden = true;
             } else goto property_invalid;
             return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
 property_invalid:
@@ -854,6 +898,28 @@ static bool editor_command_uint_parse(const char *text, uint32_t *value) {
     return true;
 }
 
+static bool editor_command_color_parse(const char *text, uint32_t *value) {
+    const char *digits = text;
+    char *end;
+    unsigned long parsed;
+    size_t length;
+    if(text == NULL || value == NULL) return false;
+    if(*digits == '#') digits += 1;
+    length = strlen(digits);
+    if(length != 6 && length != 8) return false;
+    errno = 0;
+    parsed = strtoul(digits, &end, 16);
+    if(errno != 0 || *end != '\0' || parsed > UINT32_MAX) return false;
+    *value = length == 6 ? ((uint32_t)parsed << 8) | UINT32_C(0xff) :
+        (uint32_t)parsed;
+    return true;
+}
+
+static bool editor_command_property_color_check(EditorPropertyKind property) {
+    return property >= EDITOR_PROPERTY_OUTLINE_COLOR &&
+        property <= EDITOR_PROPERTY_COLOR;
+}
+
 static bool editor_command_float_parse(const char *text, float *value) {
     char *end;
     float parsed;
@@ -921,6 +987,7 @@ static bool editor_command_item_kind_parse(const char *domain, EditorItemKind *k
     else if(strcmp(domain, "soft-body") == 0) *kind = EDITOR_ITEM_SOFT_BODY;
     else if(strcmp(domain, "soft-node") == 0) *kind = EDITOR_ITEM_SOFT_NODE;
     else if(strcmp(domain, "soft-beam") == 0) *kind = EDITOR_ITEM_SOFT_BEAM;
+    else if(strcmp(domain, "soft-area") == 0) *kind = EDITOR_ITEM_SOFT_AREA;
     else if(strcmp(domain, "vertex") == 0) *kind = EDITOR_ITEM_VERTEX;
     else if(strcmp(domain, "line") == 0) *kind = EDITOR_ITEM_LINE;
     else return false;
@@ -937,6 +1004,7 @@ static const char *editor_command_item_domain_get(EditorItemKind kind) {
         case EDITOR_ITEM_SOFT_BODY: return "soft-body";
         case EDITOR_ITEM_SOFT_NODE: return "soft-node";
         case EDITOR_ITEM_SOFT_BEAM: return "soft-beam";
+        case EDITOR_ITEM_SOFT_AREA: return "soft-area";
         case EDITOR_ITEM_VERTEX: return "vertex";
         case EDITOR_ITEM_LINE: return "line";
     }
@@ -968,6 +1036,18 @@ static bool editor_command_property_parse(const char *name,
     EDITOR_BOOL_PROPERTY("position-locked", EDITOR_PROPERTY_POSITION_LOCKED)
     EDITOR_BOOL_PROPERTY("position-follows-body", EDITOR_PROPERTY_POSITION_FOLLOWS_BODY)
     EDITOR_BOOL_PROPERTY("rotation-follows-body", EDITOR_PROPERTY_ROTATION_FOLLOWS_BODY)
+#define EDITOR_COLOR_PROPERTY(text, value) \
+    if(strcmp(name, text) == 0) { *property = value; \
+        *value_kind = EDITOR_PROPERTY_VALUE_UINT; return true; }
+    EDITOR_COLOR_PROPERTY("outline-color", EDITOR_PROPERTY_OUTLINE_COLOR)
+    EDITOR_COLOR_PROPERTY("surface-color", EDITOR_PROPERTY_SURFACE_COLOR)
+    EDITOR_COLOR_PROPERTY("particle-ring-color", EDITOR_PROPERTY_PARTICLE_RING_COLOR)
+    EDITOR_COLOR_PROPERTY("particle-fill-color", EDITOR_PROPERTY_PARTICLE_FILL_COLOR)
+    EDITOR_COLOR_PROPERTY("node-color", EDITOR_PROPERTY_NODE_COLOR)
+    EDITOR_COLOR_PROPERTY("beam-color", EDITOR_PROPERTY_BEAM_COLOR)
+    EDITOR_COLOR_PROPERTY("area-color", EDITOR_PROPERTY_AREA_COLOR)
+    EDITOR_COLOR_PROPERTY("color", EDITOR_PROPERTY_COLOR)
+#undef EDITOR_COLOR_PROPERTY
 #undef EDITOR_FLOAT_PROPERTY
 #undef EDITOR_BOOL_PROPERTY
     if(strcmp(name, "kind") == 0) {
@@ -997,6 +1077,14 @@ static const char *editor_command_property_name_get(EditorPropertyKind property)
         case EDITOR_PROPERTY_POSITION_FOLLOWS_BODY: return "position-follows-body";
         case EDITOR_PROPERTY_ROTATION_FOLLOWS_BODY: return "rotation-follows-body";
         case EDITOR_PROPERTY_LINE_LENGTH: return "length";
+        case EDITOR_PROPERTY_OUTLINE_COLOR: return "outline-color";
+        case EDITOR_PROPERTY_SURFACE_COLOR: return "surface-color";
+        case EDITOR_PROPERTY_PARTICLE_RING_COLOR: return "particle-ring-color";
+        case EDITOR_PROPERTY_PARTICLE_FILL_COLOR: return "particle-fill-color";
+        case EDITOR_PROPERTY_NODE_COLOR: return "node-color";
+        case EDITOR_PROPERTY_BEAM_COLOR: return "beam-color";
+        case EDITOR_PROPERTY_AREA_COLOR: return "area-color";
+        case EDITOR_PROPERTY_COLOR: return "color";
     }
     return NULL;
 }
@@ -1128,7 +1216,7 @@ collision_filter_invalid:
         int value_index;
         if(!editor_command_item_kind_parse(domain, &set->kind)) goto property_parse_invalid;
         nested = set->kind == EDITOR_ITEM_SOFT_NODE ||
-            set->kind == EDITOR_ITEM_SOFT_BEAM;
+            set->kind == EDITOR_ITEM_SOFT_BEAM || set->kind == EDITOR_ITEM_SOFT_AREA;
         indexed = set->kind == EDITOR_ITEM_VERTEX || set->kind == EDITOR_ITEM_LINE;
         if((nested && count != 9) || (indexed && count != 10) ||
                 (!nested && !indexed && count != 8) ||
@@ -1154,9 +1242,14 @@ collision_filter_invalid:
             if(!editor_command_bool_parse(arguments[value_index], &set->value.boolean))
                 goto property_parse_invalid;
         } else {
-            const char *kinds[] = {"revolute", "weld", "spring"};
-            if(!editor_command_named_uint_parse(arguments[value_index], kinds, 3,
-                    &set->value.integer)) goto property_parse_invalid;
+            if(editor_command_property_color_check(set->property)) {
+                if(!editor_command_color_parse(arguments[value_index],
+                        &set->value.integer)) goto property_parse_invalid;
+            } else {
+                const char *kinds[] = {"revolute", "weld", "spring"};
+                if(!editor_command_named_uint_parse(arguments[value_index], kinds, 3,
+                        &set->value.integer)) goto property_parse_invalid;
+            }
         }
         command->type = EDITOR_COMMAND_PROPERTY_SET;
         return editor_result_value(true);
@@ -1812,7 +1905,8 @@ EditorResult editor_command_cli_write(const EditorCommand *command,
                     !editor_command_text_append(output, output_capacity, &used, "set ") ||
                     !editor_command_shell_text_append(output, output_capacity, &used,
                         document_path)) goto capacity_error;
-            if(set->kind == EDITOR_ITEM_SOFT_NODE || set->kind == EDITOR_ITEM_SOFT_BEAM)
+            if(set->kind == EDITOR_ITEM_SOFT_NODE || set->kind == EDITOR_ITEM_SOFT_BEAM ||
+                    set->kind == EDITOR_ITEM_SOFT_AREA)
                 snprintf(values, sizeof(values), " %u %u %u", set->object,
                     set->parent, set->item);
             else if(set->kind == EDITOR_ITEM_VERTEX || set->kind == EDITOR_ITEM_LINE)
@@ -1830,10 +1924,14 @@ EditorResult editor_command_cli_write(const EditorCommand *command,
                 boolean = set->value.boolean ? "true" : "false";
                 snprintf(value, sizeof(value), "%s", boolean);
             } else {
-                const char *kinds[] = {"revolute", "weld", "spring"};
-                if(set->value.integer > (uint32_t)EDITOR_JOINT_SPRING)
-                    goto capacity_error;
-                snprintf(value, sizeof(value), "%s", kinds[set->value.integer]);
+                if(editor_command_property_color_check(set->property))
+                    snprintf(value, sizeof(value), "#%08X", set->value.integer);
+                else {
+                    const char *kinds[] = {"revolute", "weld", "spring"};
+                    if(set->value.integer > (uint32_t)EDITOR_JOINT_SPRING)
+                        goto capacity_error;
+                    snprintf(value, sizeof(value), "%s", kinds[set->value.integer]);
+                }
             }
             if(!editor_command_text_append(output, output_capacity, &used, value))
                 goto capacity_error;

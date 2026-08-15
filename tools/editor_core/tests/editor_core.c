@@ -498,6 +498,10 @@ static int property_commands_test(void) {
         "project.rohr.json", "1", "1", "1", "friction", "0.75"};
     char *joint_arguments[] = {"editor-cli", "joint", "set",
         "project.rohr.json", "1", "1", "kind", "weld"};
+    char *color_arguments[] = {"editor-cli", "rigid-body", "set",
+        "project.rohr.json", "1", "1", "surface-color", "#336699CC"};
+    char *named_color_arguments[] = {"editor-cli", "--project", "project.rohr.json",
+        "--body", "rigid_body_1", "--property", "outline-color", "#11223344"};
 
     editor_project_init(&project);
     object = editor_project_object_add(&project, (Position){0});
@@ -532,6 +536,9 @@ static int property_commands_test(void) {
         EDITOR_PROPERTY_COLLISION, EDITOR_PROPERTY_VALUE_BOOL, boolean, true);
     PROPERTY_SET(EDITOR_ITEM_RIGID_BODY, 0, rigid_body->id, 0,
         EDITOR_PROPERTY_PARTICLE, EDITOR_PROPERTY_VALUE_BOOL, boolean, true);
+    PROPERTY_SET(EDITOR_ITEM_RIGID_BODY, 0, rigid_body->id, 0,
+        EDITOR_PROPERTY_OUTLINE_COLOR, EDITOR_PROPERTY_VALUE_UINT, integer,
+        UINT32_C(0x11223344));
     PROPERTY_SET(EDITOR_ITEM_VERTEX, rigid_body->id, hitbox->id,
         hitbox->vertices[0].id, EDITOR_PROPERTY_POSITION_LOCKED,
         EDITOR_PROPERTY_VALUE_BOOL, boolean, true);
@@ -551,6 +558,7 @@ static int property_commands_test(void) {
         EDITOR_PROPERTY_DAMPING, EDITOR_PROPERTY_VALUE_FLOAT, number, 0.25f);
 #undef PROPERTY_SET
     if(rigid_body->mass_value != 5.0f || !rigid_body->particle ||
+            rigid_body->border_color != UINT32_C(0x11223344) ||
             !hitbox->vertices[0].position_locked || joint->kind != EDITOR_JOINT_WELD ||
             joint->stiffness != 12.0f || anchor->position_follows_body ||
             node->friction != 0.75f || beam->damping != 0.25f) return 1;
@@ -560,7 +568,15 @@ static int property_commands_test(void) {
             parsed.data.property_set.value.number != 0.75f ||
             editor_result_check(editor_command_cli_parse(8, joint_arguments,
                 &path, &parsed)) || parsed.data.property_set.value.integer !=
-                EDITOR_JOINT_WELD) return 1;
+                EDITOR_JOINT_WELD ||
+            editor_result_check(editor_command_cli_parse(8, color_arguments,
+                &path, &parsed)) || parsed.data.property_set.property !=
+                EDITOR_PROPERTY_SURFACE_COLOR || parsed.data.property_set.value.integer !=
+                UINT32_C(0x336699cc) ||
+            editor_result_check(editor_command_cli_standard_parse(&project, 8,
+                named_color_arguments, &path, &parsed)) ||
+            parsed.data.property_set.property != EDITOR_PROPERTY_OUTLINE_COLOR ||
+            parsed.data.property_set.value.integer != UINT32_C(0x11223344)) return 1;
     command = (EditorCommand){.type = EDITOR_COMMAND_PROPERTY_SET,
         .data.property_set = {.kind = EDITOR_ITEM_RIGID_BODY,
             .object = object->id, .item = rigid_body->id,

@@ -48,6 +48,13 @@ typedef struct EditorColorPicker {
     bool open;
     bool opened_this_frame;
     uint32_t *target;
+    uint32_t original;
+    EditorProject *project;
+    EditorItemKind kind;
+    EditorObjectId object;
+    uint32_t parent;
+    uint32_t item;
+    EditorPropertyKind property;
     float hue;
     float saturation;
     float value;
@@ -337,11 +344,36 @@ static uint32_t editor_color_hsv_to_rgba(float hue, float saturation,
         (uint32_t)lroundf(fminf(100.0f, fmaxf(0.0f, opacity)) * 2.55f);
 }
 
-static void editor_color_picker_open(EditorColorPicker *picker, uint32_t *target) {
+static void editor_color_picker_commit(EditorColorPicker *picker) {
+    uint32_t value;
+    EditorCommand command;
+    if(picker == NULL || !picker->open || picker->target == NULL) return;
+    value = *picker->target;
+    picker->open = false;
+    if(picker->project == NULL || value == picker->original) return;
+    *picker->target = picker->original;
+    command = (EditorCommand){.type = EDITOR_COMMAND_PROPERTY_SET,
+        .data.property_set = {picker->kind, picker->object, picker->parent,
+            picker->item, 0, picker->property, EDITOR_PROPERTY_VALUE_UINT,
+            {.integer = value}}};
+    (void)editor_command_execute(picker->project, &command);
+}
+
+static void editor_color_picker_open(EditorColorPicker *picker, uint32_t *target,
+        EditorProject *project, EditorItemKind kind, EditorObjectId object,
+        uint32_t parent, uint32_t item, EditorPropertyKind property) {
     if(picker == NULL || target == NULL) return;
+    editor_color_picker_commit(picker);
     picker->open = true;
     picker->opened_this_frame = true;
     picker->target = target;
+    picker->original = *target;
+    picker->project = project;
+    picker->kind = kind;
+    picker->object = object;
+    picker->parent = parent;
+    picker->item = item;
+    picker->property = property;
     editor_color_rgb_to_hsv(*target, &picker->hue, &picker->saturation, &picker->value);
     picker->opacity = (float)(*target & 0xff) * 100.0f / 255.0f;
     editor_hex_color_format(picker->hex, *target);
@@ -451,13 +483,15 @@ static bool editor_color_picker_draw(EditorColorPicker *picker, MouseState *mous
     *field_editing = *field_editing || hex_result.active || opacity_result.active;
     if(!picker->opened_this_frame &&
             mouse->button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_PRESSED &&
-            !editor_point_in_rect(pointer, menu)) picker->open = false;
+            !editor_point_in_rect(pointer, menu)) editor_color_picker_commit(picker);
     picker->opened_this_frame = false;
     return true;
 }
 
 static bool editor_color_swatch(const char *id, uint32_t *color, bool disabled,
-        EditorColorPicker *picker, UIRect bounds) {
+        EditorColorPicker *picker, UIRect bounds, EditorProject *project,
+        EditorItemKind kind, EditorObjectId object, uint32_t parent,
+        uint32_t item, EditorPropertyKind property) {
     UIButtonStyle style = rohr_ui_button_style_default_get();
     Color displayed = disabled ? (Color){70, 72, 78, 255} :
         rohr_graphics_color_hex_create(*color);
@@ -474,7 +508,8 @@ static bool editor_color_swatch(const char *id, uint32_t *color, bool disabled,
     }
     result = rohr_ui_button(id, NULL, bounds, &style);
     rohr_ui_border(bounds, 2.0f, (Color){8, 9, 12, 255});
-    if(result.clicked) editor_color_picker_open(picker, color);
+    if(result.clicked) editor_color_picker_open(picker, color, project, kind,
+        object, parent, item, property);
     return result.clicked;
 }
 
@@ -1374,7 +1409,7 @@ int main(void) {
             !editor_text_create(&font, "Rigid Body", &rigid_body_label) ||
             !editor_text_create(&font, "Node A", &node_a_label) ||
             !editor_text_create(&font, "Node B", &node_b_label) ||
-            !editor_text_create(&font, "Border Color", &border_color_label) ||
+            !editor_text_create(&font, "Outline Color", &border_color_label) ||
             !editor_text_create(&font, "Surface Color", &surface_color_label) ||
             !editor_text_create(&font, "Node Color", &node_color_label) ||
             !editor_text_create(&font, "Beam Color", &beam_color_label) ||
@@ -1497,7 +1532,7 @@ int main(void) {
             collide_with_open = false;
         } else if(color_picker.open &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
-            color_picker.open = false;
+            editor_color_picker_commit(&color_picker);
         } else if(!field_editing &&
                 !editor_terminal_panel_focused_check(&terminal_panel) &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
@@ -1687,13 +1722,17 @@ int main(void) {
                 (void)editor_color_swatch("editor.particle.ring_color",
                     &body->particle_ring_color, false, &color_picker,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 114.0f, 120.0f,
-                        EDITOR_TOOLS_WIDTH - 124.0f, 26.0f});
+                        EDITOR_TOOLS_WIDTH - 124.0f, 26.0f}, &project,
+                    EDITOR_ITEM_RIGID_BODY, selected->id, 0, body->id,
+                    EDITOR_PROPERTY_PARTICLE_RING_COLOR);
                 rohr_ui_label(&particle_fill_color_label,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 156.0f, 104.0f, 26.0f});
                 (void)editor_color_swatch("editor.particle.fill_color",
                     &body->particle_fill_color, false, &color_picker,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 114.0f, 156.0f,
-                        EDITOR_TOOLS_WIDTH - 124.0f, 26.0f});
+                        EDITOR_TOOLS_WIDTH - 124.0f, 26.0f}, &project,
+                    EDITOR_ITEM_RIGID_BODY, selected->id, 0, body->id,
+                    EDITOR_PROPERTY_PARTICLE_FILL_COLOR);
                 field_editing = radius_result.active;
             }
         } else if(viewport_state.mode == EDITOR_VIEWPORT_RIGID_BODY) {
@@ -1809,13 +1848,17 @@ int main(void) {
                     (void)editor_color_swatch("editor.rigid_body.border_color",
                         &body->border_color, false, &color_picker,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 114.0f,
-                            276.0f, EDITOR_TOOLS_WIDTH - 124.0f, 26.0f});
+                            276.0f, EDITOR_TOOLS_WIDTH - 124.0f, 26.0f}, &project,
+                        EDITOR_ITEM_RIGID_BODY, selected->id, 0, body->id,
+                        EDITOR_PROPERTY_OUTLINE_COLOR);
                     rohr_ui_label(&surface_color_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         308.0f, 104.0f, 26.0f});
                     (void)editor_color_swatch("editor.rigid_body.surface_color",
                         &body->surface_color, false, &color_picker,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 114.0f,
-                            308.0f, EDITOR_TOOLS_WIDTH - 124.0f, 26.0f});
+                            308.0f, EDITOR_TOOLS_WIDTH - 124.0f, 26.0f}, &project,
+                        EDITOR_ITEM_RIGID_BODY, selected->id, 0, body->id,
+                        EDITOR_PROPERTY_SURFACE_COLOR);
                 }
                 {
                     bool edited = body->gravity_enabled;
@@ -2868,19 +2911,25 @@ int main(void) {
                     (void)editor_color_swatch("editor.soft_body.node_color",
                         &body->node_color, false, &color_picker,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 226.0f,
-                            EDITOR_TOOLS_WIDTH - 110.0f, 26.0f});
+                            EDITOR_TOOLS_WIDTH - 110.0f, 26.0f}, &project,
+                        EDITOR_ITEM_SOFT_BODY, selected->id, 0, body->id,
+                        EDITOR_PROPERTY_NODE_COLOR);
                     rohr_ui_label(&beam_color_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         258.0f, 90.0f, 26.0f});
                     (void)editor_color_swatch("editor.soft_body.beam_color",
                         &body->beam_color, false, &color_picker,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 258.0f,
-                            EDITOR_TOOLS_WIDTH - 110.0f, 26.0f});
+                            EDITOR_TOOLS_WIDTH - 110.0f, 26.0f}, &project,
+                        EDITOR_ITEM_SOFT_BODY, selected->id, 0, body->id,
+                        EDITOR_PROPERTY_BEAM_COLOR);
                     rohr_ui_label(&area_color_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         290.0f, 90.0f, 26.0f});
                     (void)editor_color_swatch("editor.soft_body.area_color",
                         &body->area_color, false, &color_picker,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 290.0f,
-                            EDITOR_TOOLS_WIDTH - 110.0f, 26.0f});
+                            EDITOR_TOOLS_WIDTH - 110.0f, 26.0f}, &project,
+                        EDITOR_ITEM_SOFT_BODY, selected->id, 0, body->id,
+                        EDITOR_PROPERTY_AREA_COLOR);
                 }
                 {
                     UIButtonStyle origin_style = editor_selected_button_style_get();
@@ -3231,7 +3280,8 @@ int main(void) {
                     (void)editor_color_swatch("editor.soft_node.color", &node->color,
                         inherit, &color_picker,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 620.0f,
-                            field_width, 26.0f});
+                            field_width, 26.0f}, &project, EDITOR_ITEM_SOFT_NODE,
+                        selected->id, body->id, node->id, EDITOR_PROPERTY_COLOR);
                 }
                 if(rohr_ui_button("editor.soft_node.delete", &delete_node_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
@@ -3356,7 +3406,8 @@ int main(void) {
                     (void)editor_color_swatch("editor.soft_beam.color", &beam->color,
                         inherit, &color_picker,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 268.0f,
-                            field_width, 26.0f});
+                            field_width, 26.0f}, &project, EDITOR_ITEM_SOFT_BEAM,
+                        selected->id, body->id, beam->id, EDITOR_PROPERTY_COLOR);
                 }
                 if(rohr_ui_button("editor.soft_beam.delete", &delete_beam_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
@@ -3431,7 +3482,8 @@ int main(void) {
                     (void)editor_color_swatch("editor.soft_area.color", &area->color,
                         inherit, &color_picker,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, controls_y,
-                            field_width, 26.0f});
+                            field_width, 26.0f}, &project, EDITOR_ITEM_SOFT_AREA,
+                        selected->id, body->id, area->id, EDITOR_PROPERTY_COLOR);
                 }
                 field_editing = name_result.active;
                 controls_y += 36.0f;
@@ -3465,7 +3517,8 @@ int main(void) {
                     (void)editor_color_swatch("editor.soft_area.boundary_beam_color",
                         &boundary_beam_color, inherit, &color_picker,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, controls_y,
-                            field_width, 26.0f});
+                            field_width, 26.0f}, NULL, EDITOR_ITEM_SOFT_BEAM,
+                        0, 0, 0, EDITOR_PROPERTY_COLOR);
                     if(!inherit && color_picker.target == &boundary_beam_color) {
                         for(size_t edge = 0; edge < area->node_count; edge += 1) {
                             EditorSoftBeam *beam = editor_soft_area_beam_get(body, area, edge);
