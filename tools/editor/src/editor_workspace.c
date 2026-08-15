@@ -68,6 +68,54 @@ static bool editor_workspace_directory_empty(const char *directory) {
         SDL_EnumerateDirectory(directory, editor_workspace_not_empty, &empty) && empty;
 }
 
+static EditorResult editor_workspace_manifest_load(EditorWorkspace *workspace,
+    const char *directory, bool *recognized);
+
+static EditorResult editor_workspace_root_find(char *root, size_t capacity,
+        const char *selection, EditorWorkspace *workspace) {
+    SDL_PathInfo info;
+    size_t length;
+    EditorResult result;
+    bool recognized;
+
+    if(root == NULL || capacity == 0 || selection == NULL || selection[0] == '\0' ||
+            workspace == NULL ||
+            snprintf(root, capacity, "%s", selection) >= (int)capacity)
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "Workspace root search received an invalid or oversized path");
+    if(SDL_GetPathInfo(root, &info) && info.type == SDL_PATHTYPE_FILE) {
+        char *separator = strrchr(root, '/');
+#if defined(_WIN32)
+        char *backslash = strrchr(root, '\\');
+        if(backslash != NULL && (separator == NULL || backslash > separator))
+            separator = backslash;
+#endif
+        if(separator == NULL) return editor_result_error(
+            EDITOR_ERROR_PROJECT_ROOT_NOT_FOUND,
+            "Could not determine the parent directory of: %s", selection);
+        *separator = '\0';
+    }
+    for(;;) {
+        recognized = false;
+        result = editor_workspace_manifest_load(workspace, root, &recognized);
+        if(recognized || !editor_result_check(result)) return result;
+        length = strlen(root);
+        while(length > 1 && (root[length - 1] == '/' || root[length - 1] == '\\'))
+            root[--length] = '\0';
+        while(length > 0 && root[length - 1] != '/' && root[length - 1] != '\\')
+            length -= 1;
+        if(length == 0) break;
+        if(length == 1) {
+            if(root[0] == '/') break;
+            root[0] = '\0';
+            break;
+        }
+        root[length - 1] = '\0';
+    }
+    return editor_result_error(EDITOR_ERROR_PROJECT_ROOT_NOT_FOUND,
+        "Could not find a valid project manifest at or above: %s", selection);
+}
+
 static const EditorRigidBody *editor_workspace_body_get(
     const EditorObject *object, EditorRigidBodyId id) {
     if(object == NULL || id == 0) return NULL;
@@ -210,52 +258,78 @@ static bool editor_workspace_json_string(yyjson_val *root, const char *key,
     return true;
 }
 
-static bool editor_workspace_manifest_load(EditorWorkspace *workspace,
-    const char *directory) {
+static EditorResult editor_workspace_manifest_load(EditorWorkspace *workspace,
+        const char *directory, bool *recognized) {
     yyjson_doc *document;
     yyjson_val *root;
     yyjson_val *version;
+    yyjson_read_err read_error = {0};
     char path[EDITOR_WORKSPACE_PATH_MAX * 2];
-    bool success = false;
+    EditorResult result;
 
-    if(workspace == NULL || directory == NULL ||
+    if(recognized != NULL) *recognized = false;
+    if(workspace == NULL || directory == NULL || recognized == NULL ||
             !editor_workspace_path_join(path, sizeof(path), directory,
-                "project.rohr.json")) return false;
-    document = yyjson_read_file(path, 0, NULL, NULL);
-    if(document == NULL) return false;
+                "project.rohr.json")) return editor_result_error(
+                    EDITOR_ERROR_INVALID_ARGUMENT,
+                    "Workspace manifest load received an invalid path");
+    document = yyjson_read_file(path, 0, NULL, &read_error);
+    if(document == NULL) return editor_result_error(
+        read_error.code == YYJSON_READ_ERROR_FILE_OPEN ||
+                read_error.code == YYJSON_READ_ERROR_FILE_READ ?
+            EDITOR_ERROR_FILE_IO : EDITOR_ERROR_JSON_PARSE,
+        "Could not parse workspace manifest '%s': %s at byte %zu", path,
+        read_error.msg == NULL ? "unknown JSON error" : read_error.msg,
+        read_error.pos);
     root = yyjson_doc_get_root(document);
     version = yyjson_obj_get(root, "format_version");
-    if(!yyjson_is_obj(root) || !yyjson_is_uint(version) ||
-            yyjson_get_uint(version) != EDITOR_WORKSPACE_FORMAT_VERSION) goto done;
+    *recognized = yyjson_is_obj(root) &&
+        yyjson_obj_get(root, "editor_state_file") != NULL;
+    result = editor_result_error(EDITOR_ERROR_SCHEMA_INVALID,
+        "Workspace manifest '%s' does not match the current schema", path);
+    if(!yyjson_is_obj(root)) goto done;
+    if(!yyjson_is_uint(version)) {
+        result = editor_result_error(EDITOR_ERROR_SCHEMA_VERSION,
+            "Workspace manifest '%s' is missing integer format_version; expected %u",
+            path, EDITOR_WORKSPACE_FORMAT_VERSION);
+        goto done;
+    }
+    if(yyjson_get_uint(version) != EDITOR_WORKSPACE_FORMAT_VERSION) {
+        result = editor_result_error(EDITOR_ERROR_SCHEMA_VERSION,
+            "Workspace manifest '%s' uses format_version %llu; this editor requires %u",
+            path, (unsigned long long)yyjson_get_uint(version),
+            EDITOR_WORKSPACE_FORMAT_VERSION);
+        goto done;
+    }
     workspace->config = editor_workspace_config_default_get();
     workspace->config.format_version = (uint32_t)yyjson_get_uint(version);
-    if(!editor_workspace_json_string(root, "name", workspace->config.name,
-                sizeof(workspace->config.name)) ||
-            !editor_workspace_json_string(root, "source_directory",
-                workspace->config.source_directory,
-                sizeof(workspace->config.source_directory)) ||
-            !editor_workspace_json_string(root, "generated_directory",
-                workspace->config.generated_directory,
-                sizeof(workspace->config.generated_directory)) ||
-            !editor_workspace_json_string(root, "asset_directory",
-                workspace->config.asset_directory,
-                sizeof(workspace->config.asset_directory)) ||
-            !editor_workspace_json_string(root, "object_directory",
-                workspace->config.object_directory,
-                sizeof(workspace->config.object_directory)) ||
-            !editor_workspace_json_string(root, "editor_state_file",
-                workspace->config.editor_state_file,
-                sizeof(workspace->config.editor_state_file)) ||
-            !editor_workspace_json_string(root, "engine_root",
-                workspace->config.engine_root,
-                sizeof(workspace->config.engine_root)) ||
-            strlen(directory) >= sizeof(workspace->directory)) goto done;
+#define EDITOR_MANIFEST_STRING_READ(Field) \
+    if(!editor_workspace_json_string(root, #Field, workspace->config.Field, \
+            sizeof(workspace->config.Field))) { \
+        result = editor_result_error(EDITOR_ERROR_SCHEMA_INVALID, \
+            "Workspace manifest '%s' has missing, empty, or oversized field '%s'", \
+            path, #Field); \
+        goto done; \
+    }
+    EDITOR_MANIFEST_STRING_READ(name);
+    EDITOR_MANIFEST_STRING_READ(source_directory);
+    EDITOR_MANIFEST_STRING_READ(generated_directory);
+    EDITOR_MANIFEST_STRING_READ(asset_directory);
+    EDITOR_MANIFEST_STRING_READ(object_directory);
+    EDITOR_MANIFEST_STRING_READ(editor_state_file);
+    EDITOR_MANIFEST_STRING_READ(engine_root);
+#undef EDITOR_MANIFEST_STRING_READ
+    if(strlen(directory) >= sizeof(workspace->directory)) {
+        result = editor_result_error(EDITOR_ERROR_FILE_IO,
+            "Workspace directory path is too long: %s", directory);
+        goto done;
+    }
     snprintf(workspace->directory, sizeof(workspace->directory), "%s", directory);
     workspace->open = true;
-    success = true;
+    result = editor_result_value(true);
 done:
     yyjson_doc_free(document);
-    return success;
+    return result;
 }
 
 static bool editor_workspace_generated_objects_write(const EditorWorkspace *workspace,
@@ -790,16 +864,20 @@ bool editor_workspace_c_generate(const EditorWorkspace *workspace,
         editor_workspace_generated_objects_write(workspace, project);
 }
 
-bool editor_workspace_create(EditorWorkspace *workspace, EditorProject *project,
+EditorResult editor_workspace_create(EditorWorkspace *workspace, EditorProject *project,
     const char *directory, const char *engine_root) {
     EditorWorkspace created = {0};
 
     if(workspace == NULL || project == NULL || directory == NULL || directory[0] == '\0' ||
             engine_root == NULL || engine_root[0] == '\0' ||
             strlen(directory) >= sizeof(created.directory) ||
-            strlen(engine_root) >= sizeof(created.config.engine_root) ||
-            !SDL_CreateDirectory(directory) ||
-            !editor_workspace_directory_empty(directory)) return false;
+            strlen(engine_root) >= sizeof(created.config.engine_root))
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "Project creation received an invalid or oversized path");
+    if(!SDL_CreateDirectory(directory)) return editor_result_error(
+        EDITOR_ERROR_FILE_IO, "Could not create project directory: %s", directory);
+    if(!editor_workspace_directory_empty(directory)) return editor_result_error(
+        EDITOR_ERROR_FILE_IO, "Project directory is not empty: %s", directory);
     created.config = editor_workspace_config_default_get();
     editor_project_object_name_format(created.config.name,
         sizeof(created.config.name), editor_workspace_basename(directory));
@@ -812,34 +890,129 @@ bool editor_workspace_create(EditorWorkspace *workspace, EditorProject *project,
                 created.config.generated_directory) ||
             !editor_workspace_directory_create(directory, created.config.asset_directory) ||
             !editor_workspace_directory_create(directory, created.config.object_directory)) {
-        return false;
+        return editor_result_error(EDITOR_ERROR_FILE_IO,
+            "Could not create the project directory structure under: %s", directory);
     }
-    if(!editor_workspace_starter_project_init(project) ||
-            !editor_workspace_save(&created, project) ||
-            !editor_workspace_scaffold_write(&created) ||
-            !editor_workspace_generated_objects_write(&created, project) ||
-            !editor_workspace_main_write(&created, project)) return false;
+    if(!editor_workspace_starter_project_init(project)) return editor_result_error(
+        EDITOR_ERROR_SCHEMA_INVALID, "Could not initialize the starter project");
+    if(!editor_workspace_save(&created, project)) return editor_result_error(
+        EDITOR_ERROR_FILE_IO, "Could not save the initial project state under: %s", directory);
+    if(!editor_workspace_scaffold_write(&created)) return editor_result_error(
+        EDITOR_ERROR_FILE_IO, "Could not write the project build scaffold under: %s", directory);
+    if(!editor_workspace_generated_objects_write(&created, project))
+        return editor_result_error(EDITOR_ERROR_FILE_IO,
+            "Could not write initial generated C under: %s", directory);
+    if(!editor_workspace_main_write(&created, project)) return editor_result_error(
+        EDITOR_ERROR_FILE_IO, "Could not write initial main.c under: %s", directory);
     *workspace = created;
-    return true;
+    return editor_result_value(true);
 }
 
-bool editor_workspace_load(EditorWorkspace *workspace, EditorProject *project,
+EditorResult editor_workspace_load(EditorWorkspace *workspace, EditorProject *project,
     const char *directory) {
     EditorWorkspace loaded = {0};
     static EditorProject loaded_project;
     char path[EDITOR_WORKSPACE_PATH_MAX * 2];
+    char root[EDITOR_WORKSPACE_PATH_MAX];
+    EditorResult result;
 
-    if(workspace == NULL || project == NULL ||
-            !editor_workspace_manifest_load(&loaded, directory) ||
-            !editor_workspace_path_join(path, sizeof(path), directory,
-                loaded.config.editor_state_file) ||
-            !editor_project_load(&loaded_project, path)) return false;
+    if(workspace == NULL || project == NULL || directory == NULL)
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "Workspace load received an invalid argument");
+    result = editor_workspace_root_find(root, sizeof(root), directory, &loaded);
+    if(editor_result_check(result)) return result;
+    if(!editor_workspace_path_join(path, sizeof(path), root,
+            loaded.config.editor_state_file))
+        return editor_result_error(EDITOR_ERROR_FILE_IO,
+            "Project editor-state path is too long under: %s", root);
+    result = editor_project_load(&loaded_project, path);
+    if(editor_result_check(result)) return result;
     *workspace = loaded;
     *project = loaded_project;
-    return true;
+    return editor_result_value(true);
 }
 
 void editor_workspace_close(EditorWorkspace *workspace, EditorProject *project) {
     if(workspace != NULL) *workspace = (EditorWorkspace){0};
     editor_project_init(project);
+}
+
+EditorResult editor_workspace_command_execute(EditorWorkspace *workspace,
+        EditorProject *project, const EditorWorkspaceCommand *command) {
+    if(workspace == NULL || project == NULL || command == NULL)
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "Workspace command requires a workspace, project, and command");
+    switch(command->type) {
+        case EDITOR_WORKSPACE_COMMAND_CREATE:
+            return editor_workspace_create(workspace, project, command->directory,
+                command->engine_root);
+        case EDITOR_WORKSPACE_COMMAND_LOAD:
+            return editor_workspace_load(workspace, project, command->directory);
+        case EDITOR_WORKSPACE_COMMAND_SAVE:
+            if(!editor_workspace_save(workspace, project))
+                return editor_result_error(EDITOR_ERROR_FILE_IO,
+                    "Could not save project workspace: %s", workspace->directory);
+            return editor_result_value(true);
+        case EDITOR_WORKSPACE_COMMAND_GENERATE_C:
+            if(!editor_workspace_c_generate(workspace, project))
+                return editor_result_error(EDITOR_ERROR_FILE_IO,
+                    "Could not generate project C source: %s", workspace->directory);
+            return editor_result_value(true);
+    }
+    return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+        "Unknown workspace command");
+}
+
+static bool editor_workspace_command_text_append(char *output, size_t capacity,
+        size_t *used, const char *text) {
+    size_t length = strlen(text);
+    if(*used >= capacity || length >= capacity - *used) return false;
+    memcpy(output + *used, text, length);
+    *used += length;
+    output[*used] = '\0';
+    return true;
+}
+
+static bool editor_workspace_command_shell_append(char *output, size_t capacity,
+        size_t *used, const char *text) {
+    if(!editor_workspace_command_text_append(output, capacity, used, "'")) return false;
+    for(const char *at = text; *at != '\0'; at += 1) {
+        char character[2] = {*at, '\0'};
+        if(!editor_workspace_command_text_append(output, capacity, used,
+                *at == '\'' ? "'\\''" : character)) return false;
+    }
+    return editor_workspace_command_text_append(output, capacity, used, "'");
+}
+
+EditorResult editor_workspace_command_cli_write(const EditorWorkspaceCommand *command,
+        char *output, size_t output_capacity) {
+    const char *action;
+    size_t used = 0;
+    if(command == NULL || output == NULL || output_capacity == 0 ||
+            command->directory[0] == '\0')
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "Workspace command serialization received an invalid argument");
+    if(command->type == EDITOR_WORKSPACE_COMMAND_CREATE) action = "create ";
+    else if(command->type == EDITOR_WORKSPACE_COMMAND_LOAD) action = "load ";
+    else if(command->type == EDITOR_WORKSPACE_COMMAND_SAVE) action = "save ";
+    else if(command->type == EDITOR_WORKSPACE_COMMAND_GENERATE_C) action = "generate-c ";
+    else return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+        "Unknown workspace command");
+    output[0] = '\0';
+    if(!editor_workspace_command_text_append(output, output_capacity, &used,
+            "editor-cli project ") ||
+            !editor_workspace_command_text_append(output, output_capacity, &used,
+                action) ||
+            !editor_workspace_command_shell_append(output, output_capacity, &used,
+                command->directory)) goto capacity_error;
+    if(command->type == EDITOR_WORKSPACE_COMMAND_CREATE) {
+        if(command->engine_root[0] == '\0' ||
+                !editor_workspace_command_text_append(output, output_capacity, &used, " ") ||
+                !editor_workspace_command_shell_append(output, output_capacity, &used,
+                    command->engine_root)) goto capacity_error;
+    }
+    return editor_result_value(true);
+capacity_error:
+    return editor_result_error(EDITOR_ERROR_CAPACITY,
+        "Workspace CLI command output buffer is too small");
 }

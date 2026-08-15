@@ -24,15 +24,32 @@ typedef struct EditorWorkspace {
     bool open;
 } EditorWorkspace;
 
+typedef enum EditorWorkspaceCommandType {
+    EDITOR_WORKSPACE_COMMAND_CREATE,
+    EDITOR_WORKSPACE_COMMAND_LOAD,
+    EDITOR_WORKSPACE_COMMAND_SAVE,
+    EDITOR_WORKSPACE_COMMAND_GENERATE_C
+} EditorWorkspaceCommandType;
+
+typedef struct EditorWorkspaceCommand {
+    EditorWorkspaceCommandType type;
+    char directory[EDITOR_WORKSPACE_PATH_MAX];
+    char engine_root[EDITOR_WORKSPACE_PATH_MAX];
+} EditorWorkspaceCommand;
+
 EditorWorkspaceConfig editor_workspace_config_default_get(void);
-bool editor_workspace_create(EditorWorkspace *workspace, EditorProject *project,
+EditorResult editor_workspace_create(EditorWorkspace *workspace, EditorProject *project,
     const char *directory, const char *engine_root);
-bool editor_workspace_load(EditorWorkspace *workspace, EditorProject *project,
+EditorResult editor_workspace_load(EditorWorkspace *workspace, EditorProject *project,
     const char *directory);
 bool editor_workspace_save(const EditorWorkspace *workspace,
     const EditorProject *project);
 bool editor_workspace_c_generate(const EditorWorkspace *workspace,
     const EditorProject *project);
 void editor_workspace_close(EditorWorkspace *workspace, EditorProject *project);
+EditorResult editor_workspace_command_execute(EditorWorkspace *workspace,
+    EditorProject *project, const EditorWorkspaceCommand *command);
+EditorResult editor_workspace_command_cli_write(const EditorWorkspaceCommand *command,
+    char *output, size_t output_capacity);
 
 #endif

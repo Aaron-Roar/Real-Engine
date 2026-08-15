@@ -1968,6 +1968,8 @@ UIRect rohr_ui_component_bounds_get(UIRect bounds, const TextAsset *const *texts
 void rohr_ui_event_add(const SDL_Event *event);
 /** Queues a keyboard event for focused UI fields. */
 void rohr_ui_field_event_add(const SDL_Event *event);
+/** Clears the currently focused UI text or number field. */
+void rohr_ui_field_focus_clear(void);
 /** Draws and edits a caller-owned string or float field. */
 UIFieldResult rohr_ui_field(const char *id, UIFieldBinding binding,
     TextAsset *display, UIRect bounds, const UIButtonStyle *style);

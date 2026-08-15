@@ -53,6 +53,8 @@ void editor_file_browser_destroy(EditorFileBrowser *browser);
 bool editor_file_browser_open(EditorFileBrowser *browser, EditorFileBrowserMode mode,
     const char *directory, FontAsset *font);
 bool editor_file_browser_selection_clear(EditorFileBrowser *browser);
+bool editor_file_browser_directory_path_get(const EditorFileBrowser *browser,
+    char *path, size_t capacity);
 EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
     TextAsset *field_display, const TextAsset *save_label,
     const TextAsset *open_label, const TextAsset *create_label,

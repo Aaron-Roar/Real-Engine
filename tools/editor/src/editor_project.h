@@ -2,6 +2,7 @@
 #define ROHR_EDITOR_PROJECT_H
 
 #include "rohr.h"
+#include "editor_error.h"
 
 #define EDITOR_OBJECT_MAX 64
 #define EDITOR_HITBOX_VERTEX_MIN 3
@@ -17,7 +18,8 @@
 #define EDITOR_SOFT_AREA_MAX 128
 #define EDITOR_SOFT_AREA_NODE_MAX EDITOR_SOFT_NODE_MAX
 #define EDITOR_COLLISION_MASK_MAX 64
-#define EDITOR_PROJECT_FORMAT_VERSION 5
+/* Pre-release project schemas remain version 1 until the editor format is stable. */
+#define EDITOR_PROJECT_FORMAT_VERSION 1
 
 typedef uint32_t EditorObjectId;
 typedef uint32_t EditorVertexId;
@@ -183,7 +185,27 @@ typedef struct EditorObject {
     size_t soft_body_count;
 } EditorObject;
 
+typedef struct EditorNavigationState {
+    uint32_t mode;
+    uint32_t selection;
+    EditorObjectId object;
+    uint32_t selected_line;
+    uint32_t selected_vertex;
+    EditorRigidBodyId rigid_body;
+    EditorHitboxId hitbox;
+    EditorJointId joint;
+    EditorAnchorId anchor;
+    EditorSoftBodyId soft_body;
+    EditorSoftNodeId soft_node;
+    EditorSoftBeamId soft_beam;
+    uint32_t origin_kind;
+} EditorNavigationState;
+
 typedef struct EditorProject {
+    Vec2D viewport_camera_offset;
+    float viewport_camera_zoom;
+    bool viewport_local_view;
+    EditorNavigationState navigation;
     EditorCollisionMask collision_masks[EDITOR_COLLISION_MASK_MAX];
     size_t collision_mask_count;
     EditorObject objects[EDITOR_OBJECT_MAX];
@@ -209,7 +231,7 @@ void editor_project_property_name_format(char *output, size_t capacity,
 bool editor_project_collision_mask_add(EditorProject *project, const char *name,
     size_t *index);
 bool editor_project_save(const EditorProject *project, const char *path);
-bool editor_project_load(EditorProject *project, const char *path);
+EditorResult editor_project_load(EditorProject *project, const char *path);
 EditorObject *editor_project_object_add(EditorProject *project, Position position);
 bool editor_project_object_remove(EditorProject *project, EditorObjectId id);
 EditorObject *editor_project_selected_get(EditorProject *project);

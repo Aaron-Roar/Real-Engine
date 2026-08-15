@@ -19,7 +19,7 @@ function(rohr_example_runtime_dir output project_dir)
     if(ROHR_EXAMPLE_STANDALONE)
         set(${output} ${CMAKE_BINARY_DIR} PARENT_SCOPE)
     else()
-        set(${output} ${CMAKE_BINARY_DIR}/examples PARENT_SCOPE)
+        set(${output} ${ROHR_BUILD_OUTPUT_DIRECTORY}/examples PARENT_SCOPE)
     endif()
 endfunction()
 

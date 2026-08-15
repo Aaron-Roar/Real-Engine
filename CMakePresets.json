@@ -10,7 +10,7 @@
       "name": "linux",
       "displayName": "Linux development",
       "generator": "Unix Makefiles",
-      "binaryDir": "${sourceDir}/build",
+      "binaryDir": "${sourceDir}/build/cmake/linux",
       "condition": {
         "type": "notEquals",
         "lhs": "${hostSystemName}",
@@ -19,6 +19,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "ROHR_BUILD_OUTPUT_DIRECTORY": "${sourceDir}/build",
         "ROHR_BUILD_EXAMPLES": "ON",
         "ROHR_BUILD_TESTS": "ON"
       }
@@ -28,13 +29,14 @@
       "displayName": "Windows 10/11 development",
       "generator": "Visual Studio 17 2022",
       "architecture": "x64",
-      "binaryDir": "${sourceDir}/build/windows",
+      "binaryDir": "${sourceDir}/build/cmake/windows",
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
         "rhs": "Windows"
       },
       "cacheVariables": {
+        "ROHR_BUILD_OUTPUT_DIRECTORY": "${sourceDir}/build",
         "ROHR_BUILD_EXAMPLES": "ON",
         "ROHR_BUILD_TESTS": "ON"
       }

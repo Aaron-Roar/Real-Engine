@@ -30,7 +30,7 @@ From the project root:
 ```sh
 nix develop
 cmake --preset linux
-cmake --build build --target docs
+cmake --build build/cmake/linux --target docs
 ```
 
 The generated HTML is written to:
@@ -43,7 +43,7 @@ The `docs` target also refreshes the committed Markdown API references. To
 regenerate only those references, run:
 
 ```sh
-cmake --build build --target generate_public_api
+cmake --build build/cmake/linux --target generate_public_api
 ```
 
 Generated HTML is not committed. The Markdown API references are committed and

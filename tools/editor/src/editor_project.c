@@ -127,6 +127,7 @@ static void editor_hitbox_regular_set(EditorProject *project, EditorHitbox *hitb
 void editor_project_init(EditorProject *project) {
     if(project == NULL) return;
     *project = (EditorProject){
+        .viewport_camera_zoom = 1.0f,
         .collision_masks = {{.name = "default"}},
         .collision_mask_count = 1,
         .next_id = 1,
@@ -225,6 +226,11 @@ EditorRigidBody editor_project_rigid_body_default_get(void) {
         .restitution = 0.0f,
         .gravity_enabled = false,
         .collision_enabled = true,
+        .particle_auto_fit = true,
+        .particle_ring_color = UINT32_C(0x4a925fff),
+        .particle_fill_color = UINT32_C(0x4a925f40),
+        .border_color = UINT32_C(0xe6ebf4ff),
+        .surface_color = UINT32_C(0x66758c80),
         .collision_category = UINT64_C(1),
         .collision_with = UINT64_C(1),
         .particle_auto_fit = true,

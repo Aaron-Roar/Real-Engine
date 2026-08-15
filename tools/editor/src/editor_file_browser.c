@@ -146,6 +146,24 @@ bool editor_file_browser_selection_clear(EditorFileBrowser *browser) {
     return false;
 }
 
+bool editor_file_browser_directory_path_get(const EditorFileBrowser *browser,
+        char *path, size_t capacity) {
+    const char *directory;
+
+    if(browser == NULL || path == NULL || capacity == 0 ||
+            browser->mode != EDITOR_FILE_BROWSER_DIRECTORY) return false;
+    if(browser->preview_selected_directory &&
+            browser->preview_selected_path[0] != '\0') {
+        directory = browser->preview_selected_path;
+    } else if(browser->selected_directory[0] != '\0') {
+        directory = browser->selected_directory;
+    } else {
+        directory = browser->directory;
+    }
+    return directory[0] != '\0' &&
+        snprintf(path, capacity, "%s", directory) < (int)capacity;
+}
+
 static bool editor_file_browser_preview_refresh(EditorFileBrowser *browser,
     const char *directory) {
     size_t length;
@@ -443,18 +461,8 @@ EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
                 (UIRect){dialog.x + dialog.width - 274.0f, dialog.y + 490.0f,
                     120.0f, 34.0f}, NULL).clicked &&
             ((browser->mode == EDITOR_FILE_BROWSER_DIRECTORY &&
-                ((browser->preview_selected_path[0] != '\0' &&
-                    browser->preview_selected_directory) ||
-                 (browser->preview_selected_path[0] == '\0' &&
-                    browser->selected_directory[0] != '\0') ||
-                 (browser->preview_selected_path[0] == '\0' &&
-                    browser->selected_directory[0] == '\0')) &&
-                snprintf(result.path, sizeof(result.path), "%s",
-                    browser->preview_selected_directory ?
-                        browser->preview_selected_path :
-                        (browser->selected_directory[0] != '\0' ?
-                            browser->selected_directory : browser->directory)) <
-                    (int)sizeof(result.path)) ||
+                editor_file_browser_directory_path_get(
+                    browser, result.path, sizeof(result.path))) ||
              (browser->mode == EDITOR_FILE_BROWSER_CREATE_DIRECTORY &&
                 editor_file_browser_directory_name_valid(browser->filename) &&
                 editor_file_browser_path_join(result.path, sizeof(result.path),

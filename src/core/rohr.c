@@ -479,6 +479,7 @@ void rohr_ui_frame_begin(UIInput input) { ui_frame_begin(input); }
 UIRect rohr_ui_component_bounds_get(UIRect bounds, const TextAsset *const *texts, size_t text_count, UIComponentConfig config) { return ui_component_bounds_get(bounds, texts, text_count, config); }
 void rohr_ui_event_add(const SDL_Event *event) { ui_event_add(event); }
 void rohr_ui_field_event_add(const SDL_Event *event) { ui_field_event_add(event); }
+void rohr_ui_field_focus_clear(void) { ui_field_focus_clear(); }
 UIFieldResult rohr_ui_field(const char *id, UIFieldBinding binding, TextAsset *display, UIRect bounds, const UIButtonStyle *style) { return ui_field(id, binding, display, bounds, style); }
 UIButtonResult rohr_ui_button(const char *id, const TextAsset *label, UIRect bounds, const UIButtonStyle *style) { return ui_button(id, label, bounds, style); }
 UIDropdownResult rohr_ui_dropdown(const char *id, const TextAsset *const *options, size_t option_count, size_t selected_index, UIRect bounds, const UIButtonStyle *style) { return ui_dropdown(id, options, option_count, selected_index, bounds, style); }

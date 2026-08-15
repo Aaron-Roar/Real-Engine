@@ -1,0 +1,1910 @@
+#include "editor_command.h"
+
+#include <errno.h>
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+static EditorCommandExecuted editor_command_executed_callback;
+static void *editor_command_executed_context;
+static EditorCommandExecuting editor_command_executing_callback;
+static void *editor_command_executing_context;
+static EditorCommandFinished editor_command_finished_callback;
+static void *editor_command_finished_context;
+
+static EditorCommandResult editor_command_error(EditorError error) {
+    return (EditorCommandResult){.kind = ERROR_RESULT_ERROR,
+        .result.error = error};
+}
+
+static bool editor_command_float_equal(float first, float second) {
+    return fabsf(first - second) <= 0.0001f;
+}
+
+static bool editor_command_position_equal(Position first, Position second) {
+    return editor_command_float_equal(first.x, second.x) &&
+        editor_command_float_equal(first.y, second.y);
+}
+
+static EditorCommandResult editor_command_result_from(EditorResult result) {
+    if(editor_result_check(result)) return editor_command_error(result.result.error);
+    return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+}
+
+static EditorCommandResult editor_command_not_found(const char *kind, uint32_t id) {
+    EditorResult result = editor_result_error(EDITOR_ERROR_NOT_FOUND,
+        "%s %u was not found", kind, id);
+    return editor_command_error(result.result.error);
+}
+
+static EditorSoftBody *editor_command_soft_body_get(EditorObject *object,
+        EditorSoftBodyId body) {
+    if(object == NULL) return NULL;
+    for(size_t i = 0; i < object->soft_body_count; i += 1)
+        if(object->soft_body_items[i].id == body) return &object->soft_body_items[i];
+    return NULL;
+}
+
+static EditorJoint *editor_command_joint_get(EditorObject *object, EditorJointId joint) {
+    if(object == NULL) return NULL;
+    for(size_t i = 0; i < object->joint_count; i += 1)
+        if(object->joint_items[i].id == joint) return &object->joint_items[i];
+    return NULL;
+}
+
+static EditorSoftNode *editor_command_soft_node_get(EditorSoftBody *body,
+        EditorSoftNodeId node) {
+    if(body == NULL) return NULL;
+    for(size_t i = 0; i < body->node_count; i += 1)
+        if(body->nodes[i].id == node) return &body->nodes[i];
+    return NULL;
+}
+
+static EditorSoftBeam *editor_command_soft_beam_get(EditorSoftBody *body,
+        EditorSoftBeamId beam) {
+    if(body == NULL) return NULL;
+    for(size_t i = 0; i < body->beam_count; i += 1)
+        if(body->beams[i].id == beam) return &body->beams[i];
+    return NULL;
+}
+
+static bool editor_command_collision_mask_find(const EditorProject *project,
+        const char *name, size_t *index) {
+    char formatted[EDITOR_OBJECT_NAME_MAX];
+    if(project == NULL || name == NULL || index == NULL) return false;
+    editor_project_property_name_format(formatted, sizeof(formatted), name);
+    if(formatted[0] == '\0') return false;
+    for(size_t i = 0; i < project->collision_mask_count; i += 1) {
+        if(strcmp(project->collision_masks[i].name, formatted) != 0) continue;
+        *index = i;
+        return true;
+    }
+    return false;
+}
+
+static EditorCommandResult editor_command_execute_internal(EditorProject *project,
+        const EditorCommand *command) {
+    if(project == NULL || command == NULL)
+        return editor_command_error((EditorError){EDITOR_ERROR_INVALID_ARGUMENT,
+            "command execution requires a project and command"});
+    switch(command->type) {
+        case EDITOR_COMMAND_OBJECT_ADD: {
+            EditorObjectIdResult result = editor_object_command_add(project,
+                &(EditorObjectAddArgs){
+                    .name = command->data.object_add.name,
+                    .position = command->data.object_add.position
+                });
+            if(result.kind == ERROR_RESULT_ERROR)
+                return editor_command_error(result.result.error);
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE,
+                .result.object = result.result.value};
+        }
+        case EDITOR_COMMAND_OBJECT_RENAME:
+            return editor_command_result_from(editor_object_command_rename(project,
+                command->data.object_rename.object,
+                command->data.object_rename.name));
+        case EDITOR_COMMAND_OBJECT_REMOVE:
+            return editor_command_result_from(editor_object_command_remove(project,
+                command->data.object_remove.object));
+        case EDITOR_COMMAND_OBJECT_POSITION: {
+            EditorObject *object = editor_object_query_get(project,
+                command->data.object_position.object);
+            if(object == NULL) return editor_command_not_found("object",
+                command->data.object_position.object);
+            if(editor_command_position_equal(object->position,
+                    command->data.object_position.position))
+                return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+            object->position = command->data.object_position.position;
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+        }
+        case EDITOR_COMMAND_RIGID_BODY_TRANSFORM: {
+            EditorObject *object = editor_object_query_get(project,
+                command->data.rigid_body_transform.object);
+            EditorRigidBody *body = editor_project_rigid_body_get(object,
+                command->data.rigid_body_transform.body);
+            if(object == NULL) return editor_command_not_found("object",
+                command->data.rigid_body_transform.object);
+            if(body == NULL) return editor_command_not_found("rigid body",
+                command->data.rigid_body_transform.body);
+            if(editor_command_position_equal(body->position,
+                        command->data.rigid_body_transform.position) &&
+                    editor_command_float_equal(body->rotation,
+                        command->data.rigid_body_transform.rotation))
+                return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+            body->position = command->data.rigid_body_transform.position;
+            body->rotation = command->data.rigid_body_transform.rotation;
+            editor_project_rigid_body_constraints_apply(object, body->id);
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+        }
+        case EDITOR_COMMAND_VERTEX_POSITION: {
+            EditorObject *object = editor_object_query_get(project,
+                command->data.vertex_position.object);
+            EditorRigidBody *body = editor_project_rigid_body_get(object,
+                command->data.vertex_position.body);
+            EditorHitbox *hitbox = editor_project_hitbox_get(body,
+                command->data.vertex_position.hitbox);
+            if(object == NULL) return editor_command_not_found("object",
+                command->data.vertex_position.object);
+            if(body == NULL) return editor_command_not_found("rigid body",
+                command->data.vertex_position.body);
+            if(hitbox == NULL) return editor_command_not_found("hitbox",
+                command->data.vertex_position.hitbox);
+            for(uint32_t i = 0; i < hitbox->vertex_count; i += 1) {
+                if(hitbox->vertices[i].id != command->data.vertex_position.vertex) continue;
+                if(hitbox->vertices[i].position_locked)
+                    return editor_command_error(editor_result_error(
+                        EDITOR_ERROR_INVALID_ARGUMENT, "vertex %u is locked",
+                        command->data.vertex_position.vertex).result.error);
+                if(editor_command_position_equal(hitbox->vertices[i].position,
+                        command->data.vertex_position.position))
+                    return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+                hitbox->vertices[i].position = command->data.vertex_position.position;
+                return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+            }
+            return editor_command_not_found("vertex",
+                command->data.vertex_position.vertex);
+        }
+        case EDITOR_COMMAND_ANCHOR_TRANSFORM: {
+            EditorObject *object = editor_object_query_get(project,
+                command->data.anchor_transform.object);
+            EditorAnchor *anchor = editor_project_anchor_get(object,
+                command->data.anchor_transform.anchor);
+            if(object == NULL) return editor_command_not_found("object",
+                command->data.anchor_transform.object);
+            if(anchor == NULL) return editor_command_not_found("anchor",
+                command->data.anchor_transform.anchor);
+            if(editor_command_position_equal(anchor->position,
+                        command->data.anchor_transform.position) &&
+                    editor_command_float_equal(anchor->rotation,
+                        command->data.anchor_transform.rotation))
+                return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+            anchor->position = command->data.anchor_transform.position;
+            anchor->rotation = command->data.anchor_transform.rotation;
+            editor_project_anchor_constraints_apply(object, anchor->id);
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+        }
+        case EDITOR_COMMAND_SOFT_BODY_TRANSFORM: {
+            EditorObject *object = editor_object_query_get(project,
+                command->data.soft_body_transform.object);
+            EditorSoftBody *body = editor_command_soft_body_get(object,
+                command->data.soft_body_transform.body);
+            if(object == NULL) return editor_command_not_found("object",
+                command->data.soft_body_transform.object);
+            if(body == NULL) return editor_command_not_found("soft body",
+                command->data.soft_body_transform.body);
+            if(editor_command_position_equal(body->position,
+                        command->data.soft_body_transform.position) &&
+                    editor_command_float_equal(body->rotation,
+                        command->data.soft_body_transform.rotation))
+                return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+            body->position = command->data.soft_body_transform.position;
+            body->rotation = command->data.soft_body_transform.rotation;
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+        }
+        case EDITOR_COMMAND_SOFT_NODE_POSITION: {
+            EditorObject *object = editor_object_query_get(project,
+                command->data.soft_node_position.object);
+            EditorSoftBody *body = editor_command_soft_body_get(object,
+                command->data.soft_node_position.body);
+            if(object == NULL) return editor_command_not_found("object",
+                command->data.soft_node_position.object);
+            if(body == NULL) return editor_command_not_found("soft body",
+                command->data.soft_node_position.body);
+            for(size_t i = 0; i < body->node_count; i += 1) {
+                if(body->nodes[i].id != command->data.soft_node_position.node) continue;
+                if(editor_command_position_equal(body->nodes[i].position,
+                        command->data.soft_node_position.position))
+                    return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+                body->nodes[i].position = command->data.soft_node_position.position;
+                return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+            }
+            return editor_command_not_found("soft node",
+                command->data.soft_node_position.node);
+        }
+        case EDITOR_COMMAND_RIGID_BODY_ORIGIN: {
+            EditorObject *object = editor_object_query_get(project,
+                command->data.origin.object);
+            EditorRigidBody *body = editor_project_rigid_body_get(object,
+                command->data.origin.body);
+            if(object == NULL) return editor_command_not_found("object",
+                command->data.origin.object);
+            if(body == NULL) return editor_command_not_found("rigid body",
+                command->data.origin.body);
+            if(editor_command_position_equal(body->position,
+                    command->data.origin.position))
+                return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+            if(!editor_project_rigid_body_origin_set(object, body,
+                    command->data.origin.position))
+                return editor_command_error(editor_result_error(
+                    EDITOR_ERROR_INVALID_ARGUMENT,
+                    "rigid body origin could not be changed").result.error);
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+        }
+        case EDITOR_COMMAND_SOFT_BODY_ORIGIN: {
+            EditorObject *object = editor_object_query_get(project,
+                command->data.origin.object);
+            EditorSoftBody *body = editor_command_soft_body_get(object,
+                command->data.origin.body);
+            if(object == NULL) return editor_command_not_found("object",
+                command->data.origin.object);
+            if(body == NULL) return editor_command_not_found("soft body",
+                command->data.origin.body);
+            if(editor_command_position_equal(body->position,
+                    command->data.origin.position))
+                return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+            if(!editor_project_soft_body_origin_set(body,
+                    command->data.origin.position))
+                return editor_command_error(editor_result_error(
+                    EDITOR_ERROR_INVALID_ARGUMENT,
+                    "soft body origin could not be changed").result.error);
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+        }
+        case EDITOR_COMMAND_VIEWPORT_CAMERA:
+            if(command->data.viewport_camera.zoom < 0.1f ||
+                    command->data.viewport_camera.zoom > 8.0f)
+                return editor_command_error(editor_result_error(
+                    EDITOR_ERROR_INVALID_ARGUMENT,
+                    "viewport zoom must be between 0.1 and 8").result.error);
+            project->viewport_camera_offset = command->data.viewport_camera.offset;
+            project->viewport_camera_zoom = command->data.viewport_camera.zoom;
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+        case EDITOR_COMMAND_VIEWPORT_COORDINATES:
+            project->viewport_local_view = command->data.viewport_coordinates.local;
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+        case EDITOR_COMMAND_VISIBILITY: {
+            EditorObject *object = editor_object_query_get(project,
+                command->data.visibility.object);
+            bool *visible = NULL;
+            if(object == NULL) return editor_command_not_found("object",
+                command->data.visibility.object);
+            switch(command->data.visibility.kind) {
+                case EDITOR_VISIBILITY_OBJECT:
+                    visible = &object->visible;
+                    break;
+                case EDITOR_VISIBILITY_RIGID_BODY: {
+                    EditorRigidBody *body = editor_project_rigid_body_get(object,
+                        command->data.visibility.item);
+                    if(body != NULL) visible = &body->visible;
+                    break;
+                }
+                case EDITOR_VISIBILITY_HITBOX: {
+                    EditorRigidBody *body = editor_project_rigid_body_get(object,
+                        command->data.visibility.parent);
+                    EditorHitbox *hitbox = editor_project_hitbox_get(body,
+                        command->data.visibility.item);
+                    if(hitbox != NULL) visible = &hitbox->visible;
+                    break;
+                }
+                case EDITOR_VISIBILITY_JOINT:
+                    for(size_t i = 0; i < object->joint_count; i += 1)
+                        if(object->joint_items[i].id == command->data.visibility.item)
+                            visible = &object->joint_items[i].visible;
+                    break;
+                case EDITOR_VISIBILITY_ANCHOR: {
+                    EditorAnchor *anchor = editor_project_anchor_get(object,
+                        command->data.visibility.item);
+                    if(anchor != NULL) visible = &anchor->visible;
+                    break;
+                }
+                case EDITOR_VISIBILITY_SOFT_BODY: {
+                    EditorSoftBody *body = editor_command_soft_body_get(object,
+                        command->data.visibility.item);
+                    if(body != NULL) visible = &body->visible;
+                    break;
+                }
+                case EDITOR_VISIBILITY_SOFT_NODE: {
+                    EditorSoftBody *body = editor_command_soft_body_get(object,
+                        command->data.visibility.parent);
+                    if(body != NULL) for(size_t i = 0; i < body->node_count; i += 1)
+                        if(body->nodes[i].id == command->data.visibility.item)
+                            visible = &body->nodes[i].visible;
+                    break;
+                }
+                case EDITOR_VISIBILITY_SOFT_BEAM: {
+                    EditorSoftBody *body = editor_command_soft_body_get(object,
+                        command->data.visibility.parent);
+                    if(body != NULL) for(size_t i = 0; i < body->beam_count; i += 1)
+                        if(body->beams[i].id == command->data.visibility.item)
+                            visible = &body->beams[i].visible;
+                    break;
+                }
+                case EDITOR_VISIBILITY_SOFT_AREA: {
+                    EditorSoftBody *body = editor_command_soft_body_get(object,
+                        command->data.visibility.parent);
+                    if(body != NULL) for(size_t i = 0; i < body->area_count; i += 1)
+                        if(body->areas[i].id == command->data.visibility.item)
+                            visible = &body->areas[i].visible;
+                    break;
+                }
+            }
+            if(visible == NULL) return editor_command_not_found("visibility target",
+                command->data.visibility.item);
+            *visible = command->data.visibility.visible;
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+        }
+        case EDITOR_COMMAND_NAVIGATION_SET:
+            if(command->data.navigation.mode > 11 ||
+                    command->data.navigation.selection > 11 ||
+                    command->data.navigation.origin_kind > 2)
+                return editor_command_error(editor_result_error(
+                    EDITOR_ERROR_INVALID_ARGUMENT,
+                    "navigation state contains an invalid mode or selection").result.error);
+            if(command->data.navigation.object != 0 &&
+                    editor_object_query_get(project,
+                        command->data.navigation.object) == NULL)
+                return editor_command_not_found("object",
+                    command->data.navigation.object);
+            project->selected = command->data.navigation.object;
+            project->navigation = command->data.navigation;
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+        case EDITOR_COMMAND_ITEM_ADD: {
+            const EditorItemKind kind = command->data.item_add.kind;
+            EditorObject *object;
+            uint32_t created = 0;
+            const char *created_name = NULL;
+            if(kind == EDITOR_ITEM_OBJECT) {
+                EditorObjectIdResult result = editor_object_command_add(project,
+                    &(EditorObjectAddArgs){command->data.item_add.name,
+                        command->data.item_add.position});
+                EditorCommandResult command_result;
+                EditorObject *created_object;
+                if(result.kind == ERROR_RESULT_ERROR)
+                    return editor_command_error(result.result.error);
+                command_result = (EditorCommandResult){.kind = ERROR_RESULT_VALUE,
+                    .result.object = result.result.value,
+                    .created = {.valid = true, .kind = EDITOR_ITEM_OBJECT,
+                        .object = result.result.value, .item = result.result.value}};
+                created_object = editor_object_query_get(project, result.result.value);
+                if(created_object != NULL) snprintf(command_result.created.name,
+                    sizeof(command_result.created.name), "%s", created_object->name);
+                return command_result;
+            }
+            object = editor_object_query_get(project, command->data.item_add.object);
+            if(object == NULL) return editor_command_not_found("object",
+                command->data.item_add.object);
+            if(kind == EDITOR_ITEM_RIGID_BODY) {
+                EditorRigidBody *value = editor_project_rigid_body_add(project, object);
+                if(value != NULL) { created = value->id; created_name = value->name; }
+            } else if(kind == EDITOR_ITEM_HITBOX) {
+                EditorRigidBody *body = editor_project_rigid_body_get(object,
+                    command->data.item_add.parent);
+                EditorHitbox *value = editor_project_hitbox_add(project, body);
+                if(value != NULL) { created = value->id; created_name = value->name; }
+            } else if(kind == EDITOR_ITEM_JOINT && command->data.item_add.option <=
+                    (uint32_t)EDITOR_JOINT_SPRING) {
+                EditorJoint *value = editor_project_joint_add(project, object,
+                    (EditorJointKind)command->data.item_add.option);
+                if(value != NULL) { created = value->id; created_name = value->name; }
+            } else if(kind == EDITOR_ITEM_ANCHOR) {
+                EditorAnchor *value = editor_project_anchor_add(project, object,
+                    command->data.item_add.position, command->data.item_add.parent);
+                if(value != NULL) { created = value->id; created_name = value->name; }
+            } else if(kind == EDITOR_ITEM_SOFT_BODY) {
+                EditorSoftBody *value = editor_project_soft_body_add(project, object);
+                if(value != NULL) { created = value->id; created_name = value->name; }
+            } else if(kind == EDITOR_ITEM_SOFT_NODE) {
+                EditorSoftBody *body = editor_command_soft_body_get(object,
+                    command->data.item_add.parent);
+                EditorSoftNode *value = editor_project_soft_node_add(project, body,
+                    command->data.item_add.position);
+                if(value != NULL) { created = value->id; created_name = value->name; }
+            } else if(kind == EDITOR_ITEM_SOFT_BEAM) {
+                EditorSoftBody *body = editor_command_soft_body_get(object,
+                    command->data.item_add.parent);
+                EditorSoftBeam *value = editor_project_soft_beam_add(project, body,
+                    command->data.item_add.first, command->data.item_add.second);
+                if(value != NULL) { created = value->id; created_name = value->name; }
+            } else if(kind == EDITOR_ITEM_VERTEX) {
+                EditorRigidBody *body = editor_project_rigid_body_get(object,
+                    command->data.item_add.parent);
+                EditorHitbox *hitbox = editor_project_hitbox_get(body,
+                    command->data.item_add.first);
+                if(editor_project_hitbox_vertex_insert(project, hitbox,
+                        command->data.item_add.index)) {
+                    created = project->next_vertex_id - 1;
+                    if(hitbox != NULL) for(uint32_t i = 0; i < hitbox->vertex_count; i += 1)
+                        if(hitbox->vertices[i].id == created)
+                            created_name = hitbox->vertices[i].name;
+                }
+            }
+            if(created == 0) return editor_command_error(editor_result_error(
+                EDITOR_ERROR_CAPACITY, "could not add editor item").result.error);
+            if(command->data.item_add.name[0] != '\0') {
+                EditorCommand rename = {.type = EDITOR_COMMAND_ITEM_RENAME,
+                    .data.item_rename = {.kind = kind,
+                        .object = command->data.item_add.object,
+                        .parent = command->data.item_add.parent,
+                        .item = created,
+                        .index = kind == EDITOR_ITEM_VERTEX ? created :
+                            command->data.item_add.index}};
+                EditorCommandResult renamed;
+                if(kind == EDITOR_ITEM_VERTEX || kind == EDITOR_ITEM_LINE)
+                    rename.data.item_rename.item = command->data.item_add.first;
+                snprintf(rename.data.item_rename.name,
+                    sizeof(rename.data.item_rename.name), "%s",
+                    command->data.item_add.name);
+                renamed = editor_command_execute_internal(project, &rename);
+                if(renamed.kind == ERROR_RESULT_ERROR) return renamed;
+            }
+            {
+                EditorCommandResult result = {.kind = ERROR_RESULT_VALUE,
+                    .result.object = created,
+                    .created = {.valid = true, .kind = kind,
+                        .object = command->data.item_add.object,
+                        .parent = command->data.item_add.parent,
+                        .container = command->data.item_add.first,
+                        .item = created}};
+                if(created_name != NULL) snprintf(result.created.name,
+                    sizeof(result.created.name), "%s", created_name);
+                return result;
+            }
+        }
+        case EDITOR_COMMAND_ITEM_REMOVE: {
+            const EditorItemKind kind = command->data.item_remove.kind;
+            EditorObject *object = editor_object_query_get(project,
+                command->data.item_remove.object);
+            bool removed = false;
+            if(kind == EDITOR_ITEM_OBJECT)
+                return editor_command_result_from(editor_object_command_remove(project,
+                    command->data.item_remove.object));
+            if(object == NULL) return editor_command_not_found("object",
+                command->data.item_remove.object);
+            if(kind == EDITOR_ITEM_RIGID_BODY)
+                removed = editor_project_rigid_body_remove(object,
+                    command->data.item_remove.item);
+            else if(kind == EDITOR_ITEM_HITBOX) {
+                EditorRigidBody *body = editor_project_rigid_body_get(object,
+                    command->data.item_remove.parent);
+                removed = editor_project_hitbox_remove(body,
+                    command->data.item_remove.item);
+            } else if(kind == EDITOR_ITEM_JOINT)
+                removed = editor_project_joint_remove(object,
+                    command->data.item_remove.item);
+            else if(kind == EDITOR_ITEM_ANCHOR)
+                removed = editor_project_anchor_remove(object,
+                    command->data.item_remove.item);
+            else if(kind == EDITOR_ITEM_SOFT_BODY)
+                removed = editor_project_soft_body_remove(object,
+                    command->data.item_remove.item);
+            else if(kind == EDITOR_ITEM_SOFT_NODE) {
+                EditorSoftBody *body = editor_command_soft_body_get(object,
+                    command->data.item_remove.parent);
+                removed = editor_project_soft_node_remove(project, body,
+                    command->data.item_remove.item);
+            } else if(kind == EDITOR_ITEM_SOFT_BEAM) {
+                EditorSoftBody *body = editor_command_soft_body_get(object,
+                    command->data.item_remove.parent);
+                removed = editor_project_soft_beam_remove(project, body,
+                    command->data.item_remove.item);
+            } else if(kind == EDITOR_ITEM_VERTEX || kind == EDITOR_ITEM_LINE) {
+                EditorRigidBody *body = editor_project_rigid_body_get(object,
+                    command->data.item_remove.parent);
+                EditorHitbox *hitbox = editor_project_hitbox_get(body,
+                    command->data.item_remove.item);
+                uint32_t index = command->data.item_remove.index;
+                if(kind == EDITOR_ITEM_VERTEX && hitbox != NULL) {
+                    for(uint32_t i = 0; i < hitbox->vertex_count; i += 1)
+                        if(hitbox->vertices[i].id == command->data.item_remove.index)
+                            index = i;
+                    removed = editor_project_hitbox_vertex_remove(hitbox, index);
+                } else if(kind == EDITOR_ITEM_LINE) {
+                    removed = editor_project_hitbox_line_remove(hitbox, index);
+                }
+            }
+            if(!removed) return editor_command_not_found("editor item",
+                command->data.item_remove.item);
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+        }
+        case EDITOR_COMMAND_ITEM_RENAME: {
+            const EditorItemKind kind = command->data.item_rename.kind;
+            EditorObject *object = editor_object_query_get(project,
+                command->data.item_rename.object);
+            char *name = NULL;
+            char formatted[EDITOR_OBJECT_NAME_MAX];
+            if(kind == EDITOR_ITEM_OBJECT)
+                return editor_command_result_from(editor_object_command_rename(project,
+                    command->data.item_rename.object,
+                    command->data.item_rename.name));
+            if(object == NULL) return editor_command_not_found("object",
+                command->data.item_rename.object);
+            if(kind == EDITOR_ITEM_RIGID_BODY) {
+                EditorRigidBody *value = editor_project_rigid_body_get(object,
+                    command->data.item_rename.item);
+                if(value != NULL) name = value->name;
+            } else if(kind == EDITOR_ITEM_HITBOX) {
+                EditorRigidBody *body = editor_project_rigid_body_get(object,
+                    command->data.item_rename.parent);
+                EditorHitbox *value = editor_project_hitbox_get(body,
+                    command->data.item_rename.item);
+                if(value != NULL) name = value->name;
+            } else if(kind == EDITOR_ITEM_JOINT) {
+                EditorJoint *value = editor_command_joint_get(object,
+                    command->data.item_rename.item);
+                if(value != NULL) name = value->name;
+            } else if(kind == EDITOR_ITEM_ANCHOR) {
+                EditorAnchor *value = editor_project_anchor_get(object,
+                    command->data.item_rename.item);
+                if(value != NULL) name = value->name;
+            } else if(kind == EDITOR_ITEM_SOFT_BODY) {
+                EditorSoftBody *value = editor_command_soft_body_get(object,
+                    command->data.item_rename.item);
+                if(value != NULL) name = value->name;
+            } else if(kind == EDITOR_ITEM_SOFT_NODE) {
+                EditorSoftBody *body = editor_command_soft_body_get(object,
+                    command->data.item_rename.parent);
+                EditorSoftNode *value = editor_command_soft_node_get(body,
+                    command->data.item_rename.item);
+                if(value != NULL) name = value->name;
+            } else if(kind == EDITOR_ITEM_SOFT_BEAM) {
+                EditorSoftBody *body = editor_command_soft_body_get(object,
+                    command->data.item_rename.parent);
+                EditorSoftBeam *value = editor_command_soft_beam_get(body,
+                    command->data.item_rename.item);
+                if(value != NULL) name = value->name;
+            } else if(kind == EDITOR_ITEM_VERTEX || kind == EDITOR_ITEM_LINE) {
+                EditorRigidBody *body = editor_project_rigid_body_get(object,
+                    command->data.item_rename.parent);
+                EditorHitbox *hitbox = editor_project_hitbox_get(body,
+                    command->data.item_rename.item);
+                if(hitbox != NULL && kind == EDITOR_ITEM_LINE &&
+                        command->data.item_rename.index < hitbox->vertex_count)
+                    name = hitbox->line_names[command->data.item_rename.index];
+                if(hitbox != NULL && kind == EDITOR_ITEM_VERTEX)
+                    for(uint32_t i = 0; i < hitbox->vertex_count; i += 1)
+                        if(hitbox->vertices[i].id == command->data.item_rename.index)
+                            name = hitbox->vertices[i].name;
+            }
+            if(name == NULL) return editor_command_not_found("editor item",
+                command->data.item_rename.item);
+            editor_project_property_name_format(formatted, sizeof(formatted),
+                command->data.item_rename.name);
+            if(formatted[0] == '\0') return editor_command_error(editor_result_error(
+                EDITOR_ERROR_NAME_INVALID,
+                "item name does not contain a valid identifier").result.error);
+            snprintf(name, EDITOR_OBJECT_NAME_MAX, "%s", formatted);
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+        }
+        case EDITOR_COMMAND_PROPERTY_SET: {
+            const EditorPropertySetCommand *set = &command->data.property_set;
+            EditorObject *object = editor_object_query_get(project, set->object);
+            if(object == NULL) return editor_command_not_found("object", set->object);
+            if(set->kind == EDITOR_ITEM_RIGID_BODY) {
+                EditorRigidBody *body = editor_project_rigid_body_get(object, set->item);
+                if(body == NULL) return editor_command_not_found("rigid body", set->item);
+                if(set->property == EDITOR_PROPERTY_MASS &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number >= 0.0f) body->mass_value = set->value.number;
+                else if(set->property == EDITOR_PROPERTY_FRICTION &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number >= 0.0f) body->friction = set->value.number;
+                else if(set->property == EDITOR_PROPERTY_RESTITUTION &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number >= 0.0f && set->value.number <= 1.0f)
+                    body->restitution = set->value.number;
+                else if(set->property == EDITOR_PROPERTY_GRAVITY &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_BOOL)
+                    body->gravity_enabled = set->value.boolean;
+                else if(set->property == EDITOR_PROPERTY_STATIC &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_BOOL)
+                    body->static_body = set->value.boolean;
+                else if(set->property == EDITOR_PROPERTY_ROTATION_LOCKED &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_BOOL)
+                    body->rotation_locked = set->value.boolean;
+                else if(set->property == EDITOR_PROPERTY_COLLISION &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_BOOL) {
+                    body->collision_enabled = set->value.boolean;
+                    if(!body->collision_enabled) body->particle = false;
+                } else if(set->property == EDITOR_PROPERTY_PARTICLE &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_BOOL &&
+                        (!set->value.boolean || body->collision_enabled))
+                    body->particle = set->value.boolean;
+                else goto property_invalid;
+            } else if(set->kind == EDITOR_ITEM_VERTEX) {
+                EditorRigidBody *body = editor_project_rigid_body_get(object, set->parent);
+                EditorHitbox *hitbox = editor_project_hitbox_get(body, set->item);
+                EditorVertex *vertex = NULL;
+                if(hitbox != NULL) for(uint32_t i = 0; i < hitbox->vertex_count; i += 1)
+                    if(hitbox->vertices[i].id == set->index) vertex = &hitbox->vertices[i];
+                if(vertex == NULL) return editor_command_not_found("vertex", set->index);
+                if(set->property != EDITOR_PROPERTY_POSITION_LOCKED ||
+                        set->value_kind != EDITOR_PROPERTY_VALUE_BOOL) goto property_invalid;
+                vertex->position_locked = set->value.boolean;
+            } else if(set->kind == EDITOR_ITEM_LINE) {
+                EditorRigidBody *body = editor_project_rigid_body_get(object, set->parent);
+                EditorHitbox *hitbox = editor_project_hitbox_get(body, set->item);
+                if(set->property != EDITOR_PROPERTY_LINE_LENGTH ||
+                        set->value_kind != EDITOR_PROPERTY_VALUE_FLOAT ||
+                        set->value.number < 0.0f ||
+                        !editor_project_hitbox_line_length_set(hitbox, set->index,
+                            set->value.number)) goto property_invalid;
+            } else if(set->kind == EDITOR_ITEM_JOINT) {
+                EditorJoint *joint = editor_command_joint_get(object, set->item);
+                if(joint == NULL) return editor_command_not_found("joint", set->item);
+                if(set->property == EDITOR_PROPERTY_VISUAL_SIZE &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number >= 0.25f && set->value.number <= 3.0f)
+                    joint->visual_size = set->value.number;
+                else if(set->property == EDITOR_PROPERTY_JOINT_KIND &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_UINT &&
+                        set->value.integer <= (uint32_t)EDITOR_JOINT_SPRING) {
+                    if(!editor_project_joint_kind_set(object, joint,
+                            (EditorJointKind)set->value.integer)) goto property_invalid;
+                } else if(set->property == EDITOR_PROPERTY_REST_LENGTH &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number >= 0.0f) joint->rest_length = set->value.number;
+                else if(set->property == EDITOR_PROPERTY_STIFFNESS &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number >= 0.0f) joint->stiffness = set->value.number;
+                else if(set->property == EDITOR_PROPERTY_DAMPING &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number >= 0.0f) joint->damping = set->value.number;
+                else goto property_invalid;
+            } else if(set->kind == EDITOR_ITEM_ANCHOR) {
+                EditorAnchor *anchor = editor_project_anchor_get(object, set->item);
+                bool success = false;
+                if(anchor == NULL) return editor_command_not_found("anchor", set->item);
+                if(set->property == EDITOR_PROPERTY_POSITION_FOLLOWS_BODY &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_BOOL)
+                    success = editor_project_anchor_position_lock_set(object, anchor,
+                        set->value.boolean);
+                else if(set->property == EDITOR_PROPERTY_ROTATION_FOLLOWS_BODY &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_BOOL)
+                    success = editor_project_anchor_rotation_lock_set(object, anchor,
+                        set->value.boolean);
+                if(!success) goto property_invalid;
+                editor_project_anchor_constraints_apply(object, anchor->id);
+            } else if(set->kind == EDITOR_ITEM_SOFT_NODE) {
+                EditorSoftBody *body = editor_command_soft_body_get(object, set->parent);
+                EditorSoftNode *node = editor_command_soft_node_get(body, set->item);
+                if(node == NULL) return editor_command_not_found("soft node", set->item);
+                if(set->property == EDITOR_PROPERTY_MASS &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number >= 0.0f) node->node_mass = set->value.number;
+                else if(set->property == EDITOR_PROPERTY_FRICTION &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number >= 0.0f) node->friction = set->value.number;
+                else if(set->property == EDITOR_PROPERTY_RESTITUTION &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number >= 0.0f && set->value.number <= 1.0f)
+                    node->restitution = set->value.number;
+                else if(set->property == EDITOR_PROPERTY_GRAVITY &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_BOOL)
+                    node->gravity_enabled = set->value.boolean;
+                else if(set->property == EDITOR_PROPERTY_COLLISION &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_BOOL)
+                    node->collision_enabled = set->value.boolean;
+                else goto property_invalid;
+            } else if(set->kind == EDITOR_ITEM_SOFT_BEAM) {
+                EditorSoftBody *body = editor_command_soft_body_get(object, set->parent);
+                EditorSoftBeam *beam = editor_command_soft_beam_get(body, set->item);
+                if(beam == NULL) return editor_command_not_found("soft beam", set->item);
+                if(set->property == EDITOR_PROPERTY_STIFFNESS &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number >= 0.0f) beam->stiffness = set->value.number;
+                else if(set->property == EDITOR_PROPERTY_DAMPING &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
+                        set->value.number >= 0.0f) beam->damping = set->value.number;
+                else goto property_invalid;
+            } else goto property_invalid;
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+property_invalid:
+            return editor_command_error(editor_result_error(
+                EDITOR_ERROR_INVALID_ARGUMENT,
+                "property is invalid for the target or value").result.error);
+        }
+        case EDITOR_COMMAND_RELATIONSHIP_SET: {
+            const EditorRelationshipSetCommand *set =
+                &command->data.relationship_set;
+            EditorObject *object = editor_object_query_get(project, set->object);
+            if(object == NULL) return editor_command_not_found("object", set->object);
+            if(set->endpoint > 1) return editor_command_error(editor_result_error(
+                EDITOR_ERROR_INVALID_ARGUMENT,
+                "relationship endpoint must be 0 or 1").result.error);
+            if(set->kind == EDITOR_RELATIONSHIP_JOINT_ANCHOR) {
+                EditorJoint *joint = editor_command_joint_get(object, set->item);
+                if(joint == NULL) return editor_command_not_found("joint", set->item);
+                if(!editor_project_joint_anchor_set(object, joint, set->endpoint,
+                        set->target)) return editor_command_error(editor_result_error(
+                    EDITOR_ERROR_INVALID_ARGUMENT,
+                    "joint anchor relationship is invalid").result.error);
+            } else if(set->kind == EDITOR_RELATIONSHIP_ANCHOR_RIGID_BODY) {
+                EditorAnchor *anchor = editor_project_anchor_get(object, set->item);
+                if(anchor == NULL) return editor_command_not_found("anchor", set->item);
+                if(!editor_project_anchor_rigid_body_set(object, anchor, set->target))
+                    return editor_command_error(editor_result_error(
+                        EDITOR_ERROR_INVALID_ARGUMENT,
+                        "anchor rigid-body relationship is invalid").result.error);
+                editor_project_anchor_constraints_apply(object, anchor->id);
+            } else if(set->kind == EDITOR_RELATIONSHIP_SOFT_BEAM_NODE) {
+                EditorSoftBody *body = editor_command_soft_body_get(object, set->parent);
+                EditorSoftBeam *beam = editor_command_soft_beam_get(body, set->item);
+                if(beam == NULL) return editor_command_not_found("soft beam", set->item);
+                if(set->target != 0 &&
+                        editor_command_soft_node_get(body, set->target) == NULL)
+                    return editor_command_not_found("soft node", set->target);
+                if(set->endpoint == 0) beam->node_a = set->target;
+                else beam->node_b = set->target;
+            } else {
+                return editor_command_error(editor_result_error(
+                    EDITOR_ERROR_INVALID_ARGUMENT,
+                    "unknown relationship kind").result.error);
+            }
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+        }
+        case EDITOR_COMMAND_COLLISION_MASK_ADD: {
+            size_t index;
+            if(editor_command_collision_mask_find(project,
+                    command->data.collision_mask_add.name, &index))
+                return (EditorCommandResult){.kind = ERROR_RESULT_VALUE,
+                    .result.object = (uint32_t)index};
+            if(!editor_project_collision_mask_add(project,
+                    command->data.collision_mask_add.name, &index))
+                return editor_command_error(editor_result_error(
+                    EDITOR_ERROR_CAPACITY,
+                    "collision mask could not be added").result.error);
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE,
+                .result.object = (uint32_t)index};
+        }
+        case EDITOR_COMMAND_COLLISION_FILTER_SET: {
+            const EditorCollisionFilterSetCommand *set =
+                &command->data.collision_filter_set;
+            EditorObject *object = editor_object_query_get(project, set->object);
+            RohrCollisionCategoryMask *filter;
+            size_t index;
+            uint64_t bit;
+            if(object == NULL) return editor_command_not_found("object", set->object);
+            if(set->filter != EDITOR_COLLISION_FILTER_CATEGORY &&
+                    set->filter != EDITOR_COLLISION_FILTER_COLLIDE_WITH)
+                return editor_command_error(editor_result_error(
+                    EDITOR_ERROR_INVALID_ARGUMENT,
+                    "unknown collision filter kind").result.error);
+            if(!editor_command_collision_mask_find(project, set->mask, &index))
+                return editor_command_error(editor_result_error(
+                    EDITOR_ERROR_NOT_FOUND,
+                    "collision mask '%s' was not found", set->mask).result.error);
+            if(set->kind == EDITOR_ITEM_RIGID_BODY) {
+                EditorRigidBody *body = editor_project_rigid_body_get(object, set->item);
+                if(body == NULL) return editor_command_not_found("rigid body", set->item);
+                filter = set->filter == EDITOR_COLLISION_FILTER_CATEGORY ?
+                    &body->collision_category : &body->collision_with;
+            } else if(set->kind == EDITOR_ITEM_SOFT_NODE) {
+                EditorSoftBody *body = editor_command_soft_body_get(object, set->parent);
+                EditorSoftNode *node = editor_command_soft_node_get(body, set->item);
+                if(node == NULL) return editor_command_not_found("soft node", set->item);
+                filter = set->filter == EDITOR_COLLISION_FILTER_CATEGORY ?
+                    &node->collision_category : &node->collision_with;
+            } else {
+                return editor_command_error(editor_result_error(
+                    EDITOR_ERROR_INVALID_ARGUMENT,
+                    "collision filters are only supported by rigid bodies and soft nodes")
+                        .result.error);
+            }
+            bit = UINT64_C(1) << index;
+            if(set->enabled) *filter |= bit;
+            else *filter &= ~bit;
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+        }
+    }
+    return editor_command_error((EditorError){EDITOR_ERROR_INVALID_ARGUMENT,
+        "unknown editor command"});
+}
+
+EditorCommandResult editor_command_execute(EditorProject *project,
+        const EditorCommand *command) {
+    if(editor_command_executing_callback != NULL)
+        editor_command_executing_callback(project, command,
+            editor_command_executing_context);
+    EditorCommandResult result = editor_command_execute_internal(project, command);
+    if(result.kind == ERROR_RESULT_VALUE && editor_command_executed_callback != NULL)
+        editor_command_executed_callback(command, &result,
+            editor_command_executed_context);
+    if(editor_command_finished_callback != NULL)
+        editor_command_finished_callback(command, &result,
+            editor_command_finished_context);
+    return result;
+}
+
+void editor_command_executed_callback_set(EditorCommandExecuted callback,
+        void *context) {
+    editor_command_executed_callback = callback;
+    editor_command_executed_context = context;
+}
+
+void editor_command_executing_callback_set(EditorCommandExecuting callback,
+        void *context) {
+    editor_command_executing_callback = callback;
+    editor_command_executing_context = context;
+}
+
+void editor_command_finished_callback_set(EditorCommandFinished callback,
+        void *context) {
+    editor_command_finished_callback = callback;
+    editor_command_finished_context = context;
+}
+
+static bool editor_command_uint_parse(const char *text, uint32_t *value) {
+    char *end;
+    unsigned long parsed;
+    if(text == NULL || value == NULL || text[0] == '\0') return false;
+    errno = 0;
+    parsed = strtoul(text, &end, 10);
+    if(errno != 0 || *end != '\0' || parsed > UINT32_MAX) return false;
+    *value = (uint32_t)parsed;
+    return true;
+}
+
+static bool editor_command_float_parse(const char *text, float *value) {
+    char *end;
+    float parsed;
+    if(text == NULL || value == NULL || text[0] == '\0') return false;
+    errno = 0;
+    parsed = strtof(text, &end);
+    if(errno != 0 || *end != '\0') return false;
+    *value = parsed;
+    return true;
+}
+
+static bool editor_command_bool_parse(const char *text, bool *value) {
+    if(text == NULL || value == NULL) return false;
+    if(strcmp(text, "true") == 0) {
+        *value = true;
+        return true;
+    }
+    if(strcmp(text, "false") == 0) {
+        *value = false;
+        return true;
+    }
+    return false;
+}
+
+static bool editor_command_optional_id_parse(const char *text, uint32_t *value) {
+    if(text != NULL && strcmp(text, "none") == 0) {
+        *value = 0;
+        return true;
+    }
+    return editor_command_uint_parse(text, value);
+}
+
+static const char *editor_command_navigation_modes[] = {
+    "hierarchy", "object", "rigid-body", "hitbox", "joint", "anchor",
+    "soft-body", "soft-node", "soft-beam", "origin", "line", "vertex"
+};
+
+static const char *editor_command_navigation_selections[] = {
+    "none", "object", "rigid-body", "hitbox", "joint", "anchor",
+    "soft-body", "soft-node", "soft-beam", "origin", "line", "vertex"
+};
+
+static const char *editor_command_origin_kinds[] = {
+    "none", "rigid-body", "soft-body"
+};
+
+static bool editor_command_named_uint_parse(const char *text,
+        const char *const *names, size_t count, uint32_t *value) {
+    if(text == NULL || names == NULL || value == NULL) return false;
+    for(size_t i = 0; i < count; i += 1) {
+        if(strcmp(text, names[i]) != 0) continue;
+        *value = (uint32_t)i;
+        return true;
+    }
+    return false;
+}
+
+static bool editor_command_item_kind_parse(const char *domain, EditorItemKind *kind) {
+    if(domain == NULL || kind == NULL) return false;
+    if(strcmp(domain, "object") == 0) *kind = EDITOR_ITEM_OBJECT;
+    else if(strcmp(domain, "rigid-body") == 0) *kind = EDITOR_ITEM_RIGID_BODY;
+    else if(strcmp(domain, "hitbox") == 0) *kind = EDITOR_ITEM_HITBOX;
+    else if(strcmp(domain, "joint") == 0) *kind = EDITOR_ITEM_JOINT;
+    else if(strcmp(domain, "anchor") == 0) *kind = EDITOR_ITEM_ANCHOR;
+    else if(strcmp(domain, "soft-body") == 0) *kind = EDITOR_ITEM_SOFT_BODY;
+    else if(strcmp(domain, "soft-node") == 0) *kind = EDITOR_ITEM_SOFT_NODE;
+    else if(strcmp(domain, "soft-beam") == 0) *kind = EDITOR_ITEM_SOFT_BEAM;
+    else if(strcmp(domain, "vertex") == 0) *kind = EDITOR_ITEM_VERTEX;
+    else if(strcmp(domain, "line") == 0) *kind = EDITOR_ITEM_LINE;
+    else return false;
+    return true;
+}
+
+static const char *editor_command_item_domain_get(EditorItemKind kind) {
+    switch(kind) {
+        case EDITOR_ITEM_OBJECT: return "object";
+        case EDITOR_ITEM_RIGID_BODY: return "rigid-body";
+        case EDITOR_ITEM_HITBOX: return "hitbox";
+        case EDITOR_ITEM_JOINT: return "joint";
+        case EDITOR_ITEM_ANCHOR: return "anchor";
+        case EDITOR_ITEM_SOFT_BODY: return "soft-body";
+        case EDITOR_ITEM_SOFT_NODE: return "soft-node";
+        case EDITOR_ITEM_SOFT_BEAM: return "soft-beam";
+        case EDITOR_ITEM_VERTEX: return "vertex";
+        case EDITOR_ITEM_LINE: return "line";
+    }
+    return NULL;
+}
+
+static bool editor_command_property_parse(const char *name,
+        EditorPropertyKind *property, EditorPropertyValueKind *value_kind) {
+    if(name == NULL || property == NULL || value_kind == NULL) return false;
+#define EDITOR_FLOAT_PROPERTY(text, value) \
+    if(strcmp(name, text) == 0) { *property = value; \
+        *value_kind = EDITOR_PROPERTY_VALUE_FLOAT; return true; }
+#define EDITOR_BOOL_PROPERTY(text, value) \
+    if(strcmp(name, text) == 0) { *property = value; \
+        *value_kind = EDITOR_PROPERTY_VALUE_BOOL; return true; }
+    EDITOR_FLOAT_PROPERTY("mass", EDITOR_PROPERTY_MASS)
+    EDITOR_FLOAT_PROPERTY("friction", EDITOR_PROPERTY_FRICTION)
+    EDITOR_FLOAT_PROPERTY("restitution", EDITOR_PROPERTY_RESTITUTION)
+    EDITOR_FLOAT_PROPERTY("visual-size", EDITOR_PROPERTY_VISUAL_SIZE)
+    EDITOR_FLOAT_PROPERTY("rest-length", EDITOR_PROPERTY_REST_LENGTH)
+    EDITOR_FLOAT_PROPERTY("stiffness", EDITOR_PROPERTY_STIFFNESS)
+    EDITOR_FLOAT_PROPERTY("damping", EDITOR_PROPERTY_DAMPING)
+    EDITOR_FLOAT_PROPERTY("length", EDITOR_PROPERTY_LINE_LENGTH)
+    EDITOR_BOOL_PROPERTY("gravity", EDITOR_PROPERTY_GRAVITY)
+    EDITOR_BOOL_PROPERTY("static", EDITOR_PROPERTY_STATIC)
+    EDITOR_BOOL_PROPERTY("rotation-locked", EDITOR_PROPERTY_ROTATION_LOCKED)
+    EDITOR_BOOL_PROPERTY("collision", EDITOR_PROPERTY_COLLISION)
+    EDITOR_BOOL_PROPERTY("particle", EDITOR_PROPERTY_PARTICLE)
+    EDITOR_BOOL_PROPERTY("position-locked", EDITOR_PROPERTY_POSITION_LOCKED)
+    EDITOR_BOOL_PROPERTY("position-follows-body", EDITOR_PROPERTY_POSITION_FOLLOWS_BODY)
+    EDITOR_BOOL_PROPERTY("rotation-follows-body", EDITOR_PROPERTY_ROTATION_FOLLOWS_BODY)
+#undef EDITOR_FLOAT_PROPERTY
+#undef EDITOR_BOOL_PROPERTY
+    if(strcmp(name, "kind") == 0) {
+        *property = EDITOR_PROPERTY_JOINT_KIND;
+        *value_kind = EDITOR_PROPERTY_VALUE_UINT;
+        return true;
+    }
+    return false;
+}
+
+static const char *editor_command_property_name_get(EditorPropertyKind property) {
+    switch(property) {
+        case EDITOR_PROPERTY_MASS: return "mass";
+        case EDITOR_PROPERTY_FRICTION: return "friction";
+        case EDITOR_PROPERTY_RESTITUTION: return "restitution";
+        case EDITOR_PROPERTY_GRAVITY: return "gravity";
+        case EDITOR_PROPERTY_STATIC: return "static";
+        case EDITOR_PROPERTY_ROTATION_LOCKED: return "rotation-locked";
+        case EDITOR_PROPERTY_COLLISION: return "collision";
+        case EDITOR_PROPERTY_PARTICLE: return "particle";
+        case EDITOR_PROPERTY_POSITION_LOCKED: return "position-locked";
+        case EDITOR_PROPERTY_VISUAL_SIZE: return "visual-size";
+        case EDITOR_PROPERTY_JOINT_KIND: return "kind";
+        case EDITOR_PROPERTY_REST_LENGTH: return "rest-length";
+        case EDITOR_PROPERTY_STIFFNESS: return "stiffness";
+        case EDITOR_PROPERTY_DAMPING: return "damping";
+        case EDITOR_PROPERTY_POSITION_FOLLOWS_BODY: return "position-follows-body";
+        case EDITOR_PROPERTY_ROTATION_FOLLOWS_BODY: return "rotation-follows-body";
+        case EDITOR_PROPERTY_LINE_LENGTH: return "length";
+    }
+    return NULL;
+}
+
+EditorResult editor_command_cli_parse(int count, char **arguments,
+        const char **document_path, EditorCommand *command) {
+    const char *domain;
+    const char *action;
+    if(arguments == NULL || document_path == NULL || command == NULL || count < 4)
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "expected an editor mutation command");
+    domain = arguments[1];
+    action = arguments[2];
+    *document_path = arguments[3];
+    memset(command, 0, sizeof(*command));
+    if(strcmp(domain, "navigation") == 0 && strcmp(action, "set") == 0) {
+        EditorNavigationState *navigation = &command->data.navigation;
+        if(count != 17 || !editor_command_named_uint_parse(arguments[4],
+                    editor_command_navigation_modes,
+                    sizeof(editor_command_navigation_modes) /
+                        sizeof(editor_command_navigation_modes[0]), &navigation->mode) ||
+                !editor_command_named_uint_parse(arguments[5],
+                    editor_command_navigation_selections,
+                    sizeof(editor_command_navigation_selections) /
+                        sizeof(editor_command_navigation_selections[0]),
+                    &navigation->selection) ||
+                !editor_command_uint_parse(arguments[6], &navigation->object) ||
+                !editor_command_uint_parse(arguments[7], &navigation->rigid_body) ||
+                !editor_command_uint_parse(arguments[8], &navigation->hitbox) ||
+                !editor_command_uint_parse(arguments[9], &navigation->joint) ||
+                !editor_command_uint_parse(arguments[10], &navigation->anchor) ||
+                !editor_command_uint_parse(arguments[11], &navigation->soft_body) ||
+                !editor_command_uint_parse(arguments[12], &navigation->soft_node) ||
+                !editor_command_uint_parse(arguments[13], &navigation->soft_beam) ||
+                !editor_command_uint_parse(arguments[14], &navigation->selected_line) ||
+                !editor_command_uint_parse(arguments[15], &navigation->selected_vertex) ||
+                !editor_command_named_uint_parse(arguments[16],
+                    editor_command_origin_kinds,
+                    sizeof(editor_command_origin_kinds) /
+                        sizeof(editor_command_origin_kinds[0]),
+                    &navigation->origin_kind))
+            return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                "invalid navigation set command");
+        command->type = EDITOR_COMMAND_NAVIGATION_SET;
+        return editor_result_value(true);
+    }
+    if(strcmp(domain, "collision-mask") == 0 && strcmp(action, "add") == 0) {
+        if(count != 5 || arguments[4][0] == '\0')
+            return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                "invalid collision-mask add command");
+        command->type = EDITOR_COMMAND_COLLISION_MASK_ADD;
+        snprintf(command->data.collision_mask_add.name,
+            sizeof(command->data.collision_mask_add.name), "%s", arguments[4]);
+        return editor_result_value(true);
+    }
+    if(strcmp(action, "filter") == 0) {
+        EditorCollisionFilterSetCommand *set = &command->data.collision_filter_set;
+        int filter_index;
+        int mask_index;
+        int enabled_index;
+        if(strcmp(domain, "rigid-body") == 0 && count == 9) {
+            set->kind = EDITOR_ITEM_RIGID_BODY;
+            if(!editor_command_uint_parse(arguments[4], &set->object) ||
+                    !editor_command_uint_parse(arguments[5], &set->item))
+                goto collision_filter_invalid;
+            filter_index = 6;
+        } else if(strcmp(domain, "soft-node") == 0 && count == 10) {
+            set->kind = EDITOR_ITEM_SOFT_NODE;
+            if(!editor_command_uint_parse(arguments[4], &set->object) ||
+                    !editor_command_uint_parse(arguments[5], &set->parent) ||
+                    !editor_command_uint_parse(arguments[6], &set->item))
+                goto collision_filter_invalid;
+            filter_index = 7;
+        } else goto collision_filter_invalid;
+        mask_index = filter_index + 1;
+        enabled_index = filter_index + 2;
+        if(strcmp(arguments[filter_index], "category") == 0)
+            set->filter = EDITOR_COLLISION_FILTER_CATEGORY;
+        else if(strcmp(arguments[filter_index], "collide-with") == 0)
+            set->filter = EDITOR_COLLISION_FILTER_COLLIDE_WITH;
+        else goto collision_filter_invalid;
+        if(arguments[mask_index][0] == '\0' ||
+                !editor_command_bool_parse(arguments[enabled_index], &set->enabled))
+            goto collision_filter_invalid;
+        snprintf(set->mask, sizeof(set->mask), "%s", arguments[mask_index]);
+        command->type = EDITOR_COMMAND_COLLISION_FILTER_SET;
+        return editor_result_value(true);
+collision_filter_invalid:
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "invalid %s collision-filter command", domain);
+    }
+    if(strcmp(action, "connect") == 0) {
+        EditorRelationshipSetCommand *set = &command->data.relationship_set;
+        if(strcmp(domain, "joint") == 0 && count == 8 &&
+                editor_command_uint_parse(arguments[4], &set->object) &&
+                editor_command_uint_parse(arguments[5], &set->item) &&
+                (strcmp(arguments[6], "anchor-a") == 0 ||
+                    strcmp(arguments[6], "anchor-b") == 0) &&
+                editor_command_optional_id_parse(arguments[7], &set->target)) {
+            set->kind = EDITOR_RELATIONSHIP_JOINT_ANCHOR;
+            set->endpoint = strcmp(arguments[6], "anchor-b") == 0;
+        } else if(strcmp(domain, "anchor") == 0 && count == 8 &&
+                editor_command_uint_parse(arguments[4], &set->object) &&
+                editor_command_uint_parse(arguments[5], &set->item) &&
+                strcmp(arguments[6], "rigid-body") == 0 &&
+                editor_command_optional_id_parse(arguments[7], &set->target)) {
+            set->kind = EDITOR_RELATIONSHIP_ANCHOR_RIGID_BODY;
+        } else if(strcmp(domain, "soft-beam") == 0 && count == 9 &&
+                editor_command_uint_parse(arguments[4], &set->object) &&
+                editor_command_uint_parse(arguments[5], &set->parent) &&
+                editor_command_uint_parse(arguments[6], &set->item) &&
+                (strcmp(arguments[7], "node-a") == 0 ||
+                    strcmp(arguments[7], "node-b") == 0) &&
+                editor_command_optional_id_parse(arguments[8], &set->target)) {
+            set->kind = EDITOR_RELATIONSHIP_SOFT_BEAM_NODE;
+            set->endpoint = strcmp(arguments[7], "node-b") == 0;
+        } else {
+            return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                "invalid %s relationship command", domain);
+        }
+        command->type = EDITOR_COMMAND_RELATIONSHIP_SET;
+        return editor_result_value(true);
+    }
+    if(strcmp(action, "set") == 0) {
+        EditorPropertySetCommand *set = &command->data.property_set;
+        bool nested;
+        bool indexed;
+        int property_index;
+        int value_index;
+        if(!editor_command_item_kind_parse(domain, &set->kind)) goto property_parse_invalid;
+        nested = set->kind == EDITOR_ITEM_SOFT_NODE ||
+            set->kind == EDITOR_ITEM_SOFT_BEAM;
+        indexed = set->kind == EDITOR_ITEM_VERTEX || set->kind == EDITOR_ITEM_LINE;
+        if((nested && count != 9) || (indexed && count != 10) ||
+                (!nested && !indexed && count != 8) ||
+                !editor_command_uint_parse(arguments[4], &set->object))
+            goto property_parse_invalid;
+        if(nested || indexed) {
+            if(!editor_command_uint_parse(arguments[5], &set->parent) ||
+                    !editor_command_uint_parse(arguments[6], &set->item))
+                goto property_parse_invalid;
+        } else if(!editor_command_uint_parse(arguments[5], &set->item)) {
+            goto property_parse_invalid;
+        }
+        if(indexed && !editor_command_uint_parse(arguments[7], &set->index))
+            goto property_parse_invalid;
+        property_index = indexed ? 8 : nested ? 7 : 6;
+        value_index = property_index + 1;
+        if(!editor_command_property_parse(arguments[property_index],
+                &set->property, &set->value_kind)) goto property_parse_invalid;
+        if(set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT) {
+            if(!editor_command_float_parse(arguments[value_index], &set->value.number))
+                goto property_parse_invalid;
+        } else if(set->value_kind == EDITOR_PROPERTY_VALUE_BOOL) {
+            if(!editor_command_bool_parse(arguments[value_index], &set->value.boolean))
+                goto property_parse_invalid;
+        } else {
+            const char *kinds[] = {"revolute", "weld", "spring"};
+            if(!editor_command_named_uint_parse(arguments[value_index], kinds, 3,
+                    &set->value.integer)) goto property_parse_invalid;
+        }
+        command->type = EDITOR_COMMAND_PROPERTY_SET;
+        return editor_result_value(true);
+property_parse_invalid:
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "invalid %s property command", domain);
+    }
+    if(strcmp(domain, "object") != 0 && (strcmp(action, "add") == 0 ||
+            strcmp(action, "delete") == 0 || strcmp(action, "rename") == 0)) {
+        EditorItemKind kind;
+        if(!editor_command_item_kind_parse(domain, &kind)) goto item_invalid;
+        if(strcmp(action, "add") == 0) {
+            command->type = EDITOR_COMMAND_ITEM_ADD;
+            command->data.item_add.kind = kind;
+            if(kind == EDITOR_ITEM_RIGID_BODY || kind == EDITOR_ITEM_SOFT_BODY) {
+                if(count == 5 && editor_command_uint_parse(arguments[4],
+                        &command->data.item_add.object)) return editor_result_value(true);
+            } else if(kind == EDITOR_ITEM_HITBOX) {
+                if(count == 6 && editor_command_uint_parse(arguments[4],
+                            &command->data.item_add.object) &&
+                        editor_command_uint_parse(arguments[5],
+                            &command->data.item_add.parent)) return editor_result_value(true);
+            } else if(kind == EDITOR_ITEM_JOINT) {
+                const char *kinds[] = {"revolute", "weld", "spring"};
+                if(count == 6 && editor_command_uint_parse(arguments[4],
+                            &command->data.item_add.object) &&
+                        editor_command_named_uint_parse(arguments[5], kinds, 3,
+                            &command->data.item_add.option)) return editor_result_value(true);
+            } else if(kind == EDITOR_ITEM_ANCHOR) {
+                if(count == 8 && editor_command_uint_parse(arguments[4],
+                            &command->data.item_add.object) &&
+                        editor_command_uint_parse(arguments[5],
+                            &command->data.item_add.parent) &&
+                        editor_command_float_parse(arguments[6],
+                            &command->data.item_add.position.x) &&
+                        editor_command_float_parse(arguments[7],
+                            &command->data.item_add.position.y)) return editor_result_value(true);
+            } else if(kind == EDITOR_ITEM_SOFT_NODE) {
+                if(count == 8 && editor_command_uint_parse(arguments[4],
+                            &command->data.item_add.object) &&
+                        editor_command_uint_parse(arguments[5],
+                            &command->data.item_add.parent) &&
+                        editor_command_float_parse(arguments[6],
+                            &command->data.item_add.position.x) &&
+                        editor_command_float_parse(arguments[7],
+                            &command->data.item_add.position.y)) return editor_result_value(true);
+            } else if(kind == EDITOR_ITEM_SOFT_BEAM) {
+                if(count == 8 && editor_command_uint_parse(arguments[4],
+                            &command->data.item_add.object) &&
+                        editor_command_uint_parse(arguments[5],
+                            &command->data.item_add.parent) &&
+                        editor_command_uint_parse(arguments[6],
+                            &command->data.item_add.first) &&
+                        editor_command_uint_parse(arguments[7],
+                            &command->data.item_add.second)) return editor_result_value(true);
+            } else if(kind == EDITOR_ITEM_VERTEX) {
+                if(count == 8 && editor_command_uint_parse(arguments[4],
+                            &command->data.item_add.object) &&
+                        editor_command_uint_parse(arguments[5],
+                            &command->data.item_add.parent) &&
+                        editor_command_uint_parse(arguments[6],
+                            &command->data.item_add.first) &&
+                        editor_command_uint_parse(arguments[7],
+                            &command->data.item_add.index)) return editor_result_value(true);
+            }
+        } else {
+            bool rename = strcmp(action, "rename") == 0;
+            int base_count = kind == EDITOR_ITEM_HITBOX || kind == EDITOR_ITEM_SOFT_NODE ||
+                    kind == EDITOR_ITEM_SOFT_BEAM ? 7 :
+                kind == EDITOR_ITEM_VERTEX || kind == EDITOR_ITEM_LINE ? 8 : 6;
+            if(count == base_count + (rename ? 1 : 0)) {
+                uint32_t object;
+                uint32_t parent = 0;
+                uint32_t item;
+                uint32_t index = 0;
+                bool nested = kind == EDITOR_ITEM_HITBOX ||
+                    kind == EDITOR_ITEM_SOFT_NODE || kind == EDITOR_ITEM_SOFT_BEAM;
+                bool indexed = kind == EDITOR_ITEM_VERTEX || kind == EDITOR_ITEM_LINE;
+                if(editor_command_uint_parse(arguments[4], &object) &&
+                        (!nested && !indexed || editor_command_uint_parse(arguments[5],
+                            &parent)) &&
+                        editor_command_uint_parse(arguments[nested || indexed ? 6 : 5],
+                            &item) &&
+                        (!indexed || editor_command_uint_parse(arguments[7], &index))) {
+                    if(rename) {
+                        command->type = EDITOR_COMMAND_ITEM_RENAME;
+                        command->data.item_rename.kind = kind;
+                        command->data.item_rename.object = object;
+                        command->data.item_rename.parent = parent;
+                        command->data.item_rename.item = item;
+                        command->data.item_rename.index = index;
+                        snprintf(command->data.item_rename.name,
+                            sizeof(command->data.item_rename.name), "%s",
+                            arguments[base_count]);
+                    } else {
+                        command->type = EDITOR_COMMAND_ITEM_REMOVE;
+                        command->data.item_remove.kind = kind;
+                        command->data.item_remove.object = object;
+                        command->data.item_remove.parent = parent;
+                        command->data.item_remove.item = item;
+                        command->data.item_remove.index = index;
+                    }
+                    return editor_result_value(true);
+                }
+            }
+        }
+item_invalid:
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "invalid %s %s command", domain, action);
+    }
+    if(strcmp(action, "visibility") == 0) {
+        EditorVisibilityKind kind;
+        bool has_parent = false;
+        if(strcmp(domain, "object") == 0) kind = EDITOR_VISIBILITY_OBJECT;
+        else if(strcmp(domain, "rigid-body") == 0) kind = EDITOR_VISIBILITY_RIGID_BODY;
+        else if(strcmp(domain, "hitbox") == 0) {
+            kind = EDITOR_VISIBILITY_HITBOX;
+            has_parent = true;
+        } else if(strcmp(domain, "joint") == 0) kind = EDITOR_VISIBILITY_JOINT;
+        else if(strcmp(domain, "anchor") == 0) kind = EDITOR_VISIBILITY_ANCHOR;
+        else if(strcmp(domain, "soft-body") == 0) kind = EDITOR_VISIBILITY_SOFT_BODY;
+        else if(strcmp(domain, "soft-node") == 0) {
+            kind = EDITOR_VISIBILITY_SOFT_NODE;
+            has_parent = true;
+        } else if(strcmp(domain, "soft-beam") == 0) {
+            kind = EDITOR_VISIBILITY_SOFT_BEAM;
+            has_parent = true;
+        } else if(strcmp(domain, "soft-area") == 0) {
+            kind = EDITOR_VISIBILITY_SOFT_AREA;
+            has_parent = true;
+        } else goto visibility_invalid;
+        if(kind == EDITOR_VISIBILITY_OBJECT && count == 6) {
+            command->type = EDITOR_COMMAND_VISIBILITY;
+            command->data.visibility.kind = kind;
+            if(editor_command_uint_parse(arguments[4], &command->data.visibility.object) &&
+                    editor_command_bool_parse(arguments[5],
+                        &command->data.visibility.visible)) return editor_result_value(true);
+        } else if((has_parent && count == 8) || (!has_parent && count == 7)) {
+            command->type = EDITOR_COMMAND_VISIBILITY;
+            command->data.visibility.kind = kind;
+            if(editor_command_uint_parse(arguments[4], &command->data.visibility.object) &&
+                    (!has_parent || editor_command_uint_parse(arguments[5],
+                        &command->data.visibility.parent)) &&
+                    editor_command_uint_parse(arguments[has_parent ? 6 : 5],
+                        &command->data.visibility.item) &&
+                    editor_command_bool_parse(arguments[has_parent ? 7 : 6],
+                        &command->data.visibility.visible)) {
+                return editor_result_value(true);
+            }
+        }
+visibility_invalid:
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "invalid %s visibility command", domain);
+    }
+    if(strcmp(domain, "object") == 0 && strcmp(action, "add") == 0) {
+        if(count != 5 && count != 7)
+            return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                "object add expects <file> <name> [x y]");
+        command->type = EDITOR_COMMAND_OBJECT_ADD;
+        snprintf(command->data.object_add.name,
+            sizeof(command->data.object_add.name), "%s", arguments[4]);
+        if(count == 7 && (!editor_command_float_parse(arguments[5],
+                    &command->data.object_add.position.x) ||
+                !editor_command_float_parse(arguments[6],
+                    &command->data.object_add.position.y)))
+            return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                "object position must contain valid numbers");
+        return editor_result_value(true);
+    }
+    if(strcmp(domain, "object") == 0 && strcmp(action, "rename") == 0) {
+        if(count != 6 || !editor_command_uint_parse(arguments[4],
+                &command->data.object_rename.object))
+            return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                "object rename expects <file> <id> <name>");
+        command->type = EDITOR_COMMAND_OBJECT_RENAME;
+        snprintf(command->data.object_rename.name,
+            sizeof(command->data.object_rename.name), "%s", arguments[5]);
+        return editor_result_value(true);
+    }
+    if(strcmp(domain, "object") == 0 && strcmp(action, "delete") == 0) {
+        if(count != 5 || !editor_command_uint_parse(arguments[4],
+                &command->data.object_remove.object))
+            return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                "object delete expects <file> <id>");
+        command->type = EDITOR_COMMAND_OBJECT_REMOVE;
+        return editor_result_value(true);
+    }
+    if(strcmp(domain, "object") == 0 && strcmp(action, "position") == 0 &&
+            count == 7 && editor_command_uint_parse(arguments[4],
+                &command->data.object_position.object) &&
+            editor_command_float_parse(arguments[5],
+                &command->data.object_position.position.x) &&
+            editor_command_float_parse(arguments[6],
+                &command->data.object_position.position.y)) {
+        command->type = EDITOR_COMMAND_OBJECT_POSITION;
+        return editor_result_value(true);
+    }
+    if(strcmp(domain, "rigid-body") == 0 && strcmp(action, "transform") == 0 &&
+            count == 9 && editor_command_uint_parse(arguments[4],
+                &command->data.rigid_body_transform.object) &&
+            editor_command_uint_parse(arguments[5],
+                &command->data.rigid_body_transform.body) &&
+            editor_command_float_parse(arguments[6],
+                &command->data.rigid_body_transform.position.x) &&
+            editor_command_float_parse(arguments[7],
+                &command->data.rigid_body_transform.position.y) &&
+            editor_command_float_parse(arguments[8],
+                &command->data.rigid_body_transform.rotation)) {
+        command->type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM;
+        return editor_result_value(true);
+    }
+    if(strcmp(domain, "vertex") == 0 && strcmp(action, "position") == 0 &&
+            count == 10 && editor_command_uint_parse(arguments[4],
+                &command->data.vertex_position.object) &&
+            editor_command_uint_parse(arguments[5],
+                &command->data.vertex_position.body) &&
+            editor_command_uint_parse(arguments[6],
+                &command->data.vertex_position.hitbox) &&
+            editor_command_uint_parse(arguments[7],
+                &command->data.vertex_position.vertex) &&
+            editor_command_float_parse(arguments[8],
+                &command->data.vertex_position.position.x) &&
+            editor_command_float_parse(arguments[9],
+                &command->data.vertex_position.position.y)) {
+        command->type = EDITOR_COMMAND_VERTEX_POSITION;
+        return editor_result_value(true);
+    }
+    if(strcmp(domain, "anchor") == 0 && strcmp(action, "transform") == 0 &&
+            count == 9 && editor_command_uint_parse(arguments[4],
+                &command->data.anchor_transform.object) &&
+            editor_command_uint_parse(arguments[5],
+                &command->data.anchor_transform.anchor) &&
+            editor_command_float_parse(arguments[6],
+                &command->data.anchor_transform.position.x) &&
+            editor_command_float_parse(arguments[7],
+                &command->data.anchor_transform.position.y) &&
+            editor_command_float_parse(arguments[8],
+                &command->data.anchor_transform.rotation)) {
+        command->type = EDITOR_COMMAND_ANCHOR_TRANSFORM;
+        return editor_result_value(true);
+    }
+    if(strcmp(domain, "soft-body") == 0 && strcmp(action, "transform") == 0 &&
+            count == 9 && editor_command_uint_parse(arguments[4],
+                &command->data.soft_body_transform.object) &&
+            editor_command_uint_parse(arguments[5],
+                &command->data.soft_body_transform.body) &&
+            editor_command_float_parse(arguments[6],
+                &command->data.soft_body_transform.position.x) &&
+            editor_command_float_parse(arguments[7],
+                &command->data.soft_body_transform.position.y) &&
+            editor_command_float_parse(arguments[8],
+                &command->data.soft_body_transform.rotation)) {
+        command->type = EDITOR_COMMAND_SOFT_BODY_TRANSFORM;
+        return editor_result_value(true);
+    }
+    if(strcmp(domain, "soft-node") == 0 && strcmp(action, "position") == 0 &&
+            count == 9 && editor_command_uint_parse(arguments[4],
+                &command->data.soft_node_position.object) &&
+            editor_command_uint_parse(arguments[5],
+                &command->data.soft_node_position.body) &&
+            editor_command_uint_parse(arguments[6],
+                &command->data.soft_node_position.node) &&
+            editor_command_float_parse(arguments[7],
+                &command->data.soft_node_position.position.x) &&
+            editor_command_float_parse(arguments[8],
+                &command->data.soft_node_position.position.y)) {
+        command->type = EDITOR_COMMAND_SOFT_NODE_POSITION;
+        return editor_result_value(true);
+    }
+    if((strcmp(domain, "rigid-body") == 0 || strcmp(domain, "soft-body") == 0) &&
+            strcmp(action, "origin") == 0 && count == 8 &&
+            editor_command_uint_parse(arguments[4], &command->data.origin.object) &&
+            editor_command_uint_parse(arguments[5], &command->data.origin.body) &&
+            editor_command_float_parse(arguments[6], &command->data.origin.position.x) &&
+            editor_command_float_parse(arguments[7], &command->data.origin.position.y)) {
+        command->type = strcmp(domain, "rigid-body") == 0 ?
+            EDITOR_COMMAND_RIGID_BODY_ORIGIN : EDITOR_COMMAND_SOFT_BODY_ORIGIN;
+        return editor_result_value(true);
+    }
+    if(strcmp(domain, "viewport") == 0 && strcmp(action, "camera") == 0 &&
+            count == 7 && editor_command_float_parse(arguments[4],
+                &command->data.viewport_camera.offset.x) &&
+            editor_command_float_parse(arguments[5],
+                &command->data.viewport_camera.offset.y) &&
+            editor_command_float_parse(arguments[6],
+                &command->data.viewport_camera.zoom)) {
+        command->type = EDITOR_COMMAND_VIEWPORT_CAMERA;
+        return editor_result_value(true);
+    }
+    if(strcmp(domain, "viewport") == 0 && strcmp(action, "coordinates") == 0 &&
+            count == 5 && (strcmp(arguments[4], "local") == 0 ||
+                strcmp(arguments[4], "world") == 0)) {
+        command->type = EDITOR_COMMAND_VIEWPORT_COORDINATES;
+        command->data.viewport_coordinates.local = strcmp(arguments[4], "local") == 0;
+        return editor_result_value(true);
+    }
+    return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+        "invalid or unknown %s %s command", domain, action);
+}
+
+static bool editor_command_text_append(char *output, size_t capacity,
+        size_t *used, const char *text) {
+    size_t length = strlen(text);
+    if(*used >= capacity || length >= capacity - *used) return false;
+    memcpy(output + *used, text, length);
+    *used += length;
+    output[*used] = '\0';
+    return true;
+}
+
+static bool editor_command_shell_text_append(char *output, size_t capacity,
+        size_t *used, const char *text) {
+    if(!editor_command_text_append(output, capacity, used, "'")) return false;
+    for(const char *at = text; *at != '\0'; at += 1) {
+        const char *part = *at == '\'' ? "'\\''" : NULL;
+        char character[2] = {*at, '\0'};
+        if(!editor_command_text_append(output, capacity, used,
+                part != NULL ? part : character)) return false;
+    }
+    return editor_command_text_append(output, capacity, used, "'");
+}
+
+EditorResult editor_command_cli_write(const EditorCommand *command,
+        const char *document_path, char *output, size_t output_capacity) {
+    const char *domain;
+    char values[512];
+    size_t used = 0;
+    if(command == NULL || document_path == NULL || output == NULL ||
+            output_capacity == 0)
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "command serialization requires a command, path, and output buffer");
+    output[0] = '\0';
+    switch(command->type) {
+        case EDITOR_COMMAND_OBJECT_ADD:
+        case EDITOR_COMMAND_OBJECT_RENAME:
+        case EDITOR_COMMAND_OBJECT_REMOVE:
+        case EDITOR_COMMAND_OBJECT_POSITION: domain = "object"; break;
+        case EDITOR_COMMAND_RIGID_BODY_TRANSFORM:
+        case EDITOR_COMMAND_RIGID_BODY_ORIGIN: domain = "rigid-body"; break;
+        case EDITOR_COMMAND_VERTEX_POSITION: domain = "vertex"; break;
+        case EDITOR_COMMAND_ANCHOR_TRANSFORM: domain = "anchor"; break;
+        case EDITOR_COMMAND_SOFT_BODY_TRANSFORM:
+        case EDITOR_COMMAND_SOFT_BODY_ORIGIN: domain = "soft-body"; break;
+        case EDITOR_COMMAND_SOFT_NODE_POSITION: domain = "soft-node"; break;
+        case EDITOR_COMMAND_VIEWPORT_CAMERA:
+        case EDITOR_COMMAND_VIEWPORT_COORDINATES: domain = "viewport"; break;
+        case EDITOR_COMMAND_VISIBILITY:
+            switch(command->data.visibility.kind) {
+                case EDITOR_VISIBILITY_OBJECT: domain = "object"; break;
+                case EDITOR_VISIBILITY_RIGID_BODY: domain = "rigid-body"; break;
+                case EDITOR_VISIBILITY_HITBOX: domain = "hitbox"; break;
+                case EDITOR_VISIBILITY_JOINT: domain = "joint"; break;
+                case EDITOR_VISIBILITY_ANCHOR: domain = "anchor"; break;
+                case EDITOR_VISIBILITY_SOFT_BODY: domain = "soft-body"; break;
+                case EDITOR_VISIBILITY_SOFT_NODE: domain = "soft-node"; break;
+                case EDITOR_VISIBILITY_SOFT_BEAM: domain = "soft-beam"; break;
+                case EDITOR_VISIBILITY_SOFT_AREA: domain = "soft-area"; break;
+                default: return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                    "unknown visibility target");
+            }
+            break;
+        case EDITOR_COMMAND_NAVIGATION_SET: domain = "navigation"; break;
+        case EDITOR_COMMAND_ITEM_ADD:
+            domain = editor_command_item_domain_get(command->data.item_add.kind);
+            break;
+        case EDITOR_COMMAND_ITEM_REMOVE:
+            domain = editor_command_item_domain_get(command->data.item_remove.kind);
+            break;
+        case EDITOR_COMMAND_ITEM_RENAME:
+            domain = editor_command_item_domain_get(command->data.item_rename.kind);
+            break;
+        case EDITOR_COMMAND_PROPERTY_SET:
+            domain = editor_command_item_domain_get(command->data.property_set.kind);
+            break;
+        case EDITOR_COMMAND_RELATIONSHIP_SET:
+            if(command->data.relationship_set.kind ==
+                    EDITOR_RELATIONSHIP_JOINT_ANCHOR) domain = "joint";
+            else if(command->data.relationship_set.kind ==
+                    EDITOR_RELATIONSHIP_ANCHOR_RIGID_BODY) domain = "anchor";
+            else if(command->data.relationship_set.kind ==
+                    EDITOR_RELATIONSHIP_SOFT_BEAM_NODE) domain = "soft-beam";
+            else return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                "unknown relationship target");
+            break;
+        case EDITOR_COMMAND_COLLISION_MASK_ADD: domain = "collision-mask"; break;
+        case EDITOR_COMMAND_COLLISION_FILTER_SET:
+            domain = editor_command_item_domain_get(
+                command->data.collision_filter_set.kind);
+            break;
+        default: return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "unknown editor command");
+    }
+    if(domain == NULL) return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+        "unknown editor item target");
+    if(!editor_command_text_append(output, output_capacity, &used, "editor-cli ") ||
+            !editor_command_text_append(output, output_capacity, &used, domain) ||
+            !editor_command_text_append(output, output_capacity, &used, " "))
+        goto capacity_error;
+    switch(command->type) {
+        case EDITOR_COMMAND_OBJECT_ADD:
+            if(!editor_command_text_append(output, output_capacity, &used, "add ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path) ||
+                    !editor_command_text_append(output, output_capacity, &used, " ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        command->data.object_add.name)) goto capacity_error;
+            snprintf(values, sizeof(values), " %.9g %.9g",
+                command->data.object_add.position.x,
+                command->data.object_add.position.y);
+            if(!editor_command_text_append(output, output_capacity, &used, values))
+                goto capacity_error;
+            return editor_result_value(true);
+        case EDITOR_COMMAND_OBJECT_RENAME:
+            snprintf(values, sizeof(values), "rename ");
+            if(!editor_command_text_append(output, output_capacity, &used, values) ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            snprintf(values, sizeof(values), " %u ",
+                command->data.object_rename.object);
+            if(!editor_command_text_append(output, output_capacity, &used, values) ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        command->data.object_rename.name)) goto capacity_error;
+            return editor_result_value(true);
+        case EDITOR_COMMAND_OBJECT_REMOVE:
+            if(!editor_command_text_append(output, output_capacity, &used, "delete ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            snprintf(values, sizeof(values), " %u",
+                command->data.object_remove.object);
+            if(!editor_command_text_append(output, output_capacity, &used, values))
+                goto capacity_error;
+            return editor_result_value(true);
+        case EDITOR_COMMAND_OBJECT_POSITION:
+            snprintf(values, sizeof(values), "position ");
+            if(!editor_command_text_append(output, output_capacity, &used, values) ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            snprintf(values, sizeof(values), " %u %.9g %.9g",
+                command->data.object_position.object,
+                command->data.object_position.position.x,
+                command->data.object_position.position.y);
+            break;
+        case EDITOR_COMMAND_RIGID_BODY_TRANSFORM:
+            if(!editor_command_text_append(output, output_capacity, &used, "transform ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            snprintf(values, sizeof(values), " %u %u %.9g %.9g %.9g",
+                command->data.rigid_body_transform.object,
+                command->data.rigid_body_transform.body,
+                command->data.rigid_body_transform.position.x,
+                command->data.rigid_body_transform.position.y,
+                command->data.rigid_body_transform.rotation);
+            break;
+        case EDITOR_COMMAND_VERTEX_POSITION:
+            if(!editor_command_text_append(output, output_capacity, &used, "position ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            snprintf(values, sizeof(values), " %u %u %u %u %.9g %.9g",
+                command->data.vertex_position.object,
+                command->data.vertex_position.body,
+                command->data.vertex_position.hitbox,
+                command->data.vertex_position.vertex,
+                command->data.vertex_position.position.x,
+                command->data.vertex_position.position.y);
+            break;
+        case EDITOR_COMMAND_ANCHOR_TRANSFORM:
+            if(!editor_command_text_append(output, output_capacity, &used, "transform ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            snprintf(values, sizeof(values), " %u %u %.9g %.9g %.9g",
+                command->data.anchor_transform.object,
+                command->data.anchor_transform.anchor,
+                command->data.anchor_transform.position.x,
+                command->data.anchor_transform.position.y,
+                command->data.anchor_transform.rotation);
+            break;
+        case EDITOR_COMMAND_SOFT_BODY_TRANSFORM:
+            if(!editor_command_text_append(output, output_capacity, &used, "transform ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            snprintf(values, sizeof(values), " %u %u %.9g %.9g %.9g",
+                command->data.soft_body_transform.object,
+                command->data.soft_body_transform.body,
+                command->data.soft_body_transform.position.x,
+                command->data.soft_body_transform.position.y,
+                command->data.soft_body_transform.rotation);
+            break;
+        case EDITOR_COMMAND_SOFT_NODE_POSITION:
+            if(!editor_command_text_append(output, output_capacity, &used, "position ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            snprintf(values, sizeof(values), " %u %u %u %.9g %.9g",
+                command->data.soft_node_position.object,
+                command->data.soft_node_position.body,
+                command->data.soft_node_position.node,
+                command->data.soft_node_position.position.x,
+                command->data.soft_node_position.position.y);
+            break;
+        case EDITOR_COMMAND_RIGID_BODY_ORIGIN:
+        case EDITOR_COMMAND_SOFT_BODY_ORIGIN:
+            if(!editor_command_text_append(output, output_capacity, &used, "origin ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            snprintf(values, sizeof(values), " %u %u %.9g %.9g",
+                command->data.origin.object, command->data.origin.body,
+                command->data.origin.position.x, command->data.origin.position.y);
+            break;
+        case EDITOR_COMMAND_VIEWPORT_CAMERA:
+            if(!editor_command_text_append(output, output_capacity, &used, "camera ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            snprintf(values, sizeof(values), " %.9g %.9g %.9g",
+                command->data.viewport_camera.offset.x,
+                command->data.viewport_camera.offset.y,
+                command->data.viewport_camera.zoom);
+            break;
+        case EDITOR_COMMAND_VIEWPORT_COORDINATES:
+            if(!editor_command_text_append(output, output_capacity, &used,
+                    "coordinates ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            snprintf(values, sizeof(values), " %s",
+                command->data.viewport_coordinates.local ? "local" : "world");
+            break;
+        case EDITOR_COMMAND_VISIBILITY:
+            if(!editor_command_text_append(output, output_capacity, &used,
+                    "visibility ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            if(command->data.visibility.kind == EDITOR_VISIBILITY_OBJECT) {
+                snprintf(values, sizeof(values), " %u %s",
+                    command->data.visibility.object,
+                    command->data.visibility.visible ? "true" : "false");
+            } else if(command->data.visibility.kind == EDITOR_VISIBILITY_HITBOX ||
+                    command->data.visibility.kind == EDITOR_VISIBILITY_SOFT_NODE ||
+                    command->data.visibility.kind == EDITOR_VISIBILITY_SOFT_BEAM ||
+                    command->data.visibility.kind == EDITOR_VISIBILITY_SOFT_AREA) {
+                snprintf(values, sizeof(values), " %u %u %u %s",
+                    command->data.visibility.object,
+                    command->data.visibility.parent,
+                    command->data.visibility.item,
+                    command->data.visibility.visible ? "true" : "false");
+            } else {
+                snprintf(values, sizeof(values), " %u %u %s",
+                    command->data.visibility.object,
+                    command->data.visibility.item,
+                    command->data.visibility.visible ? "true" : "false");
+            }
+            break;
+        case EDITOR_COMMAND_NAVIGATION_SET: {
+            const EditorNavigationState *navigation = &command->data.navigation;
+            if(navigation->mode >= sizeof(editor_command_navigation_modes) /
+                        sizeof(editor_command_navigation_modes[0]) ||
+                    navigation->selection >= sizeof(editor_command_navigation_selections) /
+                        sizeof(editor_command_navigation_selections[0]) ||
+                    navigation->origin_kind >= sizeof(editor_command_origin_kinds) /
+                        sizeof(editor_command_origin_kinds[0]) ||
+                    !editor_command_text_append(output, output_capacity, &used, "set ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            snprintf(values, sizeof(values),
+                " %s %s %u %u %u %u %u %u %u %u %u %u %s",
+                editor_command_navigation_modes[navigation->mode],
+                editor_command_navigation_selections[navigation->selection],
+                navigation->object, navigation->rigid_body, navigation->hitbox,
+                navigation->joint, navigation->anchor, navigation->soft_body,
+                navigation->soft_node, navigation->soft_beam,
+                navigation->selected_line, navigation->selected_vertex,
+                editor_command_origin_kinds[navigation->origin_kind]);
+            break;
+        }
+        case EDITOR_COMMAND_ITEM_ADD: {
+            const EditorItemAddCommand *item = &command->data.item_add;
+            if(!editor_command_text_append(output, output_capacity, &used, "add ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            if(item->kind == EDITOR_ITEM_OBJECT) {
+                if(!editor_command_text_append(output, output_capacity, &used, " ") ||
+                        !editor_command_shell_text_append(output, output_capacity, &used,
+                            item->name)) goto capacity_error;
+                snprintf(values, sizeof(values), " %.9g %.9g",
+                    item->position.x, item->position.y);
+            } else if(item->kind == EDITOR_ITEM_RIGID_BODY ||
+                    item->kind == EDITOR_ITEM_SOFT_BODY) {
+                snprintf(values, sizeof(values), " %u", item->object);
+            } else if(item->kind == EDITOR_ITEM_HITBOX) {
+                snprintf(values, sizeof(values), " %u %u", item->object, item->parent);
+            } else if(item->kind == EDITOR_ITEM_JOINT) {
+                const char *kinds[] = {"revolute", "weld", "spring"};
+                if(item->option > (uint32_t)EDITOR_JOINT_SPRING) goto capacity_error;
+                snprintf(values, sizeof(values), " %u %s", item->object,
+                    kinds[item->option]);
+            } else if(item->kind == EDITOR_ITEM_ANCHOR ||
+                    item->kind == EDITOR_ITEM_SOFT_NODE) {
+                snprintf(values, sizeof(values), " %u %u %.9g %.9g", item->object,
+                    item->parent, item->position.x, item->position.y);
+            } else if(item->kind == EDITOR_ITEM_SOFT_BEAM) {
+                snprintf(values, sizeof(values), " %u %u %u %u", item->object,
+                    item->parent, item->first, item->second);
+            } else if(item->kind == EDITOR_ITEM_VERTEX) {
+                snprintf(values, sizeof(values), " %u %u %u %u", item->object,
+                    item->parent, item->first, item->index);
+            } else goto capacity_error;
+            break;
+        }
+        case EDITOR_COMMAND_ITEM_REMOVE: {
+            const EditorItemRemoveCommand *item = &command->data.item_remove;
+            if(!editor_command_text_append(output, output_capacity, &used, "delete ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            if(item->kind == EDITOR_ITEM_OBJECT)
+                snprintf(values, sizeof(values), " %u", item->object);
+            else if(item->kind == EDITOR_ITEM_HITBOX ||
+                    item->kind == EDITOR_ITEM_SOFT_NODE ||
+                    item->kind == EDITOR_ITEM_SOFT_BEAM)
+                snprintf(values, sizeof(values), " %u %u %u", item->object,
+                    item->parent, item->item);
+            else if(item->kind == EDITOR_ITEM_VERTEX || item->kind == EDITOR_ITEM_LINE)
+                snprintf(values, sizeof(values), " %u %u %u %u", item->object,
+                    item->parent, item->item, item->index);
+            else snprintf(values, sizeof(values), " %u %u", item->object, item->item);
+            break;
+        }
+        case EDITOR_COMMAND_ITEM_RENAME: {
+            const EditorItemRenameCommand *item = &command->data.item_rename;
+            if(!editor_command_text_append(output, output_capacity, &used, "rename ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            if(item->kind == EDITOR_ITEM_OBJECT) {
+                snprintf(values, sizeof(values), " %u ", item->object);
+                if(!editor_command_text_append(output, output_capacity, &used, values) ||
+                        !editor_command_shell_text_append(output, output_capacity, &used,
+                            item->name)) goto capacity_error;
+                return editor_result_value(true);
+            } else if(item->kind == EDITOR_ITEM_HITBOX ||
+                    item->kind == EDITOR_ITEM_SOFT_NODE ||
+                    item->kind == EDITOR_ITEM_SOFT_BEAM)
+                snprintf(values, sizeof(values), " %u %u %u %s", item->object,
+                    item->parent, item->item, item->name);
+            else if(item->kind == EDITOR_ITEM_VERTEX || item->kind == EDITOR_ITEM_LINE)
+                snprintf(values, sizeof(values), " %u %u %u %u %s", item->object,
+                    item->parent, item->item, item->index, item->name);
+            else snprintf(values, sizeof(values), " %u %u %s", item->object,
+                item->item, item->name);
+            break;
+        }
+        case EDITOR_COMMAND_PROPERTY_SET: {
+            const EditorPropertySetCommand *set = &command->data.property_set;
+            const char *property = editor_command_property_name_get(set->property);
+            const char *boolean;
+            char value[64];
+            if(property == NULL ||
+                    !editor_command_text_append(output, output_capacity, &used, "set ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            if(set->kind == EDITOR_ITEM_SOFT_NODE || set->kind == EDITOR_ITEM_SOFT_BEAM)
+                snprintf(values, sizeof(values), " %u %u %u", set->object,
+                    set->parent, set->item);
+            else if(set->kind == EDITOR_ITEM_VERTEX || set->kind == EDITOR_ITEM_LINE)
+                snprintf(values, sizeof(values), " %u %u %u %u", set->object,
+                    set->parent, set->item, set->index);
+            else snprintf(values, sizeof(values), " %u %u", set->object, set->item);
+            if(!editor_command_text_append(output, output_capacity, &used, values) ||
+                    !editor_command_text_append(output, output_capacity, &used, " ") ||
+                    !editor_command_text_append(output, output_capacity, &used, property) ||
+                    !editor_command_text_append(output, output_capacity, &used, " "))
+                goto capacity_error;
+            if(set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT)
+                snprintf(value, sizeof(value), "%.9g", set->value.number);
+            else if(set->value_kind == EDITOR_PROPERTY_VALUE_BOOL) {
+                boolean = set->value.boolean ? "true" : "false";
+                snprintf(value, sizeof(value), "%s", boolean);
+            } else {
+                const char *kinds[] = {"revolute", "weld", "spring"};
+                if(set->value.integer > (uint32_t)EDITOR_JOINT_SPRING)
+                    goto capacity_error;
+                snprintf(value, sizeof(value), "%s", kinds[set->value.integer]);
+            }
+            if(!editor_command_text_append(output, output_capacity, &used, value))
+                goto capacity_error;
+            return editor_result_value(true);
+        }
+        case EDITOR_COMMAND_RELATIONSHIP_SET: {
+            const EditorRelationshipSetCommand *set =
+                &command->data.relationship_set;
+            const char *slot;
+            char target[32];
+            if(!editor_command_text_append(output, output_capacity, &used, "connect ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            if(set->target == 0) snprintf(target, sizeof(target), "none");
+            else snprintf(target, sizeof(target), "%u", set->target);
+            if(set->kind == EDITOR_RELATIONSHIP_JOINT_ANCHOR) {
+                slot = set->endpoint == 0 ? "anchor-a" : "anchor-b";
+                snprintf(values, sizeof(values), " %u %u %s %s", set->object,
+                    set->item, slot, target);
+            } else if(set->kind == EDITOR_RELATIONSHIP_ANCHOR_RIGID_BODY) {
+                snprintf(values, sizeof(values), " %u %u rigid-body %s", set->object,
+                    set->item, target);
+            } else if(set->kind == EDITOR_RELATIONSHIP_SOFT_BEAM_NODE) {
+                slot = set->endpoint == 0 ? "node-a" : "node-b";
+                snprintf(values, sizeof(values), " %u %u %u %s %s", set->object,
+                    set->parent, set->item, slot, target);
+            } else goto capacity_error;
+            break;
+        }
+        case EDITOR_COMMAND_COLLISION_MASK_ADD:
+            if(!editor_command_text_append(output, output_capacity, &used, "add ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path) ||
+                    !editor_command_text_append(output, output_capacity, &used, " ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        command->data.collision_mask_add.name)) goto capacity_error;
+            return editor_result_value(true);
+        case EDITOR_COMMAND_COLLISION_FILTER_SET: {
+            const EditorCollisionFilterSetCommand *set =
+                &command->data.collision_filter_set;
+            const char *filter = set->filter == EDITOR_COLLISION_FILTER_CATEGORY ?
+                "category" : "collide-with";
+            const char *enabled = set->enabled ? "true" : "false";
+            if((set->kind != EDITOR_ITEM_RIGID_BODY &&
+                        set->kind != EDITOR_ITEM_SOFT_NODE) ||
+                    (set->filter != EDITOR_COLLISION_FILTER_CATEGORY &&
+                        set->filter != EDITOR_COLLISION_FILTER_COLLIDE_WITH) ||
+                    !editor_command_text_append(output, output_capacity, &used, "filter ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            if(set->kind == EDITOR_ITEM_RIGID_BODY)
+                snprintf(values, sizeof(values), " %u %u %s ", set->object,
+                    set->item, filter);
+            else snprintf(values, sizeof(values), " %u %u %u %s ", set->object,
+                set->parent, set->item, filter);
+            if(!editor_command_text_append(output, output_capacity, &used, values) ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        set->mask) ||
+                    !editor_command_text_append(output, output_capacity, &used, " ") ||
+                    !editor_command_text_append(output, output_capacity, &used, enabled))
+                goto capacity_error;
+            return editor_result_value(true);
+        }
+    }
+    if(!editor_command_text_append(output, output_capacity, &used, values))
+        goto capacity_error;
+    return editor_result_value(true);
+    return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+        "unknown editor command");
+
+capacity_error:
+    return editor_result_error(EDITOR_ERROR_CAPACITY,
+        "CLI command output buffer is too small");
+}

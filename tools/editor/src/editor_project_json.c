@@ -246,6 +246,32 @@ bool editor_project_save(const EditorProject *project, const char *path) {
     collision_masks = yyjson_mut_arr(document);
     yyjson_mut_doc_set_root(document, root);
     yyjson_mut_obj_add_uint(document, root, "format_version", EDITOR_PROJECT_FORMAT_VERSION);
+    yyjson_mut_obj_add_val(document, root, "viewport_camera_offset",
+        editor_json_position_write(document,
+            (Position){project->viewport_camera_offset.x,
+                project->viewport_camera_offset.y}));
+    yyjson_mut_obj_add_real(document, root, "viewport_camera_zoom",
+        project->viewport_camera_zoom);
+    yyjson_mut_obj_add_bool(document, root, "viewport_local_view",
+        project->viewport_local_view);
+    {
+        const EditorNavigationState *navigation = &project->navigation;
+        yyjson_mut_val *value = yyjson_mut_obj(document);
+        yyjson_mut_obj_add_uint(document, value, "mode", navigation->mode);
+        yyjson_mut_obj_add_uint(document, value, "selection", navigation->selection);
+        yyjson_mut_obj_add_uint(document, value, "object", navigation->object);
+        yyjson_mut_obj_add_uint(document, value, "line", navigation->selected_line);
+        yyjson_mut_obj_add_uint(document, value, "vertex", navigation->selected_vertex);
+        yyjson_mut_obj_add_uint(document, value, "rigid_body", navigation->rigid_body);
+        yyjson_mut_obj_add_uint(document, value, "hitbox", navigation->hitbox);
+        yyjson_mut_obj_add_uint(document, value, "joint", navigation->joint);
+        yyjson_mut_obj_add_uint(document, value, "anchor", navigation->anchor);
+        yyjson_mut_obj_add_uint(document, value, "soft_body", navigation->soft_body);
+        yyjson_mut_obj_add_uint(document, value, "soft_node", navigation->soft_node);
+        yyjson_mut_obj_add_uint(document, value, "soft_beam", navigation->soft_beam);
+        yyjson_mut_obj_add_uint(document, value, "origin_kind", navigation->origin_kind);
+        yyjson_mut_obj_add_val(document, root, "navigation", value);
+    }
     yyjson_mut_obj_add_uint(document, root, "selected", project->selected);
     yyjson_mut_obj_add_uint(document, root, "next_object_id", project->next_id);
     yyjson_mut_obj_add_uint(document, root, "next_vertex_id", project->next_vertex_id);
@@ -606,24 +632,85 @@ static bool editor_json_references_valid(EditorProject *project) {
     return project->selected == 0 || editor_project_selected_get(project) != NULL;
 }
 
-bool editor_project_load(EditorProject *project, const char *path) {
+EditorResult editor_project_load(EditorProject *project, const char *path) {
     static EditorProject loaded;
     yyjson_doc *document;
+    yyjson_read_err read_error = {0};
     yyjson_val *root;
     yyjson_val *objects;
     yyjson_val *collision_masks;
     uint32_t version;
-    bool success = false;
-    if(project == NULL || path == NULL || path[0] == '\0') return false;
-    document = yyjson_read_file(path, 0, NULL, NULL);
-    if(document == NULL) return false;
+    EditorResult result = editor_result_error(EDITOR_ERROR_SCHEMA_INVALID,
+        "Project editor state does not match the current schema: %s",
+        path == NULL ? "(null)" : path);
+    if(project == NULL || path == NULL || path[0] == '\0')
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "Project editor-state load received an invalid argument");
+    document = yyjson_read_file(path, 0, NULL, &read_error);
+    if(document == NULL) {
+        return editor_result_error(
+            read_error.code == YYJSON_READ_ERROR_FILE_OPEN ||
+                    read_error.code == YYJSON_READ_ERROR_FILE_READ ?
+                EDITOR_ERROR_FILE_IO : EDITOR_ERROR_JSON_PARSE,
+            "Could not parse project editor state '%s': %s at byte %zu",
+            path, read_error.msg == NULL ? "unknown JSON error" : read_error.msg,
+            read_error.pos);
+    }
     root = yyjson_doc_get_root(document);
     objects = yyjson_obj_get(root, "objects");
     collision_masks = yyjson_obj_get(root, "collision_masks");
     editor_project_init(&loaded);
-    if(!yyjson_is_obj(root) || !editor_json_uint(root, "format_version", &version) ||
-            (version == 0 || version > EDITOR_PROJECT_FORMAT_VERSION) ||
-            !editor_json_uint(root, "selected", &loaded.selected) || !yyjson_is_arr(objects) ||
+    if(!yyjson_is_obj(root)) goto done;
+    if(!editor_json_uint(root, "format_version", &version)) {
+        result = editor_result_error(EDITOR_ERROR_SCHEMA_VERSION,
+            "Project editor state '%s' is missing integer format_version; expected %u",
+            path, EDITOR_PROJECT_FORMAT_VERSION);
+        goto done;
+    }
+    if(version != EDITOR_PROJECT_FORMAT_VERSION) {
+        result = editor_result_error(EDITOR_ERROR_SCHEMA_VERSION,
+            "Project editor state '%s' uses format_version %u; this editor requires %u",
+            path, version, EDITOR_PROJECT_FORMAT_VERSION);
+        goto done;
+    }
+    {
+        yyjson_val *camera_offset = yyjson_obj_get(root, "viewport_camera_offset");
+        yyjson_val *camera_zoom = yyjson_obj_get(root, "viewport_camera_zoom");
+        yyjson_val *local_view = yyjson_obj_get(root, "viewport_local_view");
+        Position offset;
+        if((camera_offset != NULL &&
+                !editor_json_position_read(camera_offset, &offset)) ||
+                (camera_zoom != NULL && (!yyjson_is_num(camera_zoom) ||
+                    yyjson_get_real(camera_zoom) < 0.1 ||
+                    yyjson_get_real(camera_zoom) > 8.0)) ||
+                (local_view != NULL && !yyjson_is_bool(local_view))) goto done;
+        if(camera_offset != NULL)
+            loaded.viewport_camera_offset = (Vec2D){offset.x, offset.y};
+        if(camera_zoom != NULL)
+            loaded.viewport_camera_zoom = (float)yyjson_get_real(camera_zoom);
+        if(local_view != NULL)
+            loaded.viewport_local_view = yyjson_get_bool(local_view);
+    }
+    {
+        yyjson_val *navigation = yyjson_obj_get(root, "navigation");
+        if(navigation != NULL && (!yyjson_is_obj(navigation) ||
+                !editor_json_uint(navigation, "mode", &loaded.navigation.mode) ||
+                !editor_json_uint(navigation, "selection", &loaded.navigation.selection) ||
+                !editor_json_uint(navigation, "object", &loaded.navigation.object) ||
+                !editor_json_uint(navigation, "line", &loaded.navigation.selected_line) ||
+                !editor_json_uint(navigation, "vertex", &loaded.navigation.selected_vertex) ||
+                !editor_json_uint(navigation, "rigid_body", &loaded.navigation.rigid_body) ||
+                !editor_json_uint(navigation, "hitbox", &loaded.navigation.hitbox) ||
+                !editor_json_uint(navigation, "joint", &loaded.navigation.joint) ||
+                !editor_json_uint(navigation, "anchor", &loaded.navigation.anchor) ||
+                !editor_json_uint(navigation, "soft_body", &loaded.navigation.soft_body) ||
+                !editor_json_uint(navigation, "soft_node", &loaded.navigation.soft_node) ||
+                !editor_json_uint(navigation, "soft_beam", &loaded.navigation.soft_beam) ||
+                !editor_json_uint(navigation, "origin_kind", &loaded.navigation.origin_kind) ||
+                loaded.navigation.mode > 11 || loaded.navigation.selection > 11 ||
+                loaded.navigation.origin_kind > 2)) goto done;
+    }
+    if(!editor_json_uint(root, "selected", &loaded.selected) || !yyjson_is_arr(objects) ||
             yyjson_arr_size(objects) > EDITOR_OBJECT_MAX ||
             !editor_json_uint(root, "next_object_id", &loaded.next_id) ||
             !editor_json_uint(root, "next_vertex_id", &loaded.next_vertex_id) ||
@@ -634,26 +721,23 @@ bool editor_project_load(EditorProject *project, const char *path) {
             !editor_json_uint(root, "next_soft_body_id", &loaded.next_soft_body_id) ||
             !editor_json_uint(root, "next_soft_node_id", &loaded.next_soft_node_id) ||
             !editor_json_uint(root, "next_soft_beam_id", &loaded.next_soft_beam_id) ||
+            !editor_json_uint(root, "next_soft_area_id", &loaded.next_soft_area_id) ||
             loaded.next_id == 0 || loaded.next_vertex_id == 0 ||
             loaded.next_rigid_body_id == 0 || loaded.next_hitbox_id == 0 ||
             loaded.next_joint_id == 0 || loaded.next_anchor_id == 0 ||
             loaded.next_soft_body_id == 0 || loaded.next_soft_node_id == 0 ||
-            loaded.next_soft_beam_id == 0) goto done;
-    if(version >= 4 && (!editor_json_uint(root, "next_soft_area_id",
-            &loaded.next_soft_area_id) || loaded.next_soft_area_id == 0)) goto done;
-    if(version >= 3) {
-        if(!yyjson_is_arr(collision_masks) || yyjson_arr_size(collision_masks) == 0 ||
-                yyjson_arr_size(collision_masks) > EDITOR_COLLISION_MASK_MAX) goto done;
-        loaded.collision_mask_count = yyjson_arr_size(collision_masks);
-        for(size_t i = 0; i < loaded.collision_mask_count; i += 1) {
-            yyjson_val *name = yyjson_arr_get(collision_masks, i);
-            if(!yyjson_is_str(name) || yyjson_get_len(name) == 0 ||
-                    yyjson_get_len(name) >= EDITOR_OBJECT_NAME_MAX) goto done;
-            memcpy(loaded.collision_masks[i].name, yyjson_get_str(name),
-                yyjson_get_len(name) + 1);
-            editor_project_property_name_format(loaded.collision_masks[i].name,
-                sizeof(loaded.collision_masks[i].name), loaded.collision_masks[i].name);
-        }
+            loaded.next_soft_beam_id == 0 || loaded.next_soft_area_id == 0 ||
+            !yyjson_is_arr(collision_masks) || yyjson_arr_size(collision_masks) == 0 ||
+            yyjson_arr_size(collision_masks) > EDITOR_COLLISION_MASK_MAX) goto done;
+    loaded.collision_mask_count = yyjson_arr_size(collision_masks);
+    for(size_t i = 0; i < loaded.collision_mask_count; i += 1) {
+        yyjson_val *name = yyjson_arr_get(collision_masks, i);
+        if(!yyjson_is_str(name) || yyjson_get_len(name) == 0 ||
+                yyjson_get_len(name) >= EDITOR_OBJECT_NAME_MAX) goto done;
+        memcpy(loaded.collision_masks[i].name, yyjson_get_str(name),
+            yyjson_get_len(name) + 1);
+        editor_project_property_name_format(loaded.collision_masks[i].name,
+            sizeof(loaded.collision_masks[i].name), loaded.collision_masks[i].name);
     }
     loaded.object_count = yyjson_arr_size(objects);
     for(size_t i = 0; i < loaded.object_count; i += 1) {
@@ -692,10 +776,15 @@ bool editor_project_load(EditorProject *project, const char *path) {
                     &object->soft_body_items[j], &loaded)) goto done;
         if(loaded.next_id <= object->id) loaded.next_id = object->id + 1;
     }
-    if(!editor_json_references_valid(&loaded)) goto done;
+    if(!editor_json_references_valid(&loaded)) {
+        result = editor_result_error(EDITOR_ERROR_REFERENCE_INVALID,
+            "Project editor state '%s' contains an invalid entity, joint, beam, or collision-mask reference",
+            path);
+        goto done;
+    }
     *project = loaded;
-    success = true;
+    result = editor_result_value(true);
 done:
     yyjson_doc_free(document);
-    return success;
+    return result;
 }
