@@ -25,11 +25,30 @@ static void history_finish(const EditorCommand *command,
     editor_history_command_finish(callback_history, command, result);
 }
 
+static Position test_world_to_screen(Position world) {
+    return (Position){editor_viewport_width * 0.5f + world.x,
+        EDITOR_MENU_HEIGHT +
+            (editor_viewport_bottom - EDITOR_MENU_HEIGHT) * 0.5f - world.y};
+}
+
+static void shortcut_apply(EditorHistory *history, SDL_Keycode key) {
+    SDL_Event shortcut = {0};
+    EditorHistoryShortcutResult result;
+    shortcut.type = SDL_EVENT_KEY_DOWN;
+    shortcut.key.key = key;
+    shortcut.key.mod = SDL_KMOD_CTRL;
+    result = editor_history_shortcut_handle(&shortcut, true, history);
+    assert(result.consumed && result.restored);
+}
+
 int main(void) {
     static EditorProject project;
     EditorHistory history;
     EditorRigidBody *body;
     EditorHitbox *hitbox;
+    EditorAnchor *anchor;
+    EditorSoftBody *soft_body;
+    EditorSoftNode *soft_node;
     Position original_vertex;
     EditorCommand command = {.type = EDITOR_COMMAND_ITEM_ADD,
         .data.item_add = {.kind = EDITOR_ITEM_OBJECT}};
@@ -101,12 +120,9 @@ int main(void) {
             project.objects[0].position.y + body->position.y +
                 hitbox->vertices[0].position.y
         };
-        Position grab = {
-            editor_viewport_width * 0.5f + world.x + 5.0f,
-            EDITOR_MENU_HEIGHT +
-                (editor_viewport_bottom - EDITOR_MENU_HEIGHT) * 0.5f -
-                world.y - 3.0f
-        };
+        Position grab = test_world_to_screen(world);
+        grab.x += 5.0f;
+        grab.y -= 3.0f;
         editor_history_continuous_set(&history, true);
         assert(editor_viewport_update(&viewport, &project, grab,
             MOUSE_BUTTON_STATE_PRESSED, MOUSE_BUTTON_STATE_UP, false, 0.0f, false));
@@ -119,30 +135,76 @@ int main(void) {
             MOUSE_BUTTON_STATE_DOWN, MOUSE_BUTTON_STATE_UP, false, 0.0f, false));
         editor_history_continuous_set(&history, false);
         assert(history.undo_count == 1);
-        {
-            SDL_Event shortcut = {0};
-            EditorHistoryShortcutResult shortcut_result =
-                {0};
-            shortcut.type = SDL_EVENT_KEY_DOWN;
-            shortcut.key.key = SDLK_Z;
-            shortcut.key.mod = SDL_KMOD_CTRL;
-            shortcut_result = editor_history_shortcut_handle(
-                &shortcut, true, &history);
-            assert(shortcut_result.consumed && shortcut_result.restored);
-        }
+        shortcut_apply(&history, SDLK_Z);
         assert(hitbox->vertices[0].position.x == original_vertex.x);
-        {
-            SDL_Event shortcut = {0};
-            EditorHistoryShortcutResult shortcut_result =
-                {0};
-            shortcut.type = SDL_EVENT_KEY_DOWN;
-            shortcut.key.key = SDLK_Y;
-            shortcut.key.mod = SDL_KMOD_CTRL;
-            shortcut_result = editor_history_shortcut_handle(
-                &shortcut, true, &history);
-            assert(shortcut_result.consumed && shortcut_result.restored);
-        }
+        shortcut_apply(&history, SDLK_Y);
         assert(hitbox->vertices[0].position.x == original_vertex.x + 20.0f);
+    }
+
+
+    anchor = editor_project_anchor_add(&project, &project.objects[0],
+        (Position){200.0f, 100.0f}, 0);
+    assert(anchor != NULL);
+    editor_history_reset(&history);
+    editor_viewport_state_init(&viewport);
+    viewport.mode = EDITOR_VIEWPORT_OBJECT;
+    {
+        Position original = anchor->position;
+        Position grab = test_world_to_screen((Position){
+            project.objects[0].position.x + original.x,
+            project.objects[0].position.y + original.y});
+        grab.x += 4.0f;
+        grab.y -= 2.0f;
+        editor_history_continuous_set(&history, true);
+        assert(editor_viewport_update(&viewport, &project, grab,
+            MOUSE_BUTTON_STATE_PRESSED, MOUSE_BUTTON_STATE_UP, false, 0.0f, false));
+        assert(editor_viewport_update(&viewport, &project, grab,
+            MOUSE_BUTTON_STATE_DOWN, MOUSE_BUTTON_STATE_UP, false, 0.0f, false));
+        assert(history.undo_count == 0);
+        grab.x += 20.0f;
+        assert(editor_viewport_update(&viewport, &project, grab,
+            MOUSE_BUTTON_STATE_DOWN, MOUSE_BUTTON_STATE_UP, false, 0.0f, false));
+        editor_history_continuous_set(&history, false);
+        assert(history.undo_count == 1);
+        shortcut_apply(&history, SDLK_Z);
+        assert(anchor->position.x == original.x);
+        shortcut_apply(&history, SDLK_Y);
+        assert(anchor->position.x == original.x + 20.0f);
+    }
+
+    soft_body = editor_project_soft_body_add(&project, &project.objects[0]);
+    assert(soft_body != NULL);
+    soft_node = editor_project_soft_node_add(&project, soft_body,
+        (Position){-200.0f, -100.0f});
+    assert(soft_node != NULL);
+    editor_history_reset(&history);
+    editor_viewport_state_init(&viewport);
+    viewport.mode = EDITOR_VIEWPORT_SOFT_NODE;
+    viewport.selection = EDITOR_SELECTION_SOFT_NODE;
+    viewport.selected_soft_body = soft_body->id;
+    viewport.selected_soft_node = soft_node->id;
+    {
+        Position original = soft_node->position;
+        Position grab = test_world_to_screen((Position){
+            project.objects[0].position.x + soft_body->position.x + original.x,
+            project.objects[0].position.y + soft_body->position.y + original.y});
+        grab.x += 3.0f;
+        grab.y -= 4.0f;
+        editor_history_continuous_set(&history, true);
+        assert(editor_viewport_update(&viewport, &project, grab,
+            MOUSE_BUTTON_STATE_PRESSED, MOUSE_BUTTON_STATE_UP, false, 0.0f, false));
+        assert(editor_viewport_update(&viewport, &project, grab,
+            MOUSE_BUTTON_STATE_DOWN, MOUSE_BUTTON_STATE_UP, false, 0.0f, false));
+        assert(history.undo_count == 0);
+        grab.x += 20.0f;
+        assert(editor_viewport_update(&viewport, &project, grab,
+            MOUSE_BUTTON_STATE_DOWN, MOUSE_BUTTON_STATE_UP, false, 0.0f, false));
+        editor_history_continuous_set(&history, false);
+        assert(history.undo_count == 1);
+        shortcut_apply(&history, SDLK_Z);
+        assert(soft_node->position.x == original.x);
+        shortcut_apply(&history, SDLK_Y);
+        assert(soft_node->position.x == original.x + 20.0f);
     }
     editor_command_executing_callback_set(NULL, NULL);
     editor_command_finished_callback_set(NULL, NULL);

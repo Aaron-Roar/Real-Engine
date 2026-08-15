@@ -18,6 +18,15 @@ static EditorCommandResult editor_command_error(EditorError error) {
         .result.error = error};
 }
 
+static bool editor_command_float_equal(float first, float second) {
+    return fabsf(first - second) <= 0.0001f;
+}
+
+static bool editor_command_position_equal(Position first, Position second) {
+    return editor_command_float_equal(first.x, second.x) &&
+        editor_command_float_equal(first.y, second.y);
+}
+
 static EditorCommandResult editor_command_result_from(EditorResult result) {
     if(editor_result_check(result)) return editor_command_error(result.result.error);
     return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
@@ -103,6 +112,9 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
                 command->data.object_position.object);
             if(object == NULL) return editor_command_not_found("object",
                 command->data.object_position.object);
+            if(editor_command_position_equal(object->position,
+                    command->data.object_position.position))
+                return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
             object->position = command->data.object_position.position;
             return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
         }
@@ -115,6 +127,11 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
                 command->data.rigid_body_transform.object);
             if(body == NULL) return editor_command_not_found("rigid body",
                 command->data.rigid_body_transform.body);
+            if(editor_command_position_equal(body->position,
+                        command->data.rigid_body_transform.position) &&
+                    editor_command_float_equal(body->rotation,
+                        command->data.rigid_body_transform.rotation))
+                return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
             body->position = command->data.rigid_body_transform.position;
             body->rotation = command->data.rigid_body_transform.rotation;
             editor_project_rigid_body_constraints_apply(object, body->id);
@@ -139,10 +156,8 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
                     return editor_command_error(editor_result_error(
                         EDITOR_ERROR_INVALID_ARGUMENT, "vertex %u is locked",
                         command->data.vertex_position.vertex).result.error);
-                if(fabsf(hitbox->vertices[i].position.x -
-                            command->data.vertex_position.position.x) <= 0.0001f &&
-                        fabsf(hitbox->vertices[i].position.y -
-                            command->data.vertex_position.position.y) <= 0.0001f)
+                if(editor_command_position_equal(hitbox->vertices[i].position,
+                        command->data.vertex_position.position))
                     return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
                 hitbox->vertices[i].position = command->data.vertex_position.position;
                 return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
@@ -159,6 +174,11 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
                 command->data.anchor_transform.object);
             if(anchor == NULL) return editor_command_not_found("anchor",
                 command->data.anchor_transform.anchor);
+            if(editor_command_position_equal(anchor->position,
+                        command->data.anchor_transform.position) &&
+                    editor_command_float_equal(anchor->rotation,
+                        command->data.anchor_transform.rotation))
+                return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
             anchor->position = command->data.anchor_transform.position;
             anchor->rotation = command->data.anchor_transform.rotation;
             editor_project_anchor_constraints_apply(object, anchor->id);
@@ -173,6 +193,11 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
                 command->data.soft_body_transform.object);
             if(body == NULL) return editor_command_not_found("soft body",
                 command->data.soft_body_transform.body);
+            if(editor_command_position_equal(body->position,
+                        command->data.soft_body_transform.position) &&
+                    editor_command_float_equal(body->rotation,
+                        command->data.soft_body_transform.rotation))
+                return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
             body->position = command->data.soft_body_transform.position;
             body->rotation = command->data.soft_body_transform.rotation;
             return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
@@ -188,6 +213,9 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
                 command->data.soft_node_position.body);
             for(size_t i = 0; i < body->node_count; i += 1) {
                 if(body->nodes[i].id != command->data.soft_node_position.node) continue;
+                if(editor_command_position_equal(body->nodes[i].position,
+                        command->data.soft_node_position.position))
+                    return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
                 body->nodes[i].position = command->data.soft_node_position.position;
                 return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
             }
@@ -203,6 +231,9 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
                 command->data.origin.object);
             if(body == NULL) return editor_command_not_found("rigid body",
                 command->data.origin.body);
+            if(editor_command_position_equal(body->position,
+                    command->data.origin.position))
+                return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
             if(!editor_project_rigid_body_origin_set(object, body,
                     command->data.origin.position))
                 return editor_command_error(editor_result_error(
@@ -219,6 +250,9 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
                 command->data.origin.object);
             if(body == NULL) return editor_command_not_found("soft body",
                 command->data.origin.body);
+            if(editor_command_position_equal(body->position,
+                    command->data.origin.position))
+                return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
             if(!editor_project_soft_body_origin_set(body,
                     command->data.origin.position))
                 return editor_command_error(editor_result_error(
