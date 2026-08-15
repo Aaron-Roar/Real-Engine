@@ -9,13 +9,13 @@ set(generated_dir ${CMAKE_CURRENT_BINARY_DIR}/generated)
 set(generated_header ${generated_dir}/game_components.h)
 set(generated_source ${generated_dir}/game_components.c)
 
-add_executable(pong_component_generator src/generate_components.c)
-target_link_libraries(pong_component_generator PRIVATE rohr_tools)
+rohr_add_component_generator(pong_component_generator
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/generate_components.c")
 
 add_custom_command(
     OUTPUT ${generated_header} ${generated_source}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${generated_dir}
-    COMMAND $<TARGET_FILE:pong_component_generator> ${generated_header} ${generated_source}
+    COMMAND ${pong_component_generator_COMMAND} ${generated_header} ${generated_source}
     DEPENDS pong_component_generator
     COMMENT "Generating Pong app components"
     VERBATIM

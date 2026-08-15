@@ -118,6 +118,8 @@ target_include_directories(rohr_tools
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+include(cmake/RohrHostTools.cmake)
+
 if(ROHR_BUILD_TESTS)
     include(CTest)
 endif()
@@ -261,10 +263,8 @@ if(ROHR_BUILD_TESTS)
         ${ROHR_GENERATED_COMPONENT_FIXTURE_DIR}/game_components.c
     )
 
-    add_executable(component_fixture_generator
-        tests/generate_component_fixture.c
-    )
-    target_link_libraries(component_fixture_generator PRIVATE rohr_tools)
+    rohr_add_component_generator(component_fixture_generator
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/generate_component_fixture.c")
 
     add_custom_command(
         OUTPUT
@@ -274,7 +274,7 @@ if(ROHR_BUILD_TESTS)
             ${CMAKE_COMMAND} -E make_directory
             ${ROHR_GENERATED_COMPONENT_FIXTURE_DIR}
         COMMAND
-            $<TARGET_FILE:component_fixture_generator>
+            ${component_fixture_generator_COMMAND}
             ${ROHR_GENERATED_COMPONENT_HEADER}
             ${ROHR_GENERATED_COMPONENT_SOURCE}
         DEPENDS component_fixture_generator
@@ -301,7 +301,7 @@ if(ROHR_BUILD_TESTS)
         NAME generated_components_deterministic
         COMMAND
             ${CMAKE_COMMAND}
-            -DGENERATOR=$<TARGET_FILE:component_fixture_generator>
+            -DGENERATOR=${component_fixture_generator_COMMAND}
             -DOUTPUT_DIRECTORY=${ROHR_BUILD_OUTPUT_DIRECTORY}/tests/deterministic_components
             -P ${CMAKE_SOURCE_DIR}/tests/check_component_generation.cmake
     )

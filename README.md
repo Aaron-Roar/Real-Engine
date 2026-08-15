@@ -232,6 +232,9 @@ Linux hosts with a MinGW-w64 toolchain can configure the Windows compile check
 with `cmake --preset windows-cross` and build it with
 `cmake --build --preset windows-cross --parallel`. Cross-built test executables
 must still be run on Windows; CTest cannot execute them directly on Linux.
+Component generators are built as host tools during the cross-build, so generated
+C files do not need to be bootstrapped manually. Set `ROHR_HOST_C_COMPILER` if
+CMake cannot locate the build host's C compiler automatically.
 
 Games include `rohr.h` and link the `rohr_engine` CMake target. Build-time
 component generators include `rohr_tools.h` and link the `rohr_tools` target.
