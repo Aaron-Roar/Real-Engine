@@ -515,7 +515,11 @@ void editor_viewport_vertex_editor_enter(EditorViewportState *state, uint32_t ve
 
 void editor_viewport_back(EditorViewportState *state) {
     if(state == NULL) return;
-    if(state->mode == EDITOR_VIEWPORT_LINE || state->mode == EDITOR_VIEWPORT_VERTEX) {
+    if(state->mode == EDITOR_VIEWPORT_AUTO_SHAPE) {
+        state->mode = state->auto_shape_parent_mode;
+        state->selection = state->mode == EDITOR_VIEWPORT_HITBOX ?
+            EDITOR_SELECTION_HITBOX : EDITOR_SELECTION_SOFT_BODY;
+    } else if(state->mode == EDITOR_VIEWPORT_LINE || state->mode == EDITOR_VIEWPORT_VERTEX) {
         state->mode = EDITOR_VIEWPORT_HITBOX;
         state->selection = EDITOR_SELECTION_HITBOX;
     } else if(state->mode == EDITOR_VIEWPORT_HITBOX ||

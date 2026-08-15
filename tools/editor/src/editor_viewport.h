@@ -17,7 +17,8 @@ typedef enum EditorViewportMode {
     EDITOR_VIEWPORT_SOFT_AREA,
     EDITOR_VIEWPORT_ORIGIN,
     EDITOR_VIEWPORT_LINE,
-    EDITOR_VIEWPORT_VERTEX
+    EDITOR_VIEWPORT_VERTEX,
+    EDITOR_VIEWPORT_AUTO_SHAPE
 } EditorViewportMode;
 
 typedef enum EditorHierarchySelection {
@@ -76,6 +77,7 @@ typedef struct EditorViewportState {
     EditorSoftAreaId soft_area_candidates[EDITOR_SOFT_AREA_MAX];
     size_t soft_area_candidate_count;
     EditorOriginKind selected_origin_kind;
+    EditorViewportMode auto_shape_parent_mode;
     EditorRigidBodyId preview_rigid_body;
     EditorAnchorId preview_anchor;
     EditorSoftNodeId preview_soft_node;

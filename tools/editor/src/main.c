@@ -116,9 +116,12 @@ static EditorResult editor_workspace_operation_execute(EditorWorkspace *workspac
 
 static EditorNavigationState editor_navigation_state_get(
         const EditorProject *project, const EditorViewportState *state) {
+    EditorViewportMode persisted_mode;
     if(project == NULL || state == NULL) return (EditorNavigationState){0};
+    persisted_mode = state->mode == EDITOR_VIEWPORT_AUTO_SHAPE ?
+        state->auto_shape_parent_mode : state->mode;
     return (EditorNavigationState){
-        .mode = (uint32_t)state->mode,
+        .mode = (uint32_t)persisted_mode,
         .selection = (uint32_t)state->selection,
         .object = project->selected,
         .selected_line = state->selected_line,
@@ -216,7 +219,7 @@ static float editor_panel_content_height_get(const EditorProject *project,
     if(state->mode == EDITOR_VIEWPORT_SOFT_BODY) {
         for(size_t i = 0; i < object->soft_body_count; i += 1) {
             if(object->soft_body_items[i].id == state->selected_soft_body) {
-                return fmaxf(height, 540.0f + (float)(object->soft_body_items[i].node_count +
+                return fmaxf(height, 576.0f + (float)(object->soft_body_items[i].node_count +
                     object->soft_body_items[i].beam_count +
                     object->soft_body_items[i].area_count) * 28.0f);
             }
@@ -555,6 +558,67 @@ static void editor_icon_line_draw(Position start, Position end, Color color) {
         length, 1.5f, -atan2f(delta.y, delta.x), color);
 }
 
+static void editor_auto_shape_icon_draw(UIRect bounds, EditorAutoShapeKind kind,
+        Color color) {
+    Position center = {bounds.x + bounds.width * 0.5f, bounds.y + 18.0f};
+    if(kind == EDITOR_AUTO_SHAPE_TRIANGLE) {
+        Position top = {center.x, center.y - 9.0f};
+        Position right = {center.x + 11.0f, center.y + 8.0f};
+        Position left = {center.x - 11.0f, center.y + 8.0f};
+        editor_icon_line_draw(top, right, color);
+        editor_icon_line_draw(right, left, color);
+        editor_icon_line_draw(left, top, color);
+    } else if(kind == EDITOR_AUTO_SHAPE_RECTANGLE) {
+        Position top_left = {center.x - 11.0f, center.y - 8.0f};
+        Position top_right = {center.x + 11.0f, center.y - 8.0f};
+        Position bottom_right = {center.x + 11.0f, center.y + 8.0f};
+        Position bottom_left = {center.x - 11.0f, center.y + 8.0f};
+        editor_icon_line_draw(top_left, top_right, color);
+        editor_icon_line_draw(top_right, bottom_right, color);
+        editor_icon_line_draw(bottom_right, bottom_left, color);
+        editor_icon_line_draw(bottom_left, top_left, color);
+    } else {
+        Position previous = {center.x, center.y - 10.0f};
+        for(size_t i = 1; i <= 16; i += 1) {
+            float angle = -1.57079632679f + 6.28318530718f * (float)i / 16.0f;
+            Position current = {center.x + cosf(angle) * 10.0f,
+                center.y + sinf(angle) * 10.0f};
+            editor_icon_line_draw(previous, current, color);
+            previous = current;
+        }
+    }
+}
+
+static int editor_auto_shape_picker_draw(const char *id_prefix, UIRect bounds,
+        size_t point_count, const TextAsset *triangle_label,
+        const TextAsset *rectangle_label, const TextAsset *circle_label) {
+    const TextAsset *labels[3] = {triangle_label, rectangle_label, circle_label};
+    Color enabled_color = {230, 234, 242, 255};
+    Color disabled_color = {105, 108, 116, 255};
+    float gap = 4.0f;
+    float width = (bounds.width - gap * 2.0f) / 3.0f;
+
+    rohr_ui_surface(bounds, (Color){28, 31, 38, 255});
+    rohr_ui_border(bounds, 2.0f, (Color){5, 6, 8, 255});
+    for(size_t i = 0; i < 3; i += 1) {
+        char id[96];
+        UIRect button = {bounds.x + (width + gap) * (float)i, bounds.y,
+            width, bounds.height};
+        bool enabled = point_count >= (i == EDITOR_AUTO_SHAPE_RECTANGLE ? 4u : 3u);
+        snprintf(id, sizeof(id), "%s.%zu", id_prefix, i);
+        if(enabled) {
+            UIButtonResult result = rohr_ui_button(id, labels[i], button, NULL);
+            editor_auto_shape_icon_draw(button, (EditorAutoShapeKind)i, enabled_color);
+            if(result.clicked) return (int)i;
+        } else {
+            rohr_ui_button_disabled(button, NULL);
+            rohr_ui_label(labels[i], button);
+            editor_auto_shape_icon_draw(button, (EditorAutoShapeKind)i, disabled_color);
+        }
+    }
+    return -1;
+}
+
 static bool editor_visibility_toggle(const char *id, TextAsset *empty_label,
     UIRect bounds, EditorProject *project, EditorVisibilityKind kind,
     EditorObjectId object, uint32_t parent, uint32_t item, bool visible) {
@@ -826,7 +890,7 @@ static EditorJoint *editor_selected_joint_get(EditorObject *object,
 }
 
 static EditorSoftBody *editor_selected_soft_body_get(EditorObject *object,
-    const EditorViewportState *state) {
+        const EditorViewportState *state) {
     if(object == NULL || state == NULL) return NULL;
     for(size_t i = 0; i < object->soft_body_count; i += 1) {
         if(object->soft_body_items[i].id == state->selected_soft_body) {
@@ -834,6 +898,37 @@ static EditorSoftBody *editor_selected_soft_body_get(EditorObject *object,
         }
     }
     return NULL;
+}
+
+static bool editor_auto_shape_apply(EditorProject *project,
+        EditorViewportState *state, EditorViewportMode parent_mode,
+        EditorAutoShapeConfig config) {
+    EditorObject *object = editor_project_selected_get(project);
+    EditorCommand command = {.type = EDITOR_COMMAND_AUTO_SHAPE};
+    EditorCommandResult result;
+
+    if(object == NULL || state == NULL) return false;
+    command.data.auto_shape.object = object->id;
+    command.data.auto_shape.config = config;
+    if(parent_mode == EDITOR_VIEWPORT_HITBOX) {
+        EditorRigidBody *body = editor_selected_body_get(object, state);
+        EditorHitbox *hitbox = editor_selected_hitbox_get(object, state);
+        if(body == NULL || hitbox == NULL) return false;
+        command.data.auto_shape.kind = EDITOR_ITEM_HITBOX;
+        command.data.auto_shape.parent = body->id;
+        command.data.auto_shape.item = hitbox->id;
+    } else if(parent_mode == EDITOR_VIEWPORT_SOFT_BODY) {
+        EditorSoftBody *body = editor_selected_soft_body_get(object, state);
+        if(body == NULL) return false;
+        command.data.auto_shape.kind = EDITOR_ITEM_SOFT_BODY;
+        command.data.auto_shape.item = body->id;
+    } else return false;
+    result = editor_command_execute(project, &command);
+    if(result.kind == ERROR_RESULT_ERROR) {
+        fprintf(stderr, "%s\n", result.result.error.message);
+        return false;
+    }
+    return true;
 }
 
 static EditorSoftNode *editor_selected_soft_node_get(EditorSoftBody *body,
@@ -1133,6 +1228,15 @@ int main(void) {
     Position viewport_context_position = {0};
     FontAsset font = {0};
     TextAsset hitbox_editor_label = {0};
+    TextAsset auto_shape_label = {0};
+    TextAsset triangle_label = {0};
+    TextAsset rectangle_label = {0};
+    TextAsset circle_label = {0};
+    TextAsset equilateral_label = {0};
+    TextAsset isosceles_label = {0};
+    TextAsset scalene_label = {0};
+    TextAsset width_label = {0};
+    TextAsset height_label = {0};
     TextAsset file_label = {0};
     TextAsset edit_label = {0};
     TextAsset undo_label = {0};
@@ -1292,6 +1396,16 @@ int main(void) {
     bool terminal_build_operations = false;
     bool collision_category_open = false;
     bool collide_with_open = false;
+    bool auto_shape_picker_open = false;
+    bool auto_shape_first_field_was_active = false;
+    bool auto_shape_second_field_was_active = false;
+    EditorAutoShapeConfig auto_shape_config = {
+        .kind = EDITOR_AUTO_SHAPE_CIRCLE,
+        .triangle_kind = EDITOR_AUTO_TRIANGLE_ISOSCELES,
+        .width = 100.0f,
+        .height = 100.0f,
+        .radius = 50.0f
+    };
     EditorCloseAction close_action = EDITOR_CLOSE_NONE;
     float panel_scroll_offset = 0.0f;
     EditorViewportMode panel_scroll_mode = EDITOR_VIEWPORT_HIERARCHY;
@@ -1347,6 +1461,15 @@ int main(void) {
         font = result.result.value;
     }
     if(!editor_text_create(&font, "Hitbox Editor", &hitbox_editor_label) ||
+            !editor_text_create(&font, "Auto Shape", &auto_shape_label) ||
+            !editor_text_create(&font, "Triangle", &triangle_label) ||
+            !editor_text_create(&font, "Square", &rectangle_label) ||
+            !editor_text_create(&font, "Circle", &circle_label) ||
+            !editor_text_create(&font, "Equilateral", &equilateral_label) ||
+            !editor_text_create(&font, "Isosceles", &isosceles_label) ||
+            !editor_text_create(&font, "Scalene", &scalene_label) ||
+            !editor_text_create(&font, "Width", &width_label) ||
+            !editor_text_create(&font, "Height", &height_label) ||
             !editor_text_create(&font, "File", &file_label) ||
             !editor_text_create(&font, "Edit", &edit_label) ||
             !editor_text_create(&font, "Undo    Ctrl+Z", &undo_label) ||
@@ -1526,6 +1649,9 @@ int main(void) {
         } else if(close_action != EDITOR_CLOSE_NONE &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             close_action = EDITOR_CLOSE_NONE;
+        } else if(auto_shape_picker_open &&
+                rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
+            auto_shape_picker_open = false;
         } else if((collision_category_open || collide_with_open) &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             collision_category_open = false;
@@ -2102,11 +2228,16 @@ int main(void) {
                         47.0f, 26.0f, 26.0f}, &project, EDITOR_VISIBILITY_HITBOX,
                     selected->id, body->id, hitbox->id, hitbox->visible);
             }
-            rohr_ui_label(&vertices_label,
-                (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 110.0f,
-                    EDITOR_TOOLS_WIDTH - 20.0f, 24.0f});
+            if(hitbox != NULL && rohr_ui_button("editor.hitbox.auto_shape",
+                    &auto_shape_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
+                        78.0f, EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, NULL).clicked)
+                auto_shape_picker_open = !auto_shape_picker_open;
             if(hitbox != NULL) {
-                for(uint32_t i = 0; i < hitbox->vertex_count; i += 1) {
+                if(!auto_shape_picker_open) {
+                    rohr_ui_label(&vertices_label,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 110.0f,
+                            EDITOR_TOOLS_WIDTH - 20.0f, 24.0f});
+                    for(uint32_t i = 0; i < hitbox->vertex_count; i += 1) {
                     char id[64];
                     float y = 138.0f + (float)i * 27.0f;
                     UIButtonStyle selected_style = editor_selected_button_style_get();
@@ -2128,8 +2259,8 @@ int main(void) {
                             (void)editor_navigation_selected_open(&project, &viewport_state);
                         }
                     }
-                }
-                {
+                    }
+                    {
                     float base = 146.0f + (float)hitbox->vertex_count * 27.0f;
                     rohr_ui_label(&lines_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
                         base, EDITOR_TOOLS_WIDTH - 20.0f, 24.0f});
@@ -2168,8 +2299,101 @@ int main(void) {
                             (void)editor_open_item_delete(&project, &viewport_state);
                         }
                     }
+                    }
+                }
+                if(auto_shape_picker_open) {
+                    int selected_shape = editor_auto_shape_picker_draw(
+                        "editor.hitbox.auto_shape.option",
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 110.0f,
+                            EDITOR_TOOLS_WIDTH - 20.0f, 62.0f},
+                        hitbox->vertex_count, &triangle_label,
+                        &rectangle_label, &circle_label);
+                    if(selected_shape >= 0) {
+                        auto_shape_config.kind = (EditorAutoShapeKind)selected_shape;
+                        viewport_state.auto_shape_parent_mode = EDITOR_VIEWPORT_HITBOX;
+                        (void)editor_auto_shape_apply(&project, &viewport_state,
+                            EDITOR_VIEWPORT_HITBOX, auto_shape_config);
+                        viewport_state.mode = EDITOR_VIEWPORT_AUTO_SHAPE;
+                        viewport_state.selection = EDITOR_SELECTION_HITBOX;
+                        auto_shape_first_field_was_active = false;
+                        auto_shape_second_field_was_active = false;
+                        auto_shape_picker_open = false;
+                    }
                 }
             }
+        } else if(viewport_state.mode == EDITOR_VIEWPORT_AUTO_SHAPE) {
+            UIFieldResult first_result = {0};
+            UIFieldResult second_result = {0};
+            bool non_field_changed = false;
+            bool first_active;
+            bool second_active;
+            bool commit;
+
+            rohr_ui_label(auto_shape_config.kind == EDITOR_AUTO_SHAPE_TRIANGLE ?
+                    &triangle_label : auto_shape_config.kind == EDITOR_AUTO_SHAPE_RECTANGLE ?
+                    &rectangle_label : &circle_label,
+                (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 44.0f,
+                    EDITOR_TOOLS_WIDTH - 20.0f, 30.0f});
+            if(auto_shape_config.kind == EDITOR_AUTO_SHAPE_CIRCLE) {
+                rohr_ui_label(&radius_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
+                    88.0f, 80.0f, 28.0f});
+                first_result = rohr_ui_field("editor.auto_shape.radius",
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                        .number = &auto_shape_config.radius}, &length_field,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 94.0f, 88.0f,
+                        EDITOR_TOOLS_WIDTH - 104.0f, 28.0f}, NULL);
+            } else {
+                rohr_ui_label(&width_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
+                    88.0f, 80.0f, 28.0f});
+                first_result = rohr_ui_field("editor.auto_shape.width",
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                        .number = &auto_shape_config.width}, &x_field,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 94.0f, 88.0f,
+                        EDITOR_TOOLS_WIDTH - 104.0f, 28.0f}, NULL);
+                rohr_ui_label(auto_shape_config.kind == EDITOR_AUTO_SHAPE_RECTANGLE ?
+                        &length_label : &height_label,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
+                    124.0f, 80.0f, 28.0f});
+                if(auto_shape_config.kind == EDITOR_AUTO_SHAPE_TRIANGLE &&
+                        auto_shape_config.triangle_kind ==
+                            EDITOR_AUTO_TRIANGLE_EQUILATERAL) {
+                    float calculated_height = auto_shape_config.width * sqrtf(3.0f) * 0.5f;
+                    editor_numeric_field_disabled_draw(&y_field, calculated_height,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 94.0f, 124.0f,
+                            EDITOR_TOOLS_WIDTH - 104.0f, 28.0f});
+                } else {
+                    second_result = rohr_ui_field("editor.auto_shape.height",
+                        (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                            .number = &auto_shape_config.height}, &y_field,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 94.0f, 124.0f,
+                            EDITOR_TOOLS_WIDTH - 104.0f, 28.0f}, NULL);
+                }
+                if(auto_shape_config.kind == EDITOR_AUTO_SHAPE_TRIANGLE) {
+                    const TextAsset *triangle_options[3] = {&equilateral_label,
+                        &isosceles_label, &scalene_label};
+                    UIDropdownResult triangle_result = rohr_ui_dropdown(
+                        "editor.auto_shape.triangle_kind", triangle_options, 3,
+                        (size_t)auto_shape_config.triangle_kind,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 164.0f,
+                            EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, NULL);
+                    if(triangle_result.changed) {
+                        auto_shape_config.triangle_kind =
+                            (EditorAutoTriangleKind)triangle_result.selected_index;
+                        non_field_changed = true;
+                    }
+                }
+            }
+            first_active = first_result.active && !first_result.submitted;
+            second_active = second_result.active && !second_result.submitted;
+            commit = non_field_changed ||
+                (auto_shape_first_field_was_active && !first_active) ||
+                (auto_shape_second_field_was_active && !second_active) ||
+                first_result.submitted || second_result.submitted;
+            if(commit) (void)editor_auto_shape_apply(&project, &viewport_state,
+                viewport_state.auto_shape_parent_mode, auto_shape_config);
+            auto_shape_first_field_was_active = first_active;
+            auto_shape_second_field_was_active = second_active;
+            field_editing = first_active || second_active;
         } else if(viewport_state.mode == EDITOR_VIEWPORT_VERTEX) {
             EditorObject *selected = editor_project_selected_get(&project);
             EditorRigidBody *body = editor_selected_body_get(selected, &viewport_state);
@@ -2947,8 +3171,13 @@ int main(void) {
                             viewport_state.mode = EDITOR_VIEWPORT_ORIGIN;
                     }
                 }
-                if(rohr_ui_button("editor.soft_body.add_node", &add_node_label,
+                if(rohr_ui_button("editor.soft_body.auto_shape", &auto_shape_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 360.0f,
+                            EDITOR_TOOLS_WIDTH - 20.0f, 30.0f}, NULL).clicked)
+                    auto_shape_picker_open = !auto_shape_picker_open;
+                if(!auto_shape_picker_open) {
+                    if(rohr_ui_button("editor.soft_body.add_node", &add_node_label,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 396.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 30.0f}, NULL).clicked) {
                     EditorCommand command = {.type = EDITOR_COMMAND_ITEM_ADD,
                         .data.item_add = {.kind = EDITOR_ITEM_SOFT_NODE,
@@ -2960,8 +3189,8 @@ int main(void) {
                         viewport_state.selected_soft_node = node.result.object;
                     }
                 }
-                if(rohr_ui_button("editor.soft_body.add_beam", &add_beam_label,
-                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 396.0f,
+                    if(rohr_ui_button("editor.soft_body.add_beam", &add_beam_label,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 432.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 30.0f}, NULL).clicked) {
                     EditorCommand command = {.type = EDITOR_COMMAND_ITEM_ADD,
                         .data.item_add = {.kind = EDITOR_ITEM_SOFT_BEAM,
@@ -2972,8 +3201,8 @@ int main(void) {
                         viewport_state.selected_soft_beam = beam.result.object;
                     }
                 }
-                {
-                    float y = 440.0f;
+                    {
+                        float y = 476.0f;
                     for(size_t i = 0; i < body->node_count; i += 1, y += 28.0f) {
                         EditorSoftNode *node = &body->nodes[i];
                         UIButtonStyle selected_style = editor_selected_button_style_get();
@@ -3062,6 +3291,26 @@ int main(void) {
                                     &project, &viewport_state);
                             }
                         }
+                    }
+                    }
+                }
+                if(auto_shape_picker_open) {
+                    int selected_shape = editor_auto_shape_picker_draw(
+                        "editor.soft_body.auto_shape.option",
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 394.0f,
+                            EDITOR_TOOLS_WIDTH - 20.0f, 62.0f},
+                        body->node_count, &triangle_label,
+                        &rectangle_label, &circle_label);
+                    if(selected_shape >= 0) {
+                        auto_shape_config.kind = (EditorAutoShapeKind)selected_shape;
+                        viewport_state.auto_shape_parent_mode = EDITOR_VIEWPORT_SOFT_BODY;
+                        (void)editor_auto_shape_apply(&project, &viewport_state,
+                            EDITOR_VIEWPORT_SOFT_BODY, auto_shape_config);
+                        viewport_state.mode = EDITOR_VIEWPORT_AUTO_SHAPE;
+                        viewport_state.selection = EDITOR_SELECTION_SOFT_BODY;
+                        auto_shape_first_field_was_active = false;
+                        auto_shape_second_field_was_active = false;
+                        auto_shape_picker_open = false;
                     }
                 }
                 if(rohr_ui_button("editor.soft_body.delete", &delete_soft_body_label,
@@ -4173,6 +4422,22 @@ int main(void) {
             editor_window_width, 1.0f, (Color){75, 84, 100, 255});
         {
             Position pointer = rohr_graphics_mouse_screen_position_get();
+            if(auto_shape_picker_open &&
+                    mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_PRESSED) {
+                UIRect button_bounds = viewport_state.mode == EDITOR_VIEWPORT_HITBOX ?
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 78.0f,
+                        EDITOR_TOOLS_WIDTH - 20.0f, 28.0f} :
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 360.0f,
+                        EDITOR_TOOLS_WIDTH - 20.0f, 30.0f};
+                UIRect picker_bounds = viewport_state.mode == EDITOR_VIEWPORT_HITBOX ?
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 110.0f,
+                        EDITOR_TOOLS_WIDTH - 20.0f, 62.0f} :
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 394.0f,
+                        EDITOR_TOOLS_WIDTH - 20.0f, 62.0f};
+                if(!editor_point_in_rect(pointer, button_bounds) &&
+                        !editor_point_in_rect(pointer, picker_bounds))
+                    auto_shape_picker_open = false;
+            }
             bool ui_consumed = !workspace.open || file_browser.active ||
                 close_action != EDITOR_CLOSE_NONE ||
                 viewport_context_open || color_picker.open ||
@@ -4327,6 +4592,15 @@ int main(void) {
     rohr_graphics_text_destroy(&add_hitbox_label);
     rohr_graphics_text_destroy(&add_object_label);
     rohr_graphics_text_destroy(&none_label);
+    rohr_graphics_text_destroy(&height_label);
+    rohr_graphics_text_destroy(&width_label);
+    rohr_graphics_text_destroy(&scalene_label);
+    rohr_graphics_text_destroy(&isosceles_label);
+    rohr_graphics_text_destroy(&equilateral_label);
+    rohr_graphics_text_destroy(&circle_label);
+    rohr_graphics_text_destroy(&rectangle_label);
+    rohr_graphics_text_destroy(&triangle_label);
+    rohr_graphics_text_destroy(&auto_shape_label);
     rohr_graphics_text_destroy(&hitbox_editor_label);
     rohr_graphics_text_destroy(&preferences_label);
     rohr_graphics_text_destroy(&grid_label);
@@ -4488,6 +4762,15 @@ fail:
     rohr_graphics_text_destroy(&add_hitbox_label);
     rohr_graphics_text_destroy(&add_object_label);
     rohr_graphics_text_destroy(&none_label);
+    rohr_graphics_text_destroy(&height_label);
+    rohr_graphics_text_destroy(&width_label);
+    rohr_graphics_text_destroy(&scalene_label);
+    rohr_graphics_text_destroy(&isosceles_label);
+    rohr_graphics_text_destroy(&equilateral_label);
+    rohr_graphics_text_destroy(&circle_label);
+    rohr_graphics_text_destroy(&rectangle_label);
+    rohr_graphics_text_destroy(&triangle_label);
+    rohr_graphics_text_destroy(&auto_shape_label);
     rohr_graphics_text_destroy(&hitbox_editor_label);
     rohr_graphics_text_destroy(&preferences_label);
     rohr_graphics_text_destroy(&grid_label);

@@ -117,6 +117,23 @@ While a hitbox editor is open, clicks on its owning body or particle do not leav
 the editor or drag the body. Vertex and line handles retain priority. Clicking
 outside deselects the hitbox while leaving its editor open.
 
+**Auto Shape** opens a three-column triangle, square, and circle picker. The
+square option requires at least four vertices; triangle and circle require at
+least three. Choosing a shape opens its parameter editor. Polygon corners are
+always retained and additional vertices are distributed deterministically over
+the perimeter. Circles distribute every vertex at an equal angle. Existing
+vertex IDs and names are preserved.
+
+Choosing a shape applies it immediately using the displayed defaults. Editing a
+parameter reapplies the shape when that field is submitted with Enter, exited
+with Escape, or loses focus.
+
+Triangle modes are equilateral, isosceles, and scalene. Equilateral height is
+derived from width, isosceles centers its apex using editable width and height,
+and scalene uses the same fields with a deterministic asymmetric apex. Width and
+length independently control the square tool, so unequal values produce a
+rectangle.
+
 Rigid bodies expose mass, friction, restitution, gravity, motion type, rotation
 locking, colors, and collision filtering. Collision filtering has two sets:
 
@@ -172,6 +189,9 @@ disabled and follows the soft-body color.
 Dragging any node, beam, or filled area while in the soft-body editor translates
 the whole soft body. Double-click nodes, beams, or areas to open their individual
 editors.
+
+Soft bodies provide the same **Auto Shape** tool. It repositions existing nodes
+without replacing node IDs, names, beams, or area relationships.
 
 ## Current boundary
 

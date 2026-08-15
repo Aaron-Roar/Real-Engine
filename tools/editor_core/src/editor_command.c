@@ -27,6 +27,43 @@ static bool editor_command_position_equal(Position first, Position second) {
         editor_command_float_equal(first.y, second.y);
 }
 
+static const char *editor_auto_shape_kind_name_get(EditorAutoShapeKind kind) {
+    switch(kind) {
+        case EDITOR_AUTO_SHAPE_TRIANGLE: return "triangle";
+        case EDITOR_AUTO_SHAPE_RECTANGLE: return "square";
+        case EDITOR_AUTO_SHAPE_CIRCLE: return "circle";
+        default: return NULL;
+    }
+}
+
+static const char *editor_auto_triangle_kind_name_get(EditorAutoTriangleKind kind) {
+    switch(kind) {
+        case EDITOR_AUTO_TRIANGLE_EQUILATERAL: return "equilateral";
+        case EDITOR_AUTO_TRIANGLE_ISOSCELES: return "isosceles";
+        case EDITOR_AUTO_TRIANGLE_SCALENE: return "scalene";
+        default: return NULL;
+    }
+}
+
+static bool editor_auto_shape_kind_parse(const char *value,
+        EditorAutoShapeKind *kind) {
+    if(strcmp(value, "triangle") == 0) *kind = EDITOR_AUTO_SHAPE_TRIANGLE;
+    else if(strcmp(value, "rectangle") == 0 || strcmp(value, "square") == 0)
+        *kind = EDITOR_AUTO_SHAPE_RECTANGLE;
+    else if(strcmp(value, "circle") == 0) *kind = EDITOR_AUTO_SHAPE_CIRCLE;
+    else return false;
+    return true;
+}
+
+static bool editor_auto_triangle_kind_parse(const char *value,
+        EditorAutoTriangleKind *kind) {
+    if(strcmp(value, "equilateral") == 0) *kind = EDITOR_AUTO_TRIANGLE_EQUILATERAL;
+    else if(strcmp(value, "isosceles") == 0) *kind = EDITOR_AUTO_TRIANGLE_ISOSCELES;
+    else if(strcmp(value, "scalene") == 0) *kind = EDITOR_AUTO_TRIANGLE_SCALENE;
+    else return false;
+    return true;
+}
+
 static EditorCommandResult editor_command_result_from(EditorResult result) {
     if(editor_result_check(result)) return editor_command_error(result.result.error);
     return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
@@ -221,6 +258,36 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
             }
             return editor_command_not_found("soft node",
                 command->data.soft_node_position.node);
+        }
+        case EDITOR_COMMAND_AUTO_SHAPE: {
+            EditorObject *object = editor_object_query_get(project,
+                command->data.auto_shape.object);
+            if(object == NULL) return editor_command_not_found("object",
+                command->data.auto_shape.object);
+            if(command->data.auto_shape.kind == EDITOR_ITEM_HITBOX) {
+                EditorRigidBody *body = editor_project_rigid_body_get(object,
+                    command->data.auto_shape.parent);
+                EditorHitbox *hitbox;
+                if(body == NULL) return editor_command_not_found("rigid body",
+                    command->data.auto_shape.parent);
+                hitbox = editor_project_hitbox_get(body,
+                    command->data.auto_shape.item);
+                if(hitbox == NULL) return editor_command_not_found("hitbox",
+                    command->data.auto_shape.item);
+                return editor_command_result_from(editor_auto_shape_hitbox_apply(
+                    hitbox, &command->data.auto_shape.config));
+            }
+            if(command->data.auto_shape.kind == EDITOR_ITEM_SOFT_BODY) {
+                EditorSoftBody *body = editor_command_soft_body_get(object,
+                    command->data.auto_shape.item);
+                if(body == NULL) return editor_command_not_found("soft body",
+                    command->data.auto_shape.item);
+                return editor_command_result_from(editor_auto_shape_soft_body_apply(
+                    body, &command->data.auto_shape.config));
+            }
+            return editor_command_error(editor_result_error(
+                EDITOR_ERROR_INVALID_ARGUMENT,
+                "auto shape target must be a hitbox or soft body").result.error);
         }
         case EDITOR_COMMAND_RIGID_BODY_ORIGIN: {
             EditorObject *object = editor_object_query_get(project,
@@ -1519,6 +1586,41 @@ visibility_invalid:
         command->type = EDITOR_COMMAND_SOFT_NODE_POSITION;
         return editor_result_value(true);
     }
+    if((strcmp(domain, "hitbox") == 0 || strcmp(domain, "soft-body") == 0) &&
+            strcmp(action, "auto-shape") == 0) {
+        bool hitbox = strcmp(domain, "hitbox") == 0;
+        int base = hitbox ? 7 : 6;
+        if(count != base + 5 ||
+                !editor_command_uint_parse(arguments[4],
+                    &command->data.auto_shape.object) ||
+                !editor_command_uint_parse(arguments[5],
+                    &command->data.auto_shape.parent) ||
+                (hitbox && !editor_command_uint_parse(arguments[6],
+                    &command->data.auto_shape.item)) ||
+                !editor_auto_shape_kind_parse(arguments[base],
+                    &command->data.auto_shape.config.kind) ||
+                !editor_auto_triangle_kind_parse(arguments[base + 1],
+                    &command->data.auto_shape.config.triangle_kind) ||
+                !editor_command_float_parse(arguments[base + 2],
+                    &command->data.auto_shape.config.width) ||
+                !editor_command_float_parse(arguments[base + 3],
+                    &command->data.auto_shape.config.height) ||
+                !editor_command_float_parse(arguments[base + 4],
+                    &command->data.auto_shape.config.radius))
+            return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                "invalid %s auto-shape command", domain);
+        command->type = EDITOR_COMMAND_AUTO_SHAPE;
+        command->data.auto_shape.kind = hitbox ? EDITOR_ITEM_HITBOX :
+            EDITOR_ITEM_SOFT_BODY;
+        if(hitbox) {
+            uint32_t body = command->data.auto_shape.parent;
+            command->data.auto_shape.parent = body;
+        } else {
+            command->data.auto_shape.item = command->data.auto_shape.parent;
+            command->data.auto_shape.parent = 0;
+        }
+        return editor_result_value(true);
+    }
     if((strcmp(domain, "rigid-body") == 0 || strcmp(domain, "soft-body") == 0) &&
             strcmp(action, "origin") == 0 && count == 8 &&
             editor_command_uint_parse(arguments[4], &command->data.origin.object) &&
@@ -1594,6 +1696,10 @@ EditorResult editor_command_cli_write(const EditorCommand *command,
         case EDITOR_COMMAND_SOFT_BODY_TRANSFORM:
         case EDITOR_COMMAND_SOFT_BODY_ORIGIN: domain = "soft-body"; break;
         case EDITOR_COMMAND_SOFT_NODE_POSITION: domain = "soft-node"; break;
+        case EDITOR_COMMAND_AUTO_SHAPE:
+            domain = command->data.auto_shape.kind == EDITOR_ITEM_HITBOX ?
+                "hitbox" : "soft-body";
+            break;
         case EDITOR_COMMAND_VIEWPORT_CAMERA:
         case EDITOR_COMMAND_VIEWPORT_COORDINATES: domain = "viewport"; break;
         case EDITOR_COMMAND_VISIBILITY:
@@ -1748,6 +1854,34 @@ EditorResult editor_command_cli_write(const EditorCommand *command,
                 command->data.soft_node_position.position.x,
                 command->data.soft_node_position.position.y);
             break;
+        case EDITOR_COMMAND_AUTO_SHAPE: {
+            const char *shape = editor_auto_shape_kind_name_get(
+                command->data.auto_shape.config.kind);
+            const char *triangle = editor_auto_triangle_kind_name_get(
+                command->data.auto_shape.config.triangle_kind);
+            if(shape == NULL || triangle == NULL ||
+                    !editor_command_text_append(output, output_capacity, &used,
+                        "auto-shape ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            if(command->data.auto_shape.kind == EDITOR_ITEM_HITBOX)
+                snprintf(values, sizeof(values),
+                    " %u %u %u %s %s %.9g %.9g %.9g",
+                    command->data.auto_shape.object,
+                    command->data.auto_shape.parent,
+                    command->data.auto_shape.item, shape, triangle,
+                    command->data.auto_shape.config.width,
+                    command->data.auto_shape.config.height,
+                    command->data.auto_shape.config.radius);
+            else snprintf(values, sizeof(values),
+                " %u %u %s %s %.9g %.9g %.9g",
+                command->data.auto_shape.object,
+                command->data.auto_shape.item, shape, triangle,
+                command->data.auto_shape.config.width,
+                command->data.auto_shape.config.height,
+                command->data.auto_shape.config.radius);
+            break;
+        }
         case EDITOR_COMMAND_RIGID_BODY_ORIGIN:
         case EDITOR_COMMAND_SOFT_BODY_ORIGIN:
             if(!editor_command_text_append(output, output_capacity, &used, "origin ") ||

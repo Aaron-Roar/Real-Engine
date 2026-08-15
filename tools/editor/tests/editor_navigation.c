@@ -105,6 +105,17 @@ int main(void) {
             state.selection != EDITOR_SELECTION_NONE ||
             state.selected_anchor != 0) return 1;
 
+    state.mode = EDITOR_VIEWPORT_AUTO_SHAPE;
+    state.auto_shape_parent_mode = EDITOR_VIEWPORT_HITBOX;
+    editor_viewport_back(&state);
+    if(state.mode != EDITOR_VIEWPORT_HITBOX ||
+            state.selection != EDITOR_SELECTION_HITBOX) return 1;
+    state.mode = EDITOR_VIEWPORT_AUTO_SHAPE;
+    state.auto_shape_parent_mode = EDITOR_VIEWPORT_SOFT_BODY;
+    editor_viewport_back(&state);
+    if(state.mode != EDITOR_VIEWPORT_SOFT_BODY ||
+            state.selection != EDITOR_SELECTION_SOFT_BODY) return 1;
+
     snprintf(browser.directory, sizeof(browser.directory), "/projects");
     if(!editor_file_browser_directory_path_get(&browser, path, sizeof(path)) ||
             strcmp(path, "/projects") != 0) return 1;

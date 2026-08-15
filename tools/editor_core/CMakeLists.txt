@@ -4,6 +4,7 @@ add_library(rohr_editor_core STATIC
     ${PROJECT_SOURCE_DIR}/tools/editor/src/editor_project_json.c
     ${PROJECT_SOURCE_DIR}/tools/editor/src/editor_workspace.c
     src/editor_command.c
+    src/editor_auto_shape.c
     src/editor_cli_selectors.c
     src/editor_cli_standard.c
     src/editor_document.c

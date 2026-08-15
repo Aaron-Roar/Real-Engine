@@ -76,6 +76,7 @@ static const char *cli_property(const char *domain, const char *action) {
     if(strcmp(action, "position") == 0) return "position";
     if(strcmp(action, "transform") == 0) return "transform";
     if(strcmp(action, "origin") == 0) return "origin";
+    if(strcmp(action, "auto-shape") == 0) return "auto-shape";
     if(strcmp(action, "camera") == 0) return "camera";
     if(strcmp(action, "coordinates") == 0) return "coordinates";
     if(strcmp(domain, "navigation") == 0) return "navigation";
@@ -249,6 +250,7 @@ EditorResult editor_command_cli_standard_parse(const EditorProject *project,
          strcmp(property, "rotation") == 0 ? "transform" :
          strcmp(property, "transform") == 0 ? "transform" :
          strcmp(property, "origin") == 0 ? "origin" :
+         strcmp(property, "auto-shape") == 0 ? "auto-shape" :
          strcmp(property, "camera") == 0 ? "camera" :
          strcmp(property, "coordinates") == 0 ? "coordinates" :
          strcmp(property, "navigation") == 0 ? "set" :

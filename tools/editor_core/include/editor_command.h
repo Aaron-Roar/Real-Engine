@@ -1,6 +1,7 @@
 #ifndef ROHR_EDITOR_COMMAND_H
 #define ROHR_EDITOR_COMMAND_H
 
+#include "editor_auto_shape.h"
 #include "editor_object_commands.h"
 
 typedef enum EditorCommandType {
@@ -13,6 +14,7 @@ typedef enum EditorCommandType {
     EDITOR_COMMAND_ANCHOR_TRANSFORM,
     EDITOR_COMMAND_SOFT_BODY_TRANSFORM,
     EDITOR_COMMAND_SOFT_NODE_POSITION,
+    EDITOR_COMMAND_AUTO_SHAPE,
     EDITOR_COMMAND_RIGID_BODY_ORIGIN,
     EDITOR_COMMAND_SOFT_BODY_ORIGIN,
     EDITOR_COMMAND_VIEWPORT_CAMERA,
@@ -211,6 +213,13 @@ typedef struct EditorCommand {
             EditorSoftNodeId node;
             Position position;
         } soft_node_position;
+        struct {
+            EditorItemKind kind;
+            EditorObjectId object;
+            uint32_t parent;
+            uint32_t item;
+            EditorAutoShapeConfig config;
+        } auto_shape;
         struct {
             EditorObjectId object;
             uint32_t body;

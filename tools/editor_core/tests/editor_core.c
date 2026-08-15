@@ -1,11 +1,133 @@
 #include "editor_command.h"
+#include "editor_auto_shape.h"
 #include "editor_document.h"
 #include "editor_object_commands.h"
 
 #include <stdio.h>
+#include <math.h>
 #include <string.h>
 
 static EditorCommandResult observed_creation;
+
+static bool position_near(Position position, float x, float y) {
+    return fabsf(position.x - x) < 0.001f && fabsf(position.y - y) < 0.001f;
+}
+
+static int auto_shape_test(void) {
+    EditorHitbox hitbox = {0};
+    EditorSoftBody soft_body = {0};
+    EditorVertexId vertex_ids[5] = {11, 12, 13, 14, 15};
+    EditorSoftNodeId node_ids[6] = {21, 22, 23, 24, 25, 26};
+    EditorAutoShapeConfig rectangle = {
+        .kind = EDITOR_AUTO_SHAPE_RECTANGLE, .width = 8.0f, .height = 4.0f
+    };
+    EditorAutoShapeConfig circle = {
+        .kind = EDITOR_AUTO_SHAPE_CIRCLE, .radius = 3.0f
+    };
+    EditorAutoShapeConfig triangle = {
+        .kind = EDITOR_AUTO_SHAPE_TRIANGLE,
+        .triangle_kind = EDITOR_AUTO_TRIANGLE_ISOSCELES,
+        .width = 6.0f, .height = 4.0f
+    };
+
+    hitbox.vertex_count = 5;
+    for(size_t i = 0; i < hitbox.vertex_count; i += 1)
+        hitbox.vertices[i].id = vertex_ids[i];
+    if(editor_result_check(editor_auto_shape_hitbox_apply(&hitbox, &rectangle)) ||
+            !position_near(hitbox.vertices[0].position, -4.0f, -2.0f) ||
+            !position_near(hitbox.vertices[1].position, 0.0f, -2.0f) ||
+            !position_near(hitbox.vertices[2].position, 4.0f, -2.0f) ||
+            !position_near(hitbox.vertices[3].position, 4.0f, 2.0f) ||
+            !position_near(hitbox.vertices[4].position, -4.0f, 2.0f)) return 1;
+    for(size_t i = 0; i < hitbox.vertex_count; i += 1)
+        if(hitbox.vertices[i].id != vertex_ids[i]) return 1;
+
+    soft_body.node_count = 6;
+    for(size_t i = 0; i < soft_body.node_count; i += 1)
+        soft_body.nodes[i].id = node_ids[i];
+    if(editor_result_check(editor_auto_shape_soft_body_apply(&soft_body, &circle)) ||
+            !position_near(soft_body.nodes[0].position, 0.0f, -3.0f)) return 1;
+    for(size_t i = 0; i < soft_body.node_count; i += 1) {
+        float distance = sqrtf(soft_body.nodes[i].position.x *
+            soft_body.nodes[i].position.x + soft_body.nodes[i].position.y *
+            soft_body.nodes[i].position.y);
+        if(fabsf(distance - 3.0f) > 0.001f ||
+                soft_body.nodes[i].id != node_ids[i]) return 1;
+    }
+    hitbox.vertex_count = 3;
+    if(!editor_result_check(editor_auto_shape_hitbox_apply(&hitbox, &rectangle)) ||
+            editor_result_check(editor_auto_shape_hitbox_apply(&hitbox, &triangle)) ||
+            !position_near(hitbox.vertices[0].position, 0.0f, -2.0f)) return 1;
+    triangle.triangle_kind = EDITOR_AUTO_TRIANGLE_EQUILATERAL;
+    triangle.width = 4.0f;
+    triangle.height = 999.0f;
+    if(editor_result_check(editor_auto_shape_hitbox_apply(&hitbox, &triangle)) ||
+            !position_near(hitbox.vertices[0].position, 0.0f, -sqrtf(3.0f)) ||
+            !position_near(hitbox.vertices[1].position, 2.0f, sqrtf(3.0f)))
+        return 1;
+    triangle.triangle_kind = EDITOR_AUTO_TRIANGLE_SCALENE;
+    triangle.width = 8.0f;
+    triangle.height = 6.0f;
+    if(editor_result_check(editor_auto_shape_hitbox_apply(&hitbox, &triangle)) ||
+            !position_near(hitbox.vertices[0].position, -2.0f, -3.0f) ||
+            !position_near(hitbox.vertices[1].position, 4.0f, 3.0f) ||
+            !position_near(hitbox.vertices[2].position, -4.0f, 3.0f)) return 1;
+    return 0;
+}
+
+static int auto_shape_command_test(void) {
+    static EditorProject project;
+    EditorObject *object;
+    EditorRigidBody *body;
+    EditorHitbox *hitbox;
+    EditorSoftBody *soft_body;
+    EditorCommand command;
+    EditorCommand parsed;
+    EditorCommandResult result;
+    EditorResult parsed_result;
+    const char *path;
+    char output[1024];
+    char *arguments[] = {"editor-cli", "--soft-body", "cloth",
+        "--object", "ShapeObject", "--property", "auto-shape",
+        "circle", "isosceles", "100", "100", "25"};
+
+    editor_project_init(&project);
+    object = editor_project_object_add(&project, (Position){0});
+    body = editor_project_rigid_body_add(&project, object);
+    hitbox = editor_project_hitbox_add(&project, body);
+    soft_body = editor_project_soft_body_add(&project, object);
+    if(object == NULL || body == NULL || hitbox == NULL || soft_body == NULL)
+        return 1;
+    snprintf(object->name, sizeof(object->name), "ShapeObject");
+    snprintf(body->name, sizeof(body->name), "frame");
+    snprintf(hitbox->name, sizeof(hitbox->name), "frame_hitbox");
+    snprintf(soft_body->name, sizeof(soft_body->name), "cloth");
+    for(size_t i = 0; i < 4; i += 1)
+        if(editor_project_soft_node_add(&project, soft_body, (Position){0}) == NULL)
+            return 1;
+    command = (EditorCommand){.type = EDITOR_COMMAND_AUTO_SHAPE,
+        .data.auto_shape = {.kind = EDITOR_ITEM_HITBOX,
+            .object = object->id, .parent = body->id, .item = hitbox->id,
+            .config = {.kind = EDITOR_AUTO_SHAPE_CIRCLE, .radius = 12.0f,
+                .width = 100.0f, .height = 100.0f,
+                .triangle_kind = EDITOR_AUTO_TRIANGLE_ISOSCELES}}};
+    result = editor_command_execute(&project, &command);
+    if(result.kind != ERROR_RESULT_VALUE ||
+            !position_near(hitbox->vertices[0].position, 0.0f, -12.0f)) return 1;
+    parsed_result = editor_command_cli_standard_write(&project, &command, &result,
+        "project.rohr.json", output, sizeof(output));
+    if(editor_result_check(parsed_result) ||
+            strstr(output, "--property auto-shape circle") == NULL ||
+            strstr(output, "--hitbox frame_hitbox") == NULL) return 1;
+    parsed_result = editor_command_cli_standard_parse(&project,
+        (int)(sizeof(arguments) / sizeof(arguments[0])), arguments, &path, &parsed);
+    if(editor_result_check(parsed_result) || parsed.type != EDITOR_COMMAND_AUTO_SHAPE ||
+            parsed.data.auto_shape.kind != EDITOR_ITEM_SOFT_BODY ||
+            parsed.data.auto_shape.item != soft_body->id ||
+            parsed.data.auto_shape.config.kind != EDITOR_AUTO_SHAPE_CIRCLE ||
+            parsed.data.auto_shape.config.radius != 25.0f) return 1;
+    return editor_command_execute(&project, &parsed).kind == ERROR_RESULT_VALUE ? 0 : 1;
+}
 
 static void creation_observe(const EditorCommand *command,
         const EditorCommandResult *result, void *context) {
@@ -814,6 +936,8 @@ int main(void) {
     if(relationship_commands_test() != 0) return 1;
     if(collision_filter_commands_test() != 0) return 1;
     if(named_selector_commands_test() != 0) return 1;
+    if(auto_shape_test() != 0) return 1;
+    if(auto_shape_command_test() != 0) return 1;
 
     editor_document_destroy(&loaded);
     editor_document_destroy(&document);

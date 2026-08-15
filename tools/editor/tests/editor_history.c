@@ -4,6 +4,7 @@
 #include "editor_viewport.h"
 
 #include <assert.h>
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -205,6 +206,27 @@ int main(void) {
         assert(soft_node->position.x == original.x);
         shortcut_apply(&history, SDLK_Y);
         assert(soft_node->position.x == original.x + 20.0f);
+    }
+    editor_history_reset(&history);
+    {
+        Position before[EDITOR_HITBOX_VERTEX_MAX];
+        for(size_t i = 0; i < hitbox->vertex_count; i += 1)
+            before[i] = hitbox->vertices[i].position;
+        command = (EditorCommand){.type = EDITOR_COMMAND_AUTO_SHAPE,
+            .data.auto_shape = {.kind = EDITOR_ITEM_HITBOX,
+                .object = project.objects[0].id, .parent = body->id,
+                .item = hitbox->id,
+                .config = {.kind = EDITOR_AUTO_SHAPE_CIRCLE, .radius = 30.0f}}};
+        result = editor_command_execute(&project, &command);
+        assert(result.kind == ERROR_RESULT_VALUE);
+        assert(history.undo_count == 1);
+        shortcut_apply(&history, SDLK_Z);
+        for(size_t i = 0; i < hitbox->vertex_count; i += 1) {
+            assert(hitbox->vertices[i].position.x == before[i].x);
+            assert(hitbox->vertices[i].position.y == before[i].y);
+        }
+        shortcut_apply(&history, SDLK_Y);
+        assert(fabsf(hitbox->vertices[0].position.y + 30.0f) < 0.001f);
     }
     editor_command_executing_callback_set(NULL, NULL);
     editor_command_finished_callback_set(NULL, NULL);
