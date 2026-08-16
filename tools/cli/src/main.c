@@ -22,15 +22,13 @@ static void cli_usage_print(void) {
         "  Properties: --property <name> <values...>\n"
         "  Structure: add, delete, or rename [new-name]\n"
         "  Project: editor-cli [--project <project-directory>] "
-            "generate-c|compile|build\n"
+            "[--engine-root <path>] <operation>\n"
+        "  Project operations: create, load, validate, save, generate-c, "
+            "compile, build\n"
         "  Example: editor-cli --object car --body chassis --property mass 5\n"
         "  Example: editor-cli --body chassis --property position 10 20\n"
-        "\nLegacy project management:\n"
-        "  rohr project create <directory> <engine-root>\n"
-        "  rohr project load <directory>\n"
-        "  rohr project validate <directory>\n"
-        "  rohr project save <directory>\n"
-        "  rohr project generate-c <directory>");
+        "  Example: editor-cli --project ./game load\n"
+        "  Example: editor-cli --engine-root ../rohr --project ./game create");
 }
 
 static bool cli_absolute_path_get(char *output, size_t capacity,
@@ -95,85 +93,86 @@ static int cli_workspace_action_command(int count, char **arguments) {
     static EditorProject project;
     EditorWorkspace workspace = {0};
     EditorWorkspaceCommand load = {.type = EDITOR_WORKSPACE_COMMAND_LOAD};
-    EditorWorkspaceCommand generate = {.type = EDITOR_WORKSPACE_COMMAND_GENERATE_C};
+    EditorWorkspaceCommand command = {0};
     const char *directory = ".";
-    const char *operation = NULL;
+    const char *engine_root = NULL;
+    const char *operation = arguments[count - 1];
+    bool project_set = false;
     EditorResult result;
-    for(int i = 1; i < count; i += 1) {
+    for(int i = 1; i + 1 < count; i += 1) {
         if(strcmp(arguments[i], "--project") == 0) {
-            if(i + 1 >= count) return cli_error(editor_result_error(
+            if(i + 1 >= count - 1) return cli_error(editor_result_error(
                 EDITOR_ERROR_INVALID_ARGUMENT, "--project requires a path"));
+            if(project_set) return cli_error(editor_result_error(
+                EDITOR_ERROR_INVALID_ARGUMENT, "--project may only be specified once"));
             directory = arguments[++i];
-        } else if((strcmp(arguments[i], "generate-c") == 0 ||
-                strcmp(arguments[i], "compile") == 0 ||
-                strcmp(arguments[i], "build") == 0) && operation == NULL) {
-            operation = arguments[i];
+            project_set = true;
+        } else if(strcmp(arguments[i], "--engine-root") == 0) {
+            if(i + 1 >= count - 1) return cli_error(editor_result_error(
+                EDITOR_ERROR_INVALID_ARGUMENT, "--engine-root requires a path"));
+            if(engine_root != NULL) return cli_error(editor_result_error(
+                EDITOR_ERROR_INVALID_ARGUMENT,
+                "--engine-root may only be specified once"));
+            engine_root = arguments[++i];
         } else {
             return cli_error(editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
                 "Unexpected project operation argument: %s", arguments[i]));
         }
     }
-    if(operation == NULL || strlen(directory) >= sizeof(load.directory))
+    if(strlen(directory) >= sizeof(load.directory))
         return cli_error(editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
             "Project operation path is invalid or too long"));
+    if(strcmp(operation, "create") == 0) {
+        if(engine_root == NULL || strlen(engine_root) >= sizeof(command.engine_root))
+            return cli_error(editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                "Project creation requires --engine-root <path>"));
+        command.type = EDITOR_WORKSPACE_COMMAND_CREATE;
+        snprintf(command.directory, sizeof(command.directory), "%s", directory);
+        snprintf(command.engine_root, sizeof(command.engine_root), "%s", engine_root);
+        result = editor_workspace_command_execute(&workspace, &project, &command);
+        return editor_result_check(result) ? cli_error(result) : 0;
+    }
+    if(engine_root != NULL) return cli_error(editor_result_error(
+        EDITOR_ERROR_INVALID_ARGUMENT,
+        "--engine-root is only valid with the create operation"));
     snprintf(load.directory, sizeof(load.directory), "%s", directory);
     result = editor_workspace_command_execute(&workspace, &project, &load);
     if(editor_result_check(result)) return cli_error(result);
+    if(strcmp(operation, "load") == 0 || strcmp(operation, "validate") == 0) {
+        puts(strcmp(operation, "validate") == 0 ? "valid" : "loaded");
+        return 0;
+    }
+    if(strcmp(operation, "save") == 0) {
+        command.type = EDITOR_WORKSPACE_COMMAND_SAVE;
+        result = editor_workspace_command_execute(&workspace, &project, &command);
+        return editor_result_check(result) ? cli_error(result) : 0;
+    }
     if(strcmp(operation, "generate-c") == 0 || strcmp(operation, "build") == 0) {
-        snprintf(generate.directory, sizeof(generate.directory), "%s",
+        command.type = EDITOR_WORKSPACE_COMMAND_GENERATE_C;
+        snprintf(command.directory, sizeof(command.directory), "%s",
             workspace.directory);
-        result = editor_workspace_command_execute(&workspace, &project, &generate);
+        result = editor_workspace_command_execute(&workspace, &project, &command);
         if(editor_result_check(result)) return cli_error(result);
     }
     return strcmp(operation, "generate-c") == 0 ? 0 :
         cli_project_compile(&workspace);
 }
 
-static int cli_project_command(int count, char **arguments) {
-    static EditorProject project;
-    EditorWorkspace workspace = {0};
-    EditorWorkspaceCommand command = {0};
-    EditorResult result;
-    const char *action;
-    if(count < 4) {
-        cli_usage_print();
-        return 1;
+static bool cli_workspace_action_check(int count, char **arguments) {
+    const char *operation;
+    if(count < 2) return false;
+    operation = arguments[count - 1];
+    if(strcmp(operation, "create") != 0 && strcmp(operation, "load") != 0 &&
+            strcmp(operation, "validate") != 0 && strcmp(operation, "save") != 0 &&
+            strcmp(operation, "generate-c") != 0 &&
+            strcmp(operation, "compile") != 0 && strcmp(operation, "build") != 0)
+        return false;
+    for(int i = 1; i + 1 < count; i += 2) {
+        if((strcmp(arguments[i], "--project") != 0 &&
+                strcmp(arguments[i], "--engine-root") != 0) || i + 1 >= count - 1)
+            return false;
     }
-    action = arguments[2];
-    if(strlen(arguments[3]) >= sizeof(command.directory))
-        return cli_error(editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
-            "Project directory path is too long"));
-    snprintf(command.directory, sizeof(command.directory), "%s", arguments[3]);
-    if(strcmp(action, "create") == 0) {
-        if(count != 5 || strlen(arguments[4]) >= sizeof(command.engine_root)) {
-            cli_usage_print();
-            return 1;
-        }
-        command.type = EDITOR_WORKSPACE_COMMAND_CREATE;
-        snprintf(command.engine_root, sizeof(command.engine_root), "%s", arguments[4]);
-    } else {
-        EditorWorkspaceCommand load = {.type = EDITOR_WORKSPACE_COMMAND_LOAD};
-        if(count != 4) {
-            cli_usage_print();
-            return 1;
-        }
-        snprintf(load.directory, sizeof(load.directory), "%s", arguments[3]);
-        result = editor_workspace_command_execute(&workspace, &project, &load);
-        if(editor_result_check(result)) return cli_error(result);
-        if(strcmp(action, "validate") == 0 || strcmp(action, "load") == 0) {
-            puts(strcmp(action, "validate") == 0 ? "valid" : "loaded");
-            return 0;
-        }
-        if(strcmp(action, "save") == 0) command.type = EDITOR_WORKSPACE_COMMAND_SAVE;
-        else if(strcmp(action, "generate-c") == 0)
-            command.type = EDITOR_WORKSPACE_COMMAND_GENERATE_C;
-        else {
-            cli_usage_print();
-            return 1;
-        }
-    }
-    result = editor_workspace_command_execute(&workspace, &project, &command);
-    return editor_result_check(result) ? cli_error(result) : 0;
+    return true;
 }
 
 static int cli_object_command(int count, char **arguments) {
@@ -218,11 +217,7 @@ static int cli_object_command(int count, char **arguments) {
 }
 
 int main(int count, char **arguments) {
-    if(count >= 2 && strcmp(arguments[1], "project") == 0)
-        return cli_project_command(count, arguments);
-    if(count >= 2 && (strcmp(arguments[count - 1], "generate-c") == 0 ||
-            strcmp(arguments[count - 1], "compile") == 0 ||
-            strcmp(arguments[count - 1], "build") == 0))
+    if(cli_workspace_action_check(count, arguments))
         return cli_workspace_action_command(count, arguments);
     if(count >= 2 && arguments[1][0] == '-')
         return cli_object_command(count, arguments);

@@ -992,34 +992,27 @@ EditorResult editor_workspace_command_cli_write(const EditorWorkspaceCommand *co
             command->directory[0] == '\0')
         return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
             "Workspace command serialization received an invalid argument");
-    if(command->type == EDITOR_WORKSPACE_COMMAND_CREATE) action = "create ";
-    else if(command->type == EDITOR_WORKSPACE_COMMAND_LOAD) action = "load ";
-    else if(command->type == EDITOR_WORKSPACE_COMMAND_SAVE) action = "save ";
-    else if(command->type == EDITOR_WORKSPACE_COMMAND_GENERATE_C) action = "generate-c ";
+    if(command->type == EDITOR_WORKSPACE_COMMAND_CREATE) action = "create";
+    else if(command->type == EDITOR_WORKSPACE_COMMAND_LOAD) action = "load";
+    else if(command->type == EDITOR_WORKSPACE_COMMAND_SAVE) action = "save";
+    else if(command->type == EDITOR_WORKSPACE_COMMAND_GENERATE_C) action = "generate-c";
     else return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
         "Unknown workspace command");
     output[0] = '\0';
-    if(command->type == EDITOR_WORKSPACE_COMMAND_GENERATE_C) {
-        if(!editor_workspace_command_text_append(output, output_capacity, &used,
-                "editor-cli --project ") ||
-                !editor_workspace_command_shell_append(output, output_capacity, &used,
-                    command->directory) ||
-                !editor_workspace_command_text_append(output, output_capacity, &used,
-                    " generate-c")) goto capacity_error;
-        return editor_result_value(true);
-    }
     if(!editor_workspace_command_text_append(output, output_capacity, &used,
-            "editor-cli project ") ||
-            !editor_workspace_command_text_append(output, output_capacity, &used,
-                action) ||
+            "editor-cli --project ") ||
             !editor_workspace_command_shell_append(output, output_capacity, &used,
                 command->directory)) goto capacity_error;
     if(command->type == EDITOR_WORKSPACE_COMMAND_CREATE) {
         if(command->engine_root[0] == '\0' ||
-                !editor_workspace_command_text_append(output, output_capacity, &used, " ") ||
+                !editor_workspace_command_text_append(output, output_capacity, &used,
+                    " --engine-root ") ||
                 !editor_workspace_command_shell_append(output, output_capacity, &used,
                     command->engine_root)) goto capacity_error;
     }
+    if(!editor_workspace_command_text_append(output, output_capacity, &used, " ") ||
+            !editor_workspace_command_text_append(output, output_capacity, &used,
+                action)) goto capacity_error;
     return editor_result_value(true);
 capacity_error:
     return editor_result_error(EDITOR_ERROR_CAPACITY,
