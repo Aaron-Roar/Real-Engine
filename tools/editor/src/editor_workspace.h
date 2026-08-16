@@ -15,7 +15,6 @@ typedef struct EditorWorkspaceConfig {
     char asset_directory[EDITOR_WORKSPACE_PATH_MAX];
     char object_directory[EDITOR_WORKSPACE_PATH_MAX];
     char editor_state_file[EDITOR_WORKSPACE_PATH_MAX];
-    char engine_root[EDITOR_WORKSPACE_PATH_MAX];
 } EditorWorkspaceConfig;
 
 typedef struct EditorWorkspace {
@@ -34,12 +33,11 @@ typedef enum EditorWorkspaceCommandType {
 typedef struct EditorWorkspaceCommand {
     EditorWorkspaceCommandType type;
     char directory[EDITOR_WORKSPACE_PATH_MAX];
-    char engine_root[EDITOR_WORKSPACE_PATH_MAX];
 } EditorWorkspaceCommand;
 
 EditorWorkspaceConfig editor_workspace_config_default_get(void);
 EditorResult editor_workspace_create(EditorWorkspace *workspace, EditorProject *project,
-    const char *directory, const char *engine_root);
+    const char *directory);
 EditorResult editor_workspace_load(EditorWorkspace *workspace, EditorProject *project,
     const char *directory);
 bool editor_workspace_save(const EditorWorkspace *workspace,

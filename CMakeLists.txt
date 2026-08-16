@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.20)
 
 project(rohr_engine LANGUAGES C)
 
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
 set(ROHR_BUILD_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}" CACHE PATH
     "Directory for user-facing Rohr build artifacts")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${ROHR_BUILD_OUTPUT_DIRECTORY}/lib")
@@ -28,19 +31,19 @@ set(SDL_X11_SHARED OFF CACHE BOOL "Load X11 dynamically" FORCE)
 set(SDL_TEST_LIBRARY OFF CACHE BOOL "Build the SDL3 test library" FORCE)
 set(SDL_TESTS OFF CACHE BOOL "Build SDL3 tests" FORCE)
 set(SDL_EXAMPLES OFF CACHE BOOL "Build SDL3 examples" FORCE)
-set(SDL_INSTALL OFF CACHE BOOL "Install SDL3" FORCE)
-add_subdirectory(lib/SDL EXCLUDE_FROM_ALL)
+set(SDL_INSTALL ON CACHE BOOL "Install SDL3" FORCE)
+add_subdirectory(lib/SDL)
 
 set(ROHR_SDL3_TARGET SDL3::SDL3-static)
 
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build bundled libraries statically" FORCE)
-set(SDLIMAGE_INSTALL OFF CACHE BOOL "Install SDL3_image" FORCE)
+set(SDLIMAGE_INSTALL ON CACHE BOOL "Install SDL3_image" FORCE)
 set(SDLIMAGE_SAMPLES OFF CACHE BOOL "Build SDL3_image samples" FORCE)
 set(SDLIMAGE_TESTS OFF CACHE BOOL "Build SDL3_image tests" FORCE)
 set(SDLIMAGE_VENDORED OFF CACHE BOOL "Use SDL_image codec submodules" FORCE)
-add_subdirectory(lib/SDL_image EXCLUDE_FROM_ALL)
+add_subdirectory(lib/SDL_image)
 
-set(SDLTTF_INSTALL OFF CACHE BOOL "Install SDL3_ttf" FORCE)
+set(SDLTTF_INSTALL ON CACHE BOOL "Install SDL3_ttf" FORCE)
 set(SDLTTF_SAMPLES OFF CACHE BOOL "Build SDL3_ttf samples" FORCE)
 set(SDLTTF_PLUTOSVG OFF CACHE BOOL "Build SDL_ttf color emoji support" FORCE)
 if(WIN32)
@@ -50,7 +53,11 @@ else()
     set(SDLTTF_VENDORED OFF CACHE BOOL "Use bundled SDL_ttf dependencies" FORCE)
     set(SDLTTF_HARFBUZZ ON CACHE BOOL "Build SDL_ttf HarfBuzz support" FORCE)
 endif()
-add_subdirectory(lib/SDL_ttf EXCLUDE_FROM_ALL)
+add_subdirectory(lib/SDL_ttf)
+if(WIN32 AND SDLTTF_VENDORED)
+    install(SCRIPT
+        "${CMAKE_CURRENT_BINARY_DIR}/lib/SDL_ttf/external/freetype/cmake_install.cmake")
+endif()
 
 set(ROHR_SDL3_IMAGE_TARGET SDL3_image::SDL3_image-static)
 set(ROHR_SDL3_TTF_TARGET SDL3_ttf::SDL3_ttf-static)
@@ -90,9 +97,12 @@ set(ROHR_ENGINE_SOURCES
 )
 
 add_library(rohr_engine STATIC ${ROHR_ENGINE_SOURCES})
+add_library(Rohr::Engine ALIAS rohr_engine)
+set_target_properties(rohr_engine PROPERTIES EXPORT_NAME Engine)
 target_include_directories(rohr_engine
     PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}
@@ -113,10 +123,37 @@ endif()
 add_library(rohr_tools STATIC
     src/tools/component_codegen.c
 )
+add_library(Rohr::Tools ALIAS rohr_tools)
+set_target_properties(rohr_tools PROPERTIES EXPORT_NAME Tools)
 target_include_directories(rohr_tools
     PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
+
+install(TARGETS rohr_engine rohr_tools
+    EXPORT RohrTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(EXPORT RohrTargets
+    FILE RohrTargets.cmake
+    NAMESPACE Rohr::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Rohr)
+configure_package_config_file(
+    cmake/RohrConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/RohrConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Rohr)
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/RohrConfigVersion.cmake
+    VERSION 0.1.0
+    COMPATIBILITY SameMajorVersion)
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/RohrConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/RohrConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Rohr)
 
 include(cmake/RohrHostTools.cmake)
 

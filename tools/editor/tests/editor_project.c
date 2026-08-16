@@ -99,14 +99,11 @@ int main(void) {
         workspace_command.type = EDITOR_WORKSPACE_COMMAND_CREATE;
         snprintf(workspace_command.directory, sizeof(workspace_command.directory),
             "%s", fixture);
-        snprintf(workspace_command.engine_root, sizeof(workspace_command.engine_root),
-            "%s", "/engine/root");
         if(editor_result_check(editor_workspace_command_execute(
                     &workspace, &workspace_project, &workspace_command)) ||
                 editor_result_check(editor_workspace_command_cli_write(
                     &workspace_command, cli_command, sizeof(cli_command))) ||
                 strstr(cli_command, "editor-cli --project ") != cli_command ||
-                strstr(cli_command, " --engine-root ") == NULL ||
                 strstr(cli_command, " create") == NULL) {
             workspace_fixture_remove(fixture);
             return 1;
@@ -127,7 +124,6 @@ int main(void) {
                     "objects/project.rohr.json") != 0 ||
                 !loaded_workspace.open || strcmp(loaded_workspace.config.name,
                     "RohrEditorWorkspaceTest") != 0 ||
-                strcmp(loaded_workspace.config.engine_root, "/engine/root") != 0 ||
                 loaded_project.object_count != 1 ||
                 strcmp(loaded_project.objects[0].name, "Starter") != 0 ||
                 !position_equal(loaded_project.objects[0].position,
@@ -297,7 +293,7 @@ int main(void) {
         if(!file_contains(path,
                 "add_executable(${PROJECT_NAME} src/main.c") ||
                 !file_contains(path,
-                    "target_link_libraries(${PROJECT_NAME} PRIVATE rohr_engine)")) {
+                    "target_link_libraries(${PROJECT_NAME} PRIVATE ${ROHR_ENGINE_TARGET})")) {
             workspace_fixture_remove(fixture);
             return 1;
         }
@@ -822,7 +818,7 @@ int main(void) {
         snprintf(path, sizeof(path), "%s/project.rohr.json", fixture);
         if(!file_replace(path, "occupied")) return 1;
         result = editor_workspace_create(
-            &creation_workspace, &creation_project, fixture, "/engine/root");
+            &creation_workspace, &creation_project, fixture);
         workspace_fixture_remove(fixture);
         if(!editor_result_check(result) || result.result.error.code != EDITOR_ERROR_FILE_IO ||
                 strstr(result.result.error.message, "not empty") == NULL) return 1;

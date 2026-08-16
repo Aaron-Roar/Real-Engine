@@ -13,9 +13,7 @@ add_executable(rohr_editor_gui
 
 target_include_directories(rohr_editor_gui PRIVATE src ${PROJECT_SOURCE_DIR}/lib)
 target_compile_definitions(rohr_editor_gui PRIVATE
-    ROHR_ENGINE_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
-)
-
+    ROHR_DEVELOPMENT_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 target_link_libraries(rohr_editor_gui PRIVATE rohr_engine rohr_terminal rohr_editor_core)
 
 set_target_properties(rohr_editor_gui PROPERTIES
@@ -31,6 +29,8 @@ add_custom_command(TARGET rohr_editor_gui POST_BUILD
         $<TARGET_FILE_DIR:rohr_editor_gui>/assets/JetBrainsMono-BoldItalic.ttf
     VERBATIM
 )
+install(TARGETS rohr_editor_gui RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(DIRECTORY assets/ DESTINATION ${CMAKE_INSTALL_BINDIR}/assets)
 
 if(ROHR_BUILD_TESTS)
     add_executable(editor_project_test

@@ -6,6 +6,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef ROHR_DEVELOPMENT_SOURCE_DIR
+#define ROHR_DEVELOPMENT_SOURCE_DIR ""
+#endif
+
 #if defined(_WIN32)
 #include <direct.h>
 #endif
@@ -155,12 +159,12 @@ static void cli_usage_print(void) {
         "  Properties: --property <name> <values...>\n"
         "  Structure: add, delete, or rename [new-name]\n"
         "  Project: editor-cli [--project <project-directory>] "
-            "[--engine-root <path>] <operation>\n"
+            "<operation>\n"
         "  Project operations: create, validate, generate-c, compile, build\n"
         "  Example: editor-cli --object car --body chassis --property mass 5\n"
         "  Example: editor-cli --body chassis --property position 10 20\n"
         "  Example: editor-cli --project ./game validate\n"
-        "  Example: editor-cli --engine-root ../rohr --project ./game create");
+        "  Example: editor-cli --project ./game create");
 }
 
 static bool cli_absolute_path_get(char *output, size_t capacity,
@@ -185,18 +189,55 @@ static bool cli_absolute_path_get(char *output, size_t capacity,
 #endif
 }
 
+static bool cli_rohr_cmake_option_get(char *output, size_t capacity) {
+    const char *base = SDL_GetBasePath();
+    char root[EDITOR_WORKSPACE_PATH_MAX * 2];
+    char config[EDITOR_WORKSPACE_PATH_MAX * 2];
+    size_t length;
+    SDL_PathInfo info;
+    int count;
+    if(output == NULL || capacity == 0) return false;
+    if(base != NULL && strlen(base) < sizeof(root)) {
+        snprintf(root, sizeof(root), "%s", base);
+        length = strlen(root);
+        while(length > 0 && (root[length - 1] == '/' || root[length - 1] == '\\'))
+            root[--length] = '\0';
+        while(length > 0 && root[length - 1] != '/' && root[length - 1] != '\\')
+            length -= 1;
+        if(length > 0) root[length - 1] = '\0';
+        const char *library_directories[] = {"lib", "lib64"};
+        for(size_t i = 0; i < sizeof(library_directories) /
+                sizeof(library_directories[0]); i += 1) {
+            count = snprintf(config, sizeof(config), "%s/%s/cmake/Rohr/RohrConfig.cmake",
+                root, library_directories[i]);
+            if(count >= 0 && (size_t)count < sizeof(config) &&
+                    SDL_GetPathInfo(config, &info) && info.type == SDL_PATHTYPE_FILE) {
+                count = snprintf(output, capacity, "-DCMAKE_PREFIX_PATH=%s", root);
+                return count >= 0 && (size_t)count < capacity;
+            }
+        }
+    }
+    if(ROHR_DEVELOPMENT_SOURCE_DIR[0] == '\0') return false;
+    count = snprintf(output, capacity, "-DROHR_ENGINE_SOURCE_ROOT=%s",
+        ROHR_DEVELOPMENT_SOURCE_DIR);
+    return count >= 0 && (size_t)count < capacity;
+}
+
 static int cli_project_cmake_run(const EditorWorkspace *workspace,
         bool configure) {
     char root[EDITOR_WORKSPACE_PATH_MAX * 2];
     char build[EDITOR_WORKSPACE_PATH_MAX * 2];
+    char rohr_option[EDITOR_WORKSPACE_PATH_MAX * 2];
     const char *configure_arguments[] = {
-        "cmake", "-S", root, "-B", build, NULL};
+        "cmake", "-S", root, "-B", build, rohr_option, NULL};
     const char *compile_arguments[] = {"cmake", "--build", build, NULL};
     SDL_Process *process;
     int exit_code = 1;
     int count;
     if(workspace == NULL || !cli_absolute_path_get(root, sizeof(root),
-            workspace->directory)) return cli_error(editor_result_error(
+            workspace->directory) ||
+            !cli_rohr_cmake_option_get(rohr_option, sizeof(rohr_option)))
+        return cli_error(editor_result_error(
                 EDITOR_ERROR_FILE_IO, "Could not resolve project path: %s",
                 workspace == NULL ? "" : workspace->directory));
     count = snprintf(build, sizeof(build), "%s/build", root);
@@ -227,7 +268,6 @@ static int cli_workspace_action_command(int count, char **arguments) {
     EditorWorkspaceCommand load = {.type = EDITOR_WORKSPACE_COMMAND_LOAD};
     EditorWorkspaceCommand command = {0};
     const char *directory = ".";
-    const char *engine_root = NULL;
     const char *operation = arguments[count - 1];
     bool project_set = false;
     EditorResult result;
@@ -239,13 +279,6 @@ static int cli_workspace_action_command(int count, char **arguments) {
                 EDITOR_ERROR_INVALID_ARGUMENT, "--project may only be specified once"));
             directory = arguments[++i];
             project_set = true;
-        } else if(strcmp(arguments[i], "--engine-root") == 0) {
-            if(i + 1 >= count - 1) return cli_error(editor_result_error(
-                EDITOR_ERROR_INVALID_ARGUMENT, "--engine-root requires a path"));
-            if(engine_root != NULL) return cli_error(editor_result_error(
-                EDITOR_ERROR_INVALID_ARGUMENT,
-                "--engine-root may only be specified once"));
-            engine_root = arguments[++i];
         } else {
             return cli_error(editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
                 "Unexpected project operation argument: %s", arguments[i]));
@@ -255,18 +288,11 @@ static int cli_workspace_action_command(int count, char **arguments) {
         return cli_error(editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
             "Project operation path is invalid or too long"));
     if(strcmp(operation, "create") == 0) {
-        if(engine_root == NULL || strlen(engine_root) >= sizeof(command.engine_root))
-            return cli_error(editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
-                "Project creation requires --engine-root <path>"));
         command.type = EDITOR_WORKSPACE_COMMAND_CREATE;
         snprintf(command.directory, sizeof(command.directory), "%s", directory);
-        snprintf(command.engine_root, sizeof(command.engine_root), "%s", engine_root);
         result = editor_workspace_command_execute(&workspace, &project, &command);
         return editor_result_check(result) ? cli_error(result) : 0;
     }
-    if(engine_root != NULL) return cli_error(editor_result_error(
-        EDITOR_ERROR_INVALID_ARGUMENT,
-        "--engine-root is only valid with the create operation"));
     snprintf(load.directory, sizeof(load.directory), "%s", directory);
     result = editor_workspace_command_execute(&workspace, &project, &load);
     if(editor_result_check(result)) return cli_error(result);
@@ -288,8 +314,7 @@ static int cli_workspace_action_command(int count, char **arguments) {
 static bool cli_workspace_arguments_check(int count, char **arguments) {
     if(count < 2) return false;
     for(int i = 1; i + 1 < count; i += 2) {
-        if((strcmp(arguments[i], "--project") != 0 &&
-                strcmp(arguments[i], "--engine-root") != 0) || i + 1 >= count - 1)
+        if(strcmp(arguments[i], "--project") != 0 || i + 1 >= count - 1)
             return false;
     }
     return true;

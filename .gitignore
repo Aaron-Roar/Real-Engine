@@ -1,4 +1,5 @@
 build/
+dist/
 a.out
 *.o
 *.a

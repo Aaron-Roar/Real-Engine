@@ -19,6 +19,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifndef ROHR_DEVELOPMENT_SOURCE_DIR
+#define ROHR_DEVELOPMENT_SOURCE_DIR ""
+#endif
+
 #if defined(_WIN32)
 #include <direct.h>
 #define editor_chdir _chdir
@@ -30,9 +34,6 @@
 #define EDITOR_VIEWPORT_MIN_WIDTH 100.0f
 #define EDITOR_TOOLS_MIN_WIDTH 40.0f
 #define EDITOR_DIVIDER_GRAB_WIDTH 6.0f
-#ifndef ROHR_ENGINE_SOURCE_DIR
-#define ROHR_ENGINE_SOURCE_DIR "."
-#endif
 
 typedef enum EditorWorkspaceBrowserAction {
     EDITOR_WORKSPACE_BROWSER_NONE,
@@ -123,21 +124,61 @@ static bool editor_project_absolute_path_get(char *absolute, size_t capacity,
 #endif
 }
 
+static bool editor_rohr_cmake_option_get(char *output, size_t capacity) {
+    const char *base = SDL_GetBasePath();
+    char root[EDITOR_WORKSPACE_PATH_MAX * 2];
+    char config[EDITOR_WORKSPACE_PATH_MAX * 2];
+    size_t length;
+    SDL_PathInfo info;
+    int count;
+    if(output == NULL || capacity == 0) return false;
+    if(base != NULL && strlen(base) < sizeof(root)) {
+        snprintf(root, sizeof(root), "%s", base);
+        length = strlen(root);
+        while(length > 0 && (root[length - 1] == '/' || root[length - 1] == '\\'))
+            root[--length] = '\0';
+        while(length > 0 && root[length - 1] != '/' && root[length - 1] != '\\')
+            length -= 1;
+        if(length > 0) root[length - 1] = '\0';
+        const char *library_directories[] = {"lib", "lib64"};
+        for(size_t i = 0; i < sizeof(library_directories) /
+                sizeof(library_directories[0]); i += 1) {
+            count = snprintf(config, sizeof(config), "%s/%s/cmake/Rohr/RohrConfig.cmake",
+                root, library_directories[i]);
+            if(count >= 0 && (size_t)count < sizeof(config) &&
+                    SDL_GetPathInfo(config, &info) && info.type == SDL_PATHTYPE_FILE) {
+                count = snprintf(output, capacity, "-DCMAKE_PREFIX_PATH=%s", root);
+                return count >= 0 && (size_t)count < capacity;
+            }
+        }
+    }
+    if(ROHR_DEVELOPMENT_SOURCE_DIR[0] == '\0') return false;
+    count = snprintf(output, capacity, "-DROHR_ENGINE_SOURCE_ROOT=%s",
+        ROHR_DEVELOPMENT_SOURCE_DIR);
+    return count >= 0 && (size_t)count < capacity;
+}
+
 static bool editor_cmake_command_get(char *output, size_t capacity,
         const char *project_directory, bool configure) {
     char absolute[EDITOR_WORKSPACE_PATH_MAX * 2];
     char source[EDITOR_WORKSPACE_PATH_MAX * 2];
     char build_path[EDITOR_WORKSPACE_PATH_MAX * 2];
     char build[EDITOR_WORKSPACE_PATH_MAX * 2];
+    char option_path[EDITOR_WORKSPACE_PATH_MAX * 2];
+    char option[EDITOR_WORKSPACE_PATH_MAX * 2 + 4];
     int count;
     if(output == NULL || !editor_project_absolute_path_get(absolute,
             sizeof(absolute), project_directory)) return false;
     if(!editor_terminal_path_quote(source, sizeof(source), absolute))
         return false;
+    if(configure && (!editor_rohr_cmake_option_get(option_path,
+            sizeof(option_path)) || !editor_terminal_path_quote(option,
+                sizeof(option), option_path))) return false;
     count = snprintf(build_path, sizeof(build_path), "%s/build", absolute);
     if(count < 0 || (size_t)count >= sizeof(build_path) ||
             !editor_terminal_path_quote(build, sizeof(build), build_path)) return false;
-    count = configure ? snprintf(output, capacity, "cmake -S %s -B %s", source, build) :
+    count = configure ? snprintf(output, capacity, "cmake -S %s -B %s %s",
+        source, build, option) :
         snprintf(output, capacity, "cmake --build %s", build);
     return count >= 0 && (size_t)count < capacity;
 }
@@ -146,13 +187,15 @@ static SDL_Process *editor_cmake_hidden_start(const char *project_directory,
         bool configure) {
     char source[EDITOR_WORKSPACE_PATH_MAX * 2];
     char build[EDITOR_WORKSPACE_PATH_MAX * 2];
+    char option[EDITOR_WORKSPACE_PATH_MAX * 2];
     const char *configure_arguments[] = {
-        "cmake", "-S", source, "-B", build, NULL};
+        "cmake", "-S", source, "-B", build, option, NULL};
     const char *build_arguments[] = {"cmake", "--build", build, NULL};
     SDL_PropertiesID properties;
     SDL_Process *process;
     int count;
-    if(!editor_project_absolute_path_get(source, sizeof(source), project_directory))
+    if(!editor_project_absolute_path_get(source, sizeof(source), project_directory) ||
+            (configure && !editor_rohr_cmake_option_get(option, sizeof(option))))
         return NULL;
     count = snprintf(build, sizeof(build), "%s/build", source);
     if(count < 0 || (size_t)count >= sizeof(build)) return NULL;
@@ -4689,8 +4732,6 @@ int main(void) {
                     memcpy(command.directory, browser_result.path,
                         strlen(browser_result.path) + 1);
                     command.type = EDITOR_WORKSPACE_COMMAND_CREATE;
-                    snprintf(command.engine_root, sizeof(command.engine_root), "%s",
-                        ROHR_ENGINE_SOURCE_DIR);
                     load_result = editor_workspace_operation_execute(
                         &workspace, &project, &command);
                     opened = !editor_result_check(load_result);

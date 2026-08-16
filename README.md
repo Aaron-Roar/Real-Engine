@@ -110,6 +110,34 @@ engine/
 
 ## Building
 
+The supported development workflows are available through thin wrappers around
+CMake:
+
+```sh
+./dev.sh build    # Configure and build the engine, tools, tests, and examples
+./dev.sh test     # Build and run the test suite
+./dev.sh sdk      # Build and install a portable SDK under dist/rohr
+./dev.sh clean    # Remove build/ and dist/
+```
+
+On Windows, use `dev.bat build`, `dev.bat test`, `dev.bat sdk`, or
+`dev.bat clean`. CMake remains the authoritative build system; the wrappers only
+provide memorable entry points.
+
+The SDK layout produced by `./dev.sh sdk` is:
+
+```text
+dist/rohr/
+├── bin/          # editor-cli and editor-gui
+├── include/      # Rohr and SDL public headers
+├── lib or lib64/ # Static libraries and CMake packages
+└── share/        # Licenses
+```
+
+Release archives should contain the contents of `dist/rohr`. The installed
+tools find this SDK relative to their own executable, so project creation does
+not require an engine source path.
+
 ### Dependencies
 
 * C compiler: `clang` or `gcc`

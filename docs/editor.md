@@ -56,9 +56,16 @@ Saving and generating are separate operations:
 Configure and build a generated game from its project directory:
 
 ```sh
-cmake -S . -B build
-cmake --build build
+editor-cli --project . build
 ./build/MyGame
+```
+
+The installed CLI locates the Rohr SDK beside itself. When configuring manually,
+provide the unpacked SDK to CMake:
+
+```sh
+cmake -S . -B build -DCMAKE_PREFIX_PATH=/path/to/rohr
+cmake --build build
 ```
 
 The executable name is the PascalCase project directory name (`my-game`

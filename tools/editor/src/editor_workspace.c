@@ -239,8 +239,6 @@ static bool editor_workspace_manifest_save(const EditorWorkspace *workspace) {
         workspace->config.object_directory);
     yyjson_mut_obj_add_strcpy(document, root, "editor_state_file",
         workspace->config.editor_state_file);
-    yyjson_mut_obj_add_strcpy(document, root, "engine_root",
-        workspace->config.engine_root);
     success = yyjson_mut_write_file(path, document, YYJSON_WRITE_PRETTY, NULL, NULL);
     yyjson_mut_doc_free(document);
     return success;
@@ -317,7 +315,6 @@ static EditorResult editor_workspace_manifest_load(EditorWorkspace *workspace,
     EDITOR_MANIFEST_STRING_READ(asset_directory);
     EDITOR_MANIFEST_STRING_READ(object_directory);
     EDITOR_MANIFEST_STRING_READ(editor_state_file);
-    EDITOR_MANIFEST_STRING_READ(engine_root);
 #undef EDITOR_MANIFEST_STRING_READ
     if(strlen(directory) >= sizeof(workspace->directory)) {
         result = editor_result_error(EDITOR_ERROR_FILE_IO,
@@ -824,7 +821,7 @@ static bool editor_workspace_main_write(const EditorWorkspace *workspace,
 
 static bool editor_workspace_scaffold_write(const EditorWorkspace *workspace) {
     char path[EDITOR_WORKSPACE_PATH_MAX * 2];
-    char cmake[EDITOR_WORKSPACE_PATH_MAX * 2 + 1024];
+    char cmake[2048];
     static const char *gitignore = "build/\n";
 
     snprintf(cmake, sizeof(cmake),
@@ -832,16 +829,22 @@ static bool editor_workspace_scaffold_write(const EditorWorkspace *workspace) {
         "project(%s LANGUAGES C)\n\n"
         "set(CMAKE_C_STANDARD 99)\n"
         "set(CMAKE_C_STANDARD_REQUIRED ON)\n"
-        "set(ROHR_ENGINE_ROOT \"%s\" CACHE PATH \"Rohr Engine source directory\")\n"
-        "set(ROHR_BUILD_EXAMPLES OFF CACHE BOOL \"\" FORCE)\n"
-        "set(ROHR_BUILD_TESTS OFF CACHE BOOL \"\" FORCE)\n"
-        "set(ROHR_BUILD_EDITOR OFF CACHE BOOL \"\" FORCE)\n"
-        "add_subdirectory(\"${ROHR_ENGINE_ROOT}\" rohr-engine)\n\n"
+        "if(DEFINED ROHR_ENGINE_SOURCE_ROOT)\n"
+        "    set(ROHR_BUILD_EXAMPLES OFF CACHE BOOL \"\" FORCE)\n"
+        "    set(ROHR_BUILD_TESTS OFF CACHE BOOL \"\" FORCE)\n"
+        "    set(ROHR_BUILD_EDITOR OFF CACHE BOOL \"\" FORCE)\n"
+        "    set(ROHR_BUILD_CLI OFF CACHE BOOL \"\" FORCE)\n"
+        "    add_subdirectory(\"${ROHR_ENGINE_SOURCE_ROOT}\" rohr-engine)\n"
+        "    set(ROHR_ENGINE_TARGET rohr_engine)\n"
+        "else()\n"
+        "    find_package(Rohr CONFIG REQUIRED)\n"
+        "    set(ROHR_ENGINE_TARGET Rohr::Engine)\n"
+        "endif()\n\n"
         "file(GLOB ROHR_GENERATED_SOURCES CONFIGURE_DEPENDS src/generated/*.c)\n"
         "add_executable(${PROJECT_NAME} src/main.c ${ROHR_GENERATED_SOURCES})\n"
         "target_include_directories(${PROJECT_NAME} PRIVATE src/generated)\n"
-        "target_link_libraries(${PROJECT_NAME} PRIVATE rohr_engine)\n",
-        workspace->config.name, workspace->config.engine_root);
+        "target_link_libraries(${PROJECT_NAME} PRIVATE ${ROHR_ENGINE_TARGET})\n",
+        workspace->config.name);
     return editor_workspace_path_join(path, sizeof(path), workspace->directory,
             "CMakeLists.txt") && editor_workspace_file_write(path, cmake) &&
         editor_workspace_path_join(path, sizeof(path), workspace->directory,
@@ -865,13 +868,11 @@ bool editor_workspace_c_generate(const EditorWorkspace *workspace,
 }
 
 EditorResult editor_workspace_create(EditorWorkspace *workspace, EditorProject *project,
-    const char *directory, const char *engine_root) {
+    const char *directory) {
     EditorWorkspace created = {0};
 
     if(workspace == NULL || project == NULL || directory == NULL || directory[0] == '\0' ||
-            engine_root == NULL || engine_root[0] == '\0' ||
-            strlen(directory) >= sizeof(created.directory) ||
-            strlen(engine_root) >= sizeof(created.config.engine_root))
+            strlen(directory) >= sizeof(created.directory))
         return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
             "Project creation received an invalid or oversized path");
     if(!SDL_CreateDirectory(directory)) return editor_result_error(
@@ -881,8 +882,6 @@ EditorResult editor_workspace_create(EditorWorkspace *workspace, EditorProject *
     created.config = editor_workspace_config_default_get();
     editor_project_object_name_format(created.config.name,
         sizeof(created.config.name), editor_workspace_basename(directory));
-    snprintf(created.config.engine_root, sizeof(created.config.engine_root), "%s",
-        engine_root);
     snprintf(created.directory, sizeof(created.directory), "%s", directory);
     created.open = true;
     if(!editor_workspace_directory_create(directory, created.config.source_directory) ||
@@ -944,8 +943,7 @@ EditorResult editor_workspace_command_execute(EditorWorkspace *workspace,
             "Workspace command requires a workspace, project, and command");
     switch(command->type) {
         case EDITOR_WORKSPACE_COMMAND_CREATE:
-            return editor_workspace_create(workspace, project, command->directory,
-                command->engine_root);
+            return editor_workspace_create(workspace, project, command->directory);
         case EDITOR_WORKSPACE_COMMAND_LOAD:
             return editor_workspace_load(workspace, project, command->directory);
         case EDITOR_WORKSPACE_COMMAND_SAVE:
@@ -1001,13 +999,6 @@ EditorResult editor_workspace_command_cli_write(const EditorWorkspaceCommand *co
             "editor-cli --project ") ||
             !editor_workspace_command_shell_append(output, output_capacity, &used,
                 command->directory)) goto capacity_error;
-    if(command->type == EDITOR_WORKSPACE_COMMAND_CREATE) {
-        if(command->engine_root[0] == '\0' ||
-                !editor_workspace_command_text_append(output, output_capacity, &used,
-                    " --engine-root ") ||
-                !editor_workspace_command_shell_append(output, output_capacity, &used,
-                    command->engine_root)) goto capacity_error;
-    }
     if(!editor_workspace_command_text_append(output, output_capacity, &used, " ") ||
             !editor_workspace_command_text_append(output, output_capacity, &used,
                 action)) goto capacity_error;
