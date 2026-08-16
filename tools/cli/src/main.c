@@ -15,6 +15,139 @@ static int cli_error(EditorResult result) {
     return 1;
 }
 
+static void cli_usage_print(void);
+
+typedef struct CliHelpDomain {
+    const char *selector;
+    const char *name;
+    const char *properties;
+    const char *example;
+    unsigned int depth;
+} CliHelpDomain;
+
+static const CliHelpDomain cli_help_domains[] = {
+    {"--object", "object", "position <x> <y>, visibility <true|false>",
+        "--object car --property position 10 20", 0},
+    {"--body", "rigid body",
+        "position <x> <y>, rotation <radians>, origin <x> <y>, mass <number>, "
+        "friction <number>, restitution <0..1>, gravity <true|false>, "
+        "static <true|false>, rotation-locked <true|false>, collision <true|false>, "
+        "particle <true|false>, particle-radius <number>, "
+        "particle-auto-fit <true|false>, outline-color <hex>, surface-color <hex>, "
+        "particle-ring-color <hex>, particle-fill-color <hex>, visibility <true|false>, "
+        "category <mask> <true|false>, collide-with <mask> <true|false>",
+        "--object car --body chassis --property mass 5", 1},
+    {"--hitbox", "hitbox", "visibility <true|false>, "
+        "auto-shape <shape> <triangle-kind> <width> <height> <radius> <apex-offset>",
+        "--body chassis --hitbox chassis_hitbox --property visibility true", 2},
+    {"--joint", "joint", "visibility <true|false>, kind <revolute|weld|spring>, "
+        "visual-size <0.25..3>, rest-length <number>, stiffness <number>, "
+        "damping <number>, anchor-a <anchor|none>, anchor-b <anchor|none>",
+        "--joint suspension --property stiffness 40", 1},
+    {"--anchor", "anchor", "position <x> <y>, rotation <radians>, "
+        "position-follows-body <true|false>, rotation-follows-body <true|false>, "
+        "rigid-body <body|none>, visibility <true|false>",
+        "--anchor wheel_anchor --property position 12 8", 1},
+    {"--soft-body", "soft body", "position <x> <y>, rotation <radians>, "
+        "origin <x> <y>, node-color <hex>, beam-color <hex>, area-color <hex>, "
+        "visibility <true|false>, auto-shape <shape> <triangle-kind> <width> "
+        "<height> <radius> <apex-offset>",
+        "--soft-body cloth --property area-color ff8800ff", 1},
+    {"--node", "soft-body node", "position <x> <y>, mass <number>, "
+        "friction <number>, restitution <0..1>, gravity <true|false>, "
+        "collision <true|false>, node-radius <number>, color <hex>, "
+        "visibility <true|false>",
+        "--soft-body cloth --node corner --property mass 1", 2},
+    {"--beam", "soft-body beam", "stiffness <number>, damping <number>, "
+        "color <hex>, visibility <true|false>, node-a <node|none>, node-b <node|none>",
+        "--soft-body cloth --beam edge_1 --property damping 0.2", 2},
+    {"--area", "soft-body area", "color <hex>, visibility <true|false>",
+        "--soft-body cloth --area area_1 --property color 4488ffff", 2},
+    {"--vertex", "hitbox vertex", "position <x> <y>, position-locked <true|false>",
+        "--body chassis --vertex vertex_1 --property position 4 8", 3},
+    {"--line", "hitbox line", "length <number>",
+        "--body chassis --line line_1 --property length 20", 3}
+};
+
+static bool cli_help_flag_check(const char *argument) {
+    return argument != NULL && (strcmp(argument, "--help") == 0 ||
+        strcmp(argument, "-help") == 0 || strcmp(argument, "-h") == 0 ||
+        strcmp(argument, "--h") == 0);
+}
+
+static const CliHelpDomain *cli_help_domain_get(int count, char **arguments) {
+    const CliHelpDomain *selected = NULL;
+    for(int i = 1; i < count; i += 1) {
+        for(size_t j = 0; j < sizeof(cli_help_domains) / sizeof(cli_help_domains[0]);
+                j += 1) {
+            if(strcmp(arguments[i], cli_help_domains[j].selector) == 0 ||
+                    (strncmp(arguments[i], cli_help_domains[j].selector,
+                        strlen(cli_help_domains[j].selector)) == 0 &&
+                     strcmp(arguments[i] + strlen(cli_help_domains[j].selector),
+                        "-id") == 0) ||
+                    (strcmp(cli_help_domains[j].selector, "--line") == 0 &&
+                     strcmp(arguments[i], "--line-index") == 0)) {
+                if(selected == NULL || cli_help_domains[j].depth >= selected->depth)
+                    selected = &cli_help_domains[j];
+            }
+        }
+    }
+    return selected;
+}
+
+static const char *cli_help_property_get(int count, char **arguments) {
+    for(int i = 1; i + 1 < count; i += 1)
+        if(strcmp(arguments[i], "--property") == 0 &&
+                !cli_help_flag_check(arguments[i + 1])) return arguments[i + 1];
+    return NULL;
+}
+
+static void cli_help_print(int count, char **arguments) {
+    const CliHelpDomain *domain = cli_help_domain_get(count, arguments);
+    const char *property = cli_help_property_get(count, arguments);
+    cli_usage_print();
+    puts("\nGeneral examples:\n"
+        "  editor-cli --project ./objects/project.rohr.json --object car "
+            "--body chassis --property mass 5\n"
+        "  editor-cli --project ./game validate\n"
+        "  editor-cli --project ./game build");
+    if(domain == NULL) {
+        puts("\nSelectors:\n"
+            "  --object, --body, --hitbox, --joint, --anchor, --soft-body,\n"
+            "  --node, --beam, --area, --vertex, --line\n"
+            "  Every named selector also accepts its -id form.");
+        return;
+    }
+    printf("\nSelected depth: %s\n", domain->name);
+    if(property != NULL) printf("Value required:\n  --property %s\n", property);
+    printf("What can be set:\n  %s\n\nExample:\n  editor-cli %s\n",
+        domain->properties, domain->example);
+    puts("Operations at this depth:\n  rename <new-name>, delete");
+}
+
+static bool cli_help_request_check(int count, char **arguments) {
+    for(int i = 1; i < count; i += 1)
+        if(cli_help_flag_check(arguments[i])) return true;
+    if(count < 2) return true;
+    if(strcmp(arguments[count - 1], "--property") == 0) return true;
+    for(int i = 1; i + 1 < count; i += 1)
+        if(strcmp(arguments[i], "--property") == 0 && i + 2 == count) return true;
+    if(cli_help_domain_get(count, arguments) != NULL &&
+            cli_help_property_get(count, arguments) == NULL) {
+        bool operation = false;
+        for(int i = 1; i < count; i += 1) {
+            if(arguments[i][0] == '-') {
+                if(i + 1 < count) i += 1;
+            } else {
+                operation = true;
+                break;
+            }
+        }
+        if(!operation) return true;
+    }
+    return false;
+}
+
 static void cli_usage_print(void) {
     puts("usage:\n"
         "  editor-cli [--project <project.rohr.json>] <selectors> <operation>\n"
@@ -213,6 +346,10 @@ static int cli_object_command(int count, char **arguments) {
 }
 
 int main(int count, char **arguments) {
+    if(cli_help_request_check(count, arguments)) {
+        cli_help_print(count, arguments);
+        return 0;
+    }
     if(cli_workspace_action_check(count, arguments))
         return cli_workspace_action_command(count, arguments);
     if(cli_workspace_arguments_check(count, arguments))
