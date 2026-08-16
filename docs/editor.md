@@ -68,6 +68,49 @@ cmake -S . -B build -DCMAKE_PREFIX_PATH=/path/to/rohr
 cmake --build build
 ```
 
+## Lua configuration
+
+The SDK provides `share/rohr/editor.lua`. New projects receive a portable
+`editor.lua` in the project root. The CLI resolves build settings in this order:
+
+1. Project `cli` override.
+2. Project shared `project` setting.
+3. SDK `cli` override.
+4. SDK shared `project` setting.
+5. Built-in CMake command.
+
+Commands are argument arrays rather than shell strings. This preserves paths
+containing spaces and does not invoke a shell:
+
+```lua
+return {
+    project = {
+        configure = { "cmake", "-S", "{project}", "-B", "{build}" },
+        compile = { "cmake", "--build", "{build}" },
+    },
+
+    cli = {
+        configure = nil,
+        compile = nil,
+    },
+
+    gui = {
+        configure = nil,
+        compile = nil,
+    },
+}
+```
+
+`{project}` and `{build}` expand to absolute paths. `{sdk}` expands to the SDK
+root when the CLI runs from an installed SDK. Missing fields inherit the next
+configuration layer. Malformed fields stop the build with the Lua filename and
+an error message.
+
+Configuration files execute as real Lua, but the editor does not expose Lua's
+OS, I/O, package, or debug libraries while loading them. The CLI reads these
+files and never rewrites them. GUI overrides are represented now and will be
+consumed when GUI configuration support is added.
+
 The executable name is the PascalCase project directory name (`my-game`
 becomes `MyGame`).
 

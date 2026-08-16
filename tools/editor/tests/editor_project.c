@@ -14,7 +14,7 @@ static void workspace_fixture_remove(const char *root) {
     static const char *files[] = {
         "project.rohr.json", "objects/project.rohr.json", "src/main.c",
         "src/generated/project_objects.c", "src/generated/project_objects.h",
-        "CMakeLists.txt", ".gitignore"
+        "CMakeLists.txt", ".gitignore", "editor.lua"
     };
     static const char *directories[] = {
         "src/generated", "src", "assets", "objects"
@@ -822,6 +822,25 @@ int main(void) {
         workspace_fixture_remove(fixture);
         if(!editor_result_check(result) || result.result.error.code != EDITOR_ERROR_FILE_IO ||
                 strstr(result.result.error.message, "not empty") == NULL) return 1;
+    }
+
+    {
+        static EditorProject creation_project;
+        EditorWorkspace creation_workspace = {0};
+        const char *fixture = "/tmp/rohr_editor_config_creation_test";
+        char path[2048];
+        SDL_PathInfo info;
+        EditorResult result;
+
+        workspace_fixture_remove(fixture);
+        result = editor_workspace_create(&creation_workspace, &creation_project, fixture);
+        snprintf(path, sizeof(path), "%s/editor.lua", fixture);
+        if(editor_result_check(result) || !SDL_GetPathInfo(path, &info) ||
+                info.type != SDL_PATHTYPE_FILE) {
+            workspace_fixture_remove(fixture);
+            return 1;
+        }
+        workspace_fixture_remove(fixture);
     }
 
     editor_project_selection_clear(&project);

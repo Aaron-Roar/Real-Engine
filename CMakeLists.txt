@@ -17,6 +17,42 @@ option(ROHR_BUILD_TERMINAL "Build Rohr Terminal tool" ON)
 option(ROHR_BUILD_CLI "Build Rohr project CLI" ON)
 option(ROHR_ENABLE_DOCUMENTATION "Enable documentation build targets" ON)
 
+set(ROHR_LUA_SOURCES
+    lib/lua/lapi.c
+    lib/lua/lauxlib.c
+    lib/lua/lbaselib.c
+    lib/lua/lcode.c
+    lib/lua/lcorolib.c
+    lib/lua/lctype.c
+    lib/lua/ldebug.c
+    lib/lua/ldo.c
+    lib/lua/ldump.c
+    lib/lua/lfunc.c
+    lib/lua/lgc.c
+    lib/lua/linit.c
+    lib/lua/llex.c
+    lib/lua/lmathlib.c
+    lib/lua/lmem.c
+    lib/lua/lobject.c
+    lib/lua/lopcodes.c
+    lib/lua/lparser.c
+    lib/lua/lstate.c
+    lib/lua/lstring.c
+    lib/lua/lstrlib.c
+    lib/lua/ltable.c
+    lib/lua/ltablib.c
+    lib/lua/ltm.c
+    lib/lua/lundump.c
+    lib/lua/lutf8lib.c
+    lib/lua/lvm.c
+    lib/lua/lzio.c
+)
+add_library(rohr_lua STATIC ${ROHR_LUA_SOURCES})
+target_include_directories(rohr_lua PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/lua)
+if(NOT MSVC)
+    target_link_libraries(rohr_lua PUBLIC m)
+endif()
+
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
@@ -154,6 +190,15 @@ install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/RohrConfig.cmake
     ${CMAKE_CURRENT_BINARY_DIR}/RohrConfigVersion.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Rohr)
+install(FILES
+    config/editor.lua
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/rohr)
+install(FILES
+    config/project-editor.lua
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/rohr)
+install(FILES lib/lua/LICENSE
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/rohr
+    RENAME Lua-LICENSE)
 
 include(cmake/RohrHostTools.cmake)
 

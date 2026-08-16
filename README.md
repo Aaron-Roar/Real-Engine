@@ -131,12 +131,15 @@ dist/rohr/
 ├── bin/          # editor-cli and editor-gui
 ├── include/      # Rohr and SDL public headers
 ├── lib or lib64/ # Static libraries and CMake packages
-└── share/        # Licenses
+└── share/        # Editor Lua defaults, project template, and licenses
 ```
 
 Release archives should contain the contents of `dist/rohr`. The installed
 tools find this SDK relative to their own executable, so project creation does
 not require an engine source path.
+New projects copy the SDK's portable `project-editor.lua` template to a
+top-level `editor.lua`. See [Editor documentation](docs/editor.md#lua-configuration)
+for CLI configuration precedence and command placeholders.
 
 ### Dependencies
 

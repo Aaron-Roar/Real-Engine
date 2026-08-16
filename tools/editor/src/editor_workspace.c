@@ -1,5 +1,7 @@
 #include "editor_workspace.h"
 
+#include "editor_config.h"
+
 #include "yyjson.h"
 
 #include <math.h>
@@ -851,6 +853,29 @@ static bool editor_workspace_scaffold_write(const EditorWorkspace *workspace) {
             ".gitignore") && editor_workspace_file_write(path, gitignore);
 }
 
+static bool editor_workspace_config_template_copy(const EditorWorkspace *workspace) {
+    char source[EDITOR_WORKSPACE_PATH_MAX * 2];
+    char destination[EDITOR_WORKSPACE_PATH_MAX * 2];
+    size_t size = 0;
+    void *contents;
+    FILE *file;
+    EditorResult result = editor_config_sdk_path_get(source, sizeof(source),
+        "project-editor.lua", true);
+    if(editor_result_check(result) || !editor_workspace_path_join(destination,
+            sizeof(destination), workspace->directory, "editor.lua")) return false;
+    contents = SDL_LoadFile(source, &size);
+    if(contents == NULL) return false;
+    file = fopen(destination, "wb");
+    if(file == NULL) {
+        SDL_free(contents);
+        return false;
+    }
+    bool written = fwrite(contents, 1, size, file) == size;
+    bool closed = fclose(file) == 0;
+    SDL_free(contents);
+    return written && closed;
+}
+
 bool editor_workspace_save(const EditorWorkspace *workspace,
     const EditorProject *project) {
     char path[EDITOR_WORKSPACE_PATH_MAX * 2];
@@ -898,6 +923,8 @@ EditorResult editor_workspace_create(EditorWorkspace *workspace, EditorProject *
         EDITOR_ERROR_FILE_IO, "Could not save the initial project state under: %s", directory);
     if(!editor_workspace_scaffold_write(&created)) return editor_result_error(
         EDITOR_ERROR_FILE_IO, "Could not write the project build scaffold under: %s", directory);
+    if(!editor_workspace_config_template_copy(&created)) return editor_result_error(
+        EDITOR_ERROR_FILE_IO, "Could not copy editor.lua under: %s", directory);
     if(!editor_workspace_generated_objects_write(&created, project))
         return editor_result_error(EDITOR_ERROR_FILE_IO,
             "Could not write initial generated C under: %s", directory);
