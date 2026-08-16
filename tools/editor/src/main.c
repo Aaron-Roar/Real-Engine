@@ -101,6 +101,28 @@ static bool editor_terminal_path_quote(char *output, size_t capacity,
     return true;
 }
 
+static bool editor_project_absolute_path_get(char *absolute, size_t capacity,
+        const char *project_directory) {
+    if(absolute == NULL || capacity == 0 || project_directory == NULL) return false;
+#if defined(_WIN32)
+    return _fullpath(absolute, project_directory, capacity) != NULL;
+#else
+    {
+        char *resolved = realpath(project_directory, NULL);
+        size_t length;
+        if(resolved == NULL) return false;
+        length = strlen(resolved);
+        if(length >= capacity) {
+            free(resolved);
+            return false;
+        }
+        memcpy(absolute, resolved, length + 1);
+        free(resolved);
+        return true;
+    }
+#endif
+}
+
 static bool editor_cmake_command_get(char *output, size_t capacity,
         const char *project_directory, bool configure) {
     char absolute[EDITOR_WORKSPACE_PATH_MAX * 2];
@@ -108,23 +130,8 @@ static bool editor_cmake_command_get(char *output, size_t capacity,
     char build_path[EDITOR_WORKSPACE_PATH_MAX * 2];
     char build[EDITOR_WORKSPACE_PATH_MAX * 2];
     int count;
-    if(output == NULL || project_directory == NULL) return false;
-#if defined(_WIN32)
-    if(_fullpath(absolute, project_directory, sizeof(absolute)) == NULL) return false;
-#else
-    {
-        char *resolved = realpath(project_directory, NULL);
-        size_t length;
-        if(resolved == NULL) return false;
-        length = strlen(resolved);
-        if(length >= sizeof(absolute)) {
-            free(resolved);
-            return false;
-        }
-        memcpy(absolute, resolved, length + 1);
-        free(resolved);
-    }
-#endif
+    if(output == NULL || !editor_project_absolute_path_get(absolute,
+            sizeof(absolute), project_directory)) return false;
     if(!editor_terminal_path_quote(source, sizeof(source), absolute))
         return false;
     count = snprintf(build_path, sizeof(build_path), "%s/build", absolute);
@@ -133,6 +140,50 @@ static bool editor_cmake_command_get(char *output, size_t capacity,
     count = configure ? snprintf(output, capacity, "cmake -S %s -B %s", source, build) :
         snprintf(output, capacity, "cmake --build %s", build);
     return count >= 0 && (size_t)count < capacity;
+}
+
+static SDL_Process *editor_cmake_hidden_start(const char *project_directory,
+        bool configure) {
+    char source[EDITOR_WORKSPACE_PATH_MAX * 2];
+    char build[EDITOR_WORKSPACE_PATH_MAX * 2];
+    const char *configure_arguments[] = {
+        "cmake", "-S", source, "-B", build, NULL};
+    const char *build_arguments[] = {"cmake", "--build", build, NULL};
+    SDL_PropertiesID properties;
+    SDL_Process *process;
+    int count;
+    if(!editor_project_absolute_path_get(source, sizeof(source), project_directory))
+        return NULL;
+    count = snprintf(build, sizeof(build), "%s/build", source);
+    if(count < 0 || (size_t)count >= sizeof(build)) return NULL;
+    properties = SDL_CreateProperties();
+    if(properties == 0) return NULL;
+    if(!SDL_SetPointerProperty(properties, SDL_PROP_PROCESS_CREATE_ARGS_POINTER,
+            configure ? configure_arguments : build_arguments) ||
+            !SDL_SetNumberProperty(properties, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER,
+                SDL_PROCESS_STDIO_NULL) ||
+            !SDL_SetNumberProperty(properties, SDL_PROP_PROCESS_CREATE_STDERR_NUMBER,
+                SDL_PROCESS_STDIO_NULL)) {
+        SDL_DestroyProperties(properties);
+        return NULL;
+    }
+    process = SDL_CreateProcessWithProperties(properties);
+    SDL_DestroyProperties(properties);
+    return process;
+}
+
+static bool editor_cmake_compile_start(EditorTerminalPanel *terminal,
+        SDL_Process **hidden_process, const char *project_directory,
+        bool show_operations) {
+    char command[EDITOR_WORKSPACE_PATH_MAX * 4];
+    if(show_operations) {
+        return editor_cmake_command_get(command, sizeof(command),
+                project_directory, false) &&
+            editor_terminal_panel_command_execute(terminal, command);
+    }
+    if(hidden_process == NULL || *hidden_process != NULL) return false;
+    *hidden_process = editor_cmake_hidden_start(project_directory, false);
+    return *hidden_process != NULL;
 }
 
 static void editor_operation_command_write(const EditorCommand *editor_command,
@@ -1358,6 +1409,7 @@ int main(void) {
     TextAsset build_label = {0};
     TextAsset generate_c_label = {0};
     TextAsset compile_label = {0};
+    TextAsset build_project_label = {0};
     TextAsset world_view_label = {0};
     TextAsset local_view_label = {0};
     TextAsset collision_label = {0};
@@ -1501,6 +1553,7 @@ int main(void) {
     EditorOriginPanel origin_panel = {0};
     EditorBulkPanel bulk_panel = {0};
     EditorTerminalPanel terminal_panel = {0};
+    SDL_Process *hidden_build_process = NULL;
     EditorHistory history = {0};
     EditorWorkspaceBrowserAction workspace_browser_action =
         EDITOR_WORKSPACE_BROWSER_NONE;
@@ -1511,7 +1564,7 @@ int main(void) {
     bool terminal_resizing = false;
     bool terminal_editor_operations = true;
     bool terminal_generated_code = true;
-    bool terminal_build_operations = false;
+    bool terminal_build_operations = true;
     bool collision_category_open = false;
     bool collide_with_open = false;
     bool auto_shape_picker_open = false;
@@ -1597,6 +1650,7 @@ int main(void) {
             !editor_text_create(&font, "Build", &build_label) ||
             !editor_text_create(&font, "Generate C", &generate_c_label) ||
             !editor_text_create(&font, "Compile", &compile_label) ||
+            !editor_text_create(&font, "Build Project", &build_project_label) ||
             !editor_text_create(&font, "World", &world_view_label) ||
             !editor_text_create(&font, "Local", &local_view_label) ||
             !editor_text_create(&font, "Collision", &collision_label) ||
@@ -1766,6 +1820,11 @@ int main(void) {
             }
         }
         editor_terminal_panel_update(&terminal_panel);
+        if(hidden_build_process != NULL &&
+                SDL_WaitProcess(hidden_build_process, false, NULL)) {
+            SDL_DestroyProcess(hidden_build_process);
+            hidden_build_process = NULL;
+        }
         editor_history_continuous_set(&history, field_editing ||
             mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_PRESSED ||
             mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_DOWN);
@@ -4320,7 +4379,7 @@ int main(void) {
                 &terminal_generated_code_label, &terminal_build_operations_label
             };
             const TextAsset *build_options[] = {
-                &generate_c_label, &compile_label
+                &generate_c_label, &compile_label, &build_project_label
             };
             const TextAsset *edit_options[] = {&undo_label, &redo_label};
             const TextAsset *settings_options[] = {
@@ -4331,7 +4390,8 @@ int main(void) {
                 &exit_label
             };
             const TextAsset *build_texts[] = {
-                &build_label, &generate_c_label, &compile_label};
+                &build_label, &generate_c_label, &compile_label,
+                &build_project_label};
             const TextAsset *edit_texts[] = {&edit_label, &undo_label, &redo_label};
             const TextAsset *view_texts[] = {
                 &view_label, &reset_view_label, &grid_label, &terminal_label
@@ -4463,11 +4523,24 @@ int main(void) {
                             &terminal_panel, &project);
                 } else if(build_menu.changed && build_menu.selected_index == 1 &&
                         workspace.open) {
-                    char cmake_command[EDITOR_WORKSPACE_PATH_MAX * 4];
-                    if(editor_cmake_command_get(cmake_command,
-                            sizeof(cmake_command), workspace.directory, false))
-                        (void)editor_terminal_panel_command_execute(
-                            &terminal_panel, cmake_command);
+                    (void)editor_cmake_compile_start(&terminal_panel,
+                        &hidden_build_process, workspace.directory,
+                        terminal_build_operations);
+                } else if(build_menu.changed && build_menu.selected_index == 2 &&
+                        workspace.open) {
+                    EditorWorkspaceCommand command = {
+                        .type = EDITOR_WORKSPACE_COMMAND_GENERATE_C};
+                    snprintf(command.directory, sizeof(command.directory), "%s",
+                        workspace.directory);
+                    if(!editor_result_check(editor_workspace_operation_execute(
+                            &workspace, &project, &command))) {
+                        if(terminal_generated_code)
+                            (void)editor_generation_report_write(
+                                &terminal_panel, &project);
+                        (void)editor_cmake_compile_start(&terminal_panel,
+                            &hidden_build_process, workspace.directory,
+                            terminal_build_operations);
+                    }
                 }
             }
             {
@@ -4613,10 +4686,15 @@ int main(void) {
                         &terminal_panel, workspace.directory);
                     if(command.type == EDITOR_WORKSPACE_COMMAND_CREATE) {
                         char cmake_command[EDITOR_WORKSPACE_PATH_MAX * 4];
-                        if(editor_cmake_command_get(cmake_command,
-                                sizeof(cmake_command), workspace.directory, true))
-                            (void)editor_terminal_panel_command_execute(
-                                &terminal_panel, cmake_command);
+                        if(terminal_build_operations) {
+                            if(editor_cmake_command_get(cmake_command,
+                                    sizeof(cmake_command), workspace.directory, true))
+                                (void)editor_terminal_panel_command_execute(
+                                    &terminal_panel, cmake_command);
+                        } else if(hidden_build_process == NULL) {
+                            hidden_build_process = editor_cmake_hidden_start(
+                                workspace.directory, true);
+                        }
                     }
                     if(terminal_editor_operations) {
                         char cli_command[3072];
@@ -4782,6 +4860,7 @@ int main(void) {
     editor_operation_history = NULL;
     editor_viewport_state_destroy(&viewport_state);
     editor_history_destroy(&history);
+    if(hidden_build_process != NULL) SDL_DestroyProcess(hidden_build_process);
     editor_terminal_panel_destroy(&terminal_panel);
     editor_bulk_panel_destroy(&bulk_panel);
     editor_origin_panel_destroy(&origin_panel);
@@ -4920,6 +4999,7 @@ int main(void) {
     rohr_graphics_text_destroy(&view_label);
     rohr_graphics_text_destroy(&generate_c_label);
     rohr_graphics_text_destroy(&compile_label);
+    rohr_graphics_text_destroy(&build_project_label);
     rohr_graphics_text_destroy(&build_label);
     rohr_graphics_text_destroy(&local_view_label);
     rohr_graphics_text_destroy(&world_view_label);
@@ -4957,6 +5037,7 @@ fail:
     editor_operation_history = NULL;
     editor_viewport_state_destroy(&viewport_state);
     editor_history_destroy(&history);
+    if(hidden_build_process != NULL) SDL_DestroyProcess(hidden_build_process);
     editor_terminal_panel_destroy(&terminal_panel);
     editor_bulk_panel_destroy(&bulk_panel);
     editor_origin_panel_destroy(&origin_panel);
@@ -5095,6 +5176,7 @@ fail:
     rohr_graphics_text_destroy(&view_label);
     rohr_graphics_text_destroy(&generate_c_label);
     rohr_graphics_text_destroy(&compile_label);
+    rohr_graphics_text_destroy(&build_project_label);
     rohr_graphics_text_destroy(&build_label);
     rohr_graphics_text_destroy(&local_view_label);
     rohr_graphics_text_destroy(&world_view_label);
