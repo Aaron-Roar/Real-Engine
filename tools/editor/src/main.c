@@ -235,6 +235,7 @@ static EditorResult editor_workspace_operation_execute(EditorWorkspace *workspac
     if(!editor_result_check(result) &&
             workspace_command->type != EDITOR_WORKSPACE_COMMAND_CREATE &&
             workspace_command->type != EDITOR_WORKSPACE_COMMAND_LOAD &&
+            workspace_command->type != EDITOR_WORKSPACE_COMMAND_SAVE &&
             editor_operation_terminal != NULL &&
             editor_operation_enabled != NULL && *editor_operation_enabled &&
             !editor_result_check(editor_workspace_command_cli_write(
@@ -4710,7 +4711,8 @@ int main(void) {
                     panel_scroll_offset = 0.0f;
                     (void)editor_terminal_panel_project_open(
                         &terminal_panel, workspace.directory);
-                    if(terminal_editor_operations) {
+                    if(terminal_editor_operations &&
+                            command.type == EDITOR_WORKSPACE_COMMAND_CREATE) {
                         char cli_command[3072];
                         if(!editor_result_check(editor_workspace_command_cli_write(
                                 &command, cli_command, sizeof(cli_command))))

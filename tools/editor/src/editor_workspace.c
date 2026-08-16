@@ -993,8 +993,6 @@ EditorResult editor_workspace_command_cli_write(const EditorWorkspaceCommand *co
         return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
             "Workspace command serialization received an invalid argument");
     if(command->type == EDITOR_WORKSPACE_COMMAND_CREATE) action = "create";
-    else if(command->type == EDITOR_WORKSPACE_COMMAND_LOAD) action = "load";
-    else if(command->type == EDITOR_WORKSPACE_COMMAND_SAVE) action = "save";
     else if(command->type == EDITOR_WORKSPACE_COMMAND_GENERATE_C) action = "generate-c";
     else return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
         "Unknown workspace command");

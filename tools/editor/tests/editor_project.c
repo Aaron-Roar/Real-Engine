@@ -116,11 +116,7 @@ int main(void) {
         snprintf(workspace_command.directory, sizeof(workspace_command.directory),
             "%s", fixture);
         if(editor_result_check(editor_workspace_command_execute(
-                    &loaded_workspace, &loaded_project, &workspace_command)) ||
-                editor_result_check(editor_workspace_command_cli_write(
-                    &workspace_command, cli_command, sizeof(cli_command))) ||
-                strstr(cli_command, "editor-cli --project ") != cli_command ||
-                strstr(cli_command, " load") == NULL) {
+                    &loaded_workspace, &loaded_project, &workspace_command))) {
             workspace_fixture_remove(fixture);
             return 1;
         }
@@ -238,10 +234,6 @@ int main(void) {
             "%s", fixture);
         if(editor_result_check(editor_workspace_command_execute(
                     &loaded_workspace, &loaded_project, &workspace_command)) ||
-                editor_result_check(editor_workspace_command_cli_write(
-                    &workspace_command, cli_command, sizeof(cli_command))) ||
-                strstr(cli_command, "editor-cli --project ") != cli_command ||
-                strstr(cli_command, " save") == NULL ||
                 !file_contains(path, "5.00000000f") ||
                 file_contains(path, "7.00000000f")) {
             workspace_fixture_remove(fixture);

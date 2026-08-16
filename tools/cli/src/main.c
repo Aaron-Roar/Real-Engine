@@ -23,11 +23,10 @@ static void cli_usage_print(void) {
         "  Structure: add, delete, or rename [new-name]\n"
         "  Project: editor-cli [--project <project-directory>] "
             "[--engine-root <path>] <operation>\n"
-        "  Project operations: create, load, validate, save, generate-c, "
-            "compile, build\n"
+        "  Project operations: create, validate, generate-c, compile, build\n"
         "  Example: editor-cli --object car --body chassis --property mass 5\n"
         "  Example: editor-cli --body chassis --property position 10 20\n"
-        "  Example: editor-cli --project ./game load\n"
+        "  Example: editor-cli --project ./game validate\n"
         "  Example: editor-cli --engine-root ../rohr --project ./game create");
 }
 
@@ -138,14 +137,9 @@ static int cli_workspace_action_command(int count, char **arguments) {
     snprintf(load.directory, sizeof(load.directory), "%s", directory);
     result = editor_workspace_command_execute(&workspace, &project, &load);
     if(editor_result_check(result)) return cli_error(result);
-    if(strcmp(operation, "load") == 0 || strcmp(operation, "validate") == 0) {
-        puts(strcmp(operation, "validate") == 0 ? "valid" : "loaded");
+    if(strcmp(operation, "validate") == 0) {
+        puts("valid");
         return 0;
-    }
-    if(strcmp(operation, "save") == 0) {
-        command.type = EDITOR_WORKSPACE_COMMAND_SAVE;
-        result = editor_workspace_command_execute(&workspace, &project, &command);
-        return editor_result_check(result) ? cli_error(result) : 0;
     }
     if(strcmp(operation, "generate-c") == 0 || strcmp(operation, "build") == 0) {
         command.type = EDITOR_WORKSPACE_COMMAND_GENERATE_C;
@@ -158,21 +152,23 @@ static int cli_workspace_action_command(int count, char **arguments) {
         cli_project_compile(&workspace);
 }
 
-static bool cli_workspace_action_check(int count, char **arguments) {
-    const char *operation;
+static bool cli_workspace_arguments_check(int count, char **arguments) {
     if(count < 2) return false;
-    operation = arguments[count - 1];
-    if(strcmp(operation, "create") != 0 && strcmp(operation, "load") != 0 &&
-            strcmp(operation, "validate") != 0 && strcmp(operation, "save") != 0 &&
-            strcmp(operation, "generate-c") != 0 &&
-            strcmp(operation, "compile") != 0 && strcmp(operation, "build") != 0)
-        return false;
     for(int i = 1; i + 1 < count; i += 2) {
         if((strcmp(arguments[i], "--project") != 0 &&
                 strcmp(arguments[i], "--engine-root") != 0) || i + 1 >= count - 1)
             return false;
     }
     return true;
+}
+
+static bool cli_workspace_action_check(int count, char **arguments) {
+    const char *operation;
+    if(!cli_workspace_arguments_check(count, arguments)) return false;
+    operation = arguments[count - 1];
+    return strcmp(operation, "create") == 0 || strcmp(operation, "validate") == 0 ||
+        strcmp(operation, "generate-c") == 0 || strcmp(operation, "compile") == 0 ||
+        strcmp(operation, "build") == 0;
 }
 
 static int cli_object_command(int count, char **arguments) {
@@ -219,6 +215,9 @@ static int cli_object_command(int count, char **arguments) {
 int main(int count, char **arguments) {
     if(cli_workspace_action_check(count, arguments))
         return cli_workspace_action_command(count, arguments);
+    if(cli_workspace_arguments_check(count, arguments))
+        return cli_error(editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "Unknown project operation: %s", arguments[count - 1]));
     if(count >= 2 && arguments[1][0] == '-')
         return cli_object_command(count, arguments);
     cli_usage_print();
