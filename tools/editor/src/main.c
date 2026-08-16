@@ -173,16 +173,31 @@ static SDL_Process *editor_cmake_hidden_start(const char *project_directory,
 }
 
 static bool editor_cmake_compile_start(EditorTerminalPanel *terminal,
-        SDL_Process **hidden_process, const char *project_directory,
-        bool show_operations) {
-    char command[EDITOR_WORKSPACE_PATH_MAX * 4];
+        SDL_Process **hidden_process, bool *hidden_compile_pending,
+        char *hidden_directory, size_t hidden_directory_capacity,
+        const char *project_directory, bool show_operations) {
+    char configure_command[EDITOR_WORKSPACE_PATH_MAX * 4];
+    char compile_command[EDITOR_WORKSPACE_PATH_MAX * 4];
+    char command[EDITOR_WORKSPACE_PATH_MAX * 8 + 8];
     if(show_operations) {
-        return editor_cmake_command_get(command, sizeof(command),
-                project_directory, false) &&
-            editor_terminal_panel_command_execute(terminal, command);
+        int count;
+        if(!editor_cmake_command_get(configure_command,
+                sizeof(configure_command), project_directory, true) ||
+                !editor_cmake_command_get(compile_command,
+                    sizeof(compile_command), project_directory, false)) return false;
+        count = snprintf(command, sizeof(command), "%s && %s",
+            configure_command, compile_command);
+        if(count < 0 || (size_t)count >= sizeof(command)) return false;
+        return editor_terminal_panel_command_execute(terminal, command);
     }
-    if(hidden_process == NULL || *hidden_process != NULL) return false;
-    *hidden_process = editor_cmake_hidden_start(project_directory, false);
+    if(hidden_process == NULL || hidden_compile_pending == NULL ||
+            hidden_directory == NULL || *hidden_process != NULL ||
+            strlen(project_directory) >= hidden_directory_capacity) return false;
+    *hidden_process = editor_cmake_hidden_start(project_directory, true);
+    if(*hidden_process != NULL) {
+        *hidden_compile_pending = true;
+        snprintf(hidden_directory, hidden_directory_capacity, "%s", project_directory);
+    }
     return *hidden_process != NULL;
 }
 
@@ -1554,6 +1569,8 @@ int main(void) {
     EditorBulkPanel bulk_panel = {0};
     EditorTerminalPanel terminal_panel = {0};
     SDL_Process *hidden_build_process = NULL;
+    bool hidden_compile_pending = false;
+    char hidden_build_directory[EDITOR_WORKSPACE_PATH_MAX] = {0};
     EditorHistory history = {0};
     EditorWorkspaceBrowserAction workspace_browser_action =
         EDITOR_WORKSPACE_BROWSER_NONE;
@@ -1820,10 +1837,15 @@ int main(void) {
             }
         }
         editor_terminal_panel_update(&terminal_panel);
-        if(hidden_build_process != NULL &&
-                SDL_WaitProcess(hidden_build_process, false, NULL)) {
-            SDL_DestroyProcess(hidden_build_process);
-            hidden_build_process = NULL;
+        if(hidden_build_process != NULL) {
+            int exit_code;
+            if(SDL_WaitProcess(hidden_build_process, false, &exit_code)) {
+                bool compile = hidden_compile_pending && exit_code == 0;
+                hidden_compile_pending = false;
+                SDL_DestroyProcess(hidden_build_process);
+                hidden_build_process = compile ? editor_cmake_hidden_start(
+                    hidden_build_directory, false) : NULL;
+            }
         }
         editor_history_continuous_set(&history, field_editing ||
             mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_PRESSED ||
@@ -4524,7 +4546,9 @@ int main(void) {
                 } else if(build_menu.changed && build_menu.selected_index == 1 &&
                         workspace.open) {
                     (void)editor_cmake_compile_start(&terminal_panel,
-                        &hidden_build_process, workspace.directory,
+                        &hidden_build_process, &hidden_compile_pending,
+                        hidden_build_directory, sizeof(hidden_build_directory),
+                        workspace.directory,
                         terminal_build_operations);
                 } else if(build_menu.changed && build_menu.selected_index == 2 &&
                         workspace.open) {
@@ -4538,7 +4562,9 @@ int main(void) {
                             (void)editor_generation_report_write(
                                 &terminal_panel, &project);
                         (void)editor_cmake_compile_start(&terminal_panel,
-                            &hidden_build_process, workspace.directory,
+                            &hidden_build_process, &hidden_compile_pending,
+                            hidden_build_directory, sizeof(hidden_build_directory),
+                            workspace.directory,
                             terminal_build_operations);
                     }
                 }
@@ -4684,18 +4710,6 @@ int main(void) {
                     panel_scroll_offset = 0.0f;
                     (void)editor_terminal_panel_project_open(
                         &terminal_panel, workspace.directory);
-                    if(command.type == EDITOR_WORKSPACE_COMMAND_CREATE) {
-                        char cmake_command[EDITOR_WORKSPACE_PATH_MAX * 4];
-                        if(terminal_build_operations) {
-                            if(editor_cmake_command_get(cmake_command,
-                                    sizeof(cmake_command), workspace.directory, true))
-                                (void)editor_terminal_panel_command_execute(
-                                    &terminal_panel, cmake_command);
-                        } else if(hidden_build_process == NULL) {
-                            hidden_build_process = editor_cmake_hidden_start(
-                                workspace.directory, true);
-                        }
-                    }
                     if(terminal_editor_operations) {
                         char cli_command[3072];
                         if(!editor_result_check(editor_workspace_command_cli_write(
