@@ -11,6 +11,7 @@
 #include "editor_object_commands.h"
 #include "panels/editor_origin_panel.h"
 #include "panels/editor_bulk_panel.h"
+#include "panels/editor_generation_report.h"
 #include "panels/editor_terminal_panel.h"
 
 #include <math.h>
@@ -4447,8 +4448,10 @@ int main(void) {
                         .type = EDITOR_WORKSPACE_COMMAND_GENERATE_C};
                     snprintf(command.directory, sizeof(command.directory), "%s",
                         workspace.directory);
-                    (void)editor_workspace_operation_execute(
-                        &workspace, &project, &command);
+                    if(!editor_result_check(editor_workspace_operation_execute(
+                            &workspace, &project, &command)))
+                        (void)editor_generation_report_write(
+                            &terminal_panel, &project);
                 } else if(build_menu.changed && build_menu.selected_index == 1 &&
                         workspace.open) {
                     char cmake_command[EDITOR_WORKSPACE_PATH_MAX * 4];

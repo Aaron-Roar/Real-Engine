@@ -190,6 +190,20 @@ bool editor_terminal_panel_command_execute(EditorTerminalPanel *panel,
     return true;
 }
 
+bool editor_terminal_panel_output_write(EditorTerminalPanel *panel,
+        const char *output) {
+    RohrTerminalResult result;
+    if(panel == NULL || panel->terminal == NULL || output == NULL) return false;
+    result = rohr_terminal_output_write(panel->terminal, output, strlen(output));
+    if(!result.success) {
+        fprintf(stderr, "Terminal output failed: %s\n",
+            rohr_terminal_error_message_get(&result));
+        return false;
+    }
+    panel->scroll_offset = 0;
+    return true;
+}
+
 float editor_terminal_panel_viewport_bottom_get(const EditorTerminalPanel *panel) {
     if(panel == NULL || !panel->visible) return WINDOW_HEIGHT;
     return WINDOW_HEIGHT - panel->height;

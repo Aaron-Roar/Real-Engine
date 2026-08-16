@@ -30,6 +30,8 @@ void editor_terminal_panel_operation_write(EditorTerminalPanel *panel,
     const char *command);
 bool editor_terminal_panel_command_execute(EditorTerminalPanel *panel,
     const char *command);
+bool editor_terminal_panel_output_write(EditorTerminalPanel *panel,
+    const char *output);
 float editor_terminal_panel_viewport_bottom_get(const EditorTerminalPanel *panel);
 void editor_terminal_panel_draw(EditorTerminalPanel *panel, float viewport_width,
     float viewport_bottom);
