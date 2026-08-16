@@ -999,6 +999,15 @@ EditorResult editor_workspace_command_cli_write(const EditorWorkspaceCommand *co
     else return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
         "Unknown workspace command");
     output[0] = '\0';
+    if(command->type == EDITOR_WORKSPACE_COMMAND_GENERATE_C) {
+        if(!editor_workspace_command_text_append(output, output_capacity, &used,
+                "editor-cli --project ") ||
+                !editor_workspace_command_shell_append(output, output_capacity, &used,
+                    command->directory) ||
+                !editor_workspace_command_text_append(output, output_capacity, &used,
+                    " generate-c")) goto capacity_error;
+        return editor_result_value(true);
+    }
     if(!editor_workspace_command_text_append(output, output_capacity, &used,
             "editor-cli project ") ||
             !editor_workspace_command_text_append(output, output_capacity, &used,

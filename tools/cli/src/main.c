@@ -16,6 +16,7 @@ static void cli_usage_print(void) {
         "  Selectors are order-independent and precede the operation.\n"
         "  Properties: --property <name> <values...>\n"
         "  Structure: add, delete, or rename [new-name]\n"
+        "  Generate: editor-cli [--project <project-directory>] generate-c\n"
         "  Example: editor-cli --object car --body chassis --property mass 5\n"
         "  Example: editor-cli --body chassis --property position 10 20\n"
         "\nLegacy project management:\n"
@@ -24,6 +25,37 @@ static void cli_usage_print(void) {
         "  rohr project validate <directory>\n"
         "  rohr project save <directory>\n"
         "  rohr project generate-c <directory>");
+}
+
+static int cli_generate_c_command(int count, char **arguments) {
+    static EditorProject project;
+    EditorWorkspace workspace = {0};
+    EditorWorkspaceCommand load = {.type = EDITOR_WORKSPACE_COMMAND_LOAD};
+    EditorWorkspaceCommand generate = {.type = EDITOR_WORKSPACE_COMMAND_GENERATE_C};
+    const char *directory = ".";
+    bool operation_found = false;
+    EditorResult result;
+    for(int i = 1; i < count; i += 1) {
+        if(strcmp(arguments[i], "--project") == 0) {
+            if(i + 1 >= count) return cli_error(editor_result_error(
+                EDITOR_ERROR_INVALID_ARGUMENT, "--project requires a path"));
+            directory = arguments[++i];
+        } else if(strcmp(arguments[i], "generate-c") == 0 && !operation_found) {
+            operation_found = true;
+        } else {
+            return cli_error(editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                "Unexpected generate-c argument: %s", arguments[i]));
+        }
+    }
+    if(!operation_found || strlen(directory) >= sizeof(load.directory))
+        return cli_error(editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "Generate C project path is invalid or too long"));
+    snprintf(load.directory, sizeof(load.directory), "%s", directory);
+    result = editor_workspace_command_execute(&workspace, &project, &load);
+    if(editor_result_check(result)) return cli_error(result);
+    snprintf(generate.directory, sizeof(generate.directory), "%s", workspace.directory);
+    result = editor_workspace_command_execute(&workspace, &project, &generate);
+    return editor_result_check(result) ? cli_error(result) : 0;
 }
 
 static int cli_project_command(int count, char **arguments) {
@@ -117,6 +149,9 @@ static int cli_object_command(int count, char **arguments) {
 int main(int count, char **arguments) {
     if(count >= 2 && strcmp(arguments[1], "project") == 0)
         return cli_project_command(count, arguments);
+    for(int i = 1; i < count; i += 1)
+        if(strcmp(arguments[i], "generate-c") == 0)
+            return cli_generate_c_command(count, arguments);
     if(count >= 2 && arguments[1][0] == '-')
         return cli_object_command(count, arguments);
     cli_usage_print();

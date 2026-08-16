@@ -248,7 +248,8 @@ int main(void) {
                     &loaded_workspace, &loaded_project, &workspace_command)) ||
                 editor_result_check(editor_workspace_command_cli_write(
                     &workspace_command, cli_command, sizeof(cli_command))) ||
-                strstr(cli_command, "project generate-c") == NULL ||
+                strstr(cli_command, "editor-cli --project ") != cli_command ||
+                strstr(cli_command, " generate-c") == NULL ||
                 !file_contains(path, "7.00000000f") ||
                 !file_contains(path, "ROHR_PARTICLE") ||
                 !file_contains(path, "generated_world_anchor_create") ||
