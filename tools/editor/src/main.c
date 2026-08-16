@@ -1392,6 +1392,7 @@ int main(void) {
     TextAsset terminal_menu_label = {0};
     TextAsset terminal_visible_label = {0};
     TextAsset terminal_editor_operations_label = {0};
+    TextAsset terminal_generated_code_label = {0};
     TextAsset terminal_build_operations_label = {0};
     TextAsset preferences_label = {0};
     TextAsset file_browser_field = {0};
@@ -1509,6 +1510,7 @@ int main(void) {
     bool panel_resizing = false;
     bool terminal_resizing = false;
     bool terminal_editor_operations = true;
+    bool terminal_generated_code = true;
     bool terminal_build_operations = false;
     bool collision_category_open = false;
     bool collide_with_open = false;
@@ -1628,6 +1630,8 @@ int main(void) {
             !editor_text_create(&font, "[ ] Visible", &terminal_visible_label) ||
             !editor_text_create(&font, "[ ] Show editor operations",
                 &terminal_editor_operations_label) ||
+            !editor_text_create(&font, "[ ] Show generated code",
+                &terminal_generated_code_label) ||
             !editor_text_create(&font, "[ ] Show build operations",
                 &terminal_build_operations_label) ||
             !editor_text_create(&font, "Preferences", &preferences_label) ||
@@ -4313,7 +4317,7 @@ int main(void) {
             };
             const TextAsset *terminal_options[] = {
                 &terminal_visible_label, &terminal_editor_operations_label,
-                &terminal_build_operations_label
+                &terminal_generated_code_label, &terminal_build_operations_label
             };
             const TextAsset *build_options[] = {
                 &generate_c_label, &compile_label
@@ -4334,7 +4338,8 @@ int main(void) {
             };
             const TextAsset *terminal_texts[] = {
                 &terminal_menu_label, &terminal_visible_label,
-                &terminal_editor_operations_label, &terminal_build_operations_label
+                &terminal_editor_operations_label, &terminal_generated_code_label,
+                &terminal_build_operations_label
             };
             const TextAsset *settings_texts[] = {&settings_label, &preferences_label};
             UIComponentConfig menu_components = {
@@ -4359,6 +4364,9 @@ int main(void) {
             (void)rohr_graphics_text_value_set(&terminal_editor_operations_label,
                 terminal_editor_operations ? "[x] Show editor operations" :
                     "[ ] Show editor operations");
+            (void)rohr_graphics_text_value_set(&terminal_generated_code_label,
+                terminal_generated_code ? "[x] Show generated code" :
+                    "[ ] Show generated code");
             (void)rohr_graphics_text_value_set(&terminal_build_operations_label,
                 terminal_build_operations ? "[x] Show build operations" :
                     "[ ] Show build operations");
@@ -4449,7 +4457,8 @@ int main(void) {
                     snprintf(command.directory, sizeof(command.directory), "%s",
                         workspace.directory);
                     if(!editor_result_check(editor_workspace_operation_execute(
-                            &workspace, &project, &command)))
+                            &workspace, &project, &command)) &&
+                            terminal_generated_code)
                         (void)editor_generation_report_write(
                             &terminal_panel, &project);
                 } else if(build_menu.changed && build_menu.selected_index == 1 &&
@@ -4479,6 +4488,8 @@ int main(void) {
                 else if(terminal_menu.changed && terminal_menu.selected_index == 1)
                     terminal_editor_operations = !terminal_editor_operations;
                 else if(terminal_menu.changed && terminal_menu.selected_index == 2)
+                    terminal_generated_code = !terminal_generated_code;
+                else if(terminal_menu.changed && terminal_menu.selected_index == 3)
                     terminal_build_operations = !terminal_build_operations;
             }
             (void)rohr_ui_menu("editor.menu.settings", &settings_label,
@@ -4893,6 +4904,7 @@ int main(void) {
     rohr_graphics_text_destroy(&terminal_menu_label);
     rohr_graphics_text_destroy(&terminal_visible_label);
     rohr_graphics_text_destroy(&terminal_editor_operations_label);
+    rohr_graphics_text_destroy(&terminal_generated_code_label);
     rohr_graphics_text_destroy(&terminal_build_operations_label);
     rohr_graphics_text_destroy(&reset_view_label);
     rohr_graphics_text_destroy(&save_label);
@@ -5067,6 +5079,7 @@ fail:
     rohr_graphics_text_destroy(&terminal_menu_label);
     rohr_graphics_text_destroy(&terminal_visible_label);
     rohr_graphics_text_destroy(&terminal_editor_operations_label);
+    rohr_graphics_text_destroy(&terminal_generated_code_label);
     rohr_graphics_text_destroy(&terminal_build_operations_label);
     rohr_graphics_text_destroy(&reset_view_label);
     rohr_graphics_text_destroy(&save_label);
