@@ -79,6 +79,7 @@
           gnumake
           pkg-config
           ffmpeg
+          wayland-scanner
         ];
 
         buildInputs = with pkgs; [
@@ -86,6 +87,8 @@
           freetype
           harfbuzz
           libdecor
+          libffi
+          libglvnd
           libx11
           libxcb
           libxcursor
@@ -99,6 +102,7 @@
           pipewire
           pulseaudio
           wayland
+          wayland-protocols
         ];
       };
     };
