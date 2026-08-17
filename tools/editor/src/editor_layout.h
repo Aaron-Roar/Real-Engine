@@ -6,6 +6,8 @@
 #define EDITOR_VIEWPORT_WIDTH editor_viewport_width
 #define EDITOR_TOOLS_WIDTH (editor_window_width - editor_viewport_width)
 #define EDITOR_MENU_HEIGHT 34.0f
+#define EDITOR_ACTION_BAR_HEIGHT 28.0f
+#define EDITOR_ACTION_BAR_TOP (WINDOW_HEIGHT - EDITOR_ACTION_BAR_HEIGHT)
 #define EDITOR_VIEWPORT_BOTTOM editor_viewport_bottom
 
 extern float editor_viewport_width;

@@ -1,4 +1,5 @@
 #include "editor_terminal_panel.h"
+#include "editor_layout.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -103,7 +104,7 @@ bool editor_terminal_panel_event_add(EditorTerminalPanel *panel,
     if(panel == NULL || event == NULL || !panel->visible) return false;
     pointer = rohr_graphics_mouse_screen_position_get();
     inside = pointer.x >= 0.0f && pointer.x < viewport_width &&
-        pointer.y >= viewport_bottom;
+        pointer.y >= viewport_bottom && pointer.y < EDITOR_ACTION_BAR_TOP;
     if(event->type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
             event->button.button == SDL_BUTTON_LEFT) {
         panel->focused = inside;
@@ -262,8 +263,8 @@ bool editor_terminal_panel_output_write(EditorTerminalPanel *panel,
 }
 
 float editor_terminal_panel_viewport_bottom_get(const EditorTerminalPanel *panel) {
-    if(panel == NULL || !panel->visible) return WINDOW_HEIGHT;
-    return WINDOW_HEIGHT - panel->height;
+    if(panel == NULL || !panel->visible) return EDITOR_ACTION_BAR_TOP;
+    return EDITOR_ACTION_BAR_TOP - panel->height;
 }
 
 void editor_terminal_panel_draw(EditorTerminalPanel *panel, float viewport_width,
@@ -273,12 +274,12 @@ void editor_terminal_panel_draw(EditorTerminalPanel *panel, float viewport_width
     size_t first;
     if(panel == NULL || !panel->visible) return;
     (void)rohr_graphics_screen_rect_draw(0.0f, viewport_bottom, viewport_width,
-        WINDOW_HEIGHT - viewport_bottom, (Color){12, 14, 18, 255});
+        EDITOR_ACTION_BAR_TOP - viewport_bottom, (Color){12, 14, 18, 255});
     (void)rohr_graphics_screen_rect_draw(0.0f, viewport_bottom, viewport_width,
         EDITOR_TERMINAL_DIVIDER_HEIGHT, (Color){75, 84, 100, 255});
     if(panel->terminal == NULL) return;
     line_count = rohr_terminal_line_count_get(panel->terminal);
-    visible_count = (size_t)((WINDOW_HEIGHT - viewport_bottom - 10.0f) /
+    visible_count = (size_t)((EDITOR_ACTION_BAR_TOP - viewport_bottom - 10.0f) /
         EDITOR_TERMINAL_LINE_HEIGHT);
     if(visible_count > EDITOR_TERMINAL_VISIBLE_LINE_MAX)
         visible_count = EDITOR_TERMINAL_VISIBLE_LINE_MAX;

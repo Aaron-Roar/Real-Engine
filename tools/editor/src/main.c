@@ -2154,8 +2154,8 @@ int main(void) {
             if(terminal_resizing && (primary == MOUSE_BUTTON_STATE_PRESSED ||
                     primary == MOUSE_BUTTON_STATE_DOWN)) {
                 float bottom = fmaxf(EDITOR_MENU_HEIGHT + 100.0f,
-                    fminf(pointer.y, WINDOW_HEIGHT - 80.0f));
-                terminal_panel.height = WINDOW_HEIGHT - bottom;
+                    fminf(pointer.y, EDITOR_ACTION_BAR_TOP - 80.0f));
+                terminal_panel.height = EDITOR_ACTION_BAR_TOP - bottom;
                 EDITOR_VIEWPORT_BOTTOM = bottom;
             }
             if(primary == MOUSE_BUTTON_STATE_RELEASED ||
@@ -4512,6 +4512,9 @@ int main(void) {
         editor_terminal_panel_draw(&terminal_panel, EDITOR_VIEWPORT_WIDTH,
             EDITOR_VIEWPORT_BOTTOM);
         rohr_graphics_screen_clip_clear();
+        (void)rohr_graphics_screen_rect_draw(0.0f, EDITOR_ACTION_BAR_TOP,
+            EDITOR_VIEWPORT_WIDTH, EDITOR_ACTION_BAR_HEIGHT,
+            (Color){18, 21, 27, 255});
         if(color_picker.open) {
             (void)editor_color_picker_draw(&color_picker, &mouse,
                 &color_picker_hex_field, &color_picker_opacity_field,

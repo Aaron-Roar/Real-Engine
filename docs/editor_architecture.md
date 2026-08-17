@@ -149,6 +149,7 @@ When adding an authored property:
 
 Keep editor-only concepts out of the public engine API unless a game can use the
 same concept independently of the editor.
+
 # Notification architecture
 
 Editor notifications are divided into a shared system and producer modules.
@@ -162,3 +163,9 @@ build-notification module. Future engine-runtime warning modules should publish
 through the same notification system; they must not manipulate toast, log, or
 modal state directly. Notifications are for recoverable information and
 warnings, not substitutes for handling critical engine errors.
+
+The left workspace reserves a shared 28-pixel action bar directly against the
+bottom window edge. The viewport and the optional terminal both end at the
+bar's top edge. Notification Log occupies the first slot; future persistent
+actions may be placed beside it without covering terminal output or viewport
+interaction.
