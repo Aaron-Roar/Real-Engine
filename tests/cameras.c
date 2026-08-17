@@ -24,6 +24,39 @@ int main(void) {
         return 1;
     }
     {
+        GraphicsWindowPresentationConfig presentation =
+            rohr_graphics_window_presentation_default_get();
+        GraphicsWindowPresentationConfig active =
+            rohr_graphics_window_presentation_get();
+        if(active.mode != GRAPHICS_WINDOW_MODE_WINDOWED ||
+                active.logical_width != WINDOW_WIDTH ||
+                active.logical_height != WINDOW_HEIGHT) {
+            rohr_graphics_end();
+            rohr_engine_shutdown();
+            return 1;
+        }
+        presentation.window_width = 640;
+        presentation.window_height = 480;
+        presentation.logical_width = 800;
+        presentation.logical_height = 600;
+        if(rohr_error_check(rohr_graphics_window_presentation_set(presentation))) {
+            rohr_graphics_end();
+            rohr_engine_shutdown();
+            return 1;
+        }
+        active = rohr_graphics_window_presentation_get();
+        if(active.mode != GRAPHICS_WINDOW_MODE_WINDOWED ||
+                active.window_width <= 0 || active.window_height <= 0 ||
+                active.logical_width != 800 || active.logical_height != 600 ||
+                active.aspect_ratio_auto ||
+                rohr_error_check(rohr_graphics_window_presentation_set(
+                    rohr_graphics_window_presentation_default_get()))) {
+            rohr_graphics_end();
+            rohr_engine_shutdown();
+            return 1;
+        }
+    }
+    {
         EngineResult frame_limit_result = rohr_graphics_frame_limit_set(-1);
         if(!rohr_error_check(frame_limit_result) ||
                 frame_limit_result.result.error != ERROR_ENGINE_INVALID_FRAME_LIMIT ||

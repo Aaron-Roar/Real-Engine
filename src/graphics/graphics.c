@@ -22,6 +22,7 @@ static Uint64 graphics_frame_start_ns = 0;
 static int graphics_logical_width = WINDOW_WIDTH;
 static int graphics_logical_height = WINDOW_HEIGHT;
 static bool graphics_aspect_ratio_auto = false;
+static GraphicsWindowMode graphics_window_mode = GRAPHICS_WINDOW_MODE_WINDOWED;
 
 #define GRAPHICS_FRAME_LIMIT_FALLBACK 120
 #define GRAPHICS_NANOSECONDS_PER_SECOND UINT64_C(1000000000)
@@ -1363,6 +1364,21 @@ GraphicsWindowPresentationConfig graphics_window_presentation_default_get(void) 
     };
 }
 
+GraphicsWindowPresentationConfig graphics_window_presentation_get(void) {
+    GraphicsWindowPresentationConfig config = {
+        .mode = graphics_window_mode,
+        .window_width = WINDOW_WIDTH,
+        .window_height = WINDOW_HEIGHT,
+        .logical_width = graphics_logical_width,
+        .logical_height = graphics_logical_height,
+        .aspect_ratio_auto = graphics_aspect_ratio_auto
+    };
+    if(sdl_window != NULL)
+        (void)SDL_GetWindowSizeInPixels(sdl_window, &config.window_width,
+            &config.window_height);
+    return config;
+}
+
 EngineResult graphics_window_presentation_set(
         GraphicsWindowPresentationConfig config) {
     EngineResult result;
@@ -1375,6 +1391,7 @@ EngineResult graphics_window_presentation_set(
     if(!graphics_logical_size_set(config.logical_width, config.logical_height))
         return error_result_error(ERROR_ENGINE_GRAPHICS_WINDOW_PRESENTATION_FAILED);
     graphics_aspect_ratio_auto = config.aspect_ratio_auto;
+    graphics_window_mode = config.mode;
     return error_result_value(true);
 }
 
@@ -1427,6 +1444,7 @@ EngineResult graphics_start(void) {
     graphics_logical_width = WINDOW_WIDTH;
     graphics_logical_height = WINDOW_HEIGHT;
     graphics_aspect_ratio_auto = false;
+    graphics_window_mode = GRAPHICS_WINDOW_MODE_WINDOWED;
     graphics_vsync_enabled = SDL_SetRenderVSync(sdl_renderer, 1);
     graphics_frame_limit = 0;
     graphics_frame_start_ns = SDL_GetTicksNS();

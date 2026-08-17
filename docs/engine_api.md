@@ -2397,6 +2397,15 @@ aspect matching as one transaction. Modes are windowed, borderless fullscreen,
 and display-mode fullscreen. Fullscreen selects the closest display mode to the
 requested physical resolution.
 
+### `rohr_graphics_window_presentation_get`
+
+```c
+GraphicsWindowPresentationConfig rohr_graphics_window_presentation_get(void);
+```
+
+Returns the active mode, actual window size in physical pixels, current logical
+size, and automatic-aspect state.
+
 ### `rohr_graphics_screen_clip_set`
 
 ```c

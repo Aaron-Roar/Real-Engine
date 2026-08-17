@@ -276,6 +276,7 @@ bool rohr_graphics_logical_size_set(int width, int height) { return graphics_log
 bool rohr_graphics_aspect_ratio_set(int width, int height) { return graphics_aspect_ratio_set(width, height); }
 bool rohr_graphics_aspect_ratio_auto_set(bool enabled) { return graphics_aspect_ratio_auto_set(enabled); }
 GraphicsWindowPresentationConfig rohr_graphics_window_presentation_default_get(void) { return graphics_window_presentation_default_get(); }
+GraphicsWindowPresentationConfig rohr_graphics_window_presentation_get(void) { return graphics_window_presentation_get(); }
 EngineResult rohr_graphics_window_presentation_set(GraphicsWindowPresentationConfig config) { return graphics_window_presentation_set(config); }
 bool rohr_graphics_screen_clip_set(float x, float y, float width, float height) { return graphics_screen_clip_set(x, y, width, height); }
 void rohr_graphics_screen_clip_clear(void) { graphics_screen_clip_clear(); }

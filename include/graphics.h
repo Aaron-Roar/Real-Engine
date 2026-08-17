@@ -449,6 +449,7 @@ bool graphics_logical_size_set(int width, int height);
 bool graphics_aspect_ratio_set(int width, int height);
 bool graphics_aspect_ratio_auto_set(bool enabled);
 GraphicsWindowPresentationConfig graphics_window_presentation_default_get(void);
+GraphicsWindowPresentationConfig graphics_window_presentation_get(void);
 EngineResult graphics_window_presentation_set(
     GraphicsWindowPresentationConfig config);
 

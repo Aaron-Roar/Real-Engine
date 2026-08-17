@@ -1221,6 +1221,8 @@ bool rohr_graphics_aspect_ratio_set(int width, int height);
 /** Matches the logical aspect ratio to the render output when enabled. */
 bool rohr_graphics_aspect_ratio_auto_set(bool enabled);
 GraphicsWindowPresentationConfig rohr_graphics_window_presentation_default_get(void);
+/** Returns the active window mode and actual physical/logical dimensions. */
+GraphicsWindowPresentationConfig rohr_graphics_window_presentation_get(void);
 EngineResult rohr_graphics_window_presentation_set(
     GraphicsWindowPresentationConfig config);
 /** Clips subsequent screen-space drawing until the clip is cleared. */
