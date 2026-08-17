@@ -19,7 +19,7 @@ static const RohrCollisionCategoryMask spring_category = UINT64_C(1) << 4;
 
 static bool result_ok(EngineResult result) {
     if(!rohr_error_check(result)) return true;
-    rohr_error_stderr_print(result.result.error);
+    fprintf(stderr, "%s\n", rohr_error_message_get(result));
     return false;
 }
 

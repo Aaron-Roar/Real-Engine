@@ -764,7 +764,7 @@ static bool editor_workspace_main_write(const EditorWorkspace *workspace,
         "#include <stdio.h>\n\n"
         "static bool ok(EngineResult result) {\n"
         "    if(!rohr_error_check(result)) return true;\n"
-        "    rohr_error_stderr_print(result.result.error);\n"
+        "    fprintf(stderr, \"%%s\\n\", rohr_error_message_get(result));\n"
         "    return false;\n"
         "}\n\n"
         "int main(void) {\n"

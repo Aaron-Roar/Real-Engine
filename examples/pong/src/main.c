@@ -235,7 +235,7 @@ int main(void) {
     {
         EngineResult init_result = rohr_engine_init();
         if(rohr_error_check(init_result)) {
-            rohr_error_stderr_print(init_result.result.error);
+            fprintf(stderr, "%s\n", rohr_error_message_get(init_result));
             return 1;
         }
     }
@@ -243,7 +243,7 @@ int main(void) {
     {
         EngineResult graphics_result = rohr_graphics_start();
         if(rohr_error_check(graphics_result)) {
-            rohr_error_stderr_print(graphics_result.result.error);
+            fprintf(stderr, "%s\n", rohr_error_message_get(graphics_result));
             rohr_engine_shutdown();
             return 1;
         }
@@ -256,42 +256,42 @@ int main(void) {
     }
     EngineResult load_result = rohr_game_state_file_load("assets/pong/pong.json");
     if(rohr_error_check(load_result)) {
-        rohr_error_stderr_print(load_result.result.error);
+        fprintf(stderr, "%s\n", rohr_error_message_get(load_result));
         goto fail;
     }
     EntityResult wall_bottom_result = rohr_entity_by_name_get("wall_bottom");
     if(rohr_error_check(wall_bottom_result)) {
-        rohr_error_stderr_print(wall_bottom_result.result.error);
+        fprintf(stderr, "%s\n", rohr_error_message_get(wall_bottom_result));
         goto fail;
     }
     wall_bottom = wall_bottom_result.result.value;
     EntityResult wall_top_result = rohr_entity_by_name_get("wall_top");
     if(rohr_error_check(wall_top_result)) {
-        rohr_error_stderr_print(wall_top_result.result.error);
+        fprintf(stderr, "%s\n", rohr_error_message_get(wall_top_result));
         goto fail;
     }
     wall_top = wall_top_result.result.value;
     EntityResult center_line_result = rohr_entity_by_name_get("center_line");
     if(rohr_error_check(center_line_result)) {
-        rohr_error_stderr_print(center_line_result.result.error);
+        fprintf(stderr, "%s\n", rohr_error_message_get(center_line_result));
         goto fail;
     }
     center_line = center_line_result.result.value;
     EntityResult paddle_left_result = rohr_entity_by_name_get("paddle_left");
     if(rohr_error_check(paddle_left_result)) {
-        rohr_error_stderr_print(paddle_left_result.result.error);
+        fprintf(stderr, "%s\n", rohr_error_message_get(paddle_left_result));
         goto fail;
     }
     paddle_left = paddle_left_result.result.value;
     EntityResult paddle_right_result = rohr_entity_by_name_get("paddle_right");
     if(rohr_error_check(paddle_right_result)) {
-        rohr_error_stderr_print(paddle_right_result.result.error);
+        fprintf(stderr, "%s\n", rohr_error_message_get(paddle_right_result));
         goto fail;
     }
     paddle_right = paddle_right_result.result.value;
     EntityResult ball_result = rohr_entity_by_name_get("ball");
     if(rohr_error_check(ball_result)) {
-        rohr_error_stderr_print(ball_result.result.error);
+        fprintf(stderr, "%s\n", rohr_error_message_get(ball_result));
         goto fail;
     }
     ball = ball_result.result.value;
@@ -340,7 +340,7 @@ int main(void) {
         };
         EngineResult camera_result = rohr_camera_set(left_camera, left_camera_value);
         if(rohr_error_check(camera_result)) {
-            rohr_error_stderr_print(camera_result.result.error);
+            fprintf(stderr, "%s\n", rohr_error_message_get(camera_result));
             goto fail;
         }
     }
@@ -352,7 +352,7 @@ int main(void) {
         config.dimensions = (Vec2D){340.0f, 500.0f};
         camera_result = rohr_camera_create(config);
         if(rohr_error_check(camera_result)) {
-            rohr_error_stderr_print(camera_result.result.error);
+            fprintf(stderr, "%s\n", rohr_error_message_get(camera_result));
             goto fail;
         }
         right_camera = camera_result.result.value;
@@ -416,7 +416,7 @@ int main(void) {
             }
         );
         if(rohr_error_check(left_velocity_result)) {
-            rohr_error_stderr_print(left_velocity_result.result.error);
+            fprintf(stderr, "%s\n", rohr_error_message_get(left_velocity_result));
             goto fail;
         }
         EngineResult right_velocity_result = rohr_physics_velocity_set(
@@ -427,7 +427,7 @@ int main(void) {
             }
         );
         if(rohr_error_check(right_velocity_result)) {
-            rohr_error_stderr_print(right_velocity_result.result.error);
+            fprintf(stderr, "%s\n", rohr_error_message_get(right_velocity_result));
             goto fail;
         }
 
@@ -454,7 +454,7 @@ int main(void) {
             left_paddle_max_y
         );
         if(rohr_error_check(left_constraint_result)) {
-            rohr_error_stderr_print(left_constraint_result.result.error);
+            fprintf(stderr, "%s\n", rohr_error_message_get(left_constraint_result));
             goto fail;
         }
         EngineResult right_constraint_result = pong_constrain_paddle(
@@ -463,7 +463,7 @@ int main(void) {
             right_paddle_max_y
         );
         if(rohr_error_check(right_constraint_result)) {
-            rohr_error_stderr_print(right_constraint_result.result.error);
+            fprintf(stderr, "%s\n", rohr_error_message_get(right_constraint_result));
             goto fail;
         }
 
@@ -478,7 +478,7 @@ int main(void) {
             printf("Left: %d  Right: %d\n", left_score, right_score);
             EngineResult reset_result = pong_reset_ball(ball, serve_direction);
             if(rohr_error_check(reset_result)) {
-                rohr_error_stderr_print(reset_result.result.error);
+                fprintf(stderr, "%s\n", rohr_error_message_get(reset_result));
                 goto fail;
             }
         } else if(positions[ball_index].y < -goal_y) {
@@ -487,7 +487,7 @@ int main(void) {
             printf("Left: %d  Right: %d\n", left_score, right_score);
             EngineResult reset_result = pong_reset_ball(ball, serve_direction);
             if(rohr_error_check(reset_result)) {
-                rohr_error_stderr_print(reset_result.result.error);
+                fprintf(stderr, "%s\n", rohr_error_message_get(reset_result));
                 goto fail;
             }
         }
@@ -507,7 +507,7 @@ int main(void) {
                     ? rohr_physics_dt_per_tick_set(slow_motion_physics_dt)
                     : rohr_physics_dt_per_tick_set(normal_physics_dt);
                 if(rohr_error_check(dt_result)) {
-                    rohr_error_stderr_print(dt_result.result.error);
+                    fprintf(stderr, "%s\n", rohr_error_message_get(dt_result));
                     goto fail;
                 }
             }

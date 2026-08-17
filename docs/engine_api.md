@@ -209,18 +209,6 @@ failure. Pass a result variable because the macro evaluates it twice.
 
 **Returns:** Engine-owned string valid until the next error.
 
-### `rohr_error_stderr_print`
-
-```c
-void rohr_error_stderr_print(EngineError error);
-```
-
-Prints an engine error message to stderr.
-
-| Parameter | Description |
-| --- | --- |
-| `error` | Error code to print. |
-
 ## Console
 
 ### `rohr_console_logs_print`

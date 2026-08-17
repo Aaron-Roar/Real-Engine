@@ -124,12 +124,6 @@ const char *rohr_error_code_message_get(EngineError error);
     error_result_message_get((ResultValue).kind, (ResultValue).result.error)
 
 /**
- * @brief Prints an engine error message to stderr.
- * @param error Error code to print.
- */
-void rohr_error_stderr_print(EngineError error);
-
-/**
  * @brief Prints buffered console log messages.
  */
 void rohr_console_logs_print(void);

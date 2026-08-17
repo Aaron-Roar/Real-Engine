@@ -34,10 +34,10 @@ int main(void) {
     CameraAttachmentResult attachment_result = rohr_graphics_camera_attachment_get();
     if(rohr_error_check(index_result) || rohr_error_check(attachment_result)) {
         if(rohr_error_check(index_result)) {
-            rohr_error_stderr_print(index_result.result.error);
+            fprintf(stderr, "%s\n", rohr_error_message_get(index_result));
         }
         if(rohr_error_check(attachment_result)) {
-            rohr_error_stderr_print(attachment_result.result.error);
+            fprintf(stderr, "%s\n", rohr_error_message_get(attachment_result));
         }
         rohr_engine_shutdown();
         return 1;
@@ -56,7 +56,7 @@ int main(void) {
 
     EngineResult save_result = rohr_game_state_file_save("saved_game_state.json");
     if(rohr_error_check(save_result)) {
-        rohr_error_stderr_print(save_result.result.error);
+        fprintf(stderr, "%s\n", rohr_error_message_get(save_result));
         rohr_engine_shutdown();
         return 1;
     }
@@ -64,7 +64,7 @@ int main(void) {
         "saved_game_state_template.json"
     );
     if(rohr_error_check(template_result)) {
-        rohr_error_stderr_print(template_result.result.error);
+        fprintf(stderr, "%s\n", rohr_error_message_get(template_result));
     }
     rohr_engine_shutdown();
     return rohr_error_check(template_result) ? 1 : 0;

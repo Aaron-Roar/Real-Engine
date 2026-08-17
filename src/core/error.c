@@ -144,7 +144,3 @@ const char *error_result_message_get(ErrorResultKind kind, EngineError error) {
     if(kind != ERROR_RESULT_ERROR) return "result contains no error";
     return error_combined_message_get(error);
 }
-
-void error_stderr_print(EngineError error) {
-    fprintf(stderr, "%s\n", error_combined_message_get(error));
-}

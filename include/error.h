@@ -180,7 +180,4 @@ const char *error_code_message_get(EngineError error);
 /** Get a result's error message, or a diagnostic for a successful result. */
 const char *error_result_message_get(ErrorResultKind kind, EngineError error);
 
-/** Print an EngineError message to stderr. */
-void error_stderr_print(EngineError error);
-
 #endif
