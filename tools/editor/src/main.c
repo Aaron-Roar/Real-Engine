@@ -622,6 +622,17 @@ static void editor_color_picker_commit(EditorColorPicker *picker) {
     (void)editor_command_execute(picker->project, &command);
 }
 
+static void editor_color_picker_cancel(EditorColorPicker *picker) {
+    if(picker == NULL || !picker->open) return;
+    if(picker->target != NULL) *picker->target = picker->original;
+    picker->open = false;
+    picker->opened_this_frame = false;
+    picker->target = NULL;
+    picker->project = NULL;
+    picker->bulk_state = NULL;
+    picker->bulk_history = NULL;
+}
+
 static void editor_color_picker_open(EditorColorPicker *picker, uint32_t *target,
         EditorProject *project, EditorItemKind kind, EditorObjectId object,
         uint32_t parent, uint32_t item, EditorPropertyKind property) {
@@ -4685,6 +4696,33 @@ int main(void) {
                 (UIRect){menu_x, 3.0f, 0.0f, 0.0f}, settings_texts,
                 sizeof(settings_texts) / sizeof(settings_texts[0]), menu_components);
 
+            if(mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_PRESSED) {
+                Position pointer = rohr_graphics_mouse_screen_position_get();
+                bool top_menu_pressed = editor_point_in_rect(pointer, file_bounds) ||
+                    editor_point_in_rect(pointer, edit_bounds) ||
+                    editor_point_in_rect(pointer, build_bounds) ||
+                    editor_point_in_rect(pointer, view_bounds) ||
+                    editor_point_in_rect(pointer, terminal_bounds) ||
+                    editor_point_in_rect(pointer, settings_bounds);
+                if(top_menu_pressed) {
+                    editor_file_browser_destroy(&file_browser);
+                    workspace_browser_action = EDITOR_WORKSPACE_BROWSER_NONE;
+                    build_settings_panel.open = false;
+                    build_settings_panel.build_requested = false;
+                    visual_settings_panel.open = false;
+                    notification_panel.log_open = false;
+                    notification_panel.report_open = false;
+                    close_action = EDITOR_CLOSE_NONE;
+                    viewport_context_open = false;
+                    auto_shape_picker_open = false;
+                    collision_category_open = false;
+                    collide_with_open = false;
+                    editor_color_picker_cancel(&color_picker);
+                    rohr_ui_field_focus_clear();
+                }
+            }
+
+            rohr_ui_modal_controls_begin();
             file_menu = rohr_ui_menu("editor.menu.file", &file_label, file_options,
                 sizeof(file_options) / sizeof(file_options[0]),
                 file_bounds, NULL);
@@ -4823,6 +4861,7 @@ int main(void) {
             } else if(settings_menu.changed && settings_menu.selected_index == 1) {
                 editor_visual_settings_panel_open(&visual_settings_panel);
             }
+            rohr_ui_modal_controls_end();
         }
         if(!notification_panel.report_open && !notification_panel.log_open &&
                 !visual_settings_panel.open)
