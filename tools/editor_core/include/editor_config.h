@@ -46,6 +46,12 @@ EditorResult editor_config_command_expand(const EditorConfigCommand *command,
     const char *project, const char *build, const char *sdk,
     char arguments[EDITOR_CONFIG_ARGUMENT_MAX][EDITOR_CONFIG_ARGUMENT_LENGTH_MAX],
     const char *output[EDITOR_CONFIG_ARGUMENT_MAX + 1]);
+EditorResult editor_config_command_expression_parse(const char *expression,
+    EditorConfigCommand *command);
+EditorResult editor_config_command_expression_write(const EditorConfigCommand *command,
+    char *output, size_t capacity);
+EditorResult editor_config_gui_override_save(const char *project_directory,
+    const EditorConfigCommand *configure, const EditorConfigCommand *compile);
 EditorResult editor_config_sdk_path_get(char *output, size_t capacity,
     const char *name, bool required);
 

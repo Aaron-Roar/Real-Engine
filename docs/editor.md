@@ -108,8 +108,15 @@ an error message.
 
 Configuration files execute as real Lua, but the editor does not expose Lua's
 OS, I/O, package, or debug libraries while loading them. The CLI reads these
-files and never rewrites them. GUI overrides are represented now and will be
-consumed when GUI configuration support is added.
+files and never rewrites them. The GUI consumes its own layered overrides.
+
+The GUI's **Settings > Build** menu shows the effective configure and compile
+commands as Lua arrays. Applying an edited field validates that it is a
+sequential array of strings using only `{project}`, `{build}`, and `{sdk}`
+placeholders. GUI-owned overrides are written atomically to
+`.rohr/gui-overrides.lua`; `editor.lua` remains untouched. Each field can be
+reset independently to its inherited value. The command fields show three
+lines at once, wrap long Lua expressions, and scroll vertically when focused.
 
 The executable name is the PascalCase project directory name (`my-game`
 becomes `MyGame`).

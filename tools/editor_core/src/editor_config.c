@@ -38,8 +38,13 @@ static EditorResult editor_config_command_read(lua_State *lua, int table,
         size_t length;
         const char *value;
         lua_rawgeti(lua, -1, (lua_Integer)i + 1);
+        if(lua_type(lua, -1) != LUA_TSTRING) {
+            lua_pop(lua, 2);
+            return editor_config_error(path,
+                "command arguments must be strings");
+        }
         value = lua_tolstring(lua, -1, &length);
-        if(value == NULL || length >= sizeof(command->arguments[i])) {
+        if(length >= sizeof(command->arguments[i])) {
             lua_pop(lua, 2);
             return editor_config_error(path,
                 "command arguments must be non-oversized strings");
@@ -221,4 +226,189 @@ EditorResult editor_config_sdk_path_get(char *output, size_t capacity,
     output[0] = '\0';
     return required ? editor_result_error(EDITOR_ERROR_FILE_IO,
         "Could not locate SDK editor config: %s", name) : editor_result_value(true);
+}
+
+EditorResult editor_config_command_expression_parse(const char *expression,
+        EditorConfigCommand *command) {
+    lua_State *lua;
+    char source[UI_FIELD_EDIT_MAX + 16];
+    size_t count;
+    if(expression == NULL || command == NULL || expression[0] == '\0')
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "Build override must be a non-empty Lua array");
+    if(snprintf(source, sizeof(source), "return %s", expression) >=
+            (int)sizeof(source)) return editor_result_error(EDITOR_ERROR_CAPACITY,
+        "Build override Lua expression is too long");
+    lua = luaL_newstate();
+    if(lua == NULL) return editor_result_error(EDITOR_ERROR_CAPACITY,
+        "Could not allocate the Lua configuration state");
+    if(luaL_loadbuffer(lua, source, strlen(source), "build override") != LUA_OK ||
+            lua_pcall(lua, 0, 1, 0) != LUA_OK) {
+        EditorResult result = editor_config_error("build override",
+            lua_tostring(lua, -1));
+        lua_close(lua);
+        return result;
+    }
+    if(!lua_istable(lua, -1)) {
+        lua_close(lua);
+        return editor_config_error("build override", "value must be an array");
+    }
+    count = lua_rawlen(lua, -1);
+    if(count == 0 || count > EDITOR_CONFIG_ARGUMENT_MAX) {
+        lua_close(lua);
+        return editor_config_error("build override",
+            "command argument count is invalid");
+    }
+    memset(command, 0, sizeof(*command));
+    for(size_t i = 0; i < count; i += 1) {
+        size_t length;
+        const char *value;
+        lua_rawgeti(lua, -1, (lua_Integer)i + 1);
+        if(lua_type(lua, -1) != LUA_TSTRING) {
+            lua_close(lua);
+            return editor_config_error("build override",
+                "command arguments must be strings");
+        }
+        value = lua_tolstring(lua, -1, &length);
+        if(length >= sizeof(command->arguments[i])) {
+            lua_close(lua);
+            return editor_config_error("build override",
+                "command arguments must be non-oversized strings");
+        }
+        memcpy(command->arguments[i], value, length + 1);
+        lua_pop(lua, 1);
+    }
+    lua_pushnil(lua);
+    size_t key_count = 0;
+    while(lua_next(lua, -2) != 0) {
+        lua_Integer index;
+        bool integer = lua_isinteger(lua, -2);
+        index = integer ? lua_tointeger(lua, -2) : 0;
+        lua_pop(lua, 1);
+        if(!integer || index < 1 || (size_t)index > count) {
+            lua_close(lua);
+            return editor_config_error("build override",
+                "value must contain only sequential array entries");
+        }
+        key_count += 1;
+    }
+    if(key_count != count) {
+        lua_close(lua);
+        return editor_config_error("build override",
+            "value must contain only sequential array entries");
+    }
+    for(size_t i = 0; i < count; i += 1) {
+        const char *cursor = command->arguments[i];
+        while(*cursor != '\0') {
+            if(*cursor == '{') {
+                const char *known[] = {"{project}", "{build}", "{sdk}"};
+                bool matched = false;
+                for(size_t j = 0; j < sizeof(known) / sizeof(known[0]); j += 1) {
+                    size_t length = strlen(known[j]);
+                    if(strncmp(cursor, known[j], length) == 0) {
+                        cursor += length;
+                        matched = true;
+                        break;
+                    }
+                }
+                if(!matched) {
+                    lua_close(lua);
+                    return editor_config_error("build override",
+                        "unknown command placeholder");
+                }
+                continue;
+            }
+            if(*cursor == '}') {
+                lua_close(lua);
+                return editor_config_error("build override",
+                    "unknown command placeholder");
+            }
+            cursor += 1;
+        }
+    }
+    command->count = count;
+    command->set = true;
+    lua_close(lua);
+    return editor_result_value(true);
+}
+
+EditorResult editor_config_command_expression_write(const EditorConfigCommand *command,
+        char *output, size_t capacity) {
+    size_t used = 0;
+    if(command == NULL || !command->set || output == NULL || capacity < 4)
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "Could not format an unset build command");
+#define EDITOR_CONFIG_WRITE(character) do { \
+    if(used + 1 >= capacity) return editor_result_error(EDITOR_ERROR_CAPACITY, \
+        "Formatted build command is too long"); \
+    output[used++] = (character); \
+} while(0)
+    EDITOR_CONFIG_WRITE('{');
+    for(size_t i = 0; i < command->count; i += 1) {
+        if(i > 0) {
+            EDITOR_CONFIG_WRITE(',');
+            EDITOR_CONFIG_WRITE(' ');
+        }
+        EDITOR_CONFIG_WRITE('"');
+        for(size_t j = 0; command->arguments[i][j] != '\0'; j += 1) {
+            char character = command->arguments[i][j];
+            if(character == '\\' || character == '"') EDITOR_CONFIG_WRITE('\\');
+            if(character == '\n') {
+                EDITOR_CONFIG_WRITE('\\');
+                character = 'n';
+            }
+            EDITOR_CONFIG_WRITE(character);
+        }
+        EDITOR_CONFIG_WRITE('"');
+    }
+    EDITOR_CONFIG_WRITE('}');
+    output[used] = '\0';
+#undef EDITOR_CONFIG_WRITE
+    return editor_result_value(true);
+}
+
+static bool editor_config_lua_command_write(FILE *file, const char *name,
+        const EditorConfigCommand *command) {
+    char expression[UI_FIELD_EDIT_MAX];
+    if(command == NULL || !command->set)
+        return fprintf(file, "        %s = nil,\n", name) > 0;
+    if(editor_result_check(editor_config_command_expression_write(command,
+            expression, sizeof(expression)))) return false;
+    return fprintf(file, "        %s = %s,\n", name, expression) > 0;
+}
+
+EditorResult editor_config_gui_override_save(const char *project_directory,
+        const EditorConfigCommand *configure, const EditorConfigCommand *compile) {
+    char directory[EDITOR_WORKSPACE_PATH_MAX * 2];
+    char path[EDITOR_WORKSPACE_PATH_MAX * 2];
+    char temporary[EDITOR_WORKSPACE_PATH_MAX * 2];
+    FILE *file;
+    int count;
+    if(project_directory == NULL || project_directory[0] == '\0')
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "Cannot save GUI overrides without an open project");
+    count = snprintf(directory, sizeof(directory), "%s/.rohr", project_directory);
+    if(count < 0 || (size_t)count >= sizeof(directory) ||
+            !SDL_CreateDirectory(directory)) return editor_result_error(
+        EDITOR_ERROR_FILE_IO, "Could not create project config directory: %s",
+        directory);
+    if(snprintf(path, sizeof(path), "%s/gui-overrides.lua", directory) >=
+            (int)sizeof(path) || snprintf(temporary, sizeof(temporary),
+                "%s/gui-overrides.lua.tmp", directory) >= (int)sizeof(temporary))
+        return editor_result_error(EDITOR_ERROR_CAPACITY,
+            "Project GUI override path is too long");
+    file = fopen(temporary, "wb");
+    if(file == NULL) return editor_result_error(EDITOR_ERROR_FILE_IO,
+        "Could not write GUI overrides: %s", temporary);
+    bool written = fputs("-- Generated by Rohr Editor GUI.\nreturn {\n    gui = {\n",
+        file) >= 0 && editor_config_lua_command_write(file, "configure", configure) &&
+        editor_config_lua_command_write(file, "compile", compile) &&
+        fputs("    },\n}\n", file) >= 0;
+    bool closed = fclose(file) == 0;
+    if(!written || !closed || !SDL_RenamePath(temporary, path)) {
+        (void)SDL_RemovePath(temporary);
+        return editor_result_error(EDITOR_ERROR_FILE_IO,
+            "Could not atomically save GUI overrides: %s", path);
+    }
+    return editor_result_value(true);
 }

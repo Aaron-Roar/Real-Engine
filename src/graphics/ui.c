@@ -34,6 +34,7 @@ typedef struct UIContext {
     SDL_Keymod field_modifiers[UI_FIELD_KEY_EVENT_MAX];
     size_t field_key_count;
     size_t field_cursor;
+    float field_scroll_y;
     bool field_select_all;
     uint64_t dropdown_id;
     bool dropdown_seen;
@@ -52,6 +53,9 @@ typedef struct UIContext {
     float scroll_offset_stack[UI_SCROLL_REGION_MAX];
     float scroll_content_stack[UI_SCROLL_REGION_MAX];
     size_t scroll_depth;
+    bool modal_active;
+    bool modal_controls;
+    UIRect modal_bounds;
     UINavigationItem navigation_items[UI_NAVIGATION_ITEM_MAX];
     UINavigationItem navigation_previous[UI_NAVIGATION_ITEM_MAX];
     size_t navigation_item_count;
@@ -228,9 +232,13 @@ static UIButtonResult ui_interaction_id(uint64_t interaction_id, bool hovered) {
 
 static UIButtonResult ui_interaction_resolved(const char *id, UIRect bounds) {
     uint64_t interaction_id = ui_hash_id(id);
+    if(ui_context.modal_active && !ui_context.modal_controls)
+        return (UIButtonResult){0};
     ui_navigation_item_register(interaction_id, bounds);
     return ui_interaction_id(interaction_id,
         ui_point_in_rect(ui_context.input.pointer, bounds) &&
+            (!ui_context.modal_active ||
+                ui_point_in_rect(ui_context.input.pointer, ui_context.modal_bounds)) &&
             ui_point_in_scroll_clip(ui_context.input.pointer));
 }
 
@@ -415,8 +423,24 @@ void ui_frame_begin(UIInput input) {
     ui_context.pointer_consumed = false;
     ui_context.translation_y = 0.0f;
     ui_context.scroll_depth = 0;
+    ui_context.modal_active = false;
+    ui_context.modal_controls = false;
     ui_context.navigation_item_count = 0;
     ui_context.frame_active = true;
+}
+
+void ui_modal_set(UIRect bounds) {
+    if(!ui_context.frame_active) return;
+    ui_context.modal_active = true;
+    ui_context.modal_bounds = bounds;
+}
+
+void ui_modal_controls_begin(void) {
+    if(ui_context.modal_active) ui_context.modal_controls = true;
+}
+
+void ui_modal_controls_end(void) {
+    ui_context.modal_controls = false;
 }
 
 void ui_event_add(const SDL_Event *event) {
@@ -473,12 +497,15 @@ static bool ui_field_value_valid(UIFieldBinding binding, const char *value) {
     return true;
 }
 
-static bool ui_field_character_add(UIFieldBinding binding, char character) {
+static bool ui_field_character_add(UIFieldBinding binding, char character,
+        bool multiline) {
     char candidate[UI_FIELD_EDIT_MAX];
     size_t length = strlen(ui_context.field_edit);
     size_t cursor = ui_context.field_cursor;
 
-    if(character < 32 || character > 126 || character == ',') return false;
+    if((character < 32 || character > 126) && !(multiline && character == '\n'))
+        return false;
+    if(character == ',') return false;
     if(ui_context.field_select_all) length = cursor = 0;
     if(length + 1 >= sizeof(ui_context.field_edit)) return false;
     if(ui_context.field_select_all) candidate[0] = '\0';
@@ -504,13 +531,21 @@ static float ui_field_text_width_get(const TextAsset *display, size_t length) {
     return (float)width;
 }
 
-static void ui_field_cursor_from_pointer(const TextAsset *display, UIRect bounds) {
+static void ui_field_cursor_from_pointer(const TextAsset *display, UIRect bounds,
+        bool multiline) {
     size_t length = strlen(ui_context.field_edit);
     if(display == NULL || display->text == NULL || length == 0) {
         ui_context.field_cursor = length;
         return;
     }
-    {
+    if(multiline) {
+        TTF_SubString substring;
+        int x = (int)(ui_context.input.pointer.x - bounds.x - 6.0f);
+        int y = (int)(ui_context.input.pointer.y - bounds.y - 6.0f +
+            ui_context.field_scroll_y);
+        if(TTF_GetTextSubStringForPoint(display->text, x, y, &substring))
+            ui_context.field_cursor = (size_t)substring.offset;
+    } else {
         float text_width = ui_field_text_width_get(display, length);
         float left = bounds.x + (bounds.width - text_width) * 0.5f;
         float pointer_x = ui_context.input.pointer.x - left;
@@ -543,8 +578,9 @@ static bool ui_field_binding_store(UIFieldBinding binding) {
     return false;
 }
 
-UIFieldResult ui_field(const char *id, UIFieldBinding binding,
-    TextAsset *display, UIRect bounds, const UIButtonStyle *style) {
+static UIFieldResult ui_field_draw(const char *id, UIFieldBinding binding,
+        TextAsset *display, UIRect bounds, const UIButtonStyle *style,
+        bool multiline) {
     UIFieldResult result = {0};
     UIButtonStyle resolved = style == NULL ? ui_button_style_default_get() : *style;
     uint64_t field_id = ui_hash_id(id);
@@ -558,11 +594,14 @@ UIFieldResult ui_field(const char *id, UIFieldBinding binding,
     result.hovered = interaction.hovered;
     if(result.hovered && ui_context.input.primary_button == MOUSE_BUTTON_STATE_PRESSED) {
         bool newly_active = ui_context.field_id != field_id;
-        if(newly_active) ui_field_binding_display_set(binding, display);
+        if(newly_active) {
+            ui_field_binding_display_set(binding, display);
+            ui_context.field_scroll_y = 0.0f;
+        }
         ui_context.field_id = field_id;
         ui_context.field_select_all = newly_active && binding.kind == UI_FIELD_FLOAT;
         if(!ui_context.field_select_all) {
-            ui_field_cursor_from_pointer(display, resolved_bounds);
+            ui_field_cursor_from_pointer(display, resolved_bounds, multiline);
         }
     } else if(interaction.keyboard_activated) {
         ui_context.field_id = field_id;
@@ -584,7 +623,7 @@ UIFieldResult ui_field(const char *id, UIFieldBinding binding,
             if((modifiers & SDL_KMOD_CTRL) && key == SDLK_A) {
                 ui_context.field_select_all = true;
                 ui_context.field_cursor = strlen(ui_context.field_edit);
-            } else if(key == SDLK_RETURN || key == SDLK_KP_ENTER) {
+            } else if((key == SDLK_RETURN || key == SDLK_KP_ENTER) && !multiline) {
                 if(interaction.keyboard_activated) continue;
                 result.submitted = true;
                 ui_context.field_id = 0;
@@ -592,6 +631,8 @@ UIFieldResult ui_field(const char *id, UIFieldBinding binding,
                 ui_field_binding_display_set(binding, display);
                 ui_context.field_id = 0;
                 ui_context.field_select_all = false;
+            } else if((key == SDLK_RETURN || key == SDLK_KP_ENTER) && multiline) {
+                edited = ui_field_character_add(binding, '\n', true);
             } else if(key == SDLK_LEFT || key == SDLK_RIGHT ||
                     key == SDLK_UP || key == SDLK_DOWN || key == SDLK_HOME ||
                     key == SDLK_END) {
@@ -637,7 +678,7 @@ UIFieldResult ui_field(const char *id, UIFieldBinding binding,
                     edited = true;
                 }
             } else if(!(modifiers & SDL_KMOD_CTRL) && key >= 0 && key <= 127) {
-                edited = ui_field_character_add(binding, (char)key);
+                edited = ui_field_character_add(binding, (char)key, multiline);
             }
             if(edited && ui_field_binding_store(binding)) result.changed = true;
         }
@@ -653,6 +694,20 @@ UIFieldResult ui_field(const char *id, UIFieldBinding binding,
             (void)graphics_text_value_set(display, binding.string);
         }
     }
+    if(multiline && display != NULL && display->text != NULL) {
+        int text_width;
+        int text_height;
+        (void)TTF_SetTextWrapWidth(display->text,
+            (int)fmaxf(1.0f, resolved_bounds.width - 12.0f));
+        if(TTF_GetTextSize(display->text, &text_width, &text_height))
+            display->size = (Scale){(float)text_width, (float)text_height};
+        if(result.active && result.hovered && ui_context.wheel_y != 0.0f) {
+            float maximum = fmaxf(0.0f, display->size.y - resolved_bounds.height + 12.0f);
+            ui_context.field_scroll_y = fmaxf(0.0f, fminf(maximum,
+                ui_context.field_scroll_y - ui_context.wheel_y * 24.0f));
+            ui_context.wheel_y = 0.0f;
+        }
+    }
     ui_surface_raw(resolved_bounds,
         result.active ? resolved.hovered :
             ((result.hovered || interaction.focused) ? resolved.hovered : resolved.idle));
@@ -662,24 +717,51 @@ UIFieldResult ui_field(const char *id, UIFieldBinding binding,
             bool clipped = ui_clip_raw_begin(resolved_bounds);
             float text_width = ui_field_text_width_get(display,
                 strlen(ui_context.field_edit));
-            float text_left = resolved_bounds.x +
-                (resolved_bounds.width - text_width) * 0.5f;
-            float text_top = resolved_bounds.y +
+            float text_left = multiline ? resolved_bounds.x + 6.0f :
+                resolved_bounds.x + (resolved_bounds.width - text_width) * 0.5f;
+            float text_top = multiline ? resolved_bounds.y + 6.0f -
+                ui_context.field_scroll_y : resolved_bounds.y +
                 (resolved_bounds.height - display->size.y) * 0.5f;
             if(ui_context.field_select_all && text_width > 0.0f) {
                 ui_surface_raw((UIRect){text_left, text_top, text_width,
                     display->size.y}, (Color){80, 120, 185, 210});
             } else {
-                float cursor_x = text_left +
-                    ui_field_text_width_get(display, ui_context.field_cursor);
-                ui_surface_raw((UIRect){cursor_x, text_top, 1.0f,
-                    display->size.y}, (Color){245, 248, 252, 255});
+                if(multiline) {
+                    TTF_SubString substring;
+                    if(TTF_GetTextSubString(display->text,
+                            (int)ui_context.field_cursor, &substring))
+                        ui_surface_raw((UIRect){text_left + substring.rect.x,
+                            text_top + substring.rect.y, 1.0f,
+                            (float)substring.rect.h}, (Color){245, 248, 252, 255});
+                } else {
+                    float cursor_x = text_left +
+                        ui_field_text_width_get(display, ui_context.field_cursor);
+                    ui_surface_raw((UIRect){cursor_x, text_top, 1.0f,
+                        display->size.y}, (Color){245, 248, 252, 255});
+                }
             }
             if(clipped) ui_clip_end();
         }
     }
-    ui_label_raw(display, resolved_bounds);
+    if(multiline) {
+        bool clipped = ui_clip_raw_begin(resolved_bounds);
+        if(display != NULL) (void)graphics_text_draw(display,
+            (Position){resolved_bounds.x + 6.0f,
+                resolved_bounds.y + 6.0f - ui_context.field_scroll_y});
+        if(clipped) ui_clip_end();
+    } else ui_label_raw(display, resolved_bounds);
     return result;
+}
+
+UIFieldResult ui_field(const char *id, UIFieldBinding binding,
+        TextAsset *display, UIRect bounds, const UIButtonStyle *style) {
+    return ui_field_draw(id, binding, display, bounds, style, false);
+}
+
+UIFieldResult ui_multiline_field(const char *id, UIFieldBinding binding,
+        TextAsset *display, UIRect bounds, const UIButtonStyle *style) {
+    if(binding.kind != UI_FIELD_STRING) return (UIFieldResult){0};
+    return ui_field_draw(id, binding, display, bounds, style, true);
 }
 
 UIButtonResult ui_button(

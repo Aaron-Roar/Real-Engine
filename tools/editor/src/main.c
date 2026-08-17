@@ -11,6 +11,7 @@
 #include "editor_object_commands.h"
 #include "panels/editor_origin_panel.h"
 #include "panels/editor_bulk_panel.h"
+#include "panels/editor_build_settings_panel.h"
 #include "panels/editor_generation_report.h"
 #include "panels/editor_terminal_panel.h"
 
@@ -77,31 +78,6 @@ static const EditorProject *editor_operation_project;
 static bool *editor_operation_enabled;
 static EditorHistory *editor_operation_history;
 
-static bool editor_terminal_path_quote(char *output, size_t capacity,
-        const char *path) {
-    size_t used = 0;
-    if(output == NULL || capacity < 3 || path == NULL || path[0] == '\0')
-        return false;
-    output[used++] = '"';
-    for(size_t i = 0; path[i] != '\0'; i += 1) {
-#if defined(_WIN32)
-        if(path[i] == '"') return false;
-#else
-        if(path[i] == '\\' || path[i] == '"' || path[i] == '$' ||
-                path[i] == '`') {
-            if(used + 1 >= capacity) return false;
-            output[used++] = '\\';
-        }
-#endif
-        if(used + 1 >= capacity) return false;
-        output[used++] = path[i];
-    }
-    if(used + 2 > capacity) return false;
-    output[used++] = '"';
-    output[used] = '\0';
-    return true;
-}
-
 static bool editor_project_absolute_path_get(char *absolute, size_t capacity,
         const char *project_directory) {
     if(absolute == NULL || capacity == 0 || project_directory == NULL) return false;
@@ -124,7 +100,7 @@ static bool editor_project_absolute_path_get(char *absolute, size_t capacity,
 #endif
 }
 
-static bool editor_rohr_cmake_option_get(char *output, size_t capacity) {
+static bool editor_sdk_root_get(char *output, size_t capacity) {
     const char *base = SDL_GetBasePath();
     char root[EDITOR_WORKSPACE_PATH_MAX * 2];
     char config[EDITOR_WORKSPACE_PATH_MAX * 2];
@@ -147,10 +123,21 @@ static bool editor_rohr_cmake_option_get(char *output, size_t capacity) {
                 root, library_directories[i]);
             if(count >= 0 && (size_t)count < sizeof(config) &&
                     SDL_GetPathInfo(config, &info) && info.type == SDL_PATHTYPE_FILE) {
-                count = snprintf(output, capacity, "-DCMAKE_PREFIX_PATH=%s", root);
+                count = snprintf(output, capacity, "%s", root);
                 return count >= 0 && (size_t)count < capacity;
             }
         }
+    }
+    output[0] = '\0';
+    return false;
+}
+
+static bool editor_rohr_cmake_option_get(char *output, size_t capacity) {
+    char sdk[EDITOR_WORKSPACE_PATH_MAX * 2];
+    int count;
+    if(editor_sdk_root_get(sdk, sizeof(sdk))) {
+        count = snprintf(output, capacity, "-DCMAKE_PREFIX_PATH=%s", sdk);
+        return count >= 0 && (size_t)count < capacity;
     }
     if(ROHR_DEVELOPMENT_SOURCE_DIR[0] == '\0') return false;
     count = snprintf(output, capacity, "-DROHR_ENGINE_SOURCE_ROOT=%s",
@@ -158,51 +145,132 @@ static bool editor_rohr_cmake_option_get(char *output, size_t capacity) {
     return count >= 0 && (size_t)count < capacity;
 }
 
+static bool editor_gui_config_load(EditorConfig *config,
+        const char *project_directory) {
+    char path[EDITOR_WORKSPACE_PATH_MAX * 2];
+    EditorResult result;
+    editor_config_init(config);
+    result = editor_config_sdk_path_get(path, sizeof(path), "editor.lua", true);
+    if(editor_result_check(result)) return false;
+    result = editor_config_file_merge(config, path, true);
+    if(editor_result_check(result)) return false;
+    if(snprintf(path, sizeof(path), "%s/editor.lua", project_directory) >=
+            (int)sizeof(path)) return false;
+    result = editor_config_file_merge(config, path, false);
+    if(editor_result_check(result)) return false;
+    if(snprintf(path, sizeof(path), "%s/.rohr/gui-overrides.lua",
+            project_directory) >= (int)sizeof(path)) return false;
+    result = editor_config_file_merge(config, path, false);
+    return !editor_result_check(result);
+}
+
+static bool editor_build_arguments_get(const char *project_directory,
+        bool configure,
+        char storage[EDITOR_CONFIG_ARGUMENT_MAX][EDITOR_CONFIG_ARGUMENT_LENGTH_MAX],
+        const char *output[EDITOR_CONFIG_ARGUMENT_MAX + 1]) {
+    EditorConfig config;
+    const EditorConfigCommand *command;
+    char project[EDITOR_WORKSPACE_PATH_MAX * 2];
+    char build[EDITOR_WORKSPACE_PATH_MAX * 2];
+    char sdk[EDITOR_WORKSPACE_PATH_MAX * 2] = {0};
+    char option[EDITOR_WORKSPACE_PATH_MAX * 2];
+    int count;
+    if(!editor_project_absolute_path_get(project, sizeof(project), project_directory) ||
+            !editor_gui_config_load(&config, project_directory)) return false;
+    count = snprintf(build, sizeof(build), "%s/build", project);
+    if(count < 0 || (size_t)count >= sizeof(build)) return false;
+    (void)editor_sdk_root_get(sdk, sizeof(sdk));
+    command = editor_config_command_get(&config, EDITOR_CONFIG_FRONTEND_GUI,
+        configure ? EDITOR_CONFIG_OPERATION_CONFIGURE :
+            EDITOR_CONFIG_OPERATION_COMPILE);
+    if(command != NULL) return !editor_result_check(editor_config_command_expand(
+        command, project, build, sdk, storage, output));
+    if(configure) {
+        if(!editor_rohr_cmake_option_get(option, sizeof(option))) return false;
+        const char *arguments[] = {"cmake", "-S", project, "-B", build, option};
+        for(size_t i = 0; i < 6; i += 1) {
+            snprintf(storage[i], sizeof(storage[i]), "%s", arguments[i]);
+            output[i] = storage[i];
+        }
+        output[6] = NULL;
+    } else {
+        const char *arguments[] = {"cmake", "--build", build};
+        for(size_t i = 0; i < 3; i += 1) {
+            snprintf(storage[i], sizeof(storage[i]), "%s", arguments[i]);
+            output[i] = storage[i];
+        }
+        output[3] = NULL;
+    }
+    return true;
+}
+
+static bool editor_terminal_argument_write(char *output, size_t capacity,
+        size_t *used, const char *argument) {
+#if defined(_WIN32)
+    char delimiter = '"';
+#else
+    char delimiter = '\'';
+#endif
+    if(*used + 1 >= capacity) return false;
+    output[(*used)++] = delimiter;
+    for(size_t i = 0; argument[i] != '\0'; i += 1) {
+#if defined(_WIN32)
+        if(argument[i] == '%') {
+            if(*used + 2 >= capacity) return false;
+            output[(*used)++] = '%';
+            output[(*used)++] = '%';
+            continue;
+        }
+        if(argument[i] == '"' && *used + 1 < capacity) output[(*used)++] = '\\';
+#else
+        if(argument[i] == '\'') {
+            static const char escaped[] = "'\\''";
+            if(*used + sizeof(escaped) - 1 >= capacity) return false;
+            memcpy(output + *used, escaped, sizeof(escaped) - 1);
+            *used += sizeof(escaped) - 1;
+            continue;
+        }
+#endif
+        if(*used + 1 >= capacity) return false;
+        output[(*used)++] = argument[i];
+    }
+    if(*used + 2 > capacity) return false;
+    output[(*used)++] = delimiter;
+    output[*used] = '\0';
+    return true;
+}
+
 static bool editor_cmake_command_get(char *output, size_t capacity,
         const char *project_directory, bool configure) {
-    char absolute[EDITOR_WORKSPACE_PATH_MAX * 2];
-    char source[EDITOR_WORKSPACE_PATH_MAX * 2];
-    char build_path[EDITOR_WORKSPACE_PATH_MAX * 2];
-    char build[EDITOR_WORKSPACE_PATH_MAX * 2];
-    char option_path[EDITOR_WORKSPACE_PATH_MAX * 2];
-    char option[EDITOR_WORKSPACE_PATH_MAX * 2 + 4];
-    int count;
-    if(output == NULL || !editor_project_absolute_path_get(absolute,
-            sizeof(absolute), project_directory)) return false;
-    if(!editor_terminal_path_quote(source, sizeof(source), absolute))
-        return false;
-    if(configure && (!editor_rohr_cmake_option_get(option_path,
-            sizeof(option_path)) || !editor_terminal_path_quote(option,
-                sizeof(option), option_path))) return false;
-    count = snprintf(build_path, sizeof(build_path), "%s/build", absolute);
-    if(count < 0 || (size_t)count >= sizeof(build_path) ||
-            !editor_terminal_path_quote(build, sizeof(build), build_path)) return false;
-    count = configure ? snprintf(output, capacity, "cmake -S %s -B %s %s",
-        source, build, option) :
-        snprintf(output, capacity, "cmake --build %s", build);
-    return count >= 0 && (size_t)count < capacity;
+    char storage[EDITOR_CONFIG_ARGUMENT_MAX][EDITOR_CONFIG_ARGUMENT_LENGTH_MAX];
+    const char *arguments[EDITOR_CONFIG_ARGUMENT_MAX + 1];
+    size_t used = 0;
+    if(output == NULL || !editor_build_arguments_get(project_directory, configure,
+            storage, arguments)) return false;
+    output[0] = '\0';
+    for(size_t i = 0; arguments[i] != NULL; i += 1) {
+        if(i > 0) {
+            if(used + 1 >= capacity) return false;
+            output[used++] = ' ';
+        }
+        if(!editor_terminal_argument_write(output, capacity, &used, arguments[i]))
+            return false;
+    }
+    return true;
 }
 
 static SDL_Process *editor_cmake_hidden_start(const char *project_directory,
         bool configure) {
-    char source[EDITOR_WORKSPACE_PATH_MAX * 2];
-    char build[EDITOR_WORKSPACE_PATH_MAX * 2];
-    char option[EDITOR_WORKSPACE_PATH_MAX * 2];
-    const char *configure_arguments[] = {
-        "cmake", "-S", source, "-B", build, option, NULL};
-    const char *build_arguments[] = {"cmake", "--build", build, NULL};
+    char storage[EDITOR_CONFIG_ARGUMENT_MAX][EDITOR_CONFIG_ARGUMENT_LENGTH_MAX];
+    const char *arguments[EDITOR_CONFIG_ARGUMENT_MAX + 1];
     SDL_PropertiesID properties;
     SDL_Process *process;
-    int count;
-    if(!editor_project_absolute_path_get(source, sizeof(source), project_directory) ||
-            (configure && !editor_rohr_cmake_option_get(option, sizeof(option))))
+    if(!editor_build_arguments_get(project_directory, configure, storage, arguments))
         return NULL;
-    count = snprintf(build, sizeof(build), "%s/build", source);
-    if(count < 0 || (size_t)count >= sizeof(build)) return NULL;
     properties = SDL_CreateProperties();
     if(properties == 0) return NULL;
     if(!SDL_SetPointerProperty(properties, SDL_PROP_PROCESS_CREATE_ARGS_POINTER,
-            configure ? configure_arguments : build_arguments) ||
+            arguments) ||
             !SDL_SetNumberProperty(properties, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER,
                 SDL_PROCESS_STDIO_NULL) ||
             !SDL_SetNumberProperty(properties, SDL_PROP_PROCESS_CREATE_STDERR_NUMBER,
@@ -1611,6 +1679,7 @@ int main(void) {
     EditorWorkspace workspace = {0};
     EditorOriginPanel origin_panel = {0};
     EditorBulkPanel bulk_panel = {0};
+    EditorBuildSettingsPanel build_settings_panel = {0};
     EditorTerminalPanel terminal_panel = {0};
     SDL_Process *hidden_build_process = NULL;
     bool hidden_compile_pending = false;
@@ -1749,7 +1818,7 @@ int main(void) {
                 &terminal_generated_code_label) ||
             !editor_text_create(&font, "[ ] Show build operations",
                 &terminal_build_operations_label) ||
-            !editor_text_create(&font, "Preferences", &preferences_label) ||
+            !editor_text_create(&font, "Build", &preferences_label) ||
             !editor_text_create(&font, "", &file_browser_field) ||
             !editor_text_create(&font, "Add Object", &add_object_label) ||
             !editor_text_create(&font, "None", &none_label) ||
@@ -1821,6 +1890,7 @@ int main(void) {
             !editor_text_create(&font, "", &length_field) ||
             !editor_origin_panel_create(&origin_panel, &font) ||
             !editor_bulk_panel_create(&bulk_panel, &font) ||
+            !editor_build_settings_panel_create(&build_settings_panel, &font) ||
             !editor_terminal_panel_create(&terminal_panel, &font)) goto fail;
     terminal_panel.visible = true;
     if(!editor_text_create(&font, "#FFFFFFFF", &color_picker_hex_field) ||
@@ -1849,7 +1919,8 @@ int main(void) {
         rohr_controller_key_states_update(&keyboard);
         rohr_controller_mouse_states_update(&mouse);
         while((event = rohr_engine_event_poll()).type != 0) {
-            EditorHistoryShortcutResult shortcut =
+            EditorHistoryShortcutResult shortcut = build_settings_panel.open ?
+                (EditorHistoryShortcutResult){0} :
                 editor_history_shortcut_handle(&event, workspace.open, &history);
             if(shortcut.consumed) {
                 if(shortcut.restored) {
@@ -1860,8 +1931,9 @@ int main(void) {
                 }
                 continue;
             }
-            bool terminal_consumed = editor_terminal_panel_event_add(&terminal_panel,
-                &event, EDITOR_VIEWPORT_WIDTH, EDITOR_VIEWPORT_BOTTOM);
+            bool terminal_consumed = !build_settings_panel.open &&
+                editor_terminal_panel_event_add(&terminal_panel,
+                    &event, EDITOR_VIEWPORT_WIDTH, EDITOR_VIEWPORT_BOTTOM);
             if(event.type == SDL_EVENT_MOUSE_WHEEL && !terminal_consumed)
                 viewport_wheel_y += event.wheel.y;
             rohr_ui_event_add(&event);
@@ -1894,7 +1966,11 @@ int main(void) {
         editor_history_continuous_set(&history, field_editing ||
             mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_PRESSED ||
             mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_DOWN);
-        if(file_browser.active &&
+        if(build_settings_panel.open &&
+                rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
+            build_settings_panel.open = false;
+            rohr_ui_field_focus_clear();
+        } else if(file_browser.active &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             if(!editor_file_browser_selection_clear(&file_browser)) {
                 file_browser.active = false;
@@ -1927,7 +2003,8 @@ int main(void) {
                 viewport_state.selection = EDITOR_SELECTION_NONE;
             }
         }
-        if(workspace.open && !field_editing && !color_picker.open &&
+        if(workspace.open && !build_settings_panel.open && !field_editing &&
+                !color_picker.open &&
                 !editor_terminal_panel_focused_check(&terminal_panel) &&
                 !file_browser.active &&
                 close_action == EDITOR_CLOSE_NONE &&
@@ -1935,7 +2012,8 @@ int main(void) {
                 rohr_controller_key_pressed_get(&keyboard, SDLK_DELETE)) {
             (void)editor_selected_delete(&project, &viewport_state);
         }
-        if(workspace.open && !field_editing && !color_picker.open &&
+        if(workspace.open && !build_settings_panel.open && !field_editing &&
+                !color_picker.open &&
                 !editor_terminal_panel_focused_check(&terminal_panel) &&
                 !file_browser.active &&
                 close_action == EDITOR_CLOSE_NONE) {
@@ -2000,7 +2078,7 @@ int main(void) {
             Position pointer = rohr_graphics_mouse_screen_position_get();
             MouseButtonState primary = mouse.button_states[MOUSE_BUTTON_LEFT];
 
-            if(file_browser.active) {
+            if(file_browser.active || build_settings_panel.open) {
                 panel_resizing = false;
             } else if(!panel_resizing && primary == MOUSE_BUTTON_STATE_PRESSED &&
                     fabsf(pointer.x - EDITOR_VIEWPORT_WIDTH) <=
@@ -2048,6 +2126,13 @@ int main(void) {
             .pointer = rohr_graphics_mouse_screen_position_get(),
             .primary_button = mouse.button_states[MOUSE_BUTTON_LEFT]
         });
+        UIRect build_settings_bounds = {
+            fmaxf(30.0f, EDITOR_VIEWPORT_WIDTH * 0.08f),
+            EDITOR_MENU_HEIGHT + 34.0f,
+            fmaxf(560.0f, EDITOR_VIEWPORT_WIDTH * 0.84f),
+            fminf(500.0f, WINDOW_HEIGHT - EDITOR_MENU_HEIGHT - 68.0f)
+        };
+        if(build_settings_panel.open) rohr_ui_modal_set(build_settings_bounds);
         if(panel_scroll_mode != viewport_state.mode) {
             panel_scroll_mode = viewport_state.mode;
             panel_scroll_offset = 0.0f;
@@ -4635,10 +4720,19 @@ int main(void) {
                 else if(terminal_menu.changed && terminal_menu.selected_index == 3)
                     terminal_build_operations = !terminal_build_operations;
             }
-            (void)rohr_ui_menu("editor.menu.settings", &settings_label,
+            UIDropdownResult settings_menu = rohr_ui_menu("editor.menu.settings",
+                &settings_label,
                 settings_options, sizeof(settings_options) / sizeof(settings_options[0]),
                 settings_bounds, NULL);
+            if(settings_menu.changed && settings_menu.selected_index == 0 &&
+                    workspace.open) {
+                EditorResult result = editor_build_settings_panel_open(
+                    &build_settings_panel, workspace.directory);
+                if(editor_result_check(result)) editor_result_stderr_print(result);
+            }
         }
+        editor_build_settings_panel_draw(&build_settings_panel,
+            workspace.directory, build_settings_bounds);
         if(close_action != EDITOR_CLOSE_NONE) {
             UIRect dialog = {
                 editor_window_width * 0.5f - 220.0f,
@@ -4919,6 +5013,7 @@ int main(void) {
     editor_history_destroy(&history);
     if(hidden_build_process != NULL) SDL_DestroyProcess(hidden_build_process);
     editor_terminal_panel_destroy(&terminal_panel);
+    editor_build_settings_panel_destroy(&build_settings_panel);
     editor_bulk_panel_destroy(&bulk_panel);
     editor_origin_panel_destroy(&origin_panel);
     rohr_graphics_text_destroy(&stiffness_label);
@@ -5096,6 +5191,7 @@ fail:
     editor_history_destroy(&history);
     if(hidden_build_process != NULL) SDL_DestroyProcess(hidden_build_process);
     editor_terminal_panel_destroy(&terminal_panel);
+    editor_build_settings_panel_destroy(&build_settings_panel);
     editor_bulk_panel_destroy(&bulk_panel);
     editor_origin_panel_destroy(&origin_panel);
     rohr_graphics_text_destroy(&stiffness_label);

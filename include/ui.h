@@ -8,7 +8,7 @@
 #define UI_DEFINITION_NAME_MAX 64
 #define UI_LABEL_MAX 128
 #define UI_FONT_PATH_MAX 512
-#define UI_FIELD_EDIT_MAX 256
+#define UI_FIELD_EDIT_MAX 8192
 #define UI_FIELD_KEY_EVENT_MAX 64
 
 /** Axis-aligned rectangle in logical screen coordinates. */
@@ -197,12 +197,18 @@ ERROR_DECLARE_RESULT_TYPE(UISliderDefinitionResult, UISliderDefinition);
 
 /** Start a UI frame with pointer coordinates in logical screen space. */
 void ui_frame_begin(UIInput input);
+void ui_modal_set(UIRect bounds);
+void ui_modal_controls_begin(void);
+void ui_modal_controls_end(void);
 UIRect ui_component_bounds_get(UIRect bounds, const TextAsset *const *texts,
     size_t text_count, UIComponentConfig config);
 void ui_event_add(const SDL_Event *event);
 void ui_field_event_add(const SDL_Event *event);
 void ui_field_focus_clear(void);
 UIFieldResult ui_field(const char *id, UIFieldBinding binding,
+    TextAsset *display, UIRect bounds, const UIButtonStyle *style);
+/** Draw a wrapping, vertically scrollable multiline string field. */
+UIFieldResult ui_multiline_field(const char *id, UIFieldBinding binding,
     TextAsset *display, UIRect bounds, const UIButtonStyle *style);
 
 /**

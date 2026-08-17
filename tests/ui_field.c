@@ -59,6 +59,43 @@ int main(void) {
     if(!rohr_ui_interaction("primitive", bounds).clicked) return 1;
     rohr_ui_frame_end();
 
+    snprintf(string, sizeof(string), "line");
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f},
+        .primary_button = MOUSE_BUTTON_STATE_PRESSED});
+    (void)rohr_ui_multiline_field("multiline", (UIFieldBinding){
+        .kind = UI_FIELD_STRING, .string = string,
+        .string_capacity = sizeof(string)
+    }, NULL, (UIRect){0.0f, 0.0f, 100.0f, 90.0f}, NULL);
+    rohr_ui_frame_end();
+    key_add(SDLK_RETURN);
+    key_add('x');
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f}});
+    if(!rohr_ui_multiline_field("multiline", (UIFieldBinding){
+            .kind = UI_FIELD_STRING, .string = string,
+            .string_capacity = sizeof(string)
+        }, NULL, (UIRect){0.0f, 0.0f, 100.0f, 90.0f}, NULL).changed ||
+            strcmp(string, "line\nx") != 0) {
+        fprintf(stderr, "multiline field produced '%s'\n", string);
+        return 1;
+    }
+    rohr_ui_frame_end();
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f},
+        .primary_button = MOUSE_BUTTON_STATE_RELEASED});
+    (void)rohr_ui_multiline_field("multiline", (UIFieldBinding){
+        .kind = UI_FIELD_STRING, .string = string,
+        .string_capacity = sizeof(string)
+    }, NULL, (UIRect){0.0f, 0.0f, 100.0f, 90.0f}, NULL);
+    rohr_ui_frame_end();
+
+    rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f},
+        .primary_button = MOUSE_BUTTON_STATE_PRESSED});
+    rohr_ui_modal_set((UIRect){0.0f, 0.0f, 100.0f, 100.0f});
+    if(rohr_ui_button("behind-modal", NULL, bounds, NULL).pressed) return 1;
+    rohr_ui_modal_controls_begin();
+    if(!rohr_ui_button("inside-modal", NULL, bounds, NULL).pressed) return 1;
+    rohr_ui_modal_controls_end();
+    rohr_ui_frame_end();
+
     snprintf(string, sizeof(string), "abcd");
     rohr_ui_frame_begin((UIInput){.pointer = {10.0f, 10.0f},
         .primary_button = MOUSE_BUTTON_STATE_PRESSED});

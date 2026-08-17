@@ -1961,6 +1961,9 @@ float rohr_tools_random_range_float(float min, float max);
 
 /** @brief Starts a UI frame with logical screen-space pointer input. */
 void rohr_ui_frame_begin(UIInput input);
+void rohr_ui_modal_set(UIRect bounds);
+void rohr_ui_modal_controls_begin(void);
+void rohr_ui_modal_controls_end(void);
 /** @brief Applies reusable sizing components to UI bounds. */
 UIRect rohr_ui_component_bounds_get(UIRect bounds, const TextAsset *const *texts,
     size_t text_count, UIComponentConfig config);
@@ -1972,6 +1975,8 @@ void rohr_ui_field_event_add(const SDL_Event *event);
 void rohr_ui_field_focus_clear(void);
 /** Draws and edits a caller-owned string or float field. */
 UIFieldResult rohr_ui_field(const char *id, UIFieldBinding binding,
+    TextAsset *display, UIRect bounds, const UIButtonStyle *style);
+UIFieldResult rohr_ui_multiline_field(const char *id, UIFieldBinding binding,
     TextAsset *display, UIRect bounds, const UIButtonStyle *style);
 
 /**
