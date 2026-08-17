@@ -4637,7 +4637,8 @@ int main(void) {
         (void)rohr_graphics_screen_clip_set(
             0.0f, EDITOR_MENU_HEIGHT, EDITOR_VIEWPORT_WIDTH,
             EDITOR_VIEWPORT_BOTTOM - EDITOR_MENU_HEIGHT);
-        editor_viewport_draw(&project, &viewport_state);
+        editor_viewport_draw(&project, &viewport_state,
+            visual_settings_panel.state.grid_visible);
         rohr_graphics_screen_clip_clear();
         (void)rohr_graphics_screen_clip_set(0.0f, EDITOR_VIEWPORT_BOTTOM,
             EDITOR_VIEWPORT_WIDTH, EDITOR_WINDOW_HEIGHT - EDITOR_VIEWPORT_BOTTOM);
@@ -4760,6 +4761,9 @@ int main(void) {
 
             (void)rohr_graphics_text_value_set(&terminal_label,
                 terminal_panel.visible ? "[x] Terminal" : "[ ] Terminal");
+            (void)rohr_graphics_text_value_set(&grid_label,
+                visual_settings_panel.state.grid_visible ?
+                    "[x] Grid" : "[ ] Grid");
             (void)rohr_graphics_text_value_set(&terminal_visible_label,
                 terminal_panel.visible ? "[x] Visible" : "[ ] Visible");
             (void)rohr_graphics_text_value_set(&terminal_editor_operations_label,
@@ -4930,7 +4934,13 @@ int main(void) {
                     "editor.menu.view", &view_label, view_options,
                 sizeof(view_options) / sizeof(view_options[0]),
                 view_bounds, NULL);
-                if(view_menu.changed && view_menu.selected_index == 2)
+                if(view_menu.changed && view_menu.selected_index == 1) {
+                    EditorResult result =
+                        editor_visual_settings_panel_grid_visible_set(
+                            &visual_settings_panel,
+                            !visual_settings_panel.state.grid_visible);
+                    if(editor_result_check(result)) editor_result_stderr_print(result);
+                } else if(view_menu.changed && view_menu.selected_index == 2)
                     editor_terminal_panel_visible_toggle(&terminal_panel);
             }
             {

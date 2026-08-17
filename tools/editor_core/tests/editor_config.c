@@ -131,7 +131,8 @@ int main(int count, char **program_arguments) {
             .logical_width = 1920,
             .logical_height = 1080,
             .aspect_ratio = "16:9",
-            .window_mode = "windowed"
+            .window_mode = "windowed",
+            .grid_visible = true
         };
         EditorGuiState loaded = {0};
         (void)SDL_RemovePath(state_path);
@@ -141,7 +142,8 @@ int main(int count, char **program_arguments) {
         if(editor_result_check(result) || loaded.logical_width != 1920 ||
                 loaded.logical_height != 1080 ||
                 strcmp(loaded.aspect_ratio, "16:9") != 0 ||
-                strcmp(loaded.window_mode, "windowed") != 0) return 1;
+                strcmp(loaded.window_mode, "windowed") != 0 ||
+                !loaded.grid_visible) return 1;
         (void)SDL_RemovePath(state_path);
     }
     return 0;

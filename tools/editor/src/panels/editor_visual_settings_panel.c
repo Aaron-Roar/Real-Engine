@@ -119,6 +119,15 @@ bool editor_visual_settings_panel_state_set(EditorVisualSettingsPanel *panel,
     return true;
 }
 
+EditorResult editor_visual_settings_panel_grid_visible_set(
+        EditorVisualSettingsPanel *panel, bool visible) {
+    if(panel == NULL || !panel->state_ready) return editor_result_error(
+        EDITOR_ERROR_INVALID_ARGUMENT,
+        "Grid visibility requires initialized editor GUI state");
+    panel->state.grid_visible = visible;
+    return editor_gui_state_save(&panel->state, panel->state_path);
+}
+
 void editor_visual_settings_panel_open(EditorVisualSettingsPanel *panel) {
     if(panel != NULL) panel->open = true;
 }

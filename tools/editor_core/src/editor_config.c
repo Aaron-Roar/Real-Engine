@@ -417,6 +417,14 @@ EditorResult editor_gui_state_load(EditorGuiState *state, const char *path,
                 "window_mode must be a short string");
             lua_pop(lua, 1);
         }
+        if(!editor_result_check(result)) {
+            lua_getfield(lua, root, "grid_visible");
+            if(lua_isboolean(lua, -1))
+                state->grid_visible = lua_toboolean(lua, -1) != 0;
+            else result = editor_config_error(path,
+                "grid_visible must be a boolean");
+            lua_pop(lua, 1);
+        }
         if(!editor_result_check(result) && (state->logical_width <= 0 ||
                 state->logical_height <= 0)) result = editor_config_error(path,
             "logical resolution must be positive");
@@ -440,9 +448,10 @@ EditorResult editor_gui_state_save(const EditorGuiState *state, const char *path
         "Could not write editor GUI state: %s", temporary);
     written = fprintf(file, "-- Managed by Rohr Editor GUI.\nreturn {\n"
         "    logical_width = %d,\n    logical_height = %d,\n"
-        "    aspect_ratio = \"%s\",\n    window_mode = \"%s\",\n}\n",
+        "    aspect_ratio = \"%s\",\n    window_mode = \"%s\",\n"
+        "    grid_visible = %s,\n}\n",
         state->logical_width, state->logical_height, state->aspect_ratio,
-        state->window_mode) > 0;
+        state->window_mode, state->grid_visible ? "true" : "false") > 0;
     closed = fclose(file) == 0;
     if(!written || !closed || !SDL_RenamePath(temporary, path)) {
         (void)SDL_RemovePath(temporary);

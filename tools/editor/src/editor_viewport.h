@@ -136,7 +136,8 @@ bool editor_viewport_auto_shape_update(EditorViewportState *state,
     bool pan_modifier, float wheel_y, bool pointer_consumed);
 void editor_viewport_draw(
     const EditorProject *project,
-    const EditorViewportState *state
+    const EditorViewportState *state,
+    bool grid_visible
 );
 bool editor_viewport_selection_nudge(EditorViewportState *state,
     EditorProject *project, Vec2D screen_delta);

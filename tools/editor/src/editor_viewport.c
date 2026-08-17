@@ -39,6 +39,42 @@ static Position editor_view_screen_to_world(Position screen) {
         (editor_view_origin.y - screen.y) / editor_view_scale};
 }
 
+static void editor_viewport_grid_draw(void) {
+    Position top_left = editor_view_screen_to_world(
+        (Position){0.0f, EDITOR_MENU_HEIGHT});
+    Position bottom_right = editor_view_screen_to_world(
+        (Position){EDITOR_VIEWPORT_WIDTH, EDITOR_VIEWPORT_BOTTOM});
+    float spacing = 50.0f;
+    float screen_spacing = spacing * editor_view_scale;
+    Color line = {58, 65, 78, 150};
+    Color axis = {91, 101, 120, 210};
+
+    while(screen_spacing < 25.0f) {
+        spacing *= 2.0f;
+        screen_spacing *= 2.0f;
+    }
+    while(screen_spacing > 100.0f) {
+        spacing *= 0.5f;
+        screen_spacing *= 0.5f;
+    }
+    for(float x = ceilf(top_left.x / spacing) * spacing;
+            x <= bottom_right.x; x += spacing) {
+        Position screen = editor_view_world_to_screen((Position){x, 0.0f});
+        bool origin = fabsf(x) < spacing * 0.001f;
+        (void)rohr_graphics_screen_rect_draw(screen.x, EDITOR_MENU_HEIGHT,
+            origin ? 2.0f : 1.0f, EDITOR_VIEWPORT_BOTTOM - EDITOR_MENU_HEIGHT,
+            origin ? axis : line);
+    }
+    for(float y = ceilf(bottom_right.y / spacing) * spacing;
+            y <= top_left.y; y += spacing) {
+        Position screen = editor_view_world_to_screen((Position){0.0f, y});
+        bool origin = fabsf(y) < spacing * 0.001f;
+        (void)rohr_graphics_screen_rect_draw(0.0f, screen.y,
+            EDITOR_VIEWPORT_WIDTH, origin ? 2.0f : 1.0f,
+            origin ? axis : line);
+    }
+}
+
 static Position editor_hitbox_vertex_world_get(const EditorObject *object,
     const EditorRigidBody *body, const EditorHitbox *hitbox, uint32_t vertex) {
     float cosine = cosf(body->rotation);
@@ -2332,7 +2368,8 @@ static void editor_viewport_object_draw(const EditorObject *object,
     }
 }
 
-void editor_viewport_draw(const EditorProject *project, const EditorViewportState *state) {
+void editor_viewport_draw(const EditorProject *project,
+        const EditorViewportState *state, bool grid_visible) {
     const EditorObject *selected;
 
     if(project == NULL || state == NULL) return;
@@ -2341,6 +2378,7 @@ void editor_viewport_draw(const EditorProject *project, const EditorViewportStat
         if(project->objects[i].id == project->selected) selected = &project->objects[i];
     }
     editor_view_transform_set(project, state, selected);
+    if(grid_visible) editor_viewport_grid_draw();
     if(state->mode == EDITOR_VIEWPORT_HIERARCHY) {
         for(size_t i = 0; i < project->object_count; i += 1)
             editor_viewport_particle_fills_draw(&project->objects[i]);

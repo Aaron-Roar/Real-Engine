@@ -27,6 +27,8 @@ bool editor_visual_settings_panel_create(EditorVisualSettingsPanel *panel,
     const FontAsset *font);
 bool editor_visual_settings_panel_state_set(EditorVisualSettingsPanel *panel,
     const EditorGuiState *state, const char *path);
+EditorResult editor_visual_settings_panel_grid_visible_set(
+    EditorVisualSettingsPanel *panel, bool visible);
 void editor_visual_settings_panel_open(EditorVisualSettingsPanel *panel);
 void editor_visual_settings_panel_draw(EditorVisualSettingsPanel *panel,
     UIRect bounds);

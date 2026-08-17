@@ -48,6 +48,7 @@ typedef struct EditorGuiState {
     int logical_height;
     char aspect_ratio[16];
     char window_mode[32];
+    bool grid_visible;
 } EditorGuiState;
 
 void editor_config_init(EditorConfig *config);
