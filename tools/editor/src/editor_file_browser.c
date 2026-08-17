@@ -273,6 +273,8 @@ EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
     float left_width;
     float right_x;
     float list_height;
+    float field_y;
+    float action_y;
     if(browser == NULL || !browser->active || field_display == NULL) return result;
     if(browser->refresh_pending) {
         browser->refresh_pending = false;
@@ -283,17 +285,22 @@ EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
     }
     directory_mode = browser->mode == EDITOR_FILE_BROWSER_DIRECTORY ||
         browser->mode == EDITOR_FILE_BROWSER_CREATE_DIRECTORY;
-    dialog = (UIRect){window_width * 0.5f - (directory_mode ? 460.0f : 310.0f),
-        window_height * 0.5f - 270.0f, directory_mode ? 920.0f : 620.0f, 540.0f};
+    dialog = (UIRect){0.0f, 0.0f, directory_mode ? 920.0f : 620.0f,
+        fminf(540.0f, window_height - 58.0f)};
+    dialog.width = fminf(dialog.width, window_width - 28.0f);
+    dialog.x = (window_width - dialog.width) * 0.5f;
+    dialog.y = 34.0f + (window_height - 34.0f - dialog.height) * 0.5f;
     left_width = directory_mode ? (dialog.width - 42.0f) * 0.5f : dialog.width - 28.0f;
     right_x = dialog.x + 28.0f + left_width;
+    list_height = fmaxf(90.0f, dialog.height - 150.0f);
+    field_y = dialog.y + dialog.height - 90.0f;
+    action_y = dialog.y + dialog.height - 50.0f;
     rohr_ui_surface((UIRect){0.0f, 34.0f, window_width, window_height - 34.0f},
         (Color){12, 14, 18, 255});
     rohr_ui_surface(dialog, (Color){42, 47, 58, 255});
     rohr_ui_border(dialog, 2.0f, (Color){8, 9, 12, 255});
     rohr_ui_label(&browser->directory_label, (UIRect){dialog.x + 14.0f, dialog.y + 12.0f,
         dialog.width - 28.0f, 30.0f});
-    list_height = 390.0f;
     browser->scroll_offset = rohr_ui_scroll_region_begin("editor.file_browser.scroll",
         (UIRect){dialog.x + 14.0f, dialog.y + 50.0f, left_width, list_height},
         32.0f * (float)(browser->entry_count + 1), browser->scroll_offset, 38.0f).offset;
@@ -437,19 +444,19 @@ EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
         (void)rohr_ui_field("editor.file_browser.filename",
             (UIFieldBinding){.kind = UI_FIELD_STRING, .string = browser->filename,
                 .string_capacity = sizeof(browser->filename)}, field_display,
-            (UIRect){dialog.x + 14.0f, dialog.y + 450.0f,
+            (UIRect){dialog.x + 14.0f, field_y,
                 dialog.width - 28.0f, 30.0f}, NULL);
     } else if(browser->mode == EDITOR_FILE_BROWSER_CREATE_DIRECTORY) {
         (void)rohr_ui_field("editor.file_browser.directory_name",
             (UIFieldBinding){.kind = UI_FIELD_STRING, .string = browser->filename,
                 .string_capacity = sizeof(browser->filename)}, field_display,
-            (UIRect){dialog.x + 174.0f, dialog.y + 450.0f,
+            (UIRect){dialog.x + 174.0f, field_y,
                 dialog.width - 188.0f, 34.0f}, NULL);
     } else if(browser->mode == EDITOR_FILE_BROWSER_OPEN) {
         (void)rohr_graphics_text_value_set(field_display, browser->filename);
-        rohr_ui_button_disabled((UIRect){dialog.x + 14.0f, dialog.y + 450.0f,
+        rohr_ui_button_disabled((UIRect){dialog.x + 14.0f, field_y,
             dialog.width - 28.0f, 30.0f}, NULL);
-        rohr_ui_label(field_display, (UIRect){dialog.x + 14.0f, dialog.y + 450.0f,
+        rohr_ui_label(field_display, (UIRect){dialog.x + 14.0f, field_y,
             dialog.width - 28.0f, 30.0f});
     }
     if(rohr_ui_button("editor.file_browser.submit",
@@ -457,8 +464,8 @@ EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
                 (browser->mode == EDITOR_FILE_BROWSER_CREATE_DIRECTORY ?
                     create_label : open_label),
             browser->mode == EDITOR_FILE_BROWSER_CREATE_DIRECTORY ?
-                (UIRect){dialog.x + 14.0f, dialog.y + 450.0f, 150.0f, 34.0f} :
-                (UIRect){dialog.x + dialog.width - 274.0f, dialog.y + 490.0f,
+                (UIRect){dialog.x + 14.0f, field_y, 150.0f, 34.0f} :
+                (UIRect){dialog.x + dialog.width - 274.0f, action_y,
                     120.0f, 34.0f}, NULL).clicked &&
             ((browser->mode == EDITOR_FILE_BROWSER_DIRECTORY &&
                 editor_file_browser_directory_path_get(
@@ -476,7 +483,7 @@ EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
         browser->active = false;
     }
     if(rohr_ui_button("editor.file_browser.cancel", cancel_label,
-            (UIRect){dialog.x + dialog.width - 144.0f, dialog.y + 490.0f,
+            (UIRect){dialog.x + dialog.width - 144.0f, action_y,
                 120.0f, 34.0f}, NULL).clicked) {
         result.cancelled = true;
         browser->active = false;

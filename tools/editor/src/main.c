@@ -1936,6 +1936,7 @@ int main(void) {
                 &notification_font) ||
             !editor_terminal_panel_create(&terminal_panel, &font)) goto fail;
     terminal_panel.visible = true;
+    if(!editor_terminal_panel_project_open(&terminal_panel, startup_directory)) goto fail;
     if(!editor_text_create(&font, "#FFFFFFFF", &color_picker_hex_field) ||
             !editor_text_create(&font, "100.0", &color_picker_opacity_field) ||
             !editor_text_create(&font, "Opacity %", &opacity_label)) goto fail;
@@ -1975,10 +1976,8 @@ int main(void) {
                 }
                 continue;
             }
-            bool terminal_consumed = !build_settings_panel.open &&
-                !visual_settings_panel.open &&
-                editor_terminal_panel_event_add(&terminal_panel,
-                    &event, EDITOR_VIEWPORT_WIDTH, EDITOR_VIEWPORT_BOTTOM);
+            bool terminal_consumed = editor_terminal_panel_event_add(&terminal_panel,
+                &event, EDITOR_VIEWPORT_WIDTH, EDITOR_VIEWPORT_BOTTOM);
             if(event.type == SDL_EVENT_MOUSE_WHEEL && !terminal_consumed)
                 viewport_wheel_y += event.wheel.y;
             rohr_ui_event_add(&event);
@@ -2180,7 +2179,7 @@ int main(void) {
                     primary == MOUSE_BUTTON_STATE_UP) {
                 panel_resizing = false;
             }
-            if(!terminal_panel.visible || file_browser.active) {
+            if(!terminal_panel.visible) {
                 terminal_resizing = false;
             } else if(!terminal_resizing && primary == MOUSE_BUTTON_STATE_PRESSED &&
                     pointer.x >= 0.0f && pointer.x < EDITOR_VIEWPORT_WIDTH &&
@@ -2189,7 +2188,13 @@ int main(void) {
             }
             if(terminal_resizing && (primary == MOUSE_BUTTON_STATE_PRESSED ||
                     primary == MOUSE_BUTTON_STATE_DOWN)) {
-                float bottom = fmaxf(EDITOR_MENU_HEIGHT + 100.0f,
+                bool large_overlay = !workspace.open || file_browser.active ||
+                    build_settings_panel.open || visual_settings_panel.open ||
+                    notification_panel.log_open || notification_panel.report_open ||
+                    close_action != EDITOR_CLOSE_NONE || color_picker.open;
+                float minimum_bottom = EDITOR_MENU_HEIGHT +
+                    (large_overlay ? 340.0f : 100.0f);
+                float bottom = fmaxf(minimum_bottom,
                     fminf(pointer.y, EDITOR_ACTION_BAR_TOP - 80.0f));
                 terminal_panel.height = EDITOR_ACTION_BAR_TOP - bottom;
                 EDITOR_VIEWPORT_BOTTOM = bottom;
@@ -2216,7 +2221,7 @@ int main(void) {
             fmaxf(30.0f, EDITOR_VIEWPORT_WIDTH * 0.08f),
             EDITOR_MENU_HEIGHT + 34.0f,
             fmaxf(560.0f, EDITOR_VIEWPORT_WIDTH * 0.84f),
-            fminf(500.0f, EDITOR_WINDOW_HEIGHT - EDITOR_MENU_HEIGHT - 68.0f)
+            fminf(500.0f, EDITOR_VIEWPORT_BOTTOM - EDITOR_MENU_HEIGHT - 68.0f)
         };
         if(build_settings_panel.open || visual_settings_panel.open ||
                 notification_panel.report_open ||
@@ -4746,8 +4751,9 @@ int main(void) {
                 }
             } else if(file_menu.changed && file_menu.selected_index == 3) {
                 if(editor_project_hash_get(&project) == saved_project_hash) {
-                    editor_terminal_panel_project_close(&terminal_panel);
                     editor_workspace_close(&workspace, &project);
+                    (void)editor_terminal_panel_project_open(
+                        &terminal_panel, startup_directory);
                     editor_history_reset(&history);
                     saved_project_hash = editor_project_hash_get(&project);
                     editor_viewport_state_init(&viewport_state);
@@ -4892,7 +4898,8 @@ int main(void) {
         if(close_action != EDITOR_CLOSE_NONE) {
             UIRect dialog = {
                 editor_window_width * 0.5f - 220.0f,
-                EDITOR_WINDOW_HEIGHT * 0.5f - 80.0f,
+                EDITOR_MENU_HEIGHT +
+                    (EDITOR_VIEWPORT_BOTTOM - EDITOR_MENU_HEIGHT) * 0.5f - 80.0f,
                 440.0f,
                 160.0f
             };
@@ -4912,8 +4919,9 @@ int main(void) {
                     if(close_action == EDITOR_CLOSE_PROGRAM) {
                         running = false;
                     } else {
-                        editor_terminal_panel_project_close(&terminal_panel);
                         editor_workspace_close(&workspace, &project);
+                        (void)editor_terminal_panel_project_open(
+                            &terminal_panel, startup_directory);
                         editor_history_reset(&history);
                         saved_project_hash = editor_project_hash_get(&project);
                         editor_viewport_state_init(&viewport_state);
@@ -4928,8 +4936,9 @@ int main(void) {
                 if(close_action == EDITOR_CLOSE_PROGRAM) {
                     running = false;
                 } else {
-                    editor_terminal_panel_project_close(&terminal_panel);
                     editor_workspace_close(&workspace, &project);
+                    (void)editor_terminal_panel_project_open(
+                        &terminal_panel, startup_directory);
                     editor_history_reset(&history);
                     saved_project_hash = editor_project_hash_get(&project);
                     editor_viewport_state_init(&viewport_state);
@@ -4945,9 +4954,11 @@ int main(void) {
         }
         if(!workspace.open && !file_browser.active) {
             UIRect dialog = {editor_window_width * 0.5f - 230.0f,
-                EDITOR_WINDOW_HEIGHT * 0.5f - 90.0f, 460.0f, 180.0f};
+                EDITOR_MENU_HEIGHT +
+                    (EDITOR_VIEWPORT_BOTTOM - EDITOR_MENU_HEIGHT) * 0.5f - 90.0f,
+                460.0f, 180.0f};
             rohr_ui_surface((UIRect){0.0f, EDITOR_MENU_HEIGHT, editor_window_width,
-                EDITOR_WINDOW_HEIGHT - EDITOR_MENU_HEIGHT},
+                EDITOR_VIEWPORT_BOTTOM - EDITOR_MENU_HEIGHT},
                 (Color){12, 14, 18, 238});
             rohr_ui_surface(dialog, (Color){42, 47, 58, 255});
             rohr_ui_border(dialog, 2.0f, (Color){8, 9, 12, 255});
@@ -4970,7 +4981,7 @@ int main(void) {
             EditorFileBrowserResult browser_result = editor_file_browser_draw(
                 &file_browser, &file_browser_field,
                 &save_label, &open_label, &create_project_label, &cancel_label,
-                editor_window_width, EDITOR_WINDOW_HEIGHT);
+                editor_window_width, EDITOR_VIEWPORT_BOTTOM);
             if(browser_result.submitted) {
                 EditorResult load_result = editor_result_value(true);
                 bool opened;

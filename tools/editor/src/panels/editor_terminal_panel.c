@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#define EDITOR_TERMINAL_DEFAULT_HEIGHT 220.0f
 #define EDITOR_TERMINAL_DIVIDER_HEIGHT 5.0f
 #define EDITOR_TERMINAL_LINE_HEIGHT 17.0f
 #define EDITOR_TERMINAL_COMMAND_MARKER "__ROHR_BUILD_EXIT__"
@@ -41,7 +40,7 @@ bool editor_terminal_panel_create(EditorTerminalPanel *panel, FontAsset *font) {
     int glyph_advance = 0;
     if(panel == NULL || font == NULL) return false;
     memset(panel, 0, sizeof(*panel));
-    panel->height = EDITOR_TERMINAL_DEFAULT_HEIGHT;
+    panel->height = (EDITOR_ACTION_BAR_TOP - EDITOR_MENU_HEIGHT) * 0.125f;
     if(font->font == NULL || !TTF_GetGlyphMetrics(font->font, 'M', NULL, NULL,
             NULL, NULL, &glyph_advance) || glyph_advance <= 0) return false;
     panel->cell_width = (float)glyph_advance;
