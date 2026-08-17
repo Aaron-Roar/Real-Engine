@@ -1216,6 +1216,13 @@ bool rohr_graphics_screen_rect_draw(float x, float y, float width, float height,
 Scale rohr_graphics_render_output_size_get(void);
 /** Changes the logical screen size while preserving aspect-correct presentation. */
 bool rohr_graphics_logical_size_set(int width, int height);
+/** Changes the logical aspect ratio while preserving the logical height. */
+bool rohr_graphics_aspect_ratio_set(int width, int height);
+/** Matches the logical aspect ratio to the render output when enabled. */
+bool rohr_graphics_aspect_ratio_auto_set(bool enabled);
+GraphicsWindowPresentationConfig rohr_graphics_window_presentation_default_get(void);
+EngineResult rohr_graphics_window_presentation_set(
+    GraphicsWindowPresentationConfig config);
 /** Clips subsequent screen-space drawing until the clip is cleared. */
 bool rohr_graphics_screen_clip_set(float x, float y, float width, float height);
 /** Clears the active screen-space drawing clip. */

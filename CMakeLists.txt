@@ -108,6 +108,7 @@ set(ROHR_ENGINE_SOURCES
     src/entity/entity_components.c
     src/entity/entity_pair_set.c
     src/graphics/graphics.c
+    src/graphics/window_presentation.c
     src/graphics/ui.c
     src/input/controller.c
     src/math/math2d.c

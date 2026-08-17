@@ -8,6 +8,7 @@
 
 float editor_viewport_width = WINDOW_WIDTH * 0.8f;
 float editor_window_width = WINDOW_WIDTH;
+float editor_window_height = WINDOW_HEIGHT;
 float editor_viewport_bottom = WINDOW_HEIGHT;
 
 static bool navigation_mode_open_check(EditorProject *project,

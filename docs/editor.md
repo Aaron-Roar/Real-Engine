@@ -128,6 +128,13 @@ never written. A successful Apply saves the overrides and immediately starts
 the configured configure-and-compile sequence, so a separate test-command
 action is unnecessary.
 
+The **Settings > Visuals** menu controls window mode, logical aspect ratio, and
+resolution. Windowed is the default; borderless fullscreen and display-mode
+fullscreen are available from the Window Mode dropdown.
+The editor defaults to **Auto**, matching the current window or fullscreen
+output without letterboxing. Fixed 16:9, 16:10, 4:3, and 21:9 options are also
+available at 720p, 1080p, and 1440p logical heights.
+
 The bottom-left **Notification Log** button is always available. Up to three
 new notifications appear above it, with a fourth replacing the oldest visible
 notification. The log retains the latest 100 notifications independently of

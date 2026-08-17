@@ -47,6 +47,8 @@ typedef enum EngineError {
     ERROR_ENGINE_GRAPHICS_NOT_INITIALIZED,
     /** SDL could not apply the requested VSync mode. */
     ERROR_ENGINE_GRAPHICS_VSYNC_SET_FAILED,
+    /** SDL could not apply the requested window presentation. */
+    ERROR_ENGINE_GRAPHICS_WINDOW_PRESENTATION_FAILED,
     /** A frame limit was negative. */
     ERROR_ENGINE_INVALID_FRAME_LIMIT,
     /** An operation would exceed MAX_ENTITIES. */

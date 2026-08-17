@@ -10,6 +10,7 @@
 
 float editor_viewport_width = 1024.0f;
 float editor_window_width = 1280.0f;
+float editor_window_height = 720.0f;
 float editor_viewport_bottom = 720.0f;
 
 static EditorHistory *callback_history;

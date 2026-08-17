@@ -273,6 +273,10 @@ void rohr_graphics_background_draw(Color color) { graphics_background_draw(color
 bool rohr_graphics_screen_rect_draw(float x, float y, float width, float height, Color color) { return graphics_screen_rect_draw(x, y, width, height, color); }
 Scale rohr_graphics_render_output_size_get(void) { return graphics_render_output_size_get(); }
 bool rohr_graphics_logical_size_set(int width, int height) { return graphics_logical_size_set(width, height); }
+bool rohr_graphics_aspect_ratio_set(int width, int height) { return graphics_aspect_ratio_set(width, height); }
+bool rohr_graphics_aspect_ratio_auto_set(bool enabled) { return graphics_aspect_ratio_auto_set(enabled); }
+GraphicsWindowPresentationConfig rohr_graphics_window_presentation_default_get(void) { return graphics_window_presentation_default_get(); }
+EngineResult rohr_graphics_window_presentation_set(GraphicsWindowPresentationConfig config) { return graphics_window_presentation_set(config); }
 bool rohr_graphics_screen_clip_set(float x, float y, float width, float height) { return graphics_screen_clip_set(x, y, width, height); }
 void rohr_graphics_screen_clip_clear(void) { graphics_screen_clip_clear(); }
 bool rohr_graphics_screen_quad_draw(Position center, float width, float height, float angle, Color color) { return graphics_screen_quad_draw(center, width, height, angle, color); }

@@ -16,6 +16,7 @@
 #include "panels/editor_generation_report.h"
 #include "panels/editor_notification_panel.h"
 #include "panels/editor_terminal_panel.h"
+#include "panels/editor_visual_settings_panel.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -72,6 +73,7 @@ typedef struct EditorColorPicker {
 
 float editor_viewport_width = WINDOW_WIDTH * 0.8f;
 float editor_window_width = WINDOW_WIDTH;
+float editor_window_height = WINDOW_HEIGHT;
 float editor_viewport_bottom = WINDOW_HEIGHT;
 
 static EditorTerminalPanel *editor_operation_terminal;
@@ -410,12 +412,11 @@ static void editor_window_layout_sync(void) {
     float logical_width;
 
     if(output.x <= 0.0f || output.y <= 0.0f) return;
-    logical_width = roundf(WINDOW_HEIGHT * output.x / output.y);
+    logical_width = roundf(EDITOR_WINDOW_HEIGHT * output.x / output.y);
     if(logical_width < EDITOR_VIEWPORT_MIN_WIDTH + EDITOR_TOOLS_MIN_WIDTH) {
         logical_width = EDITOR_VIEWPORT_MIN_WIDTH + EDITOR_TOOLS_MIN_WIDTH;
     }
     if(logical_width == editor_window_width) return;
-    if(!rohr_graphics_logical_size_set((int)logical_width, WINDOW_HEIGHT)) return;
     editor_window_width = logical_width;
     editor_viewport_width = fminf(editor_viewport_width,
         editor_window_width - EDITOR_TOOLS_MIN_WIDTH);
@@ -442,7 +443,7 @@ static uint64_t editor_project_hash_get(const EditorProject *project) {
 static float editor_panel_content_height_get(const EditorProject *project,
     const EditorViewportState *state) {
     const EditorObject *object = NULL;
-    float height = WINDOW_HEIGHT;
+    float height = EDITOR_WINDOW_HEIGHT;
 
     if(project == NULL || state == NULL) return height;
     for(size_t i = 0; i < project->object_count; i += 1) {
@@ -1683,6 +1684,7 @@ int main(void) {
     EditorOriginPanel origin_panel = {0};
     EditorBulkPanel bulk_panel = {0};
     EditorBuildSettingsPanel build_settings_panel = {0};
+    EditorVisualSettingsPanel visual_settings_panel = {0};
     EditorNotificationPanel notification_panel = {0};
     EditorTerminalPanel terminal_panel = {0};
     SDL_Process *hidden_build_process = NULL;
@@ -1743,13 +1745,14 @@ int main(void) {
     if(!editor_use_executable_directory() ||
             !editor_result_ok(rohr_engine_init()) ||
             !editor_result_ok(rohr_graphics_start())) goto fail;
+    if(!rohr_graphics_aspect_ratio_auto_set(true)) goto fail;
     editor_window_layout_sync();
     {
         ViewportConfig config = rohr_viewport_config_default_get();
         ViewportIdResult result;
 
         config.rectangle = (ViewportRectangle){
-            0.0f, 0.0f, EDITOR_VIEWPORT_WIDTH, WINDOW_HEIGHT
+            0.0f, 0.0f, EDITOR_VIEWPORT_WIDTH, EDITOR_WINDOW_HEIGHT
         };
         result = rohr_viewport_create(config);
         if(rohr_error_check(result)) goto fail;
@@ -1904,6 +1907,7 @@ int main(void) {
             !editor_origin_panel_create(&origin_panel, &font) ||
             !editor_bulk_panel_create(&bulk_panel, &font) ||
             !editor_build_settings_panel_create(&build_settings_panel, &font) ||
+            !editor_visual_settings_panel_create(&visual_settings_panel, &font) ||
             !editor_notification_panel_create(&notification_panel, &font,
                 &notification_font) ||
             !editor_terminal_panel_create(&terminal_panel, &font)) goto fail;
@@ -1934,7 +1938,8 @@ int main(void) {
         rohr_controller_key_states_update(&keyboard);
         rohr_controller_mouse_states_update(&mouse);
         while((event = rohr_engine_event_poll()).type != 0) {
-            EditorHistoryShortcutResult shortcut = build_settings_panel.open ?
+            EditorHistoryShortcutResult shortcut = build_settings_panel.open ||
+                visual_settings_panel.open ?
                 (EditorHistoryShortcutResult){0} :
                 editor_history_shortcut_handle(&event, workspace.open, &history);
             if(shortcut.consumed) {
@@ -1947,6 +1952,7 @@ int main(void) {
                 continue;
             }
             bool terminal_consumed = !build_settings_panel.open &&
+                !visual_settings_panel.open &&
                 editor_terminal_panel_event_add(&terminal_panel,
                     &event, EDITOR_VIEWPORT_WIDTH, EDITOR_VIEWPORT_BOTTOM);
             if(event.type == SDL_EVENT_MOUSE_WHEEL && !terminal_consumed)
@@ -2020,6 +2026,9 @@ int main(void) {
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             build_settings_panel.open = false;
             rohr_ui_field_focus_clear();
+        } else if(visual_settings_panel.open &&
+                rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
+            visual_settings_panel.open = false;
         } else if(file_browser.active &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             if(!editor_file_browser_selection_clear(&file_browser)) {
@@ -2053,7 +2062,8 @@ int main(void) {
                 viewport_state.selection = EDITOR_SELECTION_NONE;
             }
         }
-        if(workspace.open && !build_settings_panel.open && !field_editing &&
+        if(workspace.open && !build_settings_panel.open &&
+                !visual_settings_panel.open && !field_editing &&
                 !color_picker.open &&
                 !editor_terminal_panel_focused_check(&terminal_panel) &&
                 !file_browser.active &&
@@ -2062,7 +2072,8 @@ int main(void) {
                 rohr_controller_key_pressed_get(&keyboard, SDLK_DELETE)) {
             (void)editor_selected_delete(&project, &viewport_state);
         }
-        if(workspace.open && !build_settings_panel.open && !field_editing &&
+        if(workspace.open && !build_settings_panel.open &&
+                !visual_settings_panel.open && !field_editing &&
                 !color_picker.open &&
                 !editor_terminal_panel_focused_check(&terminal_panel) &&
                 !file_browser.active &&
@@ -2113,9 +2124,9 @@ int main(void) {
                     UIRect focused;
                     if(rohr_ui_navigation_focus_bounds_get(&focused)) {
                         if(focused.y < 8.0f) panel_scroll_offset += focused.y - 8.0f;
-                        if(focused.y + focused.height > WINDOW_HEIGHT - 8.0f) {
+                        if(focused.y + focused.height > EDITOR_WINDOW_HEIGHT - 8.0f) {
                             panel_scroll_offset += focused.y + focused.height -
-                                (WINDOW_HEIGHT - 8.0f);
+                                (EDITOR_WINDOW_HEIGHT - 8.0f);
                         }
                     }
                 }
@@ -2128,7 +2139,8 @@ int main(void) {
             Position pointer = rohr_graphics_mouse_screen_position_get();
             MouseButtonState primary = mouse.button_states[MOUSE_BUTTON_LEFT];
 
-            if(file_browser.active || build_settings_panel.open) {
+            if(file_browser.active || build_settings_panel.open ||
+                    visual_settings_panel.open) {
                 panel_resizing = false;
             } else if(!panel_resizing && primary == MOUSE_BUTTON_STATE_PRESSED &&
                     fabsf(pointer.x - EDITOR_VIEWPORT_WIDTH) <=
@@ -2167,11 +2179,11 @@ int main(void) {
             0.0f, 0.0f, EDITOR_VIEWPORT_WIDTH, EDITOR_VIEWPORT_BOTTOM,
             (Color){25, 29, 37, 255});
         (void)rohr_graphics_screen_rect_draw(
-            EDITOR_VIEWPORT_WIDTH, 0.0f, EDITOR_TOOLS_WIDTH, WINDOW_HEIGHT,
+            EDITOR_VIEWPORT_WIDTH, 0.0f, EDITOR_TOOLS_WIDTH, EDITOR_WINDOW_HEIGHT,
             (Color){38, 43, 53, 255});
 
         (void)rohr_graphics_screen_clip_set(
-            EDITOR_VIEWPORT_WIDTH, 0.0f, EDITOR_TOOLS_WIDTH, WINDOW_HEIGHT);
+            EDITOR_VIEWPORT_WIDTH, 0.0f, EDITOR_TOOLS_WIDTH, EDITOR_WINDOW_HEIGHT);
         rohr_ui_frame_begin((UIInput){
             .pointer = rohr_graphics_mouse_screen_position_get(),
             .primary_button = mouse.button_states[MOUSE_BUTTON_LEFT]
@@ -2180,9 +2192,10 @@ int main(void) {
             fmaxf(30.0f, EDITOR_VIEWPORT_WIDTH * 0.08f),
             EDITOR_MENU_HEIGHT + 34.0f,
             fmaxf(560.0f, EDITOR_VIEWPORT_WIDTH * 0.84f),
-            fminf(500.0f, WINDOW_HEIGHT - EDITOR_MENU_HEIGHT - 68.0f)
+            fminf(500.0f, EDITOR_WINDOW_HEIGHT - EDITOR_MENU_HEIGHT - 68.0f)
         };
-        if(build_settings_panel.open || notification_panel.report_open ||
+        if(build_settings_panel.open || visual_settings_panel.open ||
+                notification_panel.report_open ||
                 notification_panel.log_open)
             rohr_ui_modal_set(build_settings_bounds);
         if(panel_scroll_mode != viewport_state.mode) {
@@ -2193,7 +2206,7 @@ int main(void) {
         }
         panel_scroll_offset = rohr_ui_scroll_region_begin("editor.tools.scroll",
             (UIRect){EDITOR_VIEWPORT_WIDTH, EDITOR_MENU_HEIGHT,
-                EDITOR_TOOLS_WIDTH, WINDOW_HEIGHT - EDITOR_MENU_HEIGHT},
+                EDITOR_TOOLS_WIDTH, EDITOR_WINDOW_HEIGHT - EDITOR_MENU_HEIGHT},
             fmaxf(editor_panel_content_height_get(&project, &viewport_state),
                 editor_bulk_panel_content_height_get(&viewport_state)),
             panel_scroll_offset, 42.0f).offset;
@@ -4508,7 +4521,7 @@ int main(void) {
         editor_viewport_draw(&project, &viewport_state);
         rohr_graphics_screen_clip_clear();
         (void)rohr_graphics_screen_clip_set(0.0f, EDITOR_VIEWPORT_BOTTOM,
-            EDITOR_VIEWPORT_WIDTH, WINDOW_HEIGHT - EDITOR_VIEWPORT_BOTTOM);
+            EDITOR_VIEWPORT_WIDTH, EDITOR_WINDOW_HEIGHT - EDITOR_VIEWPORT_BOTTOM);
         editor_terminal_panel_draw(&terminal_panel, EDITOR_VIEWPORT_WIDTH,
             EDITOR_VIEWPORT_BOTTOM);
         rohr_graphics_screen_clip_clear();
@@ -4530,7 +4543,7 @@ int main(void) {
                 viewport_context_open = true;
                 viewport_context_position = (Position){
                     fminf(pointer.x, EDITOR_VIEWPORT_WIDTH - 150.0f),
-                    fminf(pointer.y, WINDOW_HEIGHT - 104.0f)
+                    fminf(pointer.y, EDITOR_WINDOW_HEIGHT - 104.0f)
                 };
             }
             context_bounds = (UIRect){viewport_context_position.x,
@@ -4589,7 +4602,7 @@ int main(void) {
             };
             const TextAsset *edit_options[] = {&undo_label, &redo_label};
             const TextAsset *settings_options[] = {
-                &preferences_label
+                &preferences_label, &visual_settings_panel.menu_label
             };
             const TextAsset *file_texts[] = {
                 &file_label, &new_label, &open_label, &save_label, &close_label,
@@ -4607,7 +4620,8 @@ int main(void) {
                 &terminal_editor_operations_label, &terminal_generated_code_label,
                 &terminal_build_operations_label
             };
-            const TextAsset *settings_texts[] = {&settings_label, &preferences_label};
+            const TextAsset *settings_texts[] = {&settings_label, &preferences_label,
+                &visual_settings_panel.menu_label};
             UIComponentConfig menu_components = {
                 .components = UI_COMPONENT_SIZE_TO_TEXT,
                 .text_padding_x = 12.0f,
@@ -4793,11 +4807,18 @@ int main(void) {
                 EditorResult result = editor_build_settings_panel_open(
                     &build_settings_panel, workspace.directory);
                 if(editor_result_check(result)) editor_result_stderr_print(result);
+            } else if(settings_menu.changed && settings_menu.selected_index == 1) {
+                editor_visual_settings_panel_open(&visual_settings_panel);
             }
         }
-        if(!notification_panel.report_open && !notification_panel.log_open)
+        if(!notification_panel.report_open && !notification_panel.log_open &&
+                !visual_settings_panel.open)
             editor_build_settings_panel_draw(&build_settings_panel,
                 &notification_panel, workspace.directory, build_settings_bounds);
+        if(!notification_panel.report_open && !notification_panel.log_open &&
+                !build_settings_panel.open)
+            editor_visual_settings_panel_draw(&visual_settings_panel,
+                build_settings_bounds);
         if(build_settings_panel.build_requested) {
             build_settings_panel.build_requested = false;
             if(!editor_cmake_compile_start(&terminal_panel,
@@ -4810,7 +4831,8 @@ int main(void) {
                     "Lua error:\nNo Lua runtime error.");
             }
         }
-        editor_notification_panel_toast_draw(&notification_panel, WINDOW_HEIGHT);
+        editor_notification_panel_toast_draw(&notification_panel,
+            EDITOR_WINDOW_HEIGHT);
         editor_notification_panel_log_draw(&notification_panel,
             build_settings_bounds);
         editor_notification_panel_report_draw(&notification_panel,
@@ -4818,7 +4840,7 @@ int main(void) {
         if(close_action != EDITOR_CLOSE_NONE) {
             UIRect dialog = {
                 editor_window_width * 0.5f - 220.0f,
-                WINDOW_HEIGHT * 0.5f - 80.0f,
+                EDITOR_WINDOW_HEIGHT * 0.5f - 80.0f,
                 440.0f,
                 160.0f
             };
@@ -4871,9 +4893,10 @@ int main(void) {
         }
         if(!workspace.open && !file_browser.active) {
             UIRect dialog = {editor_window_width * 0.5f - 230.0f,
-                WINDOW_HEIGHT * 0.5f - 90.0f, 460.0f, 180.0f};
+                EDITOR_WINDOW_HEIGHT * 0.5f - 90.0f, 460.0f, 180.0f};
             rohr_ui_surface((UIRect){0.0f, EDITOR_MENU_HEIGHT, editor_window_width,
-                WINDOW_HEIGHT - EDITOR_MENU_HEIGHT}, (Color){12, 14, 18, 238});
+                EDITOR_WINDOW_HEIGHT - EDITOR_MENU_HEIGHT},
+                (Color){12, 14, 18, 238});
             rohr_ui_surface(dialog, (Color){42, 47, 58, 255});
             rohr_ui_border(dialog, 2.0f, (Color){8, 9, 12, 255});
             if(rohr_ui_button("editor.start.new", &new_label,
@@ -4895,7 +4918,7 @@ int main(void) {
             EditorFileBrowserResult browser_result = editor_file_browser_draw(
                 &file_browser, &file_browser_field,
                 &save_label, &open_label, &create_project_label, &cancel_label,
-                editor_window_width, WINDOW_HEIGHT);
+                editor_window_width, EDITOR_WINDOW_HEIGHT);
             if(browser_result.submitted) {
                 EditorResult load_result = editor_result_value(true);
                 bool opened;
@@ -5081,7 +5104,7 @@ int main(void) {
         if(!file_browser.active) {
             (void)rohr_graphics_screen_rect_draw(
                 EDITOR_VIEWPORT_WIDTH - 1.0f, EDITOR_MENU_HEIGHT, 3.0f,
-                WINDOW_HEIGHT - EDITOR_MENU_HEIGHT,
+                EDITOR_WINDOW_HEIGHT - EDITOR_MENU_HEIGHT,
                 (Color){75, 84, 100, 255});
         }
         rohr_graphics_show();
@@ -5096,6 +5119,7 @@ int main(void) {
     if(hidden_build_process != NULL) SDL_DestroyProcess(hidden_build_process);
     editor_terminal_panel_destroy(&terminal_panel);
     editor_build_settings_panel_destroy(&build_settings_panel);
+    editor_visual_settings_panel_destroy(&visual_settings_panel);
     editor_notification_panel_destroy(&notification_panel);
     editor_bulk_panel_destroy(&bulk_panel);
     editor_origin_panel_destroy(&origin_panel);
@@ -5276,6 +5300,7 @@ fail:
     if(hidden_build_process != NULL) SDL_DestroyProcess(hidden_build_process);
     editor_terminal_panel_destroy(&terminal_panel);
     editor_build_settings_panel_destroy(&build_settings_panel);
+    editor_visual_settings_panel_destroy(&visual_settings_panel);
     editor_notification_panel_destroy(&notification_panel);
     editor_bulk_panel_destroy(&bulk_panel);
     editor_origin_panel_destroy(&origin_panel);

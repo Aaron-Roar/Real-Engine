@@ -5,6 +5,7 @@
 #include "systems.h"
 #include "physics.h"
 #include "core/platform_process.h"
+#include "window_presentation.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -18,6 +19,9 @@ static Camera camera = {0};
 static bool graphics_vsync_enabled = true;
 static int graphics_frame_limit = 0;
 static Uint64 graphics_frame_start_ns = 0;
+static int graphics_logical_width = WINDOW_WIDTH;
+static int graphics_logical_height = WINDOW_HEIGHT;
+static bool graphics_aspect_ratio_auto = false;
 
 #define GRAPHICS_FRAME_LIMIT_FALLBACK 120
 #define GRAPHICS_NANOSECONDS_PER_SECOND UINT64_C(1000000000)
@@ -1326,8 +1330,52 @@ Scale graphics_render_output_size_get(void) {
 
 bool graphics_logical_size_set(int width, int height) {
     if(sdl_renderer == NULL || width <= 0 || height <= 0) return false;
-    return SDL_SetRenderLogicalPresentation(sdl_renderer, width, height,
-        SDL_LOGICAL_PRESENTATION_LETTERBOX);
+    if(!SDL_SetRenderLogicalPresentation(sdl_renderer, width, height,
+            SDL_LOGICAL_PRESENTATION_LETTERBOX)) return false;
+    graphics_logical_width = width;
+    graphics_logical_height = height;
+    graphics_aspect_ratio_auto = false;
+    return true;
+}
+
+bool graphics_aspect_ratio_set(int width, int height) {
+    int logical_width;
+    if(sdl_renderer == NULL || width <= 0 || height <= 0) return false;
+    logical_width = (int)roundf((float)graphics_logical_height *
+        (float)width / (float)height);
+    return graphics_logical_size_set(logical_width, graphics_logical_height);
+}
+
+bool graphics_aspect_ratio_auto_set(bool enabled) {
+    if(sdl_renderer == NULL) return false;
+    graphics_aspect_ratio_auto = enabled;
+    return true;
+}
+
+GraphicsWindowPresentationConfig graphics_window_presentation_default_get(void) {
+    return (GraphicsWindowPresentationConfig){
+        .mode = GRAPHICS_WINDOW_MODE_WINDOWED,
+        .window_width = WINDOW_WIDTH,
+        .window_height = WINDOW_HEIGHT,
+        .logical_width = WINDOW_WIDTH,
+        .logical_height = WINDOW_HEIGHT,
+        .aspect_ratio_auto = false
+    };
+}
+
+EngineResult graphics_window_presentation_set(
+        GraphicsWindowPresentationConfig config) {
+    EngineResult result;
+    if(sdl_renderer == NULL || sdl_window == NULL)
+        return error_result_error(ERROR_ENGINE_GRAPHICS_NOT_INITIALIZED);
+    if(config.logical_width <= 0 || config.logical_height <= 0)
+        return error_result_error(ERROR_ENGINE_GRAPHICS_WINDOW_PRESENTATION_FAILED);
+    result = graphics_window_presentation_apply(sdl_window, config);
+    if(error_check(result)) return result;
+    if(!graphics_logical_size_set(config.logical_width, config.logical_height))
+        return error_result_error(ERROR_ENGINE_GRAPHICS_WINDOW_PRESENTATION_FAILED);
+    graphics_aspect_ratio_auto = config.aspect_ratio_auto;
+    return error_result_value(true);
 }
 
 Position graphics_mouse_screen_position_get(void) {
@@ -1376,6 +1424,9 @@ EngineResult graphics_start(void) {
         WINDOW_HEIGHT,
         SDL_LOGICAL_PRESENTATION_LETTERBOX
     );
+    graphics_logical_width = WINDOW_WIDTH;
+    graphics_logical_height = WINDOW_HEIGHT;
+    graphics_aspect_ratio_auto = false;
     graphics_vsync_enabled = SDL_SetRenderVSync(sdl_renderer, 1);
     graphics_frame_limit = 0;
     graphics_frame_start_ns = SDL_GetTicksNS();
@@ -1452,6 +1503,15 @@ bool graphics_events_poll(SDL_Event *event) {
 }
 
 void graphics_background_draw(Color color) {
+    if(graphics_aspect_ratio_auto) {
+        Scale output = graphics_render_output_size_get();
+        int width = output.y > 0.0f ? (int)roundf(
+            (float)graphics_logical_height * output.x / output.y) : 0;
+        if(width > 0 && width != graphics_logical_width &&
+                SDL_SetRenderLogicalPresentation(sdl_renderer, width,
+                    graphics_logical_height, SDL_LOGICAL_PRESENTATION_LETTERBOX))
+            graphics_logical_width = width;
+    }
     /* as you can see from this, rendering draws over whatever was drawn before it. */
     SDL_SetRenderDrawColor(sdl_renderer, color.red, color.green, color.blue, color.alpha);
     SDL_RenderClear(sdl_renderer);  /* start with a blank canvas. */

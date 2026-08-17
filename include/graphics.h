@@ -23,6 +23,21 @@
 #define RECORDING_WIDTH  WINDOW_WIDTH
 #define RECORDING_HEIGHT WINDOW_HEIGHT
 
+typedef enum GraphicsWindowMode {
+    GRAPHICS_WINDOW_MODE_WINDOWED,
+    GRAPHICS_WINDOW_MODE_BORDERLESS_FULLSCREEN,
+    GRAPHICS_WINDOW_MODE_FULLSCREEN
+} GraphicsWindowMode;
+
+typedef struct GraphicsWindowPresentationConfig {
+    GraphicsWindowMode mode;
+    int window_width;
+    int window_height;
+    int logical_width;
+    int logical_height;
+    bool aspect_ratio_auto;
+} GraphicsWindowPresentationConfig;
+
 /** 2D scale factor for textures and sprites. */
 typedef struct {
     /** Horizontal scale. */
@@ -431,6 +446,11 @@ Position graphics_screen_to_world_get(Position screen);
 Position graphics_window_to_screen_get(Position window);
 Scale graphics_render_output_size_get(void);
 bool graphics_logical_size_set(int width, int height);
+bool graphics_aspect_ratio_set(int width, int height);
+bool graphics_aspect_ratio_auto_set(bool enabled);
+GraphicsWindowPresentationConfig graphics_window_presentation_default_get(void);
+EngineResult graphics_window_presentation_set(
+    GraphicsWindowPresentationConfig config);
 
 /** Get the mouse position in logical screen coordinates. */
 Position graphics_mouse_screen_position_get(void);

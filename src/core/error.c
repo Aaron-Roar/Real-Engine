@@ -49,6 +49,8 @@ const char *error_default_message_get(EngineError error) {
             return "graphics renderer is not initialized";
         case ERROR_ENGINE_GRAPHICS_VSYNC_SET_FAILED:
             return "graphics VSync mode could not be applied";
+        case ERROR_ENGINE_GRAPHICS_WINDOW_PRESENTATION_FAILED:
+            return "graphics window presentation could not be applied";
         case ERROR_ENGINE_INVALID_FRAME_LIMIT:
             return "frame limit cannot be negative";
         case ERROR_ENGINE_MAX_ENTITIES_EXCEEDED:

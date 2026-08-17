@@ -2358,6 +2358,44 @@ bool rohr_graphics_logical_size_set(int width, int height);
 ```
 
  Changes the logical screen size while preserving aspect-correct presentation.
+Calling this disables automatic aspect-ratio matching. If an application does
+not configure either setting, Rohr uses the fixed 1280x720 default.
+
+### `rohr_graphics_aspect_ratio_set`
+
+```c
+bool rohr_graphics_aspect_ratio_set(int width, int height);
+```
+
+Changes the logical aspect ratio while preserving the current logical height.
+For example, `(16, 10)` produces a 16:10 logical canvas. This disables automatic
+aspect-ratio matching.
+
+### `rohr_graphics_aspect_ratio_auto_set`
+
+```c
+bool rohr_graphics_aspect_ratio_auto_set(bool enabled);
+```
+
+When enabled, matches the logical width to the current renderer output while
+preserving logical height. This avoids letterboxing as a resizable window or
+fullscreen output changes shape.
+
+### `rohr_graphics_window_presentation_default_get`
+
+Returns a 1280x720 windowed presentation configuration.
+
+### `rohr_graphics_window_presentation_set`
+
+```c
+EngineResult rohr_graphics_window_presentation_set(
+    GraphicsWindowPresentationConfig config);
+```
+
+Applies window mode, physical resolution, logical resolution, and automatic
+aspect matching as one transaction. Modes are windowed, borderless fullscreen,
+and display-mode fullscreen. Fullscreen selects the closest display mode to the
+requested physical resolution.
 
 ### `rohr_graphics_screen_clip_set`
 

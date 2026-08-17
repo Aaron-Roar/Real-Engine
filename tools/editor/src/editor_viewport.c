@@ -211,7 +211,7 @@ static void editor_triangle_filled_draw(Position a, Position b, Position c, Colo
     float minimum_y = fminf(points[0].y, fminf(points[1].y, points[2].y));
     float maximum_y = fmaxf(points[0].y, fmaxf(points[1].y, points[2].y));
     int first_row = (int)floorf(fmaxf(minimum_y, EDITOR_MENU_HEIGHT));
-    int last_row = (int)ceilf(fminf(maximum_y, WINDOW_HEIGHT - 1.0f));
+    int last_row = (int)ceilf(fminf(maximum_y, EDITOR_WINDOW_HEIGHT - 1.0f));
 
     for(int row = first_row; row <= last_row; row += 1) {
         float scan_y = (float)row + 0.5f;
@@ -284,7 +284,7 @@ static void editor_hitbox_filled_draw(const EditorObject *object,
     }
 
     int first_row = (int)floorf(fmaxf(minimum_y, EDITOR_MENU_HEIGHT));
-    int last_row = (int)ceilf(fminf(maximum_y, WINDOW_HEIGHT - 1.0f));
+    int last_row = (int)ceilf(fminf(maximum_y, EDITOR_WINDOW_HEIGHT - 1.0f));
     for(int row = first_row; row <= last_row; row += 1) {
         float scan_y = (float)row + 0.5f;
         float intersections[EDITOR_HITBOX_VERTEX_MAX];
@@ -338,7 +338,8 @@ static void editor_circle_filled_draw(Position center, float radius, Color color
     Position screen = editor_view_world_to_screen(center);
     float screen_radius = radius * editor_view_scale;
     int first_row = (int)floorf(fmaxf(screen.y - screen_radius, EDITOR_MENU_HEIGHT));
-    int last_row = (int)ceilf(fminf(screen.y + screen_radius, WINDOW_HEIGHT - 1.0f));
+    int last_row = (int)ceilf(fminf(screen.y + screen_radius,
+        EDITOR_WINDOW_HEIGHT - 1.0f));
 
     if(screen_radius <= 0.0f) return;
     for(int row = first_row; row <= last_row; row += 1) {
