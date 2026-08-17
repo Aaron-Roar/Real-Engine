@@ -77,29 +77,49 @@ The SDK provides `share/rohr/editor.lua`. New projects receive a portable
 2. Project shared `project` setting.
 3. SDK `cli` override.
 4. SDK shared `project` setting.
-5. Built-in CMake command.
+
+The SDK shared setting is the final configured default.
 
 Commands are argument arrays rather than shell strings. This preserves paths
 containing spaces and does not invoke a shell:
 
 ```lua
 return {
-    project = {
-        configure = { "cmake", "-S", "{project}", "-B", "{build}" },
-        compile = { "cmake", "--build", "{build}" },
+    editor = {
+        config_path_override = nil,
+        gui_state_path_override = nil,
     },
 
-    cli = {
-        configure = nil,
-        compile = nil,
-    },
+    build = {
+        project = {
+            configure = {
+                "cmake", "-S", "{project}", "-B", "{build}",
+                "-DROHR_ENGINE_SOURCE_ROOT={sdk}",
+            },
+            compile = { "cmake", "--build", "{build}" },
+        },
 
-    gui = {
-        configure = nil,
-        compile = nil,
+        cli = {
+            configure = nil,
+            compile = nil,
+        },
+
+        gui = {
+            configure = nil,
+            compile = nil,
+        },
     },
 }
 ```
+
+For each build operation, `nil` inherits the next configuration layer, `{}`
+explicitly disables the operation, and a non-empty string array executes that
+command.
+
+`editor.config_path_override` and `editor.gui_state_path_override` default to
+`nil`, so Rohr does not read or write external user configuration unless an
+override is explicitly enabled. The SDK file owns the defaults; GUI-state file
+loading and persistence will use these paths in a later change.
 
 `{project}` and `{build}` expand to absolute paths. `{sdk}` expands to the SDK
 root when the CLI runs from an installed SDK. Missing fields inherit the next

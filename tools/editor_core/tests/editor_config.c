@@ -26,7 +26,12 @@ int main(int count, char **program_arguments) {
     if(!path_get(path, sizeof(path), "config-base.lua")) return 1;
     result = editor_config_file_merge(&config, path, true);
     if(editor_result_check(result) || !config.font_set ||
-            strcmp(config.font, "/fonts/base.ttf") != 0) return 1;
+            strcmp(config.font, "/fonts/base.ttf") != 0 ||
+            !config.config_path_override_set ||
+            strcmp(config.config_path_override, "/config/editor.lua") != 0 ||
+            !config.gui_state_path_override_set ||
+            strcmp(config.gui_state_path_override,
+                "/config/editor-gui-state.lua") != 0) return 1;
     command = editor_config_command_get(&config, EDITOR_CONFIG_FRONTEND_CLI,
         EDITOR_CONFIG_OPERATION_CONFIGURE);
     if(command == NULL || strcmp(command->arguments[0], "base-configure") != 0)
@@ -73,6 +78,10 @@ int main(int count, char **program_arguments) {
     if(!editor_result_check(result)) return 1;
     result = editor_config_command_expression_parse("{ \"\" }", &parsed);
     if(!editor_result_check(result)) return 1;
+    result = editor_config_command_expression_parse("{}", &parsed);
+    if(editor_result_check(result) || !parsed.set || parsed.count != 0 ||
+            editor_result_check(editor_config_command_executable_check(
+                &parsed, "."))) return 1;
     result = editor_config_command_expression_parse_detailed("{", &parsed,
         lua_error, sizeof(lua_error));
     if(!editor_result_check(result) || lua_error[0] == '\0') return 1;

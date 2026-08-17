@@ -217,6 +217,10 @@ static bool cli_sdk_root_get(char *output, size_t capacity) {
             }
         }
     }
+    if(ROHR_DEVELOPMENT_SOURCE_DIR[0] != '\0') {
+        int count = snprintf(output, capacity, "%s", ROHR_DEVELOPMENT_SOURCE_DIR);
+        return count >= 0 && (size_t)count < capacity;
+    }
     output[0] = '\0';
     return false;
 }
@@ -263,6 +267,7 @@ static int cli_project_cmake_run(const EditorWorkspace *workspace,
     configured_command = editor_config_command_get(config,
         EDITOR_CONFIG_FRONTEND_CLI, configure ? EDITOR_CONFIG_OPERATION_CONFIGURE :
         EDITOR_CONFIG_OPERATION_COMPILE);
+    if(configured_command != NULL && configured_command->count == 0) return 0;
     if(configured_command != NULL) {
         EditorResult result;
         (void)cli_sdk_root_get(sdk, sizeof(sdk));

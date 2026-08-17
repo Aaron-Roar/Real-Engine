@@ -19,17 +19,19 @@ set(log_path "${TEST_ROOT}/mock-build.log")
 file(TO_CMAKE_PATH "${log_path}" log_lua)
 file(WRITE "${TEST_ROOT}/editor.lua"
 "return {
-    project = {
-        configure = { \"project-configure-must-not-run\" },
-        compile = { \"project-compile-must-not-run\" },
-    },
-    cli = {
-        configure = {
-            \"${mock_lua}\", \"${log_lua}\", \"cli-configure\",
-            \"{project}\", \"{build}\"
+    build = {
+        project = {
+            configure = { \"project-configure-must-not-run\" },
+            compile = { \"project-compile-must-not-run\" },
         },
-        compile = {
-            \"${mock_lua}\", \"${log_lua}\", \"cli-compile\", \"{build}\"
+        cli = {
+            configure = {
+                \"${mock_lua}\", \"${log_lua}\", \"cli-configure\",
+                \"{project}\", \"{build}\"
+            },
+            compile = {
+                \"${mock_lua}\", \"${log_lua}\", \"cli-compile\", \"{build}\"
+            },
         },
     },
 }

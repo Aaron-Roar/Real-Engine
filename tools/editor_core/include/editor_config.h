@@ -29,6 +29,10 @@ typedef struct EditorConfigCommand {
 typedef struct EditorConfig {
     char font[EDITOR_WORKSPACE_PATH_MAX * 2];
     bool font_set;
+    char config_path_override[EDITOR_WORKSPACE_PATH_MAX * 2];
+    bool config_path_override_set;
+    char gui_state_path_override[EDITOR_WORKSPACE_PATH_MAX * 2];
+    bool gui_state_path_override_set;
     EditorConfigCommand project_configure;
     EditorConfigCommand project_compile;
     EditorConfigCommand cli_configure;

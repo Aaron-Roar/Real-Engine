@@ -132,6 +132,10 @@ static bool editor_sdk_root_get(char *output, size_t capacity) {
             }
         }
     }
+    if(ROHR_DEVELOPMENT_SOURCE_DIR[0] != '\0') {
+        count = snprintf(output, capacity, "%s", ROHR_DEVELOPMENT_SOURCE_DIR);
+        return count >= 0 && (size_t)count < capacity;
+    }
     output[0] = '\0';
     return false;
 }
@@ -294,23 +298,29 @@ static bool editor_cmake_compile_start(EditorTerminalPanel *terminal,
     char configure_command[EDITOR_WORKSPACE_PATH_MAX * 4];
     char compile_command[EDITOR_WORKSPACE_PATH_MAX * 4];
     char command[EDITOR_WORKSPACE_PATH_MAX * 8 + 8];
+    bool configure_enabled;
+    bool compile_enabled;
+    if(!editor_cmake_command_get(configure_command,
+            sizeof(configure_command), project_directory, true) ||
+            !editor_cmake_command_get(compile_command,
+                sizeof(compile_command), project_directory, false)) return false;
+    configure_enabled = configure_command[0] != '\0';
+    compile_enabled = compile_command[0] != '\0';
+    if(!configure_enabled && !compile_enabled) return true;
     if(show_operations) {
         int count;
-        if(!editor_cmake_command_get(configure_command,
-                sizeof(configure_command), project_directory, true) ||
-                !editor_cmake_command_get(compile_command,
-                    sizeof(compile_command), project_directory, false)) return false;
-        count = snprintf(command, sizeof(command), "%s && %s",
-            configure_command, compile_command);
+        count = snprintf(command, sizeof(command), configure_enabled && compile_enabled ?
+            "%s && %s" : "%s%s", configure_command, compile_command);
         if(count < 0 || (size_t)count >= sizeof(command)) return false;
         return editor_terminal_panel_command_execute_tracked(terminal, command);
     }
     if(hidden_process == NULL || hidden_compile_pending == NULL ||
             hidden_directory == NULL || *hidden_process != NULL ||
             strlen(project_directory) >= hidden_directory_capacity) return false;
-    *hidden_process = editor_cmake_hidden_start(project_directory, true);
+    *hidden_process = editor_cmake_hidden_start(project_directory,
+        configure_enabled);
     if(*hidden_process != NULL) {
-        *hidden_compile_pending = true;
+        *hidden_compile_pending = configure_enabled && compile_enabled;
         snprintf(hidden_directory, hidden_directory_capacity, "%s", project_directory);
     }
     return *hidden_process != NULL;

@@ -40,11 +40,16 @@ static EditorResult editor_config_command_read(lua_State *lua, int table,
         return editor_config_error(path, "command must be an array of strings");
     }
     count = lua_rawlen(lua, -1);
-    if(count == 0 || count > EDITOR_CONFIG_ARGUMENT_MAX) {
+    if(count > EDITOR_CONFIG_ARGUMENT_MAX) {
         lua_pop(lua, 1);
         return editor_config_error(path, "command argument count is invalid");
     }
     memset(command, 0, sizeof(*command));
+    command->set = true;
+    if(count == 0) {
+        lua_pop(lua, 1);
+        return editor_result_value(true);
+    }
     for(size_t i = 0; i < count; i += 1) {
         size_t length;
         const char *value;
@@ -69,7 +74,6 @@ static EditorResult editor_config_command_read(lua_State *lua, int table,
             "command executable must not be empty");
     }
     command->count = count;
-    command->set = true;
     lua_pop(lua, 1);
     return editor_result_value(true);
 }
@@ -93,6 +97,29 @@ static EditorResult editor_config_command_table_read(lua_State *lua, int root,
         lua_gettop(lua), "compile", compile, path);
     lua_pop(lua, 1);
     return result;
+}
+
+static EditorResult editor_config_optional_path_read(lua_State *lua, int table,
+        const char *field, char *output, size_t capacity, bool *set,
+        const char *path) {
+    lua_getfield(lua, table, field);
+    if(lua_isnil(lua, -1)) {
+        lua_pop(lua, 1);
+        return editor_result_value(true);
+    }
+    if(!lua_isstring(lua, -1)) {
+        lua_pop(lua, 1);
+        return editor_config_error(path,
+            "editor path overrides must be strings or nil");
+    }
+    if(strlen(lua_tostring(lua, -1)) >= capacity) {
+        lua_pop(lua, 1);
+        return editor_config_error(path, "editor path override is too long");
+    }
+    snprintf(output, capacity, "%s", lua_tostring(lua, -1));
+    *set = true;
+    lua_pop(lua, 1);
+    return editor_result_value(true);
 }
 
 void editor_config_init(EditorConfig *config) {
@@ -121,6 +148,7 @@ EditorResult editor_config_file_merge(EditorConfig *config, const char *path,
         int root = lua_gettop(lua);
         lua_getfield(lua, root, "editor");
         if(lua_istable(lua, -1)) {
+            int editor = lua_gettop(lua);
             lua_getfield(lua, -1, "font");
             if(lua_isstring(lua, -1)) {
                 const char *font = lua_tostring(lua, -1);
@@ -133,16 +161,36 @@ EditorResult editor_config_file_merge(EditorConfig *config, const char *path,
             } else if(!lua_isnil(lua, -1)) result = editor_config_error(path,
                 "editor.font must be a string or nil");
             lua_pop(lua, 1);
+            if(!editor_result_check(result)) result =
+                editor_config_optional_path_read(lua, editor,
+                    "config_path_override", config->config_path_override,
+                    sizeof(config->config_path_override),
+                    &config->config_path_override_set, path);
+            if(!editor_result_check(result)) result =
+                editor_config_optional_path_read(lua, editor,
+                    "gui_state_path_override", config->gui_state_path_override,
+                    sizeof(config->gui_state_path_override),
+                    &config->gui_state_path_override_set, path);
         } else if(!lua_isnil(lua, -1)) result = editor_config_error(path,
             "editor must be a table");
         lua_pop(lua, 1);
-        if(!editor_result_check(result)) result = editor_config_command_table_read(
-            lua, root, "project", &config->project_configure,
-            &config->project_compile, path);
-        if(!editor_result_check(result)) result = editor_config_command_table_read(
-            lua, root, "cli", &config->cli_configure, &config->cli_compile, path);
-        if(!editor_result_check(result)) result = editor_config_command_table_read(
-            lua, root, "gui", &config->gui_configure, &config->gui_compile, path);
+        if(!editor_result_check(result)) {
+            lua_getfield(lua, root, "build");
+            if(lua_istable(lua, -1)) {
+                int build = lua_gettop(lua);
+                result = editor_config_command_table_read(lua, build, "project",
+                    &config->project_configure, &config->project_compile, path);
+                if(!editor_result_check(result)) result =
+                    editor_config_command_table_read(lua, build, "cli",
+                        &config->cli_configure, &config->cli_compile, path);
+                if(!editor_result_check(result)) result =
+                    editor_config_command_table_read(lua, build, "gui",
+                        &config->gui_configure, &config->gui_compile, path);
+            } else if(!lua_isnil(lua, -1)) {
+                result = editor_config_error(path, "build must be a table");
+            }
+            lua_pop(lua, 1);
+        }
     }
     lua_close(lua);
     return result;
@@ -277,12 +325,13 @@ EditorResult editor_config_command_expression_parse_detailed(
         return editor_config_error("build override", "value must be an array");
     }
     count = lua_rawlen(lua, -1);
-    if(count == 0 || count > EDITOR_CONFIG_ARGUMENT_MAX) {
+    if(count > EDITOR_CONFIG_ARGUMENT_MAX) {
         lua_close(lua);
         return editor_config_error("build override",
             "command argument count is invalid");
     }
     memset(command, 0, sizeof(*command));
+    command->set = true;
     for(size_t i = 0; i < count; i += 1) {
         size_t length;
         const char *value;
@@ -301,7 +350,7 @@ EditorResult editor_config_command_expression_parse_detailed(
         memcpy(command->arguments[i], value, length + 1);
         lua_pop(lua, 1);
     }
-    if(command->arguments[0][0] == '\0') {
+    if(count > 0 && command->arguments[0][0] == '\0') {
         lua_close(lua);
         return editor_config_error("build override",
             "command executable must not be empty");
@@ -355,7 +404,6 @@ EditorResult editor_config_command_expression_parse_detailed(
         }
     }
     command->count = count;
-    command->set = true;
     lua_close(lua);
     return editor_result_value(true);
 }
@@ -440,8 +488,10 @@ EditorResult editor_config_command_executable_check(
     const char *executable;
     const char *environment;
     bool explicit_path;
-    if(command == NULL || !command->set || command->count == 0 ||
-            command->arguments[0][0] == '\0') return editor_result_error(
+    if(command != NULL && command->set && command->count == 0)
+        return editor_result_value(true);
+    if(command == NULL || !command->set || command->arguments[0][0] == '\0')
+        return editor_result_error(
         EDITOR_ERROR_INVALID_ARGUMENT, "Build command has no executable");
     executable = command->arguments[0];
     explicit_path = strchr(executable, '/') != NULL ||
@@ -515,10 +565,11 @@ EditorResult editor_config_gui_override_save(const char *project_directory,
     file = fopen(temporary, "wb");
     if(file == NULL) return editor_result_error(EDITOR_ERROR_FILE_IO,
         "Could not write GUI overrides: %s", temporary);
-    bool written = fputs("-- Generated by Rohr Editor GUI.\nreturn {\n    gui = {\n",
+    bool written = fputs("-- Generated by Rohr Editor GUI.\nreturn {\n"
+        "    build = {\n        gui = {\n",
         file) >= 0 && editor_config_lua_command_write(file, "configure", configure) &&
         editor_config_lua_command_write(file, "compile", compile) &&
-        fputs("    },\n}\n", file) >= 0;
+        fputs("        },\n    },\n}\n", file) >= 0;
     bool closed = fclose(file) == 0;
     if(!written || !closed || !SDL_RenamePath(temporary, path)) {
         (void)SDL_RemovePath(temporary);
