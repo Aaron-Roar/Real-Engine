@@ -71,6 +71,10 @@
       };
 
       devShells.${system}.default = pkgs.mkShell {
+        shellHook = ''
+          export ROHR_DEV_SHELL=1
+        '';
+
         nativeBuildInputs = with pkgs; [
           clang
           cmake
