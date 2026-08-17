@@ -1,4 +1,5 @@
 #include "editor_notification_panel.h"
+#include "editor_notification_layout.h"
 
 #include <stdio.h>
 
@@ -85,7 +86,10 @@ void editor_notification_panel_push(EditorNotificationPanel *panel,
 
 void editor_notification_panel_toast_draw(EditorNotificationPanel *panel,
         float screen_height) {
-    UIRect log_bounds = {14.0f, screen_height - 42.0f, 190.0f, 28.0f};
+    UIRect log_bounds = {EDITOR_NOTIFICATION_LEFT,
+        screen_height - EDITOR_NOTIFICATION_BOTTOM -
+            EDITOR_NOTIFICATION_LOG_HEIGHT,
+        EDITOR_NOTIFICATION_WIDTH, EDITOR_NOTIFICATION_LOG_HEIGHT};
     if(panel == NULL) return;
     rohr_ui_modal_controls_begin();
     if(rohr_ui_button("editor.notification.log", &panel->log_label,
@@ -101,8 +105,11 @@ void editor_notification_panel_toast_draw(EditorNotificationPanel *panel,
             size_t index;
             char id[64];
             UIRect bounds = {log_bounds.x,
-                log_bounds.y - 40.0f - 40.0f * (float)slot,
-                log_bounds.width, 34.0f};
+                log_bounds.y - EDITOR_NOTIFICATION_TOAST_GAP -
+                    EDITOR_NOTIFICATION_TOAST_HEIGHT -
+                    (EDITOR_NOTIFICATION_TOAST_HEIGHT +
+                        EDITOR_NOTIFICATION_TOAST_GAP) * (float)slot,
+                log_bounds.width, EDITOR_NOTIFICATION_TOAST_HEIGHT};
             if(entry == NULL) continue;
             index = (size_t)(entry - panel->store.entries);
             snprintf(id, sizeof(id), "editor.notification.toast.%llu",
@@ -128,15 +135,16 @@ void editor_notification_panel_log_draw(EditorNotificationPanel *panel,
         bounds.width - 40.0f, bounds.height - 112.0f};
     panel->log_scroll_offset = rohr_ui_scroll_region_begin(
         "editor.notification.log.scroll", list_bounds,
-        38.0f * (float)panel->store.entry_count, panel->log_scroll_offset,
-        38.0f).offset;
+        EDITOR_NOTIFICATION_LOG_ROW_HEIGHT * (float)panel->store.entry_count,
+        panel->log_scroll_offset, EDITOR_NOTIFICATION_SCROLL_STEP).offset;
     for(size_t row = 0; row < panel->store.entry_count; row += 1) {
         EditorNotificationRecord *entry = editor_notification_store_newest_get(
             &panel->store, row);
         size_t index = (size_t)(entry - panel->store.entries);
         char id[64];
-        UIRect row_bounds = {list_bounds.x, list_bounds.y + 38.0f * (float)row,
-            list_bounds.width, 32.0f};
+        UIRect row_bounds = {list_bounds.x,
+            list_bounds.y + EDITOR_NOTIFICATION_LOG_ROW_HEIGHT * (float)row,
+            list_bounds.width, EDITOR_NOTIFICATION_LOG_ROW_BUTTON_HEIGHT};
         snprintf(id, sizeof(id), "editor.notification.log.entry.%llu",
             (unsigned long long)entry->id);
         if(rohr_ui_button(id, &panel->summary_texts[index], row_bounds,
@@ -175,7 +183,7 @@ void editor_notification_panel_report_draw(EditorNotificationPanel *panel,
     }
     panel->report_scroll_offset = rohr_ui_scroll_region_begin(
         "editor.notification.report.scroll", detail_bounds, content_height,
-        panel->report_scroll_offset, 38.0f).offset;
+        panel->report_scroll_offset, EDITOR_NOTIFICATION_SCROLL_STEP).offset;
     if(panel->detail_text.text != NULL)
         (void)rohr_graphics_text_draw(&panel->detail_text,
             (Position){detail_bounds.x + 10.0f,

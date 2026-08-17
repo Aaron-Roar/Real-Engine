@@ -1,4 +1,5 @@
 #include "editor_build_settings_panel.h"
+#include "editor_build_notifications.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -211,12 +212,8 @@ void editor_build_settings_panel_draw(EditorBuildSettingsPanel *panel,
             panel->configure_override ? &configure : NULL,
             panel->compile_override ? &compile : NULL);
         if(editor_result_check(result)) {
-            char detail[EDITOR_NOTIFICATION_DETAIL_MAX];
-            snprintf(detail, sizeof(detail), "Parser error:\n%s\n\nLua error:\n%s",
-                result.result.error.message,
-                lua_error[0] == '\0' ? "No Lua runtime error." : lua_error);
-            editor_notification_panel_push(notifications,
-                "Build configuration (GUI) - FAIL", detail);
+            editor_build_notification_configuration_failure(notifications,
+                result.result.error.message, lua_error);
         }
         editor_build_settings_error_set(panel, result);
         if(!editor_result_check(result)) {

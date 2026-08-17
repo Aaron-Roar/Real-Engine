@@ -149,3 +149,16 @@ When adding an authored property:
 
 Keep editor-only concepts out of the public engine API unless a game can use the
 same concept independently of the editor.
+# Notification architecture
+
+Editor notifications are divided into a shared system and producer modules.
+The notification panel and store own bounded history, the three-toast queue,
+selection, scrolling, and detailed-report presentation. Layout dimensions live
+in `editor_notification_layout.h` so toast and log geometry remain consistent.
+
+Producer modules own domain-specific wording and details. Build configuration,
+C generation, configure, and compile notifications are all produced by the
+build-notification module. Future engine-runtime warning modules should publish
+through the same notification system; they must not manipulate toast, log, or
+modal state directly. Notifications are for recoverable information and
+warnings, not substitutes for handling critical engine errors.
