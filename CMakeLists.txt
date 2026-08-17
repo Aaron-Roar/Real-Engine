@@ -202,6 +202,9 @@ install(FILES
 install(FILES
     config/project-editor.lua
     DESTINATION ${CMAKE_INSTALL_DATADIR}/rohr)
+install(FILES
+    config/editor_gui_settings.lua
+    DESTINATION config)
 install(FILES lib/lua/LICENSE
     DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/rohr
     RENAME Lua-LICENSE)

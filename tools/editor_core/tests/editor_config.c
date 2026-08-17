@@ -29,6 +29,7 @@ int main(int count, char **program_arguments) {
             strcmp(config.font, "/fonts/base.ttf") != 0 ||
             !config.config_path_override_set ||
             strcmp(config.config_path_override, "/config/editor.lua") != 0 ||
+            config.gui_state_path_set ||
             !config.gui_state_path_override_set ||
             strcmp(config.gui_state_path_override,
                 "/config/editor-gui-state.lua") != 0) return 1;
@@ -123,6 +124,25 @@ int main(int count, char **program_arguments) {
         snprintf(override_path, sizeof(override_path), "%s/.rohr", root);
         (void)SDL_RemovePath(override_path);
         (void)SDL_RemovePath(root);
+    }
+    {
+        const char *state_path = "/tmp/rohr_editor_gui_state_test.lua";
+        EditorGuiState state = {
+            .logical_width = 1920,
+            .logical_height = 1080,
+            .aspect_ratio = "16:9",
+            .window_mode = "windowed"
+        };
+        EditorGuiState loaded = {0};
+        (void)SDL_RemovePath(state_path);
+        result = editor_gui_state_save(&state, state_path);
+        if(editor_result_check(result)) return 1;
+        result = editor_gui_state_load(&loaded, state_path, true);
+        if(editor_result_check(result) || loaded.logical_width != 1920 ||
+                loaded.logical_height != 1080 ||
+                strcmp(loaded.aspect_ratio, "16:9") != 0 ||
+                strcmp(loaded.window_mode, "windowed") != 0) return 1;
+        (void)SDL_RemovePath(state_path);
     }
     return 0;
 }

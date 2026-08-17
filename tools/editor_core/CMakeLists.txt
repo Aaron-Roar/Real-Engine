@@ -13,7 +13,8 @@ add_library(rohr_editor_core STATIC
 )
 
 target_compile_definitions(rohr_editor_core PRIVATE
-    ROHR_DEVELOPMENT_SHARE_DIR="${PROJECT_SOURCE_DIR}/config")
+    ROHR_DEVELOPMENT_SHARE_DIR="${PROJECT_SOURCE_DIR}/config"
+    ROHR_DEVELOPMENT_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 
 target_include_directories(rohr_editor_core
     PUBLIC

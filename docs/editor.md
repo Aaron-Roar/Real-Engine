@@ -87,6 +87,7 @@ containing spaces and does not invoke a shell:
 return {
     editor = {
         config_path_override = nil,
+        gui_state_path = "config/editor_gui_settings.lua",
         gui_state_path_override = nil,
     },
 
@@ -116,10 +117,15 @@ For each build operation, `nil` inherits the next configuration layer, `{}`
 explicitly disables the operation, and a non-empty string array executes that
 command.
 
-`editor.config_path_override` and `editor.gui_state_path_override` default to
-`nil`, so Rohr does not read or write external user configuration unless an
-override is explicitly enabled. The SDK file owns the defaults; GUI-state file
-loading and persistence will use these paths in a later change.
+Relative paths declared by the SDK `editor.lua` resolve from the SDK root.
+Absolute paths remain unchanged, and paths beginning with `~/` resolve from the
+user home directory. `editor.config_path_override` remains opt-in.
+
+The GUI loads and atomically updates `editor.gui_state_path`. When
+`editor.gui_state_path_override` is set, that path becomes the managed state
+file instead. The initial flat state stores `logical_width`, `logical_height`,
+`aspect_ratio`, and `window_mode`; missing override files begin with the SDK
+state values.
 
 `{project}` and `{build}` expand to absolute paths. `{sdk}` expands to the SDK
 root when the CLI runs from an installed SDK. Missing fields inherit the next

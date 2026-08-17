@@ -172,6 +172,72 @@ static bool editor_gui_config_load(EditorConfig *config,
     return !editor_result_check(result);
 }
 
+static EditorResult editor_gui_state_resolve(EditorGuiState *state,
+        char *state_path, size_t state_path_capacity) {
+    EditorConfig config;
+    char sdk_config_path[EDITOR_WORKSPACE_PATH_MAX * 2];
+    char path[EDITOR_WORKSPACE_PATH_MAX * 2];
+    EditorResult result;
+    if(state == NULL || state_path == NULL || state_path_capacity == 0)
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "GUI state resolution received an invalid argument");
+    editor_config_init(&config);
+    result = editor_config_sdk_path_get(sdk_config_path,
+        sizeof(sdk_config_path), "editor.lua", true);
+    if(editor_result_check(result)) return result;
+    result = editor_config_file_merge(&config, sdk_config_path, true);
+    if(editor_result_check(result)) return result;
+    if(config.config_path_override_set) {
+        result = editor_config_sdk_path_resolve(path, sizeof(path),
+            config.config_path_override);
+        if(editor_result_check(result)) return result;
+        result = editor_config_file_merge(&config, path, false);
+        if(editor_result_check(result)) return result;
+    }
+    if(!config.gui_state_path_set) return editor_result_error(
+        EDITOR_ERROR_SCHEMA_INVALID,
+        "SDK editor config does not define editor.gui_state_path");
+    result = editor_config_sdk_path_resolve(path, sizeof(path),
+        config.gui_state_path);
+    if(editor_result_check(result)) return result;
+    result = editor_gui_state_load(state, path, true);
+    if(editor_result_check(result)) return result;
+    if(config.gui_state_path_override_set) {
+        result = editor_config_sdk_path_resolve(state_path, state_path_capacity,
+            config.gui_state_path_override);
+        if(editor_result_check(result)) return result;
+        return editor_gui_state_load(state, state_path, false);
+    }
+    if(strlen(path) >= state_path_capacity) return editor_result_error(
+        EDITOR_ERROR_CAPACITY, "GUI state path is too long");
+    snprintf(state_path, state_path_capacity, "%s", path);
+    return editor_result_value(true);
+}
+
+static bool editor_gui_state_presentation_apply(const EditorGuiState *state) {
+    GraphicsWindowPresentationConfig config;
+    EngineResult result;
+    if(state == NULL) return false;
+    config = rohr_graphics_window_presentation_default_get();
+    config.logical_width = state->logical_width;
+    config.logical_height = state->logical_height;
+    config.window_width = state->logical_width;
+    config.window_height = state->logical_height;
+    config.aspect_ratio_auto = strcmp(state->aspect_ratio, "auto") == 0;
+    if(strcmp(state->window_mode, "windowed") == 0)
+        config.mode = GRAPHICS_WINDOW_MODE_WINDOWED;
+    else if(strcmp(state->window_mode, "borderless_fullscreen") == 0)
+        config.mode = GRAPHICS_WINDOW_MODE_BORDERLESS_FULLSCREEN;
+    else if(strcmp(state->window_mode, "fullscreen") == 0)
+        config.mode = GRAPHICS_WINDOW_MODE_FULLSCREEN;
+    else return false;
+    result = rohr_graphics_window_presentation_set(config);
+    if(!rohr_error_check(result)) return true;
+    fprintf(stderr, "error %d: %s\n", (int)result.result.error,
+        rohr_error_message_get(result));
+    return false;
+}
+
 static bool editor_build_arguments_get(const char *project_directory,
         bool configure,
         char storage[EDITOR_CONFIG_ARGUMENT_MAX][EDITOR_CONFIG_ARGUMENT_LENGTH_MAX],
@@ -1707,6 +1773,8 @@ int main(void) {
     EditorBulkPanel bulk_panel = {0};
     EditorBuildSettingsPanel build_settings_panel = {0};
     EditorVisualSettingsPanel visual_settings_panel = {0};
+    EditorGuiState gui_state = {0};
+    char gui_state_path[EDITOR_WORKSPACE_PATH_MAX * 2] = {0};
     EditorNotificationPanel notification_panel = {0};
     EditorTerminalPanel terminal_panel = {0};
     SDL_Process *hidden_build_process = NULL;
@@ -1765,8 +1833,17 @@ int main(void) {
     }
 
     if(!editor_use_executable_directory() ||
-            !editor_result_ok(rohr_engine_init()) ||
-            !editor_result_ok(rohr_graphics_start())) goto fail;
+            !editor_result_ok(rohr_engine_init())) goto fail;
+    {
+        EditorResult result = editor_gui_state_resolve(&gui_state,
+            gui_state_path, sizeof(gui_state_path));
+        if(editor_result_check(result)) {
+            editor_result_stderr_print(result);
+            goto fail;
+        }
+    }
+    if(!editor_result_ok(rohr_graphics_start()) ||
+            !editor_gui_state_presentation_apply(&gui_state)) goto fail;
     if(!rohr_graphics_aspect_ratio_auto_set(true)) goto fail;
     editor_window_layout_sync();
     {
@@ -1945,6 +2022,8 @@ int main(void) {
             !editor_notification_panel_create(&notification_panel, &font,
                 &notification_font) ||
             !editor_terminal_panel_create(&terminal_panel, &font)) goto fail;
+    if(!editor_visual_settings_panel_state_set(&visual_settings_panel,
+            &gui_state, gui_state_path)) goto fail;
     terminal_panel.visible = true;
     if(!editor_terminal_panel_project_open(&terminal_panel, startup_directory)) goto fail;
     if(!editor_text_create(&font, "#FFFFFFFF", &color_picker_hex_field) ||

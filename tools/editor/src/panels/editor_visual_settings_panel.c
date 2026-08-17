@@ -2,6 +2,7 @@
 #include "editor_layout.h"
 
 #include <stdio.h>
+#include <string.h>
 
 static bool editor_visual_text_create(const FontAsset *font, const char *value,
         TextAsset *text) {
@@ -33,6 +34,9 @@ static void editor_visual_resolution_labels_update(
 static void editor_visual_settings_apply(EditorVisualSettingsPanel *panel) {
     static const int heights[] = {720, 1080, 1440};
     static const int ratios[][2] = {{0, 0}, {16, 9}, {16, 10}, {4, 3}, {21, 9}};
+    static const char *ratio_names[] = {"auto", "16:9", "16:10", "4:3", "21:9"};
+    static const char *mode_names[] = {
+        "windowed", "borderless_fullscreen", "fullscreen"};
     int height = heights[panel->resolution_index];
     int ratio = panel->aspect_index == 0 ? 1 : (int)panel->aspect_index;
     int width = panel->aspect_index == 0 ? height :
@@ -48,6 +52,18 @@ static void editor_visual_settings_apply(EditorVisualSettingsPanel *panel) {
     config.aspect_ratio_auto = panel->aspect_index == 0;
     if(rohr_error_check(rohr_graphics_window_presentation_set(config))) return;
     editor_window_height = (float)height;
+    if(panel->state_ready) {
+        EditorResult result;
+        panel->state.logical_width = width;
+        panel->state.logical_height = height;
+        snprintf(panel->state.aspect_ratio, sizeof(panel->state.aspect_ratio), "%s",
+            ratio_names[panel->aspect_index]);
+        snprintf(panel->state.window_mode, sizeof(panel->state.window_mode), "%s",
+            mode_names[panel->window_mode_index]);
+        result = editor_gui_state_save(&panel->state, panel->state_path);
+        if(editor_result_check(result))
+            fprintf(stderr, "%s\n", result.result.error.message);
+    }
 }
 
 bool editor_visual_settings_panel_create(EditorVisualSettingsPanel *panel,
@@ -79,6 +95,28 @@ bool editor_visual_settings_panel_create(EditorVisualSettingsPanel *panel,
 fail:
     editor_visual_settings_panel_destroy(panel);
     return false;
+}
+
+bool editor_visual_settings_panel_state_set(EditorVisualSettingsPanel *panel,
+        const EditorGuiState *state, const char *path) {
+    static const char *ratios[] = {"auto", "16:9", "16:10", "4:3", "21:9"};
+    static const char *modes[] = {
+        "windowed", "borderless_fullscreen", "fullscreen"};
+    static const int heights[] = {720, 1080, 1440};
+    if(panel == NULL || state == NULL || path == NULL ||
+            strlen(path) >= sizeof(panel->state_path)) return false;
+    for(size_t i = 0; i < 5; i += 1) {
+        if(strcmp(state->aspect_ratio, ratios[i]) == 0) panel->aspect_index = i;
+    }
+    for(size_t i = 0; i < 3; i += 1) {
+        if(strcmp(state->window_mode, modes[i]) == 0) panel->window_mode_index = i;
+        if(state->logical_height == heights[i]) panel->resolution_index = i;
+    }
+    panel->state = *state;
+    snprintf(panel->state_path, sizeof(panel->state_path), "%s", path);
+    panel->state_ready = true;
+    editor_visual_resolution_labels_update(panel);
+    return true;
 }
 
 void editor_visual_settings_panel_open(EditorVisualSettingsPanel *panel) {

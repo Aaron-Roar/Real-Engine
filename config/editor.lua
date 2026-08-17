@@ -4,6 +4,7 @@
 return {
     editor = {
         config_path_override = nil,
+        gui_state_path = "config/editor_gui_settings.lua",
         gui_state_path_override = nil,
         font = nil,
 

@@ -20,6 +20,9 @@
 #ifndef ROHR_DEVELOPMENT_SHARE_DIR
 #define ROHR_DEVELOPMENT_SHARE_DIR ""
 #endif
+#ifndef ROHR_DEVELOPMENT_SOURCE_DIR
+#define ROHR_DEVELOPMENT_SOURCE_DIR ""
+#endif
 
 static EditorResult editor_config_error(const char *path, const char *message) {
     return editor_result_error(EDITOR_ERROR_SCHEMA_INVALID,
@@ -168,6 +171,11 @@ EditorResult editor_config_file_merge(EditorConfig *config, const char *path,
                     &config->config_path_override_set, path);
             if(!editor_result_check(result)) result =
                 editor_config_optional_path_read(lua, editor,
+                    "gui_state_path", config->gui_state_path,
+                    sizeof(config->gui_state_path), &config->gui_state_path_set,
+                    path);
+            if(!editor_result_check(result)) result =
+                editor_config_optional_path_read(lua, editor,
                     "gui_state_path_override", config->gui_state_path_override,
                     sizeof(config->gui_state_path_override),
                     &config->gui_state_path_override_set, path);
@@ -290,6 +298,158 @@ EditorResult editor_config_sdk_path_get(char *output, size_t capacity,
     output[0] = '\0';
     return required ? editor_result_error(EDITOR_ERROR_FILE_IO,
         "Could not locate SDK editor config: %s", name) : editor_result_value(true);
+}
+
+EditorResult editor_config_sdk_root_get(char *output, size_t capacity) {
+    const char *base = SDL_GetBasePath();
+    char root[EDITOR_WORKSPACE_PATH_MAX * 2];
+    size_t length;
+    int count;
+    if(output == NULL || capacity == 0) return editor_result_error(
+        EDITOR_ERROR_INVALID_ARGUMENT, "SDK root received an invalid argument");
+    if(base != NULL && strlen(base) < sizeof(root)) {
+        snprintf(root, sizeof(root), "%s", base);
+        length = strlen(root);
+        while(length > 0 && (root[length - 1] == '/' || root[length - 1] == '\\'))
+            root[--length] = '\0';
+        while(length > 0 && root[length - 1] != '/' && root[length - 1] != '\\')
+            length -= 1;
+        if(length > 0) root[length - 1] = '\0';
+        if(root[0] != '\0') {
+            char config[EDITOR_WORKSPACE_PATH_MAX * 2];
+            SDL_PathInfo info;
+            count = snprintf(config, sizeof(config), "%s/share/rohr/editor.lua", root);
+            if(count >= 0 && (size_t)count < sizeof(config) &&
+                    SDL_GetPathInfo(config, &info) && info.type == SDL_PATHTYPE_FILE) {
+                count = snprintf(output, capacity, "%s", root);
+                if(count >= 0 && (size_t)count < capacity)
+                    return editor_result_value(true);
+            }
+        }
+    }
+    if(ROHR_DEVELOPMENT_SOURCE_DIR[0] != '\0') {
+        count = snprintf(output, capacity, "%s", ROHR_DEVELOPMENT_SOURCE_DIR);
+        if(count >= 0 && (size_t)count < capacity) return editor_result_value(true);
+    }
+    return editor_result_error(EDITOR_ERROR_NOT_FOUND,
+        "Could not locate the Rohr SDK root");
+}
+
+EditorResult editor_config_sdk_path_resolve(char *output, size_t capacity,
+        const char *path) {
+    char root[EDITOR_WORKSPACE_PATH_MAX * 2];
+    const char *home;
+    int count;
+    if(output == NULL || capacity == 0 || path == NULL || path[0] == '\0')
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "SDK-relative path received an invalid argument");
+    if(path[0] == '/' || path[0] == '\\' ||
+            (strlen(path) > 2 && path[1] == ':')) {
+        count = snprintf(output, capacity, "%s", path);
+    } else if(path[0] == '~' && (path[1] == '/' || path[1] == '\\')) {
+#if defined(_WIN32)
+        home = getenv("USERPROFILE");
+#else
+        home = getenv("HOME");
+#endif
+        if(home == NULL || home[0] == '\0') return editor_result_error(
+            EDITOR_ERROR_NOT_FOUND, "Could not expand the user home directory");
+        count = snprintf(output, capacity, "%s/%s", home, path + 2);
+    } else {
+        EditorResult result = editor_config_sdk_root_get(root, sizeof(root));
+        if(editor_result_check(result)) return result;
+        count = snprintf(output, capacity, "%s/%s", root, path);
+    }
+    return count >= 0 && (size_t)count < capacity ? editor_result_value(true) :
+        editor_result_error(EDITOR_ERROR_CAPACITY,
+            "Resolved SDK-relative path is too long");
+}
+
+EditorResult editor_gui_state_load(EditorGuiState *state, const char *path,
+        bool required) {
+    lua_State *lua;
+    FILE *file;
+    EditorResult result = editor_result_value(true);
+    if(state == NULL || path == NULL) return editor_result_error(
+        EDITOR_ERROR_INVALID_ARGUMENT, "GUI state received an invalid argument");
+    file = fopen(path, "rb");
+    if(file == NULL) return required ? editor_result_error(EDITOR_ERROR_FILE_IO,
+        "Could not open editor GUI state: %s", path) : result;
+    fclose(file);
+    lua = luaL_newstate();
+    if(lua == NULL) return editor_result_error(EDITOR_ERROR_CAPACITY,
+        "Could not allocate the GUI-state Lua runtime");
+    if(luaL_loadfile(lua, path) != LUA_OK || lua_pcall(lua, 0, 1, 0) != LUA_OK) {
+        result = editor_config_error(path, lua_tostring(lua, -1));
+    } else if(!lua_istable(lua, -1)) {
+        result = editor_config_error(path, "GUI state must return a table");
+    } else {
+        int root = lua_gettop(lua);
+        lua_getfield(lua, root, "logical_width");
+        if(lua_isinteger(lua, -1)) state->logical_width = (int)lua_tointeger(lua, -1);
+        else result = editor_config_error(path, "logical_width must be an integer");
+        lua_pop(lua, 1);
+        if(!editor_result_check(result)) {
+            lua_getfield(lua, root, "logical_height");
+            if(lua_isinteger(lua, -1))
+                state->logical_height = (int)lua_tointeger(lua, -1);
+            else result = editor_config_error(path,
+                "logical_height must be an integer");
+            lua_pop(lua, 1);
+        }
+        if(!editor_result_check(result)) {
+            lua_getfield(lua, root, "aspect_ratio");
+            if(lua_isstring(lua, -1) && strlen(lua_tostring(lua, -1)) <
+                    sizeof(state->aspect_ratio))
+                snprintf(state->aspect_ratio, sizeof(state->aspect_ratio), "%s",
+                    lua_tostring(lua, -1));
+            else result = editor_config_error(path,
+                "aspect_ratio must be a short string");
+            lua_pop(lua, 1);
+        }
+        if(!editor_result_check(result)) {
+            lua_getfield(lua, root, "window_mode");
+            if(lua_isstring(lua, -1) && strlen(lua_tostring(lua, -1)) <
+                    sizeof(state->window_mode))
+                snprintf(state->window_mode, sizeof(state->window_mode), "%s",
+                    lua_tostring(lua, -1));
+            else result = editor_config_error(path,
+                "window_mode must be a short string");
+            lua_pop(lua, 1);
+        }
+        if(!editor_result_check(result) && (state->logical_width <= 0 ||
+                state->logical_height <= 0)) result = editor_config_error(path,
+            "logical resolution must be positive");
+    }
+    lua_close(lua);
+    return result;
+}
+
+EditorResult editor_gui_state_save(const EditorGuiState *state, const char *path) {
+    char temporary[EDITOR_WORKSPACE_PATH_MAX * 2];
+    FILE *file;
+    bool written;
+    bool closed;
+    if(state == NULL || path == NULL || path[0] == '\0') return editor_result_error(
+        EDITOR_ERROR_INVALID_ARGUMENT, "GUI state save received an invalid argument");
+    if(snprintf(temporary, sizeof(temporary), "%s.tmp", path) >=
+            (int)sizeof(temporary)) return editor_result_error(
+        EDITOR_ERROR_CAPACITY, "GUI state temporary path is too long");
+    file = fopen(temporary, "wb");
+    if(file == NULL) return editor_result_error(EDITOR_ERROR_FILE_IO,
+        "Could not write editor GUI state: %s", temporary);
+    written = fprintf(file, "-- Managed by Rohr Editor GUI.\nreturn {\n"
+        "    logical_width = %d,\n    logical_height = %d,\n"
+        "    aspect_ratio = \"%s\",\n    window_mode = \"%s\",\n}\n",
+        state->logical_width, state->logical_height, state->aspect_ratio,
+        state->window_mode) > 0;
+    closed = fclose(file) == 0;
+    if(!written || !closed || !SDL_RenamePath(temporary, path)) {
+        (void)SDL_RemovePath(temporary);
+        return editor_result_error(EDITOR_ERROR_FILE_IO,
+            "Could not atomically save editor GUI state: %s", path);
+    }
+    return editor_result_value(true);
 }
 
 EditorResult editor_config_command_expression_parse_detailed(
