@@ -70,6 +70,8 @@ int main(void) {
     result = editor_config_command_expression_parse(
         "{ \"tool\", \"{unknown}\" }", &parsed);
     if(!editor_result_check(result)) return 1;
+    result = editor_config_command_expression_parse("{ \"\" }", &parsed);
+    if(!editor_result_check(result)) return 1;
 
     {
         const char *root = "/tmp/rohr_editor_gui_config_test";

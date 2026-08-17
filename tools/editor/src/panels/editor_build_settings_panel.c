@@ -117,6 +117,21 @@ static void editor_build_settings_error_set(EditorBuildSettingsPanel *panel,
     (void)rohr_graphics_text_value_set(&panel->error_label, panel->error);
 }
 
+static EditorResult editor_build_settings_validate(
+        const EditorBuildSettingsPanel *panel, EditorConfigCommand *configure,
+        EditorConfigCommand *compile) {
+    EditorResult result = editor_config_command_expression_parse(
+        panel->configure, configure);
+    if(editor_result_check(result)) return editor_result_error(
+        result.result.error.code, "Configure override: %s",
+        result.result.error.message);
+    result = editor_config_command_expression_parse(panel->compile, compile);
+    if(editor_result_check(result)) return editor_result_error(
+        result.result.error.code, "Compile override: %s",
+        result.result.error.message);
+    return editor_result_value(true);
+}
+
 void editor_build_settings_panel_draw(EditorBuildSettingsPanel *panel,
         const char *project_directory, UIRect bounds) {
     UIFieldResult configure_result;
@@ -124,6 +139,8 @@ void editor_build_settings_panel_draw(EditorBuildSettingsPanel *panel,
     EditorConfigCommand configure;
     EditorConfigCommand compile;
     EditorResult result;
+    bool valid;
+    bool apply_clicked = false;
     if(panel == NULL || !panel->open) return;
     rohr_ui_modal_controls_begin();
     rohr_ui_surface(bounds, (Color){37, 42, 52, 255});
@@ -160,16 +177,29 @@ void editor_build_settings_panel_draw(EditorBuildSettingsPanel *panel,
             panel->compile, sizeof(panel->compile));
         panel->compile_override = false;
     }
+    result = editor_build_settings_validate(panel, &configure, &compile);
+    valid = !editor_result_check(result);
+    if(valid) {
+        snprintf(panel->error, sizeof(panel->error),
+            "Valid Lua build command arrays");
+    } else {
+        snprintf(panel->error, sizeof(panel->error), "%s",
+            result.result.error.message);
+    }
+    (void)rohr_graphics_text_value_set(&panel->error_label, panel->error);
     rohr_ui_label(&panel->error_label,
         (UIRect){bounds.x + 30.0f, bounds.y + bounds.height - 100.0f,
             bounds.width - 60.0f, 34.0f});
-    if(rohr_ui_button("editor.settings.build.apply", &panel->apply_label,
-            (UIRect){bounds.x + bounds.width - 250.0f,
-                bounds.y + bounds.height - 54.0f, 100.0f, 34.0f}, NULL).clicked) {
-        result = editor_config_command_expression_parse(panel->configure, &configure);
-        if(!editor_result_check(result))
-            result = editor_config_command_expression_parse(panel->compile, &compile);
-        if(!editor_result_check(result)) result = editor_config_gui_override_save(
+    if(valid) {
+        apply_clicked = rohr_ui_button("editor.settings.build.apply",
+            &panel->apply_label, (UIRect){bounds.x + bounds.width - 250.0f,
+                bounds.y + bounds.height - 54.0f, 100.0f, 34.0f}, NULL).clicked;
+    } else {
+        rohr_ui_button_disabled((UIRect){bounds.x + bounds.width - 250.0f,
+            bounds.y + bounds.height - 54.0f, 100.0f, 34.0f}, NULL);
+    }
+    if(apply_clicked) {
+        result = editor_config_gui_override_save(
             project_directory, panel->configure_override ? &configure : NULL,
             panel->compile_override ? &compile : NULL);
         editor_build_settings_error_set(panel, result);

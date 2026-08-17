@@ -117,6 +117,8 @@ placeholders. GUI-owned overrides are written atomically to
 `.rohr/gui-overrides.lua`; `editor.lua` remains untouched. Each field can be
 reset independently to its inherited value. The command fields show three
 lines at once, wrap long Lua expressions, and scroll vertically when focused.
+Validation runs while editing and reports success or the specific field error;
+Apply remains disabled until both Lua command arrays are valid.
 
 The executable name is the PascalCase project directory name (`my-game`
 becomes `MyGame`).

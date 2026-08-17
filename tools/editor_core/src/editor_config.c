@@ -52,6 +52,11 @@ static EditorResult editor_config_command_read(lua_State *lua, int table,
         memcpy(command->arguments[i], value, length + 1);
         lua_pop(lua, 1);
     }
+    if(command->arguments[0][0] == '\0') {
+        lua_pop(lua, 1);
+        return editor_config_error(path,
+            "command executable must not be empty");
+    }
     command->count = count;
     command->set = true;
     lua_pop(lua, 1);
@@ -277,6 +282,11 @@ EditorResult editor_config_command_expression_parse(const char *expression,
         }
         memcpy(command->arguments[i], value, length + 1);
         lua_pop(lua, 1);
+    }
+    if(command->arguments[0][0] == '\0') {
+        lua_close(lua);
+        return editor_config_error("build override",
+            "command executable must not be empty");
     }
     lua_pushnil(lua);
     size_t key_count = 0;
