@@ -6,6 +6,16 @@ build_directory="$project_root/build"
 sdk_directory="$project_root/dist/rohr"
 operation=${1:-build}
 
+if [ -z "${IN_NIX_SHELL:-}" ]; then
+    if ! command -v nix >/dev/null 2>&1; then
+        echo "Error: Nix is required to enter the Rohr development environment." >&2
+        echo "Install Nix, then run: $0 $*" >&2
+        exit 1
+    fi
+
+    exec nix develop "$project_root" -c "$0" "$@"
+fi
+
 configure() {
     cmake -S "$project_root" -B "$build_directory"
 }
