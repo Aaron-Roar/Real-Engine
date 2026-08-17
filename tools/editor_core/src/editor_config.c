@@ -4,7 +4,18 @@
 #include "lua.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+#if defined(_WIN32)
+#include <io.h>
+#define editor_config_access(path) (_access((path), 0) == 0)
+#define EDITOR_CONFIG_PATH_SEPARATOR ';'
+#else
+#include <unistd.h>
+#define editor_config_access(path) (access((path), X_OK) == 0)
+#define EDITOR_CONFIG_PATH_SEPARATOR ':'
+#endif
 
 #ifndef ROHR_DEVELOPMENT_SHARE_DIR
 #define ROHR_DEVELOPMENT_SHARE_DIR ""
@@ -233,11 +244,13 @@ EditorResult editor_config_sdk_path_get(char *output, size_t capacity,
         "Could not locate SDK editor config: %s", name) : editor_result_value(true);
 }
 
-EditorResult editor_config_command_expression_parse(const char *expression,
-        EditorConfigCommand *command) {
+EditorResult editor_config_command_expression_parse_detailed(
+        const char *expression, EditorConfigCommand *command,
+        char *lua_error, size_t lua_error_capacity) {
     lua_State *lua;
     char source[UI_FIELD_EDIT_MAX + 16];
     size_t count;
+    if(lua_error != NULL && lua_error_capacity > 0) lua_error[0] = '\0';
     if(expression == NULL || command == NULL || expression[0] == '\0')
         return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
             "Build override must be a non-empty Lua array");
@@ -249,8 +262,13 @@ EditorResult editor_config_command_expression_parse(const char *expression,
         "Could not allocate the Lua configuration state");
     if(luaL_loadbuffer(lua, source, strlen(source), "build override") != LUA_OK ||
             lua_pcall(lua, 0, 1, 0) != LUA_OK) {
-        EditorResult result = editor_config_error("build override",
-            lua_tostring(lua, -1));
+        const char *message = lua_tostring(lua, -1);
+        EditorResult result;
+        if(lua_error != NULL && lua_error_capacity > 0)
+            snprintf(lua_error, lua_error_capacity, "%s",
+                message == NULL ? "Unknown Lua error" : message);
+        result = editor_result_error(EDITOR_ERROR_SCHEMA_INVALID,
+            "Build override contains invalid Lua syntax or evaluation");
         lua_close(lua);
         return result;
     }
@@ -342,6 +360,12 @@ EditorResult editor_config_command_expression_parse(const char *expression,
     return editor_result_value(true);
 }
 
+EditorResult editor_config_command_expression_parse(const char *expression,
+        EditorConfigCommand *command) {
+    return editor_config_command_expression_parse_detailed(expression, command,
+        NULL, 0);
+}
+
 EditorResult editor_config_command_expression_write(const EditorConfigCommand *command,
         char *output, size_t capacity) {
     size_t used = 0;
@@ -375,6 +399,87 @@ EditorResult editor_config_command_expression_write(const EditorConfigCommand *c
     output[used] = '\0';
 #undef EDITOR_CONFIG_WRITE
     return editor_result_value(true);
+}
+
+static bool editor_config_executable_file_check(const char *path) {
+    SDL_PathInfo info;
+    return path != NULL && editor_config_access(path) &&
+        SDL_GetPathInfo(path, &info) && info.type == SDL_PATHTYPE_FILE;
+}
+
+static bool editor_config_executable_candidate_check(const char *path) {
+    if(editor_config_executable_file_check(path)) return true;
+#if defined(_WIN32)
+    const char *extensions = getenv("PATHEXT");
+    char candidate[EDITOR_CONFIG_ARGUMENT_LENGTH_MAX];
+    const char *last_separator = strrchr(path, '/');
+    const char *windows_separator = strrchr(path, '\\');
+    const char *name = last_separator == NULL ? path : last_separator + 1;
+    if(windows_separator != NULL && windows_separator + 1 > name)
+        name = windows_separator + 1;
+    if(strrchr(name, '.') != NULL) return false;
+    if(extensions == NULL || extensions[0] == '\0')
+        extensions = ".COM;.EXE;.BAT;.CMD";
+    while(true) {
+        const char *end = strchr(extensions, ';');
+        size_t length = end == NULL ? strlen(extensions) :
+            (size_t)(end - extensions);
+        int count = snprintf(candidate, sizeof(candidate), "%s%.*s", path,
+            (int)length, extensions);
+        if(count >= 0 && (size_t)count < sizeof(candidate) &&
+                editor_config_executable_file_check(candidate)) return true;
+        if(end == NULL) break;
+        extensions = end + 1;
+    }
+#endif
+    return false;
+}
+
+EditorResult editor_config_command_executable_check(
+        const EditorConfigCommand *command, const char *project_directory) {
+    const char *executable;
+    const char *environment;
+    bool explicit_path;
+    if(command == NULL || !command->set || command->count == 0 ||
+            command->arguments[0][0] == '\0') return editor_result_error(
+        EDITOR_ERROR_INVALID_ARGUMENT, "Build command has no executable");
+    executable = command->arguments[0];
+    explicit_path = strchr(executable, '/') != NULL ||
+        strchr(executable, '\\') != NULL;
+    if(explicit_path) {
+        char path[EDITOR_CONFIG_ARGUMENT_LENGTH_MAX];
+        bool absolute = executable[0] == '/' || executable[0] == '\\' ||
+            (strlen(executable) > 2 && executable[1] == ':');
+        int count = absolute ? snprintf(path, sizeof(path), "%s", executable) :
+            snprintf(path, sizeof(path), "%s/%s",
+                project_directory == NULL ? "." : project_directory, executable);
+        if(count >= 0 && (size_t)count < sizeof(path) &&
+                editor_config_executable_candidate_check(path))
+            return editor_result_value(true);
+        return editor_result_error(EDITOR_ERROR_NOT_FOUND,
+            "Build executable is unavailable: %s", executable);
+    }
+    environment = getenv("PATH");
+    if(environment != NULL) {
+        const char *start = environment;
+        while(true) {
+            const char *end = strchr(start, EDITOR_CONFIG_PATH_SEPARATOR);
+            size_t length = end == NULL ? strlen(start) : (size_t)(end - start);
+            char candidate[EDITOR_CONFIG_ARGUMENT_LENGTH_MAX];
+            int count;
+            if(length == 0) count = snprintf(candidate, sizeof(candidate),
+                "%s", executable);
+            else count = snprintf(candidate, sizeof(candidate), "%.*s/%s",
+                (int)length, start, executable);
+            if(count >= 0 && (size_t)count < sizeof(candidate) &&
+                    editor_config_executable_candidate_check(candidate))
+                return editor_result_value(true);
+            if(end == NULL) break;
+            start = end + 1;
+        }
+    }
+    return editor_result_error(EDITOR_ERROR_NOT_FOUND,
+        "Build executable was not found in PATH: %s", executable);
 }
 
 static bool editor_config_lua_command_write(FILE *file, const char *name,

@@ -36,5 +36,6 @@ if(ROHR_BUILD_TESTS)
         EDITOR_CONFIG_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
     set_target_properties(editor_config_test PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
-    add_test(NAME editor_config COMMAND editor_config_test)
+    add_test(NAME editor_config COMMAND editor_config_test
+        $<TARGET_FILE:editor_config_test>)
 endif()

@@ -7,6 +7,7 @@ add_executable(rohr_editor_gui
     src/panels/editor_bulk_panel.c
     src/panels/editor_build_settings_panel.c
     src/panels/editor_generation_report.c
+    src/panels/editor_notification_panel.c
     src/panels/editor_origin_panel.c
     src/panels/editor_terminal_panel.c
     src/main.c

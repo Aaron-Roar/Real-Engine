@@ -117,8 +117,16 @@ placeholders. GUI-owned overrides are written atomically to
 `.rohr/gui-overrides.lua`; `editor.lua` remains untouched. Each field can be
 reset independently to its inherited value. The command fields show three
 lines at once, wrap long Lua expressions, and scroll vertically when focused.
-Validation runs while editing and reports success or the specific field error;
-Apply remains disabled until both Lua command arrays are valid.
+Validation runs while editing and reports success or the specific field error.
+Apply saves only when both Lua command arrays are valid and their first
+arguments resolve to executable files through explicit paths or `PATH`. Windows
+lookup also checks the standard executable extensions without running the file.
+An Apply failure creates a bottom-left notification reading
+`Build configuration (GUI) - FAIL`. Clicking it opens a detailed report with
+the editor parser error followed by Lua's raw error; invalid configuration is
+never written. A successful Apply saves the overrides and immediately starts
+the configured configure-and-compile sequence, so a separate test-command
+action is unnecessary.
 
 The executable name is the PascalCase project directory name (`my-game`
 becomes `MyGame`).

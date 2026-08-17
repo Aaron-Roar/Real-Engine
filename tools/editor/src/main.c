@@ -13,6 +13,7 @@
 #include "panels/editor_bulk_panel.h"
 #include "panels/editor_build_settings_panel.h"
 #include "panels/editor_generation_report.h"
+#include "panels/editor_notification_panel.h"
 #include "panels/editor_terminal_panel.h"
 
 #include <math.h>
@@ -1680,6 +1681,7 @@ int main(void) {
     EditorOriginPanel origin_panel = {0};
     EditorBulkPanel bulk_panel = {0};
     EditorBuildSettingsPanel build_settings_panel = {0};
+    EditorNotificationPanel notification_panel = {0};
     EditorTerminalPanel terminal_panel = {0};
     SDL_Process *hidden_build_process = NULL;
     bool hidden_compile_pending = false;
@@ -1891,6 +1893,7 @@ int main(void) {
             !editor_origin_panel_create(&origin_panel, &font) ||
             !editor_bulk_panel_create(&bulk_panel, &font) ||
             !editor_build_settings_panel_create(&build_settings_panel, &font) ||
+            !editor_notification_panel_create(&notification_panel, &font) ||
             !editor_terminal_panel_create(&terminal_panel, &font)) goto fail;
     terminal_panel.visible = true;
     if(!editor_text_create(&font, "#FFFFFFFF", &color_picker_hex_field) ||
@@ -1966,7 +1969,10 @@ int main(void) {
         editor_history_continuous_set(&history, field_editing ||
             mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_PRESSED ||
             mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_DOWN);
-        if(build_settings_panel.open &&
+        if(notification_panel.report_open &&
+                rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
+            notification_panel.report_open = false;
+        } else if(build_settings_panel.open &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             build_settings_panel.open = false;
             rohr_ui_field_focus_clear();
@@ -2132,7 +2138,8 @@ int main(void) {
             fmaxf(560.0f, EDITOR_VIEWPORT_WIDTH * 0.84f),
             fminf(500.0f, WINDOW_HEIGHT - EDITOR_MENU_HEIGHT - 68.0f)
         };
-        if(build_settings_panel.open) rohr_ui_modal_set(build_settings_bounds);
+        if(build_settings_panel.open || notification_panel.report_open)
+            rohr_ui_modal_set(build_settings_bounds);
         if(panel_scroll_mode != viewport_state.mode) {
             panel_scroll_mode = viewport_state.mode;
             panel_scroll_offset = 0.0f;
@@ -4731,8 +4738,24 @@ int main(void) {
                 if(editor_result_check(result)) editor_result_stderr_print(result);
             }
         }
-        editor_build_settings_panel_draw(&build_settings_panel,
-            workspace.directory, build_settings_bounds);
+        if(!notification_panel.report_open)
+            editor_build_settings_panel_draw(&build_settings_panel,
+                &notification_panel, workspace.directory, build_settings_bounds);
+        if(build_settings_panel.build_requested) {
+            build_settings_panel.build_requested = false;
+            if(!editor_cmake_compile_start(&terminal_panel,
+                    &hidden_build_process, &hidden_compile_pending,
+                    hidden_build_directory, sizeof(hidden_build_directory),
+                    workspace.directory, terminal_build_operations)) {
+                editor_notification_panel_push(&notification_panel,
+                    "Build configuration (GUI) - FAIL",
+                    "Parser error:\nThe build command could not be started.\n\n"
+                    "Lua error:\nNo Lua runtime error.");
+            }
+        }
+        editor_notification_panel_toast_draw(&notification_panel, WINDOW_HEIGHT);
+        editor_notification_panel_report_draw(&notification_panel,
+            build_settings_bounds);
         if(close_action != EDITOR_CLOSE_NONE) {
             UIRect dialog = {
                 editor_window_width * 0.5f - 220.0f,
@@ -5014,6 +5037,7 @@ int main(void) {
     if(hidden_build_process != NULL) SDL_DestroyProcess(hidden_build_process);
     editor_terminal_panel_destroy(&terminal_panel);
     editor_build_settings_panel_destroy(&build_settings_panel);
+    editor_notification_panel_destroy(&notification_panel);
     editor_bulk_panel_destroy(&bulk_panel);
     editor_origin_panel_destroy(&origin_panel);
     rohr_graphics_text_destroy(&stiffness_label);
@@ -5192,6 +5216,7 @@ fail:
     if(hidden_build_process != NULL) SDL_DestroyProcess(hidden_build_process);
     editor_terminal_panel_destroy(&terminal_panel);
     editor_build_settings_panel_destroy(&build_settings_panel);
+    editor_notification_panel_destroy(&notification_panel);
     editor_bulk_panel_destroy(&bulk_panel);
     editor_origin_panel_destroy(&origin_panel);
     rohr_graphics_text_destroy(&stiffness_label);

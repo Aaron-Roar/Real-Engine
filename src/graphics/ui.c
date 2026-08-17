@@ -237,8 +237,6 @@ static UIButtonResult ui_interaction_resolved(const char *id, UIRect bounds) {
     ui_navigation_item_register(interaction_id, bounds);
     return ui_interaction_id(interaction_id,
         ui_point_in_rect(ui_context.input.pointer, bounds) &&
-            (!ui_context.modal_active ||
-                ui_point_in_rect(ui_context.input.pointer, ui_context.modal_bounds)) &&
             ui_point_in_scroll_clip(ui_context.input.pointer));
 }
 

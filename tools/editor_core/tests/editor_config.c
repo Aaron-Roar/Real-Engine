@@ -12,7 +12,7 @@ static bool path_get(char *path, size_t capacity, const char *name) {
     return count >= 0 && (size_t)count < capacity;
 }
 
-int main(void) {
+int main(int count, char **program_arguments) {
     EditorConfig config;
     EditorResult result;
     const EditorConfigCommand *command;
@@ -20,6 +20,7 @@ int main(void) {
     char arguments[EDITOR_CONFIG_ARGUMENT_MAX][EDITOR_CONFIG_ARGUMENT_LENGTH_MAX];
     const char *output[EDITOR_CONFIG_ARGUMENT_MAX + 1];
     EditorConfigCommand parsed;
+    char lua_error[EDITOR_ERROR_MESSAGE_MAX];
 
     editor_config_init(&config);
     if(!path_get(path, sizeof(path), "config-base.lua")) return 1;
@@ -72,6 +73,22 @@ int main(void) {
     if(!editor_result_check(result)) return 1;
     result = editor_config_command_expression_parse("{ \"\" }", &parsed);
     if(!editor_result_check(result)) return 1;
+    result = editor_config_command_expression_parse_detailed("{", &parsed,
+        lua_error, sizeof(lua_error));
+    if(!editor_result_check(result) || lua_error[0] == '\0') return 1;
+    if(count < 2) return 1;
+    memset(&parsed, 0, sizeof(parsed));
+    parsed.set = true;
+    parsed.count = 1;
+    snprintf(parsed.arguments[0], sizeof(parsed.arguments[0]), "%s",
+        program_arguments[1]);
+    result = editor_config_command_executable_check(&parsed, ".");
+    if(editor_result_check(result)) return 1;
+    snprintf(parsed.arguments[0], sizeof(parsed.arguments[0]), "%s",
+        "rohr-editor-definitely-missing-executable");
+    result = editor_config_command_executable_check(&parsed, ".");
+    if(!editor_result_check(result) ||
+            strstr(result.result.error.message, "PATH") == NULL) return 1;
 
     {
         const char *root = "/tmp/rohr_editor_gui_config_test";

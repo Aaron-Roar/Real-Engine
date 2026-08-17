@@ -48,8 +48,13 @@ EditorResult editor_config_command_expand(const EditorConfigCommand *command,
     const char *output[EDITOR_CONFIG_ARGUMENT_MAX + 1]);
 EditorResult editor_config_command_expression_parse(const char *expression,
     EditorConfigCommand *command);
+EditorResult editor_config_command_expression_parse_detailed(
+    const char *expression, EditorConfigCommand *command,
+    char *lua_error, size_t lua_error_capacity);
 EditorResult editor_config_command_expression_write(const EditorConfigCommand *command,
     char *output, size_t capacity);
+EditorResult editor_config_command_executable_check(
+    const EditorConfigCommand *command, const char *project_directory);
 EditorResult editor_config_gui_override_save(const char *project_directory,
     const EditorConfigCommand *configure, const EditorConfigCommand *compile);
 EditorResult editor_config_sdk_path_get(char *output, size_t capacity,
