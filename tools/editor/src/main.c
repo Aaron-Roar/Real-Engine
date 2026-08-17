@@ -424,7 +424,7 @@ static void editor_window_layout_sync(void) {
 
 static bool editor_result_ok(EngineResult result) {
     if(!rohr_error_check(result)) return true;
-    fprintf(stderr, "%s\n", rohr_error_string(result));
+    fprintf(stderr, "%s\n", rohr_error_message_get(result));
     return false;
 }
 
@@ -513,7 +513,7 @@ static bool editor_text_create(
     result = rohr_graphics_text_create(font, value, (Color){230, 234, 242, 255});
     if(rohr_error_check(result)) {
         fprintf(stderr, "%s\n",
-            rohr_error_default_message_get(result.result.error));
+            rohr_error_message_get(result));
         return false;
     }
     *text = result.result.value;

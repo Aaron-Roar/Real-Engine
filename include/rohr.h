@@ -105,11 +105,11 @@ EngineResult rohr_error_result_error(EngineError error);
 #define rohr_error_check(ResultValue) error_check(ResultValue)
 
 /**
- * @brief Returns a user-facing default message for an engine error.
+ * @brief Returns the static message associated with an engine error code.
  * @param error Error code to describe.
  * @return Static string describing error.
  */
-const char *rohr_error_default_message_get(EngineError error);
+const char *rohr_error_code_message_get(EngineError error);
 
 /**
  * @brief Returns a result's error message with captured low-level detail.
@@ -120,7 +120,7 @@ const char *rohr_error_default_message_get(EngineError error);
  * @param ResultValue Generated Rohr result value to describe.
  * @return Engine-owned string valid until the next error.
  */
-#define rohr_error_string(ResultValue) \
+#define rohr_error_message_get(ResultValue) \
     error_result_message_get((ResultValue).kind, (ResultValue).result.error)
 
 /**

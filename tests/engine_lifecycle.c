@@ -16,17 +16,17 @@ int main(void) {
     EntityResult kinematic_entity;
     EngineResult result = error_result_error_detail(
         ERROR_ENGINE_SDL_INIT_FAILED, "test SDL cause");
-    if(strstr(rohr_error_string(result), "test SDL cause") == NULL) {
+    if(strstr(rohr_error_message_get(result), "test SDL cause") == NULL) {
         return 1;
     }
     result = error_result_error(ERROR_ENGINE_SDL_INIT_FAILED);
-    if(strcmp(rohr_error_string(result),
-            rohr_error_default_message_get(result.result.error)) != 0) {
+    if(strcmp(rohr_error_message_get(result),
+            rohr_error_code_message_get(result.result.error)) != 0) {
         return 1;
     }
     result = rohr_engine_init();
     if(rohr_error_check(result)) {
-        fprintf(stderr, "%s\n", rohr_error_default_message_get(result.result.error));
+        fprintf(stderr, "%s\n", rohr_error_message_get(result));
         return 1;
     }
     if(rohr_physics_solver_iterations_get() != PHYSICS_SOLVER_ITERATIONS_DEFAULT ||

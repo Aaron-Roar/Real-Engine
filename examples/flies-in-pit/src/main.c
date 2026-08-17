@@ -8,7 +8,7 @@ const float large_fly_control_acceleration = 240.0f;
 const Torque large_fly_control_torque = 2000000.0f;
 
 #define PRINT_ENGINE_ERROR(engine_result) \
-    fprintf(stderr, "%s\n", rohr_error_string(engine_result))
+    fprintf(stderr, "%s\n", rohr_error_message_get(engine_result))
 
 int main(void) {
     UIPhysicsDebugPanel debug_panel = {0};

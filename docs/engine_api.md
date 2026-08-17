@@ -177,13 +177,13 @@ Checks whether a result contains an error.
 
 **Returns:** true when ResultValue contains an error, false otherwise.
 
-### `rohr_error_default_message_get`
+### `rohr_error_code_message_get`
 
 ```c
-const char *rohr_error_default_message_get(EngineError error);
+const char *rohr_error_code_message_get(EngineError error);
 ```
 
-Returns a user-facing default message for an engine error.
+Returns the static message associated with an engine error code.
 
 | Parameter | Description |
 | --- | --- |
@@ -191,10 +191,10 @@ Returns a user-facing default message for an engine error.
 
 **Returns:** Static string describing error.
 
-### `rohr_error_string`
+### `rohr_error_message_get`
 
 ```c
-#define rohr_error_string(ResultValue) \
+#define rohr_error_message_get(ResultValue) \
     error_result_message_get((ResultValue).kind, (ResultValue).result.error)
 ```
 

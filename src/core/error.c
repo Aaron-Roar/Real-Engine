@@ -44,7 +44,7 @@ EngineResult error_result_error_detail(EngineError error, const char *detail) {
     return result;
 }
 
-const char *error_default_message_get(EngineError error) {
+const char *error_code_message_get(EngineError error) {
     switch(error) {
         case ERROR_NONE:
             return "no error";
@@ -133,8 +133,8 @@ const char *error_default_message_get(EngineError error) {
     }
 }
 
-const char *error_message_get(EngineError error) {
-    const char *message = error_default_message_get(error);
+static const char *error_combined_message_get(EngineError error) {
+    const char *message = error_code_message_get(error);
     if(error_detail_code != error || error_detail[0] == '\0') return message;
     snprintf(error_message, sizeof(error_message), "%s: %s", message, error_detail);
     return error_message;
@@ -142,9 +142,9 @@ const char *error_message_get(EngineError error) {
 
 const char *error_result_message_get(ErrorResultKind kind, EngineError error) {
     if(kind != ERROR_RESULT_ERROR) return "result contains no error";
-    return error_message_get(error);
+    return error_combined_message_get(error);
 }
 
 void error_stderr_print(EngineError error) {
-    fprintf(stderr, "%s\n", error_message_get(error));
+    fprintf(stderr, "%s\n", error_combined_message_get(error));
 }

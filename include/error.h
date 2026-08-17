@@ -166,7 +166,7 @@ void error_detail_set(EngineError error, const char *detail);
  * @param error Error code to describe.
  * @return Static string owned by the error module.
  */
-const char *error_default_message_get(EngineError error);
+const char *error_code_message_get(EngineError error);
 
 /**
  * Get the human-readable message for an EngineError.
@@ -177,8 +177,6 @@ const char *error_default_message_get(EngineError error);
  * @param error Error code to describe.
  * @return Static string owned by the error module.
  */
-const char *error_message_get(EngineError error);
-
 /** Get a result's error message, or a diagnostic for a successful result. */
 const char *error_result_message_get(ErrorResultKind kind, EngineError error);
 
