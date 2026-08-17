@@ -10,6 +10,20 @@ static const UIButtonStyle notification_style = {
     .disabled = {70, 70, 70, 255}
 };
 
+static const UIButtonStyle notification_content_style = {
+    .idle = {91, 32, 38, 0},
+    .hovered = {124, 43, 51, 170},
+    .pressed = {70, 22, 27, 210},
+    .disabled = {70, 70, 70, 0}
+};
+
+static const UIButtonStyle notification_dismiss_style = {
+    .idle = {180, 35, 43, 105},
+    .hovered = {220, 48, 58, 190},
+    .pressed = {130, 20, 27, 220},
+    .disabled = {90, 35, 40, 80}
+};
+
 static bool editor_notification_text_create(const FontAsset *font,
         const char *value, TextAsset *text) {
     TextAssetResult result = rohr_graphics_text_create(font, value,
@@ -20,7 +34,7 @@ static bool editor_notification_text_create(const FontAsset *font,
 }
 
 static void editor_notification_select(EditorNotificationPanel *panel,
-        uint64_t id) {
+        uint64_t id, bool preserve_log) {
     EditorNotificationRecord *entry = editor_notification_store_id_get(
         &panel->store, id);
     if(entry == NULL) return;
@@ -28,7 +42,7 @@ static void editor_notification_select(EditorNotificationPanel *panel,
     (void)rohr_graphics_text_value_set(&panel->report_title, entry->summary);
     (void)rohr_graphics_text_value_set(&panel->detail_text, entry->detail);
     panel->report_scroll_offset = 0.0f;
-    panel->log_open = false;
+    if(!preserve_log) panel->log_open = false;
     panel->report_open = true;
 }
 
@@ -50,8 +64,9 @@ bool editor_notification_panel_create(EditorNotificationPanel *panel,
                 &panel->log_label) &&
             editor_notification_text_create(font, "Notification Log",
                 &panel->log_title) &&
-            editor_notification_text_create(font, "Close", &panel->close_label))
-        return true;
+            editor_notification_text_create(font, "Close", &panel->close_label) &&
+            editor_notification_text_create(toast_font, "x",
+                &panel->toast_dismiss_label)) return true;
     editor_notification_panel_destroy(panel);
     return false;
 }
@@ -96,8 +111,13 @@ void editor_notification_panel_toast_draw(EditorNotificationPanel *panel,
     rohr_ui_modal_controls_begin();
     if(rohr_ui_button("editor.notification.log", &panel->log_label,
             log_bounds, NULL).clicked) {
-        panel->report_open = false;
-        panel->log_open = true;
+        if(panel->log_open) {
+            panel->log_open = false;
+            panel->report_open = false;
+        } else {
+            panel->report_open = false;
+            panel->log_open = true;
+        }
     }
     if(!panel->report_open && !panel->log_open) {
         for(size_t slot = 0; slot < panel->store.toast_count; slot += 1) {
@@ -106,19 +126,40 @@ void editor_notification_panel_toast_draw(EditorNotificationPanel *panel,
                 &panel->store, panel->store.toast_ids[toast_index]);
             size_t index;
             char id[64];
+            char dismiss_id[72];
             UIRect bounds = {log_bounds.x,
                 log_bounds.y - EDITOR_NOTIFICATION_TOAST_GAP -
                     EDITOR_NOTIFICATION_TOAST_HEIGHT -
                     (EDITOR_NOTIFICATION_TOAST_HEIGHT +
                         EDITOR_NOTIFICATION_TOAST_GAP) * (float)slot,
                 log_bounds.width, EDITOR_NOTIFICATION_TOAST_HEIGHT};
+            UIRect dismiss_bounds = {
+                bounds.x + bounds.width - EDITOR_NOTIFICATION_TOAST_DISMISS_SIZE -
+                    EDITOR_NOTIFICATION_TOAST_DISMISS_INSET,
+                bounds.y + EDITOR_NOTIFICATION_TOAST_DISMISS_INSET,
+                EDITOR_NOTIFICATION_TOAST_DISMISS_SIZE,
+                EDITOR_NOTIFICATION_TOAST_DISMISS_SIZE};
+            UIRect content_bounds = {bounds.x, bounds.y,
+                bounds.width - EDITOR_NOTIFICATION_TOAST_DISMISS_SIZE -
+                    EDITOR_NOTIFICATION_TOAST_DISMISS_INSET * 2.0f,
+                bounds.height};
             if(entry == NULL) continue;
             index = (size_t)(entry - panel->store.entries);
             snprintf(id, sizeof(id), "editor.notification.toast.%llu",
                 (unsigned long long)entry->id);
-            if(rohr_ui_button(id, &panel->toast_texts[index], bounds,
-                    &notification_style).clicked)
-                editor_notification_select(panel, entry->id);
+            snprintf(dismiss_id, sizeof(dismiss_id),
+                "editor.notification.toast.dismiss.%llu",
+                (unsigned long long)entry->id);
+            rohr_ui_surface(bounds, notification_style.idle);
+            rohr_ui_border(bounds, 1.0f, (Color){22, 5, 8, 255});
+            if(rohr_ui_button(id, &panel->toast_texts[index], content_bounds,
+                    &notification_content_style).clicked)
+                editor_notification_select(panel, entry->id, false);
+            if(rohr_ui_button(dismiss_id, &panel->toast_dismiss_label,
+                    dismiss_bounds, &notification_dismiss_style).clicked) {
+                editor_notification_toast_remove(panel, entry->id);
+                break;
+            }
         }
     }
     rohr_ui_modal_controls_end();
@@ -127,7 +168,7 @@ void editor_notification_panel_toast_draw(EditorNotificationPanel *panel,
 void editor_notification_panel_log_draw(EditorNotificationPanel *panel,
         UIRect bounds) {
     UIRect list_bounds;
-    if(panel == NULL || !panel->log_open) return;
+    if(panel == NULL || !panel->log_open || panel->report_open) return;
     rohr_ui_modal_controls_begin();
     rohr_ui_surface(bounds, (Color){37, 42, 52, 255});
     rohr_ui_border(bounds, 2.0f, (Color){5, 6, 8, 255});
@@ -151,7 +192,7 @@ void editor_notification_panel_log_draw(EditorNotificationPanel *panel,
             (unsigned long long)entry->id);
         if(rohr_ui_button(id, &panel->summary_texts[index], row_bounds,
                 &notification_style).clicked)
-            editor_notification_select(panel, entry->id);
+            editor_notification_select(panel, entry->id, true);
     }
     rohr_ui_scroll_region_end();
     if(rohr_ui_button("editor.notification.log.close", &panel->close_label,
@@ -211,5 +252,6 @@ void editor_notification_panel_destroy(EditorNotificationPanel *panel) {
     rohr_graphics_text_destroy(&panel->log_label);
     rohr_graphics_text_destroy(&panel->log_title);
     rohr_graphics_text_destroy(&panel->close_label);
+    rohr_graphics_text_destroy(&panel->toast_dismiss_label);
     *panel = (EditorNotificationPanel){0};
 }

@@ -22,6 +22,7 @@ typedef struct EditorNotificationPanel {
     TextAsset log_label;
     TextAsset log_title;
     TextAsset close_label;
+    TextAsset toast_dismiss_label;
 } EditorNotificationPanel;
 
 bool editor_notification_panel_create(EditorNotificationPanel *panel,
