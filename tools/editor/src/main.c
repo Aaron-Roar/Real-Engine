@@ -300,7 +300,7 @@ static bool editor_cmake_compile_start(EditorTerminalPanel *terminal,
         count = snprintf(command, sizeof(command), "%s && %s",
             configure_command, compile_command);
         if(count < 0 || (size_t)count >= sizeof(command)) return false;
-        return editor_terminal_panel_command_execute(terminal, command);
+        return editor_terminal_panel_command_execute_tracked(terminal, command);
     }
     if(hidden_process == NULL || hidden_compile_pending == NULL ||
             hidden_directory == NULL || *hidden_process != NULL ||
@@ -1956,14 +1956,41 @@ int main(void) {
             }
         }
         editor_terminal_panel_update(&terminal_panel);
+        {
+            int exit_code;
+            if(editor_terminal_panel_command_completion_take(&terminal_panel,
+                    &exit_code) && exit_code != 0) {
+                char detail[256];
+                snprintf(detail, sizeof(detail),
+                    "The configure-and-compile command exited with status %d.\n\n"
+                    "See the terminal output for the complete build report.",
+                    exit_code);
+                editor_notification_panel_push(&notification_panel,
+                    "Build project - FAIL", detail);
+            }
+        }
         if(hidden_build_process != NULL) {
             int exit_code;
             if(SDL_WaitProcess(hidden_build_process, false, &exit_code)) {
-                bool compile = hidden_compile_pending && exit_code == 0;
+                bool configure_finished = hidden_compile_pending;
+                bool compile = configure_finished && exit_code == 0;
                 hidden_compile_pending = false;
                 SDL_DestroyProcess(hidden_build_process);
                 hidden_build_process = compile ? editor_cmake_hidden_start(
                     hidden_build_directory, false) : NULL;
+                if(exit_code != 0) {
+                    char detail[256];
+                    snprintf(detail, sizeof(detail),
+                        "%s command exited with status %d.",
+                        configure_finished ? "Configure" : "Compile", exit_code);
+                    editor_notification_panel_push(&notification_panel,
+                        "Build project - FAIL", detail);
+                } else if(compile && hidden_build_process == NULL) {
+                    editor_notification_panel_push(&notification_panel,
+                        "Build project - FAIL",
+                        "The compile command could not be started after configure "
+                        "completed successfully.");
+                }
             }
         }
         editor_history_continuous_set(&history, field_editing ||

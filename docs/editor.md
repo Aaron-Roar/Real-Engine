@@ -133,7 +133,10 @@ new notifications appear above it, with a fourth replacing the oldest visible
 notification. The log retains the latest 100 notifications independently of
 that visible stack. Its entries are shown newest first in a scrollable menu;
 clicking either a visible notification or a log entry opens the same detailed
-report.
+report. Detailed reports scroll when their wrapped text is taller than the
+report area. Asynchronous configure or compile failures also create a build
+failure notification; visible builds retain their complete output in the
+terminal.
 
 The executable name is the PascalCase project directory name (`my-game`
 becomes `MyGame`).

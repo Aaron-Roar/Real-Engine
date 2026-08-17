@@ -2,32 +2,18 @@
 #define ROHR_EDITOR_NOTIFICATION_PANEL_H
 
 #include "rohr.h"
+#include "editor_notification_store.h"
 
 #include <stdint.h>
 
-#define EDITOR_NOTIFICATION_SUMMARY_MAX 160
-#define EDITOR_NOTIFICATION_DETAIL_MAX 2048
-#define EDITOR_NOTIFICATION_LOG_MAX 100
-#define EDITOR_NOTIFICATION_TOAST_MAX 3
-
-typedef struct EditorNotificationEntry {
-    uint64_t id;
-    char summary[EDITOR_NOTIFICATION_SUMMARY_MAX];
-    char detail[EDITOR_NOTIFICATION_DETAIL_MAX];
-    TextAsset summary_text;
-} EditorNotificationEntry;
-
 typedef struct EditorNotificationPanel {
-    EditorNotificationEntry entries[EDITOR_NOTIFICATION_LOG_MAX];
-    size_t entry_start;
-    size_t entry_count;
-    uint64_t next_id;
-    uint64_t toast_ids[EDITOR_NOTIFICATION_TOAST_MAX];
-    size_t toast_count;
+    EditorNotificationStore store;
+    TextAsset summary_texts[EDITOR_NOTIFICATION_LOG_MAX];
     uint64_t selected_id;
     bool report_open;
     bool log_open;
     float log_scroll_offset;
+    float report_scroll_offset;
     const FontAsset *font;
     TextAsset detail_text;
     TextAsset report_title;

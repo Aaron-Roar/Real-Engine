@@ -8,6 +8,7 @@ add_executable(rohr_editor_gui
     src/panels/editor_build_settings_panel.c
     src/panels/editor_generation_report.c
     src/panels/editor_notification_panel.c
+    src/panels/editor_notification_store.c
     src/panels/editor_origin_panel.c
     src/panels/editor_terminal_panel.c
     src/main.c
@@ -74,4 +75,14 @@ if(ROHR_BUILD_TESTS)
         RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests
     )
     add_test(NAME editor_history COMMAND editor_history_test)
+
+    add_executable(editor_notification_store_test
+        tests/editor_notification_store.c
+        src/panels/editor_notification_store.c
+    )
+    target_include_directories(editor_notification_store_test PRIVATE src)
+    set_target_properties(editor_notification_store_test PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests
+    )
+    add_test(NAME editor_notification_store COMMAND editor_notification_store_test)
 endif()

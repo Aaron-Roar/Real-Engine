@@ -6,6 +6,8 @@
 #define EDITOR_TERMINAL_DEFAULT_HEIGHT 220.0f
 #define EDITOR_TERMINAL_DIVIDER_HEIGHT 5.0f
 #define EDITOR_TERMINAL_LINE_HEIGHT 17.0f
+#define EDITOR_TERMINAL_COMMAND_MARKER "__ROHR_BUILD_EXIT__"
+#define EDITOR_TERMINAL_TRACKED_COMMAND_MAX 8320
 
 static bool editor_terminal_text_create(FontAsset *font, TextAsset *text) {
     TextAssetResult result = rohr_graphics_text_create(
@@ -158,6 +160,30 @@ void editor_terminal_panel_update(EditorTerminalPanel *panel) {
     result = rohr_terminal_update(panel->terminal);
     if(!result.success) fprintf(stderr, "Terminal update failed: %s\n",
         rohr_terminal_error_message_get(&result));
+    if(panel->tracked_pending) {
+        size_t line_count = rohr_terminal_line_count_get(panel->terminal);
+        for(size_t i = panel->tracked_scan_line; i < line_count; i += 1) {
+            RohrTerminalLineView line = rohr_terminal_line_get(panel->terminal, i);
+            char buffer[128];
+            size_t used = 0;
+            char *marker;
+            for(size_t cell = 0; cell < line.cell_count; cell += 1)
+                used = editor_terminal_codepoint_write(buffer, sizeof(buffer), used,
+                    line.cells[cell].codepoint);
+            buffer[used] = '\0';
+            marker = strstr(buffer, EDITOR_TERMINAL_COMMAND_MARKER);
+            if(marker == buffer) {
+                int exit_code;
+                if(sscanf(marker + strlen(EDITOR_TERMINAL_COMMAND_MARKER), "%d",
+                        &exit_code) == 1) {
+                    panel->tracked_exit_code = exit_code;
+                    panel->tracked_pending = false;
+                    panel->tracked_completed = true;
+                }
+            }
+        }
+        panel->tracked_scan_line = line_count;
+    }
 }
 
 void editor_terminal_panel_operation_write(EditorTerminalPanel *panel,
@@ -187,6 +213,37 @@ bool editor_terminal_panel_command_execute(EditorTerminalPanel *panel,
         return false;
     }
     panel->scroll_offset = 0;
+    return true;
+}
+
+bool editor_terminal_panel_command_execute_tracked(EditorTerminalPanel *panel,
+        const char *command) {
+    char tracked[EDITOR_TERMINAL_TRACKED_COMMAND_MAX];
+    int count;
+    if(panel == NULL || command == NULL || panel->tracked_pending) return false;
+#ifdef _WIN32
+    count = snprintf(tracked, sizeof(tracked),
+        "(%s) && echo " EDITOR_TERMINAL_COMMAND_MARKER "0 || echo "
+        EDITOR_TERMINAL_COMMAND_MARKER "1", command);
+#else
+    count = snprintf(tracked, sizeof(tracked),
+        "%s; printf '\\n" EDITOR_TERMINAL_COMMAND_MARKER "%%d\\n' $?", command);
+#endif
+    if(count < 0 || (size_t)count >= sizeof(tracked)) return false;
+    panel->tracked_scan_line = panel->terminal == NULL ? 0 :
+        rohr_terminal_line_count_get(panel->terminal);
+    panel->tracked_completed = false;
+    panel->tracked_pending = true;
+    if(editor_terminal_panel_command_execute(panel, tracked)) return true;
+    panel->tracked_pending = false;
+    return false;
+}
+
+bool editor_terminal_panel_command_completion_take(EditorTerminalPanel *panel,
+        int *exit_code) {
+    if(panel == NULL || exit_code == NULL || !panel->tracked_completed) return false;
+    *exit_code = panel->tracked_exit_code;
+    panel->tracked_completed = false;
     return true;
 }
 

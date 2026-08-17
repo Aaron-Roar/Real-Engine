@@ -15,6 +15,10 @@ typedef struct EditorTerminalPanel {
     float height;
     float cell_width;
     size_t scroll_offset;
+    size_t tracked_scan_line;
+    int tracked_exit_code;
+    bool tracked_pending;
+    bool tracked_completed;
 } EditorTerminalPanel;
 
 bool editor_terminal_panel_create(EditorTerminalPanel *panel, FontAsset *font);
@@ -30,6 +34,10 @@ void editor_terminal_panel_operation_write(EditorTerminalPanel *panel,
     const char *command);
 bool editor_terminal_panel_command_execute(EditorTerminalPanel *panel,
     const char *command);
+bool editor_terminal_panel_command_execute_tracked(EditorTerminalPanel *panel,
+    const char *command);
+bool editor_terminal_panel_command_completion_take(EditorTerminalPanel *panel,
+    int *exit_code);
 bool editor_terminal_panel_output_write(EditorTerminalPanel *panel,
     const char *output);
 float editor_terminal_panel_viewport_bottom_get(const EditorTerminalPanel *panel);
