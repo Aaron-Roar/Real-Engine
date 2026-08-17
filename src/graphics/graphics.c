@@ -6,7 +6,7 @@
 #include "physics.h"
 #include "core/platform_process.h"
 #include "window_presentation.h"
-#include "graphics_command_order.h"
+#include "graphics_layer_order.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,7 +49,6 @@ typedef enum GraphicsCommandType {
 } GraphicsCommandType;
 
 typedef struct GraphicsCommand {
-    GraphicsCommandOrder order;
     uint32_t screen;
     GraphicsClipState clip;
     GraphicsCommandType type;
@@ -69,11 +68,18 @@ typedef struct GraphicsCommand {
     } data;
 } GraphicsCommand;
 
-static GraphicsCommand *graphics_commands = NULL;
-static size_t graphics_command_count = 0;
-static size_t graphics_command_capacity = 0;
-static uint64_t graphics_command_sequence = 0;
+typedef struct GraphicsLayer {
+    GraphicsLayerOrder order;
+    GraphicsCommand *commands;
+    size_t count;
+    size_t capacity;
+} GraphicsLayer;
+
+static GraphicsLayer *graphics_layers = NULL;
+static size_t graphics_layer_count = 0;
+static size_t graphics_layer_capacity = 0;
 static int graphics_active_layer = 0;
+static size_t graphics_active_layer_index = SIZE_MAX;
 
 typedef struct ActiveCameraAttachment {
     CameraAttachment value;
@@ -145,23 +151,49 @@ static CameraId camera_before_screen = CAMERA_INVALID;
 static EngineResult graphics_screen_destroy(ScreenId id);
 
 static GraphicsCommand *graphics_command_append(GraphicsCommandType type) {
+    GraphicsLayer *layer = NULL;
+    GraphicsLayer *layers;
     GraphicsCommand *commands;
     GraphicsCommand *command;
     if(sdl_renderer == NULL) return NULL;
-    if(graphics_command_count == graphics_command_capacity) {
-        size_t capacity = graphics_command_capacity == 0 ? 256 :
-            graphics_command_capacity * 2;
-        commands = realloc(graphics_commands, capacity * sizeof(*commands));
-        if(commands == NULL) return NULL;
-        graphics_commands = commands;
-        graphics_command_capacity = capacity;
+    if(graphics_active_layer_index < graphics_layer_count &&
+            graphics_layers[graphics_active_layer_index].order.layer ==
+                graphics_active_layer) {
+        layer = &graphics_layers[graphics_active_layer_index];
+    } else {
+        for(size_t i = 0; i < graphics_layer_count; i += 1) {
+            if(graphics_layers[i].order.layer == graphics_active_layer) {
+                layer = &graphics_layers[i];
+                graphics_active_layer_index = i;
+                break;
+            }
+        }
     }
-    command = &graphics_commands[graphics_command_count++];
+    if(layer == NULL) {
+        if(graphics_layer_count == graphics_layer_capacity) {
+            size_t capacity = graphics_layer_capacity == 0 ? 8 :
+                graphics_layer_capacity * 2;
+            layers = realloc(graphics_layers, capacity * sizeof(*layers));
+            if(layers == NULL) return NULL;
+            memset(layers + graphics_layer_capacity, 0,
+                (capacity - graphics_layer_capacity) * sizeof(*layers));
+            graphics_layers = layers;
+            graphics_layer_capacity = capacity;
+        }
+        graphics_active_layer_index = graphics_layer_count;
+        layer = &graphics_layers[graphics_layer_count++];
+        layer->order.layer = graphics_active_layer;
+        layer->count = 0;
+    }
+    if(layer->count == layer->capacity) {
+        size_t capacity = layer->capacity == 0 ? 64 : layer->capacity * 2;
+        commands = realloc(layer->commands, capacity * sizeof(*commands));
+        if(commands == NULL) return NULL;
+        layer->commands = commands;
+        layer->capacity = capacity;
+    }
+    command = &layer->commands[layer->count++];
     *command = (GraphicsCommand){
-        .order = {
-            .layer = graphics_active_layer,
-            .sequence = graphics_command_sequence++
-        },
         .screen = drawing_screen,
         .clip = graphics_clip_state,
         .type = type
@@ -183,6 +215,7 @@ static bool graphics_lines_draw(const SDL_FPoint *points, int count, Color color
 
 void graphics_layer_set(int layer) {
     graphics_active_layer = layer;
+    graphics_active_layer_index = SIZE_MAX;
 }
 
 int graphics_layer_get(void) {
@@ -1592,11 +1625,13 @@ void graphics_renderer_end(void) {
     graphics_vsync_enabled = true;
     graphics_frame_limit = 0;
     graphics_frame_start_ns = 0;
-    free(graphics_commands);
-    graphics_commands = NULL;
-    graphics_command_count = 0;
-    graphics_command_capacity = 0;
-    graphics_command_sequence = 0;
+    for(size_t i = 0; i < graphics_layer_capacity; i += 1)
+        free(graphics_layers[i].commands);
+    free(graphics_layers);
+    graphics_layers = NULL;
+    graphics_layer_count = 0;
+    graphics_layer_capacity = 0;
+    graphics_active_layer_index = SIZE_MAX;
     graphics_active_layer = 0;
     console_write(LOG_ENGINE, "Renderer terminated\n");
 }
@@ -1907,121 +1942,131 @@ static void graphics_commands_execute(void) {
     ScreenId target = UINT32_MAX;
     GraphicsClipState clip = {0};
     bool clip_known = false;
-    if(graphics_command_count > 1)
-        qsort(graphics_commands, graphics_command_count, sizeof(*graphics_commands),
-            graphics_command_order_compare);
-    for(size_t command_index = 0; command_index < graphics_command_count;
+    if(graphics_layer_count > 1)
+        qsort(graphics_layers, graphics_layer_count, sizeof(*graphics_layers),
+              graphics_layer_order_compare);
+    for(size_t layer_index = 0; layer_index < graphics_layer_count; layer_index += 1) {
+        GraphicsLayer *layer = &graphics_layers[layer_index];
+        for(size_t command_index = 0; command_index < layer->count;
             command_index += 1) {
-        GraphicsCommand *command = &graphics_commands[command_index];
-        if(command->screen != target) {
-            size_t slot;
-            SDL_Texture *texture = graphics_screen_slot(command->screen, &slot) ?
-                screens[slot].texture : NULL;
-            (void)SDL_SetRenderTarget(sdl_renderer, texture);
-            (void)SDL_SetRenderViewport(sdl_renderer, NULL);
-            target = command->screen;
-            clip_known = false;
-        }
-        if(!clip_known || command->clip.active != clip.active ||
-                (command->clip.active && memcmp(&command->clip.rectangle,
-                    &clip.rectangle, sizeof(clip.rectangle)) != 0)) {
-            (void)SDL_SetRenderClipRect(sdl_renderer,
-                command->clip.active ? &command->clip.rectangle : NULL);
-            clip = command->clip;
-            clip_known = true;
-        }
-        switch(command->type) {
-            case GRAPHICS_COMMAND_CLEAR: {
-                Color color = command->data.clear.color;
-                (void)SDL_SetRenderDrawColor(sdl_renderer, color.red, color.green,
-                    color.blue, color.alpha);
-                (void)SDL_RenderClear(sdl_renderer);
-                break;
+            GraphicsCommand *command = &layer->commands[command_index];
+            if(command->screen != target) {
+                size_t slot;
+                SDL_Texture *texture = graphics_screen_slot(command->screen, &slot)
+                                           ? screens[slot].texture
+                                           : NULL;
+                (void)SDL_SetRenderTarget(sdl_renderer, texture);
+                (void)SDL_SetRenderViewport(sdl_renderer, NULL);
+                target = command->screen;
+                clip_known = false;
             }
-            case GRAPHICS_COMMAND_RECT: {
-                Color color = command->data.rect.color;
-                (void)SDL_SetRenderDrawColor(sdl_renderer, color.red, color.green,
-                    color.blue, color.alpha);
-                (void)SDL_RenderFillRect(sdl_renderer,
-                    &command->data.rect.rectangle);
-                break;
+            if(!clip_known || command->clip.active != clip.active ||
+               (command->clip.active &&
+                memcmp(&command->clip.rectangle, &clip.rectangle,
+                       sizeof(clip.rectangle)) != 0)) {
+                (void)SDL_SetRenderClipRect(sdl_renderer, command->clip.active
+                                                              ? &command->clip.rectangle
+                                                              : NULL);
+                clip = command->clip;
+                clip_known = true;
             }
-            case GRAPHICS_COMMAND_QUAD: {
-                SDL_Vertex vertices[4] = {0};
-                const int indices[] = {0, 1, 2, 0, 2, 3};
-                const float signs[][2] = {
-                    {-1.0f, -1.0f}, {1.0f, -1.0f},
-                    {1.0f, 1.0f}, {-1.0f, 1.0f}};
-                float half_width = command->data.quad.width * 0.5f;
-                float half_height = command->data.quad.height * 0.5f;
-                Vec2D axis = {cosf(command->data.quad.angle),
-                    -sinf(command->data.quad.angle)};
-                Vec2D perpendicular = {sinf(command->data.quad.angle),
-                    cosf(command->data.quad.angle)};
-                Color color = command->data.quad.color;
-                for(int i = 0; i < 4; i += 1) {
-                    vertices[i].position.x = command->data.quad.center.x +
-                        axis.x * half_width * signs[i][0] +
-                        perpendicular.x * half_height * signs[i][1];
-                    vertices[i].position.y = command->data.quad.center.y +
-                        axis.y * half_width * signs[i][0] +
-                        perpendicular.y * half_height * signs[i][1];
-                    vertices[i].color = (SDL_FColor){color.red / 255.0f,
-                        color.green / 255.0f, color.blue / 255.0f,
-                        color.alpha / 255.0f};
+            switch(command->type) {
+                case GRAPHICS_COMMAND_CLEAR: {
+                    Color color = command->data.clear.color;
+                    (void)SDL_SetRenderDrawColor(sdl_renderer, color.red, color.green,
+                                                 color.blue, color.alpha);
+                    (void)SDL_RenderClear(sdl_renderer);
+                    break;
                 }
-                (void)SDL_RenderGeometry(sdl_renderer, NULL, vertices, 4,
-                    indices, 6);
-                break;
-            }
-            case GRAPHICS_COMMAND_LINES: {
-                Color color = command->data.lines.color;
-                (void)SDL_SetRenderDrawColor(sdl_renderer, color.red, color.green,
-                    color.blue, color.alpha);
-                (void)SDL_RenderLines(sdl_renderer, command->data.lines.points,
-                    command->data.lines.count);
-                break;
-            }
-            case GRAPHICS_COMMAND_SHAPE_FILLED: {
-                SDL_Vertex vertices[MAX_VERTICIES] = {0};
-                int indices[(MAX_VERTICIES - 2) * 3];
-                int index_count = 0;
-                Color color = command->data.shape.color;
-                for(int i = 0; i < command->data.shape.count; i += 1) {
-                    vertices[i].position = command->data.shape.points[i];
-                    vertices[i].color = (SDL_FColor){color.red / 255.0f,
-                        color.green / 255.0f, color.blue / 255.0f,
-                        color.alpha / 255.0f};
+                case GRAPHICS_COMMAND_RECT: {
+                    Color color = command->data.rect.color;
+                    (void)SDL_SetRenderDrawColor(sdl_renderer, color.red, color.green,
+                                                 color.blue, color.alpha);
+                    (void)SDL_RenderFillRect(sdl_renderer,
+                                             &command->data.rect.rectangle);
+                    break;
                 }
-                for(int i = 1; i < command->data.shape.count - 1; i += 1) {
-                    indices[index_count++] = 0;
-                    indices[index_count++] = i;
-                    indices[index_count++] = i + 1;
+                case GRAPHICS_COMMAND_QUAD: {
+                    SDL_Vertex vertices[4] = {0};
+                    const int indices[] = {0, 1, 2, 0, 2, 3};
+                    const float signs[][2] = {
+                        {-1.0f, -1.0f}, {1.0f, -1.0f}, {1.0f, 1.0f}, {-1.0f, 1.0f}};
+                    float half_width = command->data.quad.width * 0.5f;
+                    float half_height = command->data.quad.height * 0.5f;
+                    Vec2D axis = {cosf(command->data.quad.angle),
+                                  -sinf(command->data.quad.angle)};
+                    Vec2D perpendicular = {sinf(command->data.quad.angle),
+                                           cosf(command->data.quad.angle)};
+                    Color color = command->data.quad.color;
+                    for(int i = 0; i < 4; i += 1) {
+                        vertices[i].position.x =
+                            command->data.quad.center.x +
+                            axis.x * half_width * signs[i][0] +
+                            perpendicular.x * half_height * signs[i][1];
+                        vertices[i].position.y =
+                            command->data.quad.center.y +
+                            axis.y * half_width * signs[i][0] +
+                            perpendicular.y * half_height * signs[i][1];
+                        vertices[i].color =
+                            (SDL_FColor){color.red / 255.0f, color.green / 255.0f,
+                                         color.blue / 255.0f, color.alpha / 255.0f};
+                    }
+                    (void)SDL_RenderGeometry(sdl_renderer, NULL, vertices, 4, indices,
+                                             6);
+                    break;
                 }
-                (void)SDL_RenderGeometry(sdl_renderer, NULL, vertices,
-                    command->data.shape.count, indices, index_count);
-                break;
+                case GRAPHICS_COMMAND_LINES: {
+                    Color color = command->data.lines.color;
+                    (void)SDL_SetRenderDrawColor(sdl_renderer, color.red, color.green,
+                                                 color.blue, color.alpha);
+                    (void)SDL_RenderLines(sdl_renderer, command->data.lines.points,
+                                          command->data.lines.count);
+                    break;
+                }
+                case GRAPHICS_COMMAND_SHAPE_FILLED: {
+                    SDL_Vertex vertices[MAX_VERTICIES] = {0};
+                    int indices[(MAX_VERTICIES - 2) * 3];
+                    int index_count = 0;
+                    Color color = command->data.shape.color;
+                    for(int i = 0; i < command->data.shape.count; i += 1) {
+                        vertices[i].position = command->data.shape.points[i];
+                        vertices[i].color =
+                            (SDL_FColor){color.red / 255.0f, color.green / 255.0f,
+                                         color.blue / 255.0f, color.alpha / 255.0f};
+                    }
+                    for(int i = 1; i < command->data.shape.count - 1; i += 1) {
+                        indices[index_count++] = 0;
+                        indices[index_count++] = i;
+                        indices[index_count++] = i + 1;
+                    }
+                    (void)SDL_RenderGeometry(sdl_renderer, NULL, vertices,
+                                             command->data.shape.count, indices,
+                                             index_count);
+                    break;
+                }
+                case GRAPHICS_COMMAND_TEXT:
+                    (void)TTF_DrawRendererText(command->data.text.text,
+                                               command->data.text.position.x,
+                                               command->data.text.position.y);
+                    break;
+                case GRAPHICS_COMMAND_TEXTURE:
+                    (void)SDL_RenderTextureRotated(
+                        sdl_renderer, command->data.texture.texture, NULL,
+                        &command->data.texture.destination,
+                        command->data.texture.degrees, &command->data.texture.center,
+                        SDL_FLIP_NONE);
+                    break;
             }
-            case GRAPHICS_COMMAND_TEXT:
-                (void)TTF_DrawRendererText(command->data.text.text,
-                    command->data.text.position.x,
-                    command->data.text.position.y);
-                break;
-            case GRAPHICS_COMMAND_TEXTURE:
-                (void)SDL_RenderTextureRotated(sdl_renderer,
-                    command->data.texture.texture, NULL,
-                    &command->data.texture.destination,
-                    command->data.texture.degrees,
-                    &command->data.texture.center, SDL_FLIP_NONE);
-                break;
         }
     }
     (void)SDL_SetRenderTarget(sdl_renderer, NULL);
     (void)SDL_SetRenderViewport(sdl_renderer, NULL);
     (void)SDL_SetRenderClipRect(sdl_renderer, NULL);
-    graphics_command_count = 0;
-    graphics_command_sequence = 0;
+    for(size_t i = 0; i < graphics_layer_count; i += 1)
+        graphics_layers[i].count = 0;
+    graphics_layer_count = 0;
     graphics_active_layer = 0;
+    graphics_active_layer_index = SIZE_MAX;
     graphics_clip_state = (GraphicsClipState){0};
     graphics_clip_stack_count = 0;
 }

@@ -47,6 +47,18 @@ The standard pipeline remains the behavioral reference. Custom pipelines may
 omit stages, but their caller owns the resulting behavior and must preserve
 required ordering such as clearing transient constraints before gathering.
 
+## Graphics command layers
+
+Graphics drawing is deferred until `graphics_show()`. Only layers used during
+the current frame are represented. Each active signed layer owns a dense,
+insertion-ordered command buffer; the small sparse layer array is sorted before
+execution. Command buffers retain their allocations between frames, while the
+active layer set and command counts reset after presentation.
+
+This avoids allocating gaps between layer numbers and avoids sorting every draw
+command. Commands submitted to the same layer always execute in submission
+order.
+
 ## Editor
 
 The editor under `tools/editor` is a separate application that links the engine
