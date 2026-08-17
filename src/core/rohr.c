@@ -20,7 +20,6 @@ void rohr_engine_clock_reset(void) { engine_clock_reset(); }
 EngineResult rohr_error_result_value(bool value) { return error_result_value(value); }
 EngineResult rohr_error_result_error(EngineError error) { return error_result_error(error); }
 const char *rohr_error_default_message_get(EngineError error) { return error_default_message_get(error); }
-const char *rohr_error_string(EngineError error) { return error_string(error); }
 void rohr_error_stderr_print(EngineError error) { error_stderr_print(error); }
 
 void rohr_console_logs_print(void) { console_logs_print(); }

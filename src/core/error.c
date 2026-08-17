@@ -1,6 +1,18 @@
 #include "error.h"
 #include <stdio.h>
 
+#define ERROR_DETAIL_CAPACITY 256
+#define ERROR_MESSAGE_CAPACITY 512
+
+static EngineError error_detail_code = ERROR_NONE;
+static char error_detail[ERROR_DETAIL_CAPACITY];
+static char error_message[ERROR_MESSAGE_CAPACITY];
+
+static void error_detail_clear(void) {
+    error_detail_code = ERROR_NONE;
+    error_detail[0] = '\0';
+}
+
 EngineResult error_result_value(bool value) {
     return (EngineResult){
         .kind = ERROR_RESULT_VALUE,
@@ -9,10 +21,27 @@ EngineResult error_result_value(bool value) {
 }
 
 EngineResult error_result_error(EngineError error) {
+    error_detail_clear();
     return (EngineResult){
         .kind = ERROR_RESULT_ERROR,
         .result.error = error
     };
+}
+
+void error_detail_set(EngineError error, const char *detail) {
+    error_detail_clear();
+    if(detail == NULL || detail[0] == '\0') return;
+    error_detail_code = error;
+    snprintf(error_detail, sizeof(error_detail), "%s", detail);
+}
+
+EngineResult error_result_error_detail(EngineError error, const char *detail) {
+    EngineResult result = {
+        .kind = ERROR_RESULT_ERROR,
+        .result.error = error
+    };
+    error_detail_set(error, detail);
+    return result;
 }
 
 const char *error_default_message_get(EngineError error) {
@@ -104,10 +133,18 @@ const char *error_default_message_get(EngineError error) {
     }
 }
 
-const char *error_string(EngineError error) {
-    return error_default_message_get(error);
+const char *error_message_get(EngineError error) {
+    const char *message = error_default_message_get(error);
+    if(error_detail_code != error || error_detail[0] == '\0') return message;
+    snprintf(error_message, sizeof(error_message), "%s: %s", message, error_detail);
+    return error_message;
+}
+
+const char *error_result_message_get(ErrorResultKind kind, EngineError error) {
+    if(kind != ERROR_RESULT_ERROR) return "result contains no error";
+    return error_message_get(error);
 }
 
 void error_stderr_print(EngineError error) {
-    fprintf(stderr, "%s\n", error_default_message_get(error));
+    fprintf(stderr, "%s\n", error_message_get(error));
 }

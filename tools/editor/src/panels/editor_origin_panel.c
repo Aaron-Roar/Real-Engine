@@ -10,8 +10,7 @@ static bool editor_origin_panel_text_create(FontAsset *font, const char *value,
     if(font == NULL || value == NULL || output == NULL) return false;
     result = rohr_graphics_text_create(font, value, (Color){230, 234, 242, 255});
     if(rohr_error_check(result)) {
-        fprintf(stderr, "%s\n",
-            rohr_error_default_message_get(result.result.error));
+        fprintf(stderr, "%s\n", rohr_error_string(result));
         return false;
     }
     *output = result.result.value;

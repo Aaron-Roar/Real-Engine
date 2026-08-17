@@ -16,7 +16,7 @@ int main(void) {
     {
         EngineResult load_result = rohr_game_state_files_load(paths, 2);
         if(rohr_error_check(load_result)) {
-            fprintf(stderr, "%s\n", rohr_error_default_message_get(load_result.result.error));
+            fprintf(stderr, "%s\n", rohr_error_string(load_result));
             rohr_engine_shutdown();
             return 1;
         }

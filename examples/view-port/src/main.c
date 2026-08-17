@@ -12,7 +12,7 @@ const float camera_move_speed = 100.0f;
 const float camera_turn_speed = PI_F * 0.5f;
 
 #define PRINT_ENGINE_ERROR(engine_result) \
-    fprintf(stderr, "%s\n", rohr_error_default_message_get((engine_result).result.error))
+    fprintf(stderr, "%s\n", rohr_error_string(engine_result))
 
 int main(void) {
     UIPhysicsDebugPanel debug_panel = {0};

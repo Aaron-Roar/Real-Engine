@@ -3,6 +3,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 int main(void) {
     const RohrCollisionCategoryMask player = UINT64_C(1) << 1;
@@ -13,7 +14,17 @@ int main(void) {
     ContactInfo contact;
     EntityResult gravity_entity;
     EntityResult kinematic_entity;
-    EngineResult result = rohr_engine_init();
+    EngineResult result = error_result_error_detail(
+        ERROR_ENGINE_SDL_INIT_FAILED, "test SDL cause");
+    if(strstr(rohr_error_string(result), "test SDL cause") == NULL) {
+        return 1;
+    }
+    result = error_result_error(ERROR_ENGINE_SDL_INIT_FAILED);
+    if(strcmp(rohr_error_string(result),
+            rohr_error_default_message_get(result.result.error)) != 0) {
+        return 1;
+    }
+    result = rohr_engine_init();
     if(rohr_error_check(result)) {
         fprintf(stderr, "%s\n", rohr_error_default_message_get(result.result.error));
         return 1;

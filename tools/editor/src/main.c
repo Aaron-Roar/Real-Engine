@@ -424,7 +424,7 @@ static void editor_window_layout_sync(void) {
 
 static bool editor_result_ok(EngineResult result) {
     if(!rohr_error_check(result)) return true;
-    fprintf(stderr, "%s\n", rohr_error_default_message_get(result.result.error));
+    fprintf(stderr, "%s\n", rohr_error_string(result));
     return false;
 }
 

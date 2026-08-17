@@ -1389,7 +1389,8 @@ EngineResult graphics_window_presentation_set(
     result = graphics_window_presentation_apply(sdl_window, config);
     if(error_check(result)) return result;
     if(!graphics_logical_size_set(config.logical_width, config.logical_height))
-        return error_result_error(ERROR_ENGINE_GRAPHICS_WINDOW_PRESENTATION_FAILED);
+        return error_result_error_detail(
+            ERROR_ENGINE_GRAPHICS_WINDOW_PRESENTATION_FAILED, SDL_GetError());
     graphics_aspect_ratio_auto = config.aspect_ratio_auto;
     graphics_window_mode = config.mode;
     return error_result_value(true);
@@ -1409,11 +1410,12 @@ Position graphics_mouse_screen_position_get(void) {
 EngineResult graphics_start(void) {
     console_write(LOG_ENGINE, "---Initializing Graphics---\n");
     if (!SDL_InitSubSystem(SDL_INIT_VIDEO)) {
-        SDL_Log("Couldn't initialize SDL: %s", SDL_GetError());
-        return error_result_error(ERROR_ENGINE_GRAPHICS_INIT_FAILED);
+        return error_result_error_detail(ERROR_ENGINE_GRAPHICS_INIT_FAILED,
+            SDL_GetError());
     }
     if(!TTF_Init()) {
-        return error_result_error(ERROR_ENGINE_GRAPHICS_INIT_FAILED);
+        return error_result_error_detail(ERROR_ENGINE_GRAPHICS_INIT_FAILED,
+            SDL_GetError());
     }
     ttf_initialized = true;
 
@@ -1428,19 +1430,32 @@ EngineResult graphics_start(void) {
             &sdl_window,
             &sdl_renderer
         )) {
-        SDL_Log("Couldn't create window/renderer: %s", SDL_GetError());
+        char detail[256];
+        snprintf(detail, sizeof(detail), "%s", SDL_GetError());
         TTF_Quit();
         ttf_initialized = false;
-        return error_result_error(ERROR_ENGINE_GRAPHICS_INIT_FAILED);
+        return error_result_error_detail(ERROR_ENGINE_GRAPHICS_INIT_FAILED,
+            detail);
     }
 
     console_write(LOG_ENGINE, "Configuring renderer\n");
-    SDL_SetRenderLogicalPresentation(
+    if(!SDL_SetRenderLogicalPresentation(
         sdl_renderer,
         WINDOW_WIDTH,
         WINDOW_HEIGHT,
         SDL_LOGICAL_PRESENTATION_LETTERBOX
-    );
+    )) {
+        char detail[256];
+        snprintf(detail, sizeof(detail), "%s", SDL_GetError());
+        SDL_DestroyRenderer(sdl_renderer);
+        SDL_DestroyWindow(sdl_window);
+        sdl_renderer = NULL;
+        sdl_window = NULL;
+        TTF_Quit();
+        ttf_initialized = false;
+        return error_result_error_detail(ERROR_ENGINE_GRAPHICS_INIT_FAILED,
+            detail);
+    }
     graphics_logical_width = WINDOW_WIDTH;
     graphics_logical_height = WINDOW_HEIGHT;
     graphics_aspect_ratio_auto = false;
@@ -1450,13 +1465,16 @@ EngineResult graphics_start(void) {
     graphics_frame_start_ns = SDL_GetTicksNS();
     ttf_text_engine = TTF_CreateRendererTextEngine(sdl_renderer);
     if(ttf_text_engine == NULL) {
+        char detail[256];
+        snprintf(detail, sizeof(detail), "%s", SDL_GetError());
         SDL_DestroyRenderer(sdl_renderer);
         SDL_DestroyWindow(sdl_window);
         sdl_renderer = NULL;
         sdl_window = NULL;
         TTF_Quit();
         ttf_initialized = false;
-        return error_result_error(ERROR_ENGINE_GRAPHICS_INIT_FAILED);
+        return error_result_error_detail(ERROR_ENGINE_GRAPHICS_INIT_FAILED,
+            detail);
     }
     (void)graphics_camera_active_set(active_camera);
 
@@ -1858,7 +1876,8 @@ EngineResult graphics_vsync_set(bool enabled) {
         return error_result_error(ERROR_ENGINE_GRAPHICS_NOT_INITIALIZED);
     }
     if(!SDL_SetRenderVSync(sdl_renderer, enabled ? 1 : 0)) {
-        return error_result_error(ERROR_ENGINE_GRAPHICS_VSYNC_SET_FAILED);
+        return error_result_error_detail(ERROR_ENGINE_GRAPHICS_VSYNC_SET_FAILED,
+            SDL_GetError());
     }
     graphics_vsync_enabled = enabled;
     graphics_frame_start_ns = SDL_GetTicksNS();
@@ -2026,12 +2045,14 @@ TextureAssetResult graphics_texture_load(TextureDescriptor text_desc) {
         surface = SDL_LoadPNG(png_path);
         SDL_free(png_path);
         if(surface == NULL) {
+            error_detail_set(ERROR_ENGINE_TEXTURE_LOAD_FAILED, SDL_GetError());
             return ERROR_RESULT_MAKE_ERROR(TextureAssetResult, ERROR_ENGINE_TEXTURE_LOAD_FAILED);
         }
 
         asset.texture = SDL_CreateTextureFromSurface(sdl_renderer, surface);
         SDL_DestroySurface(surface);  /* done with this, the texture has a copy of the pixels now. */
         if(asset.texture == NULL) {
+            error_detail_set(ERROR_ENGINE_TEXTURE_LOAD_FAILED, SDL_GetError());
             return ERROR_RESULT_MAKE_ERROR(TextureAssetResult, ERROR_ENGINE_TEXTURE_LOAD_FAILED);
         }
 
@@ -2042,10 +2063,12 @@ FontAssetResult graphics_font_load(FontDescriptor descriptor) {
     FontAsset asset = {0};
 
     if(descriptor.file == NULL || descriptor.point_size <= 0.0f || !ttf_initialized) {
+        error_detail_set(ERROR_ENGINE_FONT_LOAD_FAILED, NULL);
         return ERROR_RESULT_MAKE_ERROR(FontAssetResult, ERROR_ENGINE_FONT_LOAD_FAILED);
     }
     asset.font = TTF_OpenFont(descriptor.file, descriptor.point_size);
     if(asset.font == NULL) {
+        error_detail_set(ERROR_ENGINE_FONT_LOAD_FAILED, SDL_GetError());
         return ERROR_RESULT_MAKE_ERROR(FontAssetResult, ERROR_ENGINE_FONT_LOAD_FAILED);
     }
     return ERROR_RESULT_MAKE_VALUE(FontAssetResult, asset);
@@ -2065,6 +2088,7 @@ TextAssetResult graphics_text_create(const FontAsset *font, const char *value, C
     int height;
 
     if(font == NULL || font->font == NULL || value == NULL || ttf_text_engine == NULL) {
+        error_detail_set(ERROR_ENGINE_TEXT_CREATE_FAILED, NULL);
         return ERROR_RESULT_MAKE_ERROR(TextAssetResult, ERROR_ENGINE_TEXT_CREATE_FAILED);
     }
     asset.text = TTF_CreateText(ttf_text_engine, font->font, value, 0);
@@ -2074,9 +2098,12 @@ TextAssetResult graphics_text_create(const FontAsset *font, const char *value, C
             color.green,
             color.blue,
             color.alpha) || !TTF_GetTextSize(asset.text, &width, &height)) {
+        char detail[256];
+        snprintf(detail, sizeof(detail), "%s", SDL_GetError());
         if(asset.text != NULL) {
             TTF_DestroyText(asset.text);
         }
+        error_detail_set(ERROR_ENGINE_TEXT_CREATE_FAILED, detail);
         return ERROR_RESULT_MAKE_ERROR(TextAssetResult, ERROR_ENGINE_TEXT_CREATE_FAILED);
     }
     asset.size = (Scale){

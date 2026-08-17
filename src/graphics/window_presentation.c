@@ -28,5 +28,6 @@ EngineResult graphics_window_presentation_apply(SDL_Window *window,
             break;
     }
     return applied ? error_result_value(true) :
-        error_result_error(ERROR_ENGINE_GRAPHICS_WINDOW_PRESENTATION_FAILED);
+        error_result_error_detail(
+            ERROR_ENGINE_GRAPHICS_WINDOW_PRESENTATION_FAILED, SDL_GetError());
 }

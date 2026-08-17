@@ -194,16 +194,20 @@ Returns a user-facing default message for an engine error.
 ### `rohr_error_string`
 
 ```c
-const char *rohr_error_string(EngineError error);
+#define rohr_error_string(ResultValue) \
+    error_result_message_get((ResultValue).kind, (ResultValue).result.error)
 ```
 
-Returns the symbolic name for an engine error.
+Returns the error message for any generated Rohr result type, followed by
+copied low-level diagnostic detail when the failing boundary supplied it. For
+example, SDL failures append the `SDL_GetError()` text captured at the point of
+failure. Pass a result variable because the macro evaluates it twice.
 
 | Parameter | Description |
 | --- | --- |
-| `error` | Error code to name. |
+| `ResultValue` | Generated Rohr result value to describe. |
 
-**Returns:** Static string containing the error name.
+**Returns:** Engine-owned string valid until the next error.
 
 ### `rohr_error_stderr_print`
 

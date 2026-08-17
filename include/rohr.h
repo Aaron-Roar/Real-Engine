@@ -112,11 +112,16 @@ EngineResult rohr_error_result_error(EngineError error);
 const char *rohr_error_default_message_get(EngineError error);
 
 /**
- * @brief Returns the symbolic name for an engine error.
- * @param error Error code to name.
- * @return Static string containing the error name.
+ * @brief Returns a result's error message with captured low-level detail.
+ *
+ * ResultValue should be a result variable because this macro evaluates it
+ * twice. Every generated Rohr result type supports this shared field layout.
+ *
+ * @param ResultValue Generated Rohr result value to describe.
+ * @return Engine-owned string valid until the next error.
  */
-const char *rohr_error_string(EngineError error);
+#define rohr_error_string(ResultValue) \
+    error_result_message_get((ResultValue).kind, (ResultValue).result.error)
 
 /**
  * @brief Prints an engine error message to stderr.

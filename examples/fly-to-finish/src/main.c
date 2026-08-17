@@ -6,7 +6,7 @@
 #include <time.h>
 
 #define PRINT_ENGINE_ERROR(engine_result) \
-    fprintf(stderr, "%s\n", rohr_error_default_message_get((engine_result).result.error))
+    fprintf(stderr, "%s\n", rohr_error_string(engine_result))
 
 typedef struct ObstacleRecord {
     Entity entity;

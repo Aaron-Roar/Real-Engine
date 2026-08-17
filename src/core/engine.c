@@ -43,7 +43,8 @@ EngineResult engine_init(void) {
 
     SDL_SetMainReady();
     if(!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
-        return error_result_error(ERROR_ENGINE_SDL_INIT_FAILED);
+        return error_result_error_detail(ERROR_ENGINE_SDL_INIT_FAILED,
+            SDL_GetError());
     }
     result = entity_tables_init();
     if(result.kind == ERROR_RESULT_ERROR) {

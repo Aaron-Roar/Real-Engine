@@ -8,8 +8,7 @@ static bool presentation_set(GraphicsWindowPresentationConfig *config,
     config->mode = mode;
     result = rohr_graphics_window_presentation_set(*config);
     if(rohr_error_check(result)) {
-        fprintf(stderr, "%s: %s\n",
-            rohr_error_default_message_get(result.result.error), SDL_GetError());
+        fprintf(stderr, "%s\n", rohr_error_string(result));
         return false;
     }
     return rohr_graphics_window_presentation_get().mode == mode;
