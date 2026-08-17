@@ -37,10 +37,11 @@ static void editor_notification_toast_remove(EditorNotificationPanel *panel,
 }
 
 bool editor_notification_panel_create(EditorNotificationPanel *panel,
-        const FontAsset *font) {
-    if(panel == NULL || font == NULL) return false;
+        const FontAsset *font, const FontAsset *toast_font) {
+    if(panel == NULL || font == NULL || toast_font == NULL) return false;
     *panel = (EditorNotificationPanel){0};
     panel->font = font;
+    panel->toast_font = toast_font;
     if(editor_notification_text_create(font, "", &panel->detail_text) &&
             editor_notification_text_create(font, "Notification Report",
                 &panel->report_title) &&
@@ -57,18 +58,29 @@ bool editor_notification_panel_create(EditorNotificationPanel *panel,
 void editor_notification_panel_push(EditorNotificationPanel *panel,
         const char *summary, const char *detail) {
     TextAsset summary_text = {0};
+    TextAsset toast_text = {0};
     size_t index;
     bool replaced;
-    if(panel == NULL || panel->font == NULL || summary == NULL || detail == NULL)
+    if(panel == NULL || panel->font == NULL || panel->toast_font == NULL ||
+            summary == NULL || detail == NULL)
         return;
     if(!editor_notification_text_create(panel->font, summary, &summary_text)) return;
-    if(!editor_notification_store_push(&panel->store, summary, detail, &index,
-            &replaced)) {
+    if(!editor_notification_text_create(panel->toast_font, summary, &toast_text)) {
         rohr_graphics_text_destroy(&summary_text);
         return;
     }
-    if(replaced) rohr_graphics_text_destroy(&panel->summary_texts[index]);
+    if(!editor_notification_store_push(&panel->store, summary, detail, &index,
+            &replaced)) {
+        rohr_graphics_text_destroy(&summary_text);
+        rohr_graphics_text_destroy(&toast_text);
+        return;
+    }
+    if(replaced) {
+        rohr_graphics_text_destroy(&panel->summary_texts[index]);
+        rohr_graphics_text_destroy(&panel->toast_texts[index]);
+    }
     panel->summary_texts[index] = summary_text;
+    panel->toast_texts[index] = toast_text;
 }
 
 void editor_notification_panel_toast_draw(EditorNotificationPanel *panel,
@@ -88,13 +100,14 @@ void editor_notification_panel_toast_draw(EditorNotificationPanel *panel,
                 &panel->store, panel->store.toast_ids[toast_index]);
             size_t index;
             char id[64];
-            UIRect bounds = {14.0f, log_bounds.y - 60.0f - 60.0f * (float)slot,
-                360.0f, 52.0f};
+            UIRect bounds = {log_bounds.x,
+                log_bounds.y - 40.0f - 40.0f * (float)slot,
+                log_bounds.width, 34.0f};
             if(entry == NULL) continue;
             index = (size_t)(entry - panel->store.entries);
             snprintf(id, sizeof(id), "editor.notification.toast.%llu",
                 (unsigned long long)entry->id);
-            if(rohr_ui_button(id, &panel->summary_texts[index], bounds,
+            if(rohr_ui_button(id, &panel->toast_texts[index], bounds,
                     &notification_style).clicked)
                 editor_notification_select(panel, entry->id);
         }
@@ -179,8 +192,10 @@ void editor_notification_panel_report_draw(EditorNotificationPanel *panel,
 
 void editor_notification_panel_destroy(EditorNotificationPanel *panel) {
     if(panel == NULL) return;
-    for(size_t i = 0; i < EDITOR_NOTIFICATION_LOG_MAX; i += 1)
+    for(size_t i = 0; i < EDITOR_NOTIFICATION_LOG_MAX; i += 1) {
         rohr_graphics_text_destroy(&panel->summary_texts[i]);
+        rohr_graphics_text_destroy(&panel->toast_texts[i]);
+    }
     rohr_graphics_text_destroy(&panel->detail_text);
     rohr_graphics_text_destroy(&panel->report_title);
     rohr_graphics_text_destroy(&panel->log_label);

@@ -1547,6 +1547,7 @@ int main(void) {
     bool viewport_context_open = false;
     Position viewport_context_position = {0};
     FontAsset font = {0};
+    FontAsset notification_font = {0};
     TextAsset hitbox_editor_label = {0};
     TextAsset auto_shape_label = {0};
     TextAsset triangle_label = {0};
@@ -1792,6 +1793,15 @@ int main(void) {
         if(rohr_error_check(result)) goto fail;
         font = result.result.value;
     }
+    {
+        FontAssetResult result = rohr_graphics_font_load((FontDescriptor){
+            .file = "assets/JetBrainsMono-BoldItalic.ttf",
+            .point_size = 9.0f
+        });
+
+        if(rohr_error_check(result)) goto fail;
+        notification_font = result.result.value;
+    }
     if(!editor_text_create(&font, "Hitbox Editor", &hitbox_editor_label) ||
             !editor_text_create(&font, "Auto Shape", &auto_shape_label) ||
             !editor_text_create(&font, "Triangle", &triangle_label) ||
@@ -1921,7 +1931,8 @@ int main(void) {
             !editor_origin_panel_create(&origin_panel, &font) ||
             !editor_bulk_panel_create(&bulk_panel, &font) ||
             !editor_build_settings_panel_create(&build_settings_panel, &font) ||
-            !editor_notification_panel_create(&notification_panel, &font) ||
+            !editor_notification_panel_create(&notification_panel, &font,
+                &notification_font) ||
             !editor_terminal_panel_create(&terminal_panel, &font)) goto fail;
     terminal_panel.visible = true;
     if(!editor_text_create(&font, "#FFFFFFFF", &color_picker_hex_field) ||
@@ -5278,6 +5289,7 @@ int main(void) {
     rohr_graphics_text_destroy(&edit_label);
     rohr_graphics_text_destroy(&file_browser_field);
     editor_file_browser_destroy(&file_browser);
+    rohr_graphics_font_destroy(&notification_font);
     rohr_graphics_font_destroy(&font);
     if(viewport != 0) (void)rohr_viewport_destroy(viewport);
     rohr_graphics_end();
@@ -5457,6 +5469,7 @@ fail:
     rohr_graphics_text_destroy(&edit_label);
     rohr_graphics_text_destroy(&file_browser_field);
     editor_file_browser_destroy(&file_browser);
+    rohr_graphics_font_destroy(&notification_font);
     rohr_graphics_font_destroy(&font);
     if(viewport != 0) (void)rohr_viewport_destroy(viewport);
     rohr_graphics_end();
