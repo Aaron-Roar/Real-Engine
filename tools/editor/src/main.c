@@ -313,6 +313,34 @@ static bool editor_cmake_compile_start(EditorTerminalPanel *terminal,
     return *hidden_process != NULL;
 }
 
+static void editor_codegen_success_notify(EditorNotificationPanel *notifications,
+        const EditorProject *project, bool tree_shown) {
+    char detail[512];
+    snprintf(detail, sizeof(detail),
+        "Generated 2 C files:\n"
+        "- src/generated/project_objects.h\n"
+        "- src/generated/project_objects.c\n\n"
+        "Generated %zu object%s.%s",
+        project->object_count, project->object_count == 1 ? "" : "s",
+        tree_shown ? " The generated object tree is shown in the terminal." :
+            " Terminal tree output is disabled.");
+    editor_notification_panel_push(notifications,
+        "Generate C - SUCCESS", detail);
+}
+
+static void editor_compile_success_notify(EditorNotificationPanel *notifications,
+        const char *project_directory, bool terminal_output_shown) {
+    char detail[EDITOR_WORKSPACE_PATH_MAX + 256];
+    snprintf(detail, sizeof(detail),
+        "Project configuration and compilation completed successfully.\n\n"
+        "Project: %s\n%s", project_directory,
+        terminal_output_shown ?
+            "The executed commands and complete build output are shown in the terminal." :
+            "Build-operation terminal output is disabled.");
+    editor_notification_panel_push(notifications,
+        "Compile project - SUCCESS", detail);
+}
+
 static void editor_operation_command_write(const EditorCommand *editor_command,
         const EditorCommandResult *result, void *context) {
     char command[3072];
@@ -1959,14 +1987,19 @@ int main(void) {
         {
             int exit_code;
             if(editor_terminal_panel_command_completion_take(&terminal_panel,
-                    &exit_code) && exit_code != 0) {
-                char detail[256];
-                snprintf(detail, sizeof(detail),
-                    "The configure-and-compile command exited with status %d.\n\n"
-                    "See the terminal output for the complete build report.",
-                    exit_code);
-                editor_notification_panel_push(&notification_panel,
-                    "Build project - FAIL", detail);
+                    &exit_code)) {
+                if(exit_code == 0) {
+                    editor_compile_success_notify(&notification_panel,
+                        workspace.directory, true);
+                } else {
+                    char detail[256];
+                    snprintf(detail, sizeof(detail),
+                        "The configure-and-compile command exited with status %d.\n\n"
+                        "See the terminal output for the complete build report.",
+                        exit_code);
+                    editor_notification_panel_push(&notification_panel,
+                        "Build project - FAIL", detail);
+                }
             }
         }
         if(hidden_build_process != NULL) {
@@ -1990,6 +2023,9 @@ int main(void) {
                         "Build project - FAIL",
                         "The compile command could not be started after configure "
                         "completed successfully.");
+                } else if(!configure_finished && exit_code == 0) {
+                    editor_compile_success_notify(&notification_panel,
+                        workspace.directory, false);
                 }
             }
         }
@@ -4706,17 +4742,22 @@ int main(void) {
                     snprintf(command.directory, sizeof(command.directory), "%s",
                         workspace.directory);
                     if(!editor_result_check(editor_workspace_operation_execute(
-                            &workspace, &project, &command)) &&
-                            terminal_generated_code)
-                        (void)editor_generation_report_write(
-                            &terminal_panel, &project);
+                            &workspace, &project, &command))) {
+                        bool tree_shown = terminal_generated_code &&
+                            editor_generation_report_write(&terminal_panel, &project);
+                        editor_codegen_success_notify(&notification_panel, &project,
+                            tree_shown);
+                    }
                 } else if(build_menu.changed && build_menu.selected_index == 1 &&
                         workspace.open) {
-                    (void)editor_cmake_compile_start(&terminal_panel,
+                    if(!editor_cmake_compile_start(&terminal_panel,
                         &hidden_build_process, &hidden_compile_pending,
                         hidden_build_directory, sizeof(hidden_build_directory),
                         workspace.directory,
-                        terminal_build_operations);
+                        terminal_build_operations))
+                        editor_notification_panel_push(&notification_panel,
+                            "Compile project - FAIL",
+                            "The configure command could not be started.");
                 } else if(build_menu.changed && build_menu.selected_index == 2 &&
                         workspace.open) {
                     EditorWorkspaceCommand command = {
@@ -4725,14 +4766,18 @@ int main(void) {
                         workspace.directory);
                     if(!editor_result_check(editor_workspace_operation_execute(
                             &workspace, &project, &command))) {
-                        if(terminal_generated_code)
-                            (void)editor_generation_report_write(
-                                &terminal_panel, &project);
-                        (void)editor_cmake_compile_start(&terminal_panel,
+                        bool tree_shown = terminal_generated_code &&
+                            editor_generation_report_write(&terminal_panel, &project);
+                        editor_codegen_success_notify(&notification_panel, &project,
+                            tree_shown);
+                        if(!editor_cmake_compile_start(&terminal_panel,
                             &hidden_build_process, &hidden_compile_pending,
                             hidden_build_directory, sizeof(hidden_build_directory),
                             workspace.directory,
-                            terminal_build_operations);
+                            terminal_build_operations))
+                            editor_notification_panel_push(&notification_panel,
+                                "Build project - FAIL",
+                                "The configure command could not be started.");
                     }
                 }
             }

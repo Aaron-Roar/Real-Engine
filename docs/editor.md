@@ -136,7 +136,10 @@ clicking either a visible notification or a log entry opens the same detailed
 report. Detailed reports scroll when their wrapped text is taller than the
 report area. Asynchronous configure or compile failures also create a build
 failure notification; visible builds retain their complete output in the
-terminal.
+terminal. Successful C generation reports the generated files, object count,
+and whether the object tree was written to the terminal. Successful compilation
+is reported only after configure and compile both finish, with the project path
+and terminal-output state in its detailed report.
 
 The executable name is the PascalCase project directory name (`my-game`
 becomes `MyGame`).
