@@ -2325,6 +2325,27 @@ Draws the frame background.
 | --- | --- |
 | `color` | Background color. |
 
+Drawing is deferred until `rohr_graphics_show()`. Commands are ordered by their
+layer and retain submission order within the same layer.
+
+### `rohr_graphics_layer_set`
+
+```c
+void rohr_graphics_layer_set(int layer);
+```
+
+Sets the signed ordering layer captured by subsequent draw calls. Lower layers
+render first. The active layer resets to `0` after each
+`rohr_graphics_show()`.
+
+### `rohr_graphics_layer_get`
+
+```c
+int rohr_graphics_layer_get(void);
+```
+
+Returns the layer that subsequent draw calls will capture.
+
 ### `rohr_graphics_screen_rect_draw`
 
 ```c
@@ -2333,7 +2354,7 @@ bool rohr_graphics_screen_rect_draw(float x, float y, float width, float height,
 
 Draws a filled rectangle in logical screen coordinates.
 
-**Returns:** true when SDL accepted the draw command.
+**Returns:** true when the draw command was queued.
 
 ### `rohr_graphics_render_output_size_get`
 
@@ -2494,7 +2515,7 @@ Draws one joint using an engineering-style debug symbol.
 | `joint` | Joint entity to draw. |
 | `color` | Symbol color. |
 
-**Returns:** true when the symbol was drawn successfully.
+**Returns:** true when the symbol's draw commands were queued.
 
 ### `rohr_graphics_joints_draw`
 
@@ -2523,7 +2544,7 @@ Draws a soft body's current surfaces, beams, and collision nodes.
 | `beam` | Beam color. |
 | `node` | Collision-node color. |
 
-**Returns:** true when the soft body was drawn successfully.
+**Returns:** true when the soft body's draw commands were queued.
 
 ### `rohr_graphics_soft_body_node_color_set`
 

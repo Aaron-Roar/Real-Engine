@@ -539,8 +539,11 @@ int main(void) {
                 }
             }
         }
+        rohr_graphics_layer_set(-100);
         rohr_graphics_background_draw(background_color);
+        rohr_graphics_layer_set(100);
         rohr_graphics_aabb_tree_draw();
+        rohr_graphics_layer_set(0);
         for(uint32_t i = 0; i < LEVEL_WALL_COUNT; i += 1) {
             rohr_graphics_hit_box_colored_draw(walls[i], GRAPHICS_FILLED, wall_color);
         }
@@ -563,7 +566,9 @@ int main(void) {
             rohr_graphics_hit_box_colored_draw(
                 wheels[i].hub, GRAPHICS_FILLED, hub_color);
         }
+        rohr_graphics_layer_set(200);
         rohr_ui_physics_debug_panel_draw(&debug_panel);
+        rohr_graphics_layer_set(0);
         rohr_graphics_show();
     }
     rohr_graphics_end();

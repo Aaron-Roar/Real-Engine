@@ -71,7 +71,9 @@ static void pong_draw_field(
 static void pong_render_camera(CameraId camera, void *context_value) {
     PongRenderContext *context = context_value;
     (void)camera;
+    rohr_graphics_layer_set(-100);
     rohr_graphics_background_draw(background_color);
+    rohr_graphics_layer_set(0);
     pong_draw_field(
         context->wall_bottom,
         context->wall_top,
@@ -81,7 +83,9 @@ static void pong_render_camera(CameraId camera, void *context_value) {
         context->ball,
         context->ball_on_fire
     );
+    rohr_graphics_layer_set(100);
     rohr_graphics_aabb_tree_draw();
+    rohr_graphics_layer_set(0);
 }
 
 static EngineResult pong_update_camera(
@@ -549,7 +553,9 @@ int main(void) {
                 ? false
                 : fire_result.result.value;
         }
+        rohr_graphics_layer_set(200);
         rohr_ui_physics_debug_panel_draw(&debug_panel);
+        rohr_graphics_layer_set(0);
         rohr_graphics_show();
     }
 

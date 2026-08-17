@@ -87,12 +87,18 @@ int main(void) {
         rohr_physics_update(ticks_advanced);
 
         //render
+        rohr_graphics_layer_set(-100);
         rohr_graphics_background_draw(background_color);
+        rohr_graphics_layer_set(0);
         rohr_graphics_sprite_frames_update(rohr_engine_tick_get(), rohr_engine_time_get());
         rohr_graphics_animated_sprites_draw();
         rohr_graphics_aabb_tree_debug_set(true);
+        rohr_graphics_layer_set(100);
         rohr_graphics_aabb_tree_draw();
+        rohr_graphics_layer_set(0);
+        rohr_graphics_layer_set(200);
         rohr_ui_physics_debug_panel_draw(&debug_panel);
+        rohr_graphics_layer_set(0);
         rohr_graphics_show();
 
         SDL_Event sdl_event;

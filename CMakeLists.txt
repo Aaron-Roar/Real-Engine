@@ -113,6 +113,7 @@ set(ROHR_ENGINE_SOURCES
     src/entity/entity_components.c
     src/entity/entity_pair_set.c
     src/graphics/graphics.c
+    src/graphics/graphics_command_order.c
     src/graphics/window_presentation.c
     src/graphics/ui.c
     src/input/controller.c
@@ -274,6 +275,15 @@ if(ROHR_BUILD_TESTS)
     set_target_properties(cameras_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
     add_test(NAME cameras COMMAND cameras_test)
 
+    add_executable(graphics_command_order_test
+        tests/graphics_command_order.c
+        src/graphics/graphics_command_order.c)
+    target_include_directories(graphics_command_order_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    set_target_properties(graphics_command_order_test PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
+    add_test(NAME graphics_command_order COMMAND graphics_command_order_test)
+
     add_executable(window_presentation_test tests/window_presentation.c)
     target_link_libraries(window_presentation_test PRIVATE rohr_engine)
     set_target_properties(window_presentation_test PROPERTIES
@@ -406,6 +416,7 @@ if(ROHR_BUILD_TESTS)
         engine_lifecycle
         controller_mappings
         cameras
+        graphics_command_order
         timing
         joints
         soft_body
@@ -426,6 +437,7 @@ if(ROHR_BUILD_TESTS)
         engine_lifecycle_test
         controller_mappings_test
         cameras_test
+        graphics_command_order_test
         timing_test
         joints_test
         soft_body_test

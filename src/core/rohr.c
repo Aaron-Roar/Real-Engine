@@ -268,6 +268,8 @@ EngineResult rohr_graphics_start(void) { return graphics_start(); }
 void rohr_graphics_end(void) { graphics_end(); }
 bool rohr_graphics_events_poll(SDL_Event *event) { return graphics_events_poll(event); }
 void rohr_graphics_background_draw(Color color) { graphics_background_draw(color); }
+void rohr_graphics_layer_set(int layer) { graphics_layer_set(layer); }
+int rohr_graphics_layer_get(void) { return graphics_layer_get(); }
 bool rohr_graphics_screen_rect_draw(float x, float y, float width, float height, Color color) { return graphics_screen_rect_draw(x, y, width, height, color); }
 Scale rohr_graphics_render_output_size_get(void) { return graphics_render_output_size_get(); }
 bool rohr_graphics_logical_size_set(int width, int height) { return graphics_logical_size_set(width, height); }

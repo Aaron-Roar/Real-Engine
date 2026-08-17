@@ -799,7 +799,9 @@ static bool editor_workspace_main_write(const EditorWorkspace *workspace,
         "        }\n"
         "        if(rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) break;\n"
         "        rohr_physics_update(rohr_system_tick_update());\n"
-        "        rohr_graphics_background_draw((Color){18, 22, 30, 255});\n");
+        "        rohr_graphics_layer_set(-100);\n"
+        "        rohr_graphics_background_draw((Color){18, 22, 30, 255});\n"
+        "        rohr_graphics_layer_set(0);\n");
     for(size_t object_index = 0; object_index < project->object_count; object_index += 1) {
         const EditorObject *object = &project->objects[object_index];
         char variable[EDITOR_OBJECT_NAME_MAX];

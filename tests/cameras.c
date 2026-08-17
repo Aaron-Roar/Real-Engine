@@ -23,6 +23,12 @@ int main(void) {
         rohr_engine_shutdown();
         return 1;
     }
+    rohr_graphics_layer_set(27);
+    if(rohr_graphics_layer_get() != 27) {
+        rohr_graphics_end();
+        rohr_engine_shutdown();
+        return 1;
+    }
     {
         GraphicsWindowPresentationConfig presentation =
             rohr_graphics_window_presentation_default_get();
@@ -185,6 +191,7 @@ int main(void) {
             ))
             || rohr_error_check(rohr_viewport_enable_set(viewport_result.result.value))
             || (rohr_graphics_show(), render_count != 1)
+            || rohr_graphics_layer_get() != 0
             || rohr_error_check(rohr_camera_disable_set(original))
             || (rohr_graphics_show(), render_count != 1)
             || rohr_error_check(rohr_camera_enable_set(original))

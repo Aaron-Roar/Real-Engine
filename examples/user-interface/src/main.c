@@ -223,7 +223,9 @@ int main(void) {
         if(exit_requested ||
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) break;
 
+        rohr_graphics_layer_set(-100);
         rohr_graphics_background_draw((Color){18, 22, 30, 255});
+        rohr_graphics_layer_set(0);
         rohr_ui_frame_begin((UIInput){
             .pointer = rohr_graphics_mouse_screen_position_get(),
             .primary_button = mouse.button_states[MOUSE_BUTTON_LEFT],
@@ -280,8 +282,12 @@ int main(void) {
 
         rohr_ui_frame_end();
         rohr_graphics_aabb_tree_debug_set(true);
+        rohr_graphics_layer_set(100);
         rohr_graphics_aabb_tree_draw();
+        rohr_graphics_layer_set(0);
+        rohr_graphics_layer_set(200);
         rohr_ui_physics_debug_panel_draw(&debug_panel);
+        rohr_graphics_layer_set(0);
         rohr_graphics_show();
     }
 

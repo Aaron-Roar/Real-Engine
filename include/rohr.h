@@ -1206,9 +1206,15 @@ bool rohr_graphics_events_poll(SDL_Event *event);
  */
 void rohr_graphics_background_draw(Color color);
 
+/** Sets the ordering layer captured by subsequent draw commands. */
+void rohr_graphics_layer_set(int layer);
+
+/** Returns the ordering layer used by subsequent draw commands. */
+int rohr_graphics_layer_get(void);
+
 /**
  * @brief Draws a filled rectangle in logical screen coordinates.
- * @return true when SDL accepted the draw command.
+ * @return true when the draw command was queued.
  */
 bool rohr_graphics_screen_rect_draw(float x, float y, float width, float height, Color color);
 /** Returns the renderer output size in physical pixels. */
@@ -1265,7 +1271,7 @@ void rohr_graphics_hit_boxes_draw(void);
  * @brief Draws one joint using an engineering-style debug symbol.
  * @param joint Joint entity to draw.
  * @param color Symbol color.
- * @return true when the symbol was drawn successfully.
+ * @return true when the symbol's draw commands were queued.
  */
 bool rohr_graphics_joint_draw(Entity joint, Color color);
 
@@ -1281,7 +1287,7 @@ void rohr_graphics_joints_draw(Color color);
  * @param surface Triangle surface color.
  * @param beam Beam color.
  * @param node Collision-node color.
- * @return true when the soft body was drawn successfully.
+ * @return true when the soft body's draw commands were queued.
  */
 bool rohr_graphics_soft_body_draw(Entity soft_body, Color surface, Color beam, Color node);
 

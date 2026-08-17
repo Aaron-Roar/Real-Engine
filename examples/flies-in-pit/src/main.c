@@ -142,7 +142,9 @@ int main(void) {
         rohr_physics_update(ticks_advanced);
 
         //render
+        rohr_graphics_layer_set(-100);
         rohr_graphics_background_draw(background_color);
+        rohr_graphics_layer_set(0);
         rohr_graphics_hit_box_draw(wall_1, GRAPHICS_FILLED);
         rohr_graphics_hit_box_draw(wall_2, GRAPHICS_FILLED);
         rohr_graphics_hit_box_draw(wall_3, GRAPHICS_FILLED);
@@ -155,9 +157,13 @@ int main(void) {
             rohr_graphics_particles_draw();
         }
         rohr_graphics_aabb_tree_debug_set(true);
+        rohr_graphics_layer_set(100);
         rohr_graphics_aabb_tree_draw();
         rohr_graphics_local_origins_draw();
+        rohr_graphics_layer_set(0);
+        rohr_graphics_layer_set(200);
         rohr_ui_physics_debug_panel_draw(&debug_panel);
+        rohr_graphics_layer_set(0);
         rohr_graphics_show();
 
     }

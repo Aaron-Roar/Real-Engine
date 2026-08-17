@@ -6,8 +6,10 @@
 #include "physics.h"
 #include "core/platform_process.h"
 #include "window_presentation.h"
+#include "graphics_command_order.h"
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static SDL_Renderer *sdl_renderer = NULL;
@@ -35,6 +37,43 @@ typedef struct GraphicsClipState {
 static GraphicsClipState graphics_clip_state = {0};
 static GraphicsClipState graphics_clip_stack[GRAPHICS_CLIP_STACK_MAX] = {0};
 static size_t graphics_clip_stack_count = 0;
+
+typedef enum GraphicsCommandType {
+    GRAPHICS_COMMAND_CLEAR,
+    GRAPHICS_COMMAND_RECT,
+    GRAPHICS_COMMAND_QUAD,
+    GRAPHICS_COMMAND_LINES,
+    GRAPHICS_COMMAND_SHAPE_FILLED,
+    GRAPHICS_COMMAND_TEXT,
+    GRAPHICS_COMMAND_TEXTURE
+} GraphicsCommandType;
+
+typedef struct GraphicsCommand {
+    GraphicsCommandOrder order;
+    uint32_t screen;
+    GraphicsClipState clip;
+    GraphicsCommandType type;
+    union {
+        struct { Color color; } clear;
+        struct { SDL_FRect rectangle; Color color; } rect;
+        struct { Position center; float width; float height; float angle; Color color; } quad;
+        struct { SDL_FPoint points[MAX_VERTICIES + 1]; int count; Color color; } lines;
+        struct { SDL_FPoint points[MAX_VERTICIES]; int count; Color color; } shape;
+        struct { TTF_Text *text; Position position; } text;
+        struct {
+            SDL_Texture *texture;
+            SDL_FRect destination;
+            SDL_FPoint center;
+            double degrees;
+        } texture;
+    } data;
+} GraphicsCommand;
+
+static GraphicsCommand *graphics_commands = NULL;
+static size_t graphics_command_count = 0;
+static size_t graphics_command_capacity = 0;
+static uint64_t graphics_command_sequence = 0;
+static int graphics_active_layer = 0;
 
 typedef struct ActiveCameraAttachment {
     CameraAttachment value;
@@ -104,6 +143,51 @@ static bool viewports_used[MAX_VIEWPORTS] = {0};
 static ScreenId drawing_screen = SCREEN_INVALID;
 static CameraId camera_before_screen = CAMERA_INVALID;
 static EngineResult graphics_screen_destroy(ScreenId id);
+
+static GraphicsCommand *graphics_command_append(GraphicsCommandType type) {
+    GraphicsCommand *commands;
+    GraphicsCommand *command;
+    if(sdl_renderer == NULL) return NULL;
+    if(graphics_command_count == graphics_command_capacity) {
+        size_t capacity = graphics_command_capacity == 0 ? 256 :
+            graphics_command_capacity * 2;
+        commands = realloc(graphics_commands, capacity * sizeof(*commands));
+        if(commands == NULL) return NULL;
+        graphics_commands = commands;
+        graphics_command_capacity = capacity;
+    }
+    command = &graphics_commands[graphics_command_count++];
+    *command = (GraphicsCommand){
+        .order = {
+            .layer = graphics_active_layer,
+            .sequence = graphics_command_sequence++
+        },
+        .screen = drawing_screen,
+        .clip = graphics_clip_state,
+        .type = type
+    };
+    return command;
+}
+
+static bool graphics_lines_draw(const SDL_FPoint *points, int count, Color color) {
+    GraphicsCommand *command;
+    if(points == NULL || count < 2 || count > MAX_VERTICIES + 1) return false;
+    command = graphics_command_append(GRAPHICS_COMMAND_LINES);
+    if(command == NULL) return false;
+    memcpy(command->data.lines.points, points,
+        (size_t)count * sizeof(command->data.lines.points[0]));
+    command->data.lines.count = count;
+    command->data.lines.color = color;
+    return true;
+}
+
+void graphics_layer_set(int layer) {
+    graphics_active_layer = layer;
+}
+
+int graphics_layer_get(void) {
+    return graphics_active_layer;
+}
 
 static uint32_t graphics_resource_id(uint32_t generation, size_t slot) {
     return (generation << 8) | (uint32_t)(slot + 1);
@@ -524,14 +608,12 @@ void graphics_aabb_tree_draw(void) {
             {top_left.x, top_left.y}
         };
 
-        (void)SDL_SetRenderDrawColor(
-            sdl_renderer,
+        (void)graphics_lines_draw(points, 5, (Color){
             leaf ? 80 : 255,
             leaf ? 220 : 170,
             leaf ? 120 : 40,
             255
-        );
-        (void)SDL_RenderLines(sdl_renderer, points, 5);
+        });
     }
 }
 
@@ -914,6 +996,8 @@ static EngineResult graphics_screen_begin(ScreenId id) {
     }
     (void)SDL_SetRenderViewport(sdl_renderer, NULL);
     (void)SDL_SetRenderClipRect(sdl_renderer, NULL);
+    graphics_clip_state = (GraphicsClipState){0};
+    graphics_clip_stack_count = 0;
     drawing_screen = id;
     return error_result_value(true);
 }
@@ -1508,6 +1592,12 @@ void graphics_renderer_end(void) {
     graphics_vsync_enabled = true;
     graphics_frame_limit = 0;
     graphics_frame_start_ns = 0;
+    free(graphics_commands);
+    graphics_commands = NULL;
+    graphics_command_count = 0;
+    graphics_command_capacity = 0;
+    graphics_command_sequence = 0;
+    graphics_active_layer = 0;
     console_write(LOG_ENGINE, "Renderer terminated\n");
 }
 
@@ -1539,6 +1629,7 @@ bool graphics_events_poll(SDL_Event *event) {
 }
 
 void graphics_background_draw(Color color) {
+    GraphicsCommand *command;
     if(graphics_aspect_ratio_auto) {
         Scale output = graphics_render_output_size_get();
         int width = output.y > 0.0f ? (int)roundf(
@@ -1548,26 +1639,21 @@ void graphics_background_draw(Color color) {
                     graphics_logical_height, SDL_LOGICAL_PRESENTATION_LETTERBOX))
             graphics_logical_width = width;
     }
-    /* as you can see from this, rendering draws over whatever was drawn before it. */
-    SDL_SetRenderDrawColor(sdl_renderer, color.red, color.green, color.blue, color.alpha);
-    SDL_RenderClear(sdl_renderer);  /* start with a blank canvas. */
+    command = graphics_command_append(GRAPHICS_COMMAND_CLEAR);
+    if(command != NULL) command->data.clear.color = color;
 }
 
 bool graphics_screen_rect_draw(float x, float y, float width, float height, Color color) {
-    SDL_FRect rect = {
-        .x = x,
-        .y = y,
-        .w = width,
-        .h = height,
-    };
+    GraphicsCommand *command;
 
     if(sdl_renderer == NULL || width <= 0.0f || height <= 0.0f) {
         return false;
     }
-    if(!SDL_SetRenderDrawColor(sdl_renderer, color.red, color.green, color.blue, color.alpha)) {
-        return false;
-    }
-    return SDL_RenderFillRect(sdl_renderer, &rect);
+    command = graphics_command_append(GRAPHICS_COMMAND_RECT);
+    if(command == NULL) return false;
+    command->data.rect.rectangle = (SDL_FRect){x, y, width, height};
+    command->data.rect.color = color;
+    return true;
 }
 
 bool graphics_screen_clip_set(float x, float y, float width, float height) {
@@ -1584,14 +1670,12 @@ bool graphics_screen_clip_set(float x, float y, float width, float height) {
     bottom = (int)floorf(y + height);
     if(right <= left || bottom <= top) return false;
     clip = (SDL_Rect){left, top, right - left, bottom - top};
-    if(!SDL_SetRenderClipRect(sdl_renderer, &clip)) return false;
     graphics_clip_state = (GraphicsClipState){.rectangle = clip, .active = true};
     graphics_clip_stack_count = 0;
     return true;
 }
 
 void graphics_screen_clip_clear(void) {
-    if(sdl_renderer != NULL) (void)SDL_SetRenderClipRect(sdl_renderer, NULL);
     graphics_clip_state = (GraphicsClipState){0};
     graphics_clip_stack_count = 0;
 }
@@ -1625,10 +1709,6 @@ bool graphics_screen_clip_push(float x, float y, float width, float height) {
     clip = (SDL_Rect){left, top,
         right > left ? right - left : 0,
         bottom > top ? bottom - top : 0};
-    if(!SDL_SetRenderClipRect(sdl_renderer, &clip)) {
-        graphics_clip_stack_count -= 1;
-        return false;
-    }
     graphics_clip_state = (GraphicsClipState){.rectangle = clip, .active = true};
     return true;
 }
@@ -1636,8 +1716,6 @@ bool graphics_screen_clip_push(float x, float y, float width, float height) {
 void graphics_screen_clip_pop(void) {
     if(sdl_renderer == NULL || graphics_clip_stack_count == 0) return;
     graphics_clip_state = graphics_clip_stack[--graphics_clip_stack_count];
-    (void)SDL_SetRenderClipRect(sdl_renderer,
-        graphics_clip_state.active ? &graphics_clip_state.rectangle : NULL);
 }
 
 bool graphics_screen_quad_draw(
@@ -1647,52 +1725,29 @@ bool graphics_screen_quad_draw(
     float angle,
     Color color
 ) {
-    SDL_Vertex vertices[4] = {0};
-    const int indices[6] = {0, 1, 2, 0, 2, 3};
-    float half_width = width * 0.5f;
-    float half_height = height * 0.5f;
-    Vec2D axis = {cosf(angle), -sinf(angle)};
-    Vec2D perpendicular = {sinf(angle), cosf(angle)};
-    const float signs[4][2] = {
-        {-1.0f, -1.0f},
-        { 1.0f, -1.0f},
-        { 1.0f,  1.0f},
-        {-1.0f,  1.0f},
-    };
-    int i;
+    GraphicsCommand *command;
 
     if(sdl_renderer == NULL || width <= 0.0f || height <= 0.0f
             || !isfinite(angle)) {
         return false;
     }
-    for(i = 0; i < 4; i += 1) {
-        vertices[i].position.x = center.x
-            + axis.x * half_width * signs[i][0]
-            + perpendicular.x * half_height * signs[i][1];
-        vertices[i].position.y = center.y
-            + axis.y * half_width * signs[i][0]
-            + perpendicular.y * half_height * signs[i][1];
-        vertices[i].color = (SDL_FColor){
-            color.red / 255.0f,
-            color.green / 255.0f,
-            color.blue / 255.0f,
-            color.alpha / 255.0f,
-        };
-    }
-    return SDL_RenderGeometry(sdl_renderer, NULL, vertices, 4, indices, 6);
+    command = graphics_command_append(GRAPHICS_COMMAND_QUAD);
+    if(command == NULL) return false;
+    command->data.quad.center = center;
+    command->data.quad.width = width;
+    command->data.quad.height = height;
+    command->data.quad.angle = angle;
+    command->data.quad.color = color;
+    return true;
 }
 
 void graphics_rect_draw(Shape rect, Position pos) {
-    SDL_FRect sdl_rect;
     (void)rect;
-    /* draw a filled rectangle in the middle of the canvas. */
-    SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 255, SDL_ALPHA_OPAQUE);  /* blue, full alpha */
-    Position screen_loc = graphics_world_to_screen_get(pos);
-    sdl_rect.x = screen_loc.x;
-    sdl_rect.y = screen_loc.y;
-    sdl_rect.w = 20;
-    sdl_rect.h = 20;
-    SDL_RenderFillRect(sdl_renderer, &sdl_rect);
+    {
+        Position screen_loc = graphics_world_to_screen_get(pos);
+        (void)graphics_screen_rect_draw(screen_loc.x, screen_loc.y,
+            20.0f, 20.0f, (Color){0, 0, 255, 255});
+    }
 }
 
 static void graphics_empty_viewport_draw(ViewportRectangle rectangle) {
@@ -1848,9 +1903,133 @@ static void graphics_viewports_draw(void) {
     (void)SDL_SetRenderClipRect(sdl_renderer, NULL);
 }
 
+static void graphics_commands_execute(void) {
+    ScreenId target = UINT32_MAX;
+    GraphicsClipState clip = {0};
+    bool clip_known = false;
+    if(graphics_command_count > 1)
+        qsort(graphics_commands, graphics_command_count, sizeof(*graphics_commands),
+            graphics_command_order_compare);
+    for(size_t command_index = 0; command_index < graphics_command_count;
+            command_index += 1) {
+        GraphicsCommand *command = &graphics_commands[command_index];
+        if(command->screen != target) {
+            size_t slot;
+            SDL_Texture *texture = graphics_screen_slot(command->screen, &slot) ?
+                screens[slot].texture : NULL;
+            (void)SDL_SetRenderTarget(sdl_renderer, texture);
+            (void)SDL_SetRenderViewport(sdl_renderer, NULL);
+            target = command->screen;
+            clip_known = false;
+        }
+        if(!clip_known || command->clip.active != clip.active ||
+                (command->clip.active && memcmp(&command->clip.rectangle,
+                    &clip.rectangle, sizeof(clip.rectangle)) != 0)) {
+            (void)SDL_SetRenderClipRect(sdl_renderer,
+                command->clip.active ? &command->clip.rectangle : NULL);
+            clip = command->clip;
+            clip_known = true;
+        }
+        switch(command->type) {
+            case GRAPHICS_COMMAND_CLEAR: {
+                Color color = command->data.clear.color;
+                (void)SDL_SetRenderDrawColor(sdl_renderer, color.red, color.green,
+                    color.blue, color.alpha);
+                (void)SDL_RenderClear(sdl_renderer);
+                break;
+            }
+            case GRAPHICS_COMMAND_RECT: {
+                Color color = command->data.rect.color;
+                (void)SDL_SetRenderDrawColor(sdl_renderer, color.red, color.green,
+                    color.blue, color.alpha);
+                (void)SDL_RenderFillRect(sdl_renderer,
+                    &command->data.rect.rectangle);
+                break;
+            }
+            case GRAPHICS_COMMAND_QUAD: {
+                SDL_Vertex vertices[4] = {0};
+                const int indices[] = {0, 1, 2, 0, 2, 3};
+                const float signs[][2] = {
+                    {-1.0f, -1.0f}, {1.0f, -1.0f},
+                    {1.0f, 1.0f}, {-1.0f, 1.0f}};
+                float half_width = command->data.quad.width * 0.5f;
+                float half_height = command->data.quad.height * 0.5f;
+                Vec2D axis = {cosf(command->data.quad.angle),
+                    -sinf(command->data.quad.angle)};
+                Vec2D perpendicular = {sinf(command->data.quad.angle),
+                    cosf(command->data.quad.angle)};
+                Color color = command->data.quad.color;
+                for(int i = 0; i < 4; i += 1) {
+                    vertices[i].position.x = command->data.quad.center.x +
+                        axis.x * half_width * signs[i][0] +
+                        perpendicular.x * half_height * signs[i][1];
+                    vertices[i].position.y = command->data.quad.center.y +
+                        axis.y * half_width * signs[i][0] +
+                        perpendicular.y * half_height * signs[i][1];
+                    vertices[i].color = (SDL_FColor){color.red / 255.0f,
+                        color.green / 255.0f, color.blue / 255.0f,
+                        color.alpha / 255.0f};
+                }
+                (void)SDL_RenderGeometry(sdl_renderer, NULL, vertices, 4,
+                    indices, 6);
+                break;
+            }
+            case GRAPHICS_COMMAND_LINES: {
+                Color color = command->data.lines.color;
+                (void)SDL_SetRenderDrawColor(sdl_renderer, color.red, color.green,
+                    color.blue, color.alpha);
+                (void)SDL_RenderLines(sdl_renderer, command->data.lines.points,
+                    command->data.lines.count);
+                break;
+            }
+            case GRAPHICS_COMMAND_SHAPE_FILLED: {
+                SDL_Vertex vertices[MAX_VERTICIES] = {0};
+                int indices[(MAX_VERTICIES - 2) * 3];
+                int index_count = 0;
+                Color color = command->data.shape.color;
+                for(int i = 0; i < command->data.shape.count; i += 1) {
+                    vertices[i].position = command->data.shape.points[i];
+                    vertices[i].color = (SDL_FColor){color.red / 255.0f,
+                        color.green / 255.0f, color.blue / 255.0f,
+                        color.alpha / 255.0f};
+                }
+                for(int i = 1; i < command->data.shape.count - 1; i += 1) {
+                    indices[index_count++] = 0;
+                    indices[index_count++] = i;
+                    indices[index_count++] = i + 1;
+                }
+                (void)SDL_RenderGeometry(sdl_renderer, NULL, vertices,
+                    command->data.shape.count, indices, index_count);
+                break;
+            }
+            case GRAPHICS_COMMAND_TEXT:
+                (void)TTF_DrawRendererText(command->data.text.text,
+                    command->data.text.position.x,
+                    command->data.text.position.y);
+                break;
+            case GRAPHICS_COMMAND_TEXTURE:
+                (void)SDL_RenderTextureRotated(sdl_renderer,
+                    command->data.texture.texture, NULL,
+                    &command->data.texture.destination,
+                    command->data.texture.degrees,
+                    &command->data.texture.center, SDL_FLIP_NONE);
+                break;
+        }
+    }
+    (void)SDL_SetRenderTarget(sdl_renderer, NULL);
+    (void)SDL_SetRenderViewport(sdl_renderer, NULL);
+    (void)SDL_SetRenderClipRect(sdl_renderer, NULL);
+    graphics_command_count = 0;
+    graphics_command_sequence = 0;
+    graphics_active_layer = 0;
+    graphics_clip_state = (GraphicsClipState){0};
+    graphics_clip_stack_count = 0;
+}
+
 void graphics_show(void) {
     graphics_camera_motions_update();
     graphics_render_viewport_cameras();
+    graphics_commands_execute();
     graphics_viewports_draw();
     if(screen_recorder.recording) {
         if(!graphics_record_frame()) {
@@ -1911,8 +2090,7 @@ bool graphics_shape_outline_draw(Shape shape, Color color) {
 
     points[shape.amount_of_vertices] = points[0];
 
-    SDL_SetRenderDrawColor(sdl_renderer, color.red, color.green, color.blue, color.alpha);
-    return SDL_RenderLines(sdl_renderer, points, shape.amount_of_vertices + 1);
+    return graphics_lines_draw(points, shape.amount_of_vertices + 1, color);
 }
 
 bool graphics_shape_filled_draw(Shape shape, Color color)
@@ -1921,39 +2099,21 @@ bool graphics_shape_filled_draw(Shape shape, Color color)
         return false;
     }
 
-    SDL_Vertex vertices[MAX_VERTICIES];
+    GraphicsCommand *command;
 
     for (int i = 0; i < shape.amount_of_vertices; i++) {
         Position screen_loc = graphics_world_to_screen_get(shape.vertices[i]);
-        vertices[i].position.x = screen_loc.x;
-        vertices[i].position.y = screen_loc.y;
-
-        vertices[i].color.r = color.red / 255.0f;
-        vertices[i].color.g = color.green / 255.0f;
-        vertices[i].color.b = color.blue / 255.0f;
-        vertices[i].color.a = color.alpha / 255.0f;
-
-        vertices[i].tex_coord.x = 0.0f;
-        vertices[i].tex_coord.y = 0.0f;
+        shape.vertices[i] = screen_loc;
     }
 
-    int indices[(MAX_VERTICIES - 2) * 3];
-    int index_count = 0;
-
-    for (int i = 1; i < shape.amount_of_vertices - 1; i++) {
-        indices[index_count++] = 0;
-        indices[index_count++] = i;
-        indices[index_count++] = i + 1;
-    }
-
-    return SDL_RenderGeometry(
-        sdl_renderer,
-        NULL,
-        vertices,
-        shape.amount_of_vertices,
-        indices,
-        index_count
-    );
+    command = graphics_command_append(GRAPHICS_COMMAND_SHAPE_FILLED);
+    if(command == NULL) return false;
+    command->data.shape.count = shape.amount_of_vertices;
+    command->data.shape.color = color;
+    for(int i = 0; i < shape.amount_of_vertices; i += 1)
+        command->data.shape.points[i] = (SDL_FPoint){
+            shape.vertices[i].x, shape.vertices[i].y};
+    return true;
 }
 
 void graphics_hit_box_draw(Entity entity, Fill fill_type) {
@@ -2135,10 +2295,15 @@ void graphics_text_destroy(TextAsset *text) {
 }
 
 bool graphics_text_draw(const TextAsset *text, Position position) {
+    GraphicsCommand *command;
     if(text == NULL || text->text == NULL) {
         return false;
     }
-    return TTF_DrawRendererText(text->text, position.x, position.y);
+    command = graphics_command_append(GRAPHICS_COMMAND_TEXT);
+    if(command == NULL) return false;
+    command->data.text.text = text->text;
+    command->data.text.position = position;
+    return true;
 }
 
 AnimationAssetResult graphics_animation_load(AnimationDescriptor anim_desc) {
@@ -2204,15 +2369,12 @@ void graphics_texture_draw(TextureAsset texture_asset, Position pos, Orientation
         .y = dst_rect.h * 0.5f
     };
     double degrees = -(double)(ort - camera.orientation) * 180.0 / (double)PI_F;
-    SDL_RenderTextureRotated(
-        sdl_renderer,
-    texture_asset.texture,
-    NULL,
-    &dst_rect,
-    degrees,
-    &center,
-    SDL_FLIP_NONE
-    );
+    GraphicsCommand *command = graphics_command_append(GRAPHICS_COMMAND_TEXTURE);
+    if(command == NULL) return;
+    command->data.texture.texture = texture_asset.texture;
+    command->data.texture.destination = dst_rect;
+    command->data.texture.center = center;
+    command->data.texture.degrees = degrees;
 }
 
 void graphics_sprite_draw(AnimatedSprite sprite, Position pos, Orientation ort) {
@@ -2338,33 +2500,18 @@ void graphics_local_origin_draw(Entity entity) {
     Position screen_y_positive =
         graphics_world_to_screen_get(y_positive);
 
-    /* Positive local X axis */
-    SDL_SetRenderDrawColor(
-        sdl_renderer,
-        255, 255, 0, 255
-    );
-
-    SDL_RenderLine(
-        sdl_renderer,
-        screen_origin.x,
-        screen_origin.y,
-        screen_x_positive.x,
-        screen_x_positive.y
-    );
-
-    /* Positive local Y axis */
-    SDL_SetRenderDrawColor(
-        sdl_renderer,
-        0, 255, 255, 255
-    );
-
-    SDL_RenderLine(
-        sdl_renderer,
-        screen_origin.x,
-        screen_origin.y,
-        screen_y_positive.x,
-        screen_y_positive.y
-    );
+    {
+        SDL_FPoint x_axis[] = {
+            {screen_origin.x, screen_origin.y},
+            {screen_x_positive.x, screen_x_positive.y}
+        };
+        SDL_FPoint y_axis[] = {
+            {screen_origin.x, screen_origin.y},
+            {screen_y_positive.x, screen_y_positive.y}
+        };
+        (void)graphics_lines_draw(x_axis, 2, (Color){255, 255, 0, 255});
+        (void)graphics_lines_draw(y_axis, 2, (Color){0, 255, 255, 255});
+    }
 }
 
 void graphics_local_origins_draw(void) {
@@ -2406,7 +2553,7 @@ static bool graphics_joint_world_anchors_get(Joint joint, Position *anchor_a, Po
     return true;
 }
 
-static bool graphics_joint_pin_symbol_draw(Position center) {
+static bool graphics_joint_pin_symbol_draw(Position center, Color color) {
     SDL_FPoint ring[17];
     SDL_FRect dot = {.x = center.x - 3.0f, .y = center.y - 3.0f, .w = 6.0f, .h = 6.0f};
 
@@ -2415,10 +2562,11 @@ static bool graphics_joint_pin_symbol_draw(Position center) {
         ring[i] = (SDL_FPoint){center.x + cosf(angle) * 9.0f, center.y + sinf(angle) * 9.0f};
     }
     ring[16] = ring[0];
-    return SDL_RenderFillRect(sdl_renderer, &dot) && SDL_RenderLines(sdl_renderer, ring, 17);
+    return graphics_screen_rect_draw(dot.x, dot.y, dot.w, dot.h, color) &&
+        graphics_lines_draw(ring, 17, color);
 }
 
-static bool graphics_joint_weld_symbol_draw(Position center) {
+static bool graphics_joint_weld_symbol_draw(Position center, Color color) {
     const float radius = 9.0f;
     SDL_FPoint box[] = {
         {center.x - radius, center.y - radius},
@@ -2436,18 +2584,19 @@ static bool graphics_joint_weld_symbol_draw(Position center) {
         {center.x - radius, center.y + radius}
     };
 
-    return SDL_RenderLines(sdl_renderer, box, 5) &&
-        SDL_RenderLines(sdl_renderer, diagonal_a, 2) &&
-        SDL_RenderLines(sdl_renderer, diagonal_b, 2);
+    return graphics_lines_draw(box, 5, color) &&
+        graphics_lines_draw(diagonal_a, 2, color) &&
+        graphics_lines_draw(diagonal_b, 2, color);
 }
 
-static bool graphics_joint_spring_symbol_draw(Position start, Position end) {
+static bool graphics_joint_spring_symbol_draw(Position start, Position end,
+        Color color) {
     SDL_FPoint points[10];
     Vec2D delta = {.x = end.x - start.x, .y = end.y - start.y};
     float length = math_vector_magnitude(delta);
     Vec2D perpendicular;
 
-    if(length <= 0.001f) return graphics_joint_pin_symbol_draw(start);
+    if(length <= 0.001f) return graphics_joint_pin_symbol_draw(start, color);
     perpendicular = (Vec2D){.x = -delta.y / length, .y = delta.x / length};
     for(uint32_t i = 0; i < 10; i += 1) {
         float t = (float)i / 9.0f;
@@ -2457,7 +2606,7 @@ static bool graphics_joint_spring_symbol_draw(Position start, Position end) {
             .y = start.y + delta.y * t + perpendicular.y * offset
         };
     }
-    return SDL_RenderLines(sdl_renderer, points, 10);
+    return graphics_lines_draw(points, 10, color);
 }
 
 bool graphics_joint_draw(Entity joint_entity, Color color) {
@@ -2477,14 +2626,13 @@ bool graphics_joint_draw(Entity joint_entity, Color color) {
     screen_a = graphics_world_to_screen_get(world_a);
     screen_b = graphics_world_to_screen_get(world_b);
     center = (Position){(screen_a.x + screen_b.x) * 0.5f, (screen_a.y + screen_b.y) * 0.5f};
-    if(!SDL_SetRenderDrawColor(sdl_renderer, color.red, color.green, color.blue, color.alpha)) return false;
     switch(joint.type) {
         case JOINT_SPRING:
-            return graphics_joint_spring_symbol_draw(screen_a, screen_b);
+            return graphics_joint_spring_symbol_draw(screen_a, screen_b, color);
         case JOINT_PIN:
-            return graphics_joint_pin_symbol_draw(center);
+            return graphics_joint_pin_symbol_draw(center, color);
         case JOINT_WELD:
-            return graphics_joint_weld_symbol_draw(center);
+            return graphics_joint_weld_symbol_draw(center, color);
         default:
             return false;
     }
@@ -2532,12 +2680,13 @@ bool graphics_soft_body_draw(Entity soft_body_entity, Color surface_color,
         {
             Color color = beam.result.value.draw_color_overridden ?
                 beam.result.value.draw_color : beam_color;
-            if(!SDL_SetRenderDrawColor(sdl_renderer, color.red, color.green,
-                    color.blue, color.alpha)) return false;
+            SDL_FPoint points[2];
+            screen_a = graphics_world_to_screen_get(positions[a]);
+            screen_b = graphics_world_to_screen_get(positions[b]);
+            points[0] = (SDL_FPoint){screen_a.x, screen_a.y};
+            points[1] = (SDL_FPoint){screen_b.x, screen_b.y};
+            if(!graphics_lines_draw(points, 2, color)) return false;
         }
-        screen_a = graphics_world_to_screen_get(positions[a]);
-        screen_b = graphics_world_to_screen_get(positions[b]);
-        (void)SDL_RenderLine(sdl_renderer, screen_a.x, screen_a.y, screen_b.x, screen_b.y);
     }
     for(uint32_t i = 0; i < body.node_count; i += 1) {
         SoftBodyNodeResult node = physics_soft_body_node_get(body.nodes[i]);
