@@ -5041,7 +5041,10 @@ int main(void) {
                 close_action = EDITOR_CLOSE_NONE;
             }
         }
-        if(!workspace.open && !file_browser.active) {
+        if(!workspace.open && !file_browser.active &&
+                !build_settings_panel.open && !visual_settings_panel.open &&
+                !notification_panel.log_open && !notification_panel.report_open &&
+                close_action == EDITOR_CLOSE_NONE) {
             UIRect dialog = {editor_window_width * 0.5f - 230.0f,
                 EDITOR_MENU_HEIGHT +
                     (EDITOR_VIEWPORT_BOTTOM - EDITOR_MENU_HEIGHT) * 0.5f - 90.0f,
