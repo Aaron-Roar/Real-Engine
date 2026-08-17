@@ -70,8 +70,8 @@ void editor_notification_panel_push(EditorNotificationPanel *panel,
         rohr_graphics_text_destroy(&summary_text);
         return;
     }
-    if(!editor_notification_store_push(&panel->store, summary, detail, &index,
-            &replaced)) {
+    if(!editor_notification_store_push(&panel->store, summary, detail,
+            SDL_GetTicks(), &index, &replaced)) {
         rohr_graphics_text_destroy(&summary_text);
         rohr_graphics_text_destroy(&toast_text);
         return;
@@ -91,6 +91,8 @@ void editor_notification_panel_toast_draw(EditorNotificationPanel *panel,
             EDITOR_NOTIFICATION_LOG_HEIGHT,
         EDITOR_NOTIFICATION_WIDTH, EDITOR_NOTIFICATION_LOG_HEIGHT};
     if(panel == NULL) return;
+    editor_notification_store_toasts_expire(&panel->store, SDL_GetTicks(),
+        EDITOR_NOTIFICATION_TOAST_LIFETIME_MS);
     rohr_ui_modal_controls_begin();
     if(rohr_ui_button("editor.notification.log", &panel->log_label,
             log_bounds, NULL).clicked) {

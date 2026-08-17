@@ -9,8 +9,8 @@ int main(void) {
     char summary[32];
     for(size_t i = 1; i <= 105; i += 1) {
         snprintf(summary, sizeof(summary), "notification %zu", i);
-        assert(editor_notification_store_push(&store, summary, "detail", NULL,
-            NULL));
+        assert(editor_notification_store_push(&store, summary, "detail",
+            (uint64_t)i * 100, NULL, NULL));
     }
     assert(store.entry_count == 100);
     assert(store.entry_start == 5);
@@ -26,9 +26,20 @@ int main(void) {
     assert(store.toast_ids[0] == 103);
     assert(store.toast_ids[1] == 104);
     assert(store.toast_ids[2] == 105);
+    assert(store.toast_created_ms[0] == 10300);
+    assert(store.toast_created_ms[2] == 10500);
     editor_notification_store_toast_remove(&store, 104);
     assert(store.toast_count == 2);
     assert(store.toast_ids[0] == 103);
     assert(store.toast_ids[1] == 105);
+    assert(store.toast_created_ms[0] == 10300);
+    assert(store.toast_created_ms[1] == 10500);
+    editor_notification_store_toasts_expire(&store, 20300, 10000);
+    assert(store.toast_count == 1);
+    assert(store.toast_ids[0] == 105);
+    editor_notification_store_toasts_expire(&store, 20500, 10000);
+    assert(store.toast_count == 0);
+    assert(store.entry_count == 100);
+    assert(editor_notification_store_id_get(&store, 105) != NULL);
     return 0;
 }

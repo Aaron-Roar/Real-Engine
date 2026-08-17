@@ -133,7 +133,8 @@ new notifications appear above it, with a fourth replacing the oldest visible
 notification. The log retains the latest 100 notifications independently of
 that visible stack. Its entries are shown newest first in a scrollable menu;
 clicking either a visible notification or a log entry opens the same detailed
-report. Detailed reports scroll when their wrapped text is taller than the
+report. A visible notification expires after 10 seconds but remains available
+in the log. Detailed reports scroll when their wrapped text is taller than the
 report area. Asynchronous configure or compile failures also create a build
 failure notification; visible builds retain their complete output in the
 terminal. Successful C generation reports the generated files, object count,
