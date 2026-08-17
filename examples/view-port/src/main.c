@@ -12,7 +12,8 @@ const float camera_move_speed = 100.0f;
 const float camera_turn_speed = PI_F * 0.5f;
 
 #define PRINT_ENGINE_ERROR(engine_result) \
-    fprintf(stderr, "%s\n", rohr_error_message_get(engine_result))
+    fprintf(stderr, "error %d: %s\n", (int)(engine_result).result.error, \
+        rohr_error_message_get(engine_result))
 
 int main(void) {
     UIPhysicsDebugPanel debug_panel = {0};
@@ -35,8 +36,14 @@ int main(void) {
         }
     }
 
-    if(rohr_error_check(rohr_ui_physics_debug_panel_init(&debug_panel,
-            (FontDescriptor){"assets/debug/JetBrainsMono-BoldItalic.ttf", 11.0f}))) goto fail;
+    {
+        EngineResult debug_result = rohr_ui_physics_debug_panel_init(&debug_panel,
+            (FontDescriptor){"assets/debug/JetBrainsMono-BoldItalic.ttf", 11.0f});
+        if(rohr_error_check(debug_result)) {
+            PRINT_ENGINE_ERROR(debug_result);
+            goto fail;
+        }
+    }
     EntityResult water_smash_result = rohr_entity_add();
     if(rohr_error_check(water_smash_result)) {
         PRINT_ENGINE_ERROR(water_smash_result);

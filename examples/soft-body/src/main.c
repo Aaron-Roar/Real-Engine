@@ -84,7 +84,8 @@ static const float camera_collision_physics_scale;
 
 static bool result_ok(EngineResult result) {
     if(!rohr_error_check(result)) return true;
-    fprintf(stderr, "%s\n", rohr_error_message_get(result));
+    fprintf(stderr, "error %d: %s\n", (int)result.result.error,
+        rohr_error_message_get(result));
     return false;
 }
 

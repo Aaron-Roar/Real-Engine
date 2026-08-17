@@ -2,6 +2,10 @@
 #include "rohr.h"
 #include "example_runtime.h"
 
+#define PRINT_ENGINE_ERROR(result_value) \
+    fprintf(stderr, "error %d: %s\n", (int)(result_value).result.error, \
+        rohr_error_message_get(result_value))
+
 int main(void) {
     if(!example_use_executable_directory()) return 1;
     const char *paths[] = {
@@ -11,12 +15,18 @@ int main(void) {
     EntityIndex seeker_index;
     CameraAttachment camera_attachment;
 
-    if(rohr_error_check(rohr_engine_init())) return 1;
+    {
+        EngineResult init_result = rohr_engine_init();
+        if(rohr_error_check(init_result)) {
+            PRINT_ENGINE_ERROR(init_result);
+            return 1;
+        }
+    }
 
     {
         EngineResult load_result = rohr_game_state_files_load(paths, 2);
         if(rohr_error_check(load_result)) {
-            fprintf(stderr, "%s\n", rohr_error_message_get(load_result));
+            PRINT_ENGINE_ERROR(load_result);
             rohr_engine_shutdown();
             return 1;
         }
@@ -34,10 +44,10 @@ int main(void) {
     CameraAttachmentResult attachment_result = rohr_graphics_camera_attachment_get();
     if(rohr_error_check(index_result) || rohr_error_check(attachment_result)) {
         if(rohr_error_check(index_result)) {
-            fprintf(stderr, "%s\n", rohr_error_message_get(index_result));
+            PRINT_ENGINE_ERROR(index_result);
         }
         if(rohr_error_check(attachment_result)) {
-            fprintf(stderr, "%s\n", rohr_error_message_get(attachment_result));
+            PRINT_ENGINE_ERROR(attachment_result);
         }
         rohr_engine_shutdown();
         return 1;
@@ -56,7 +66,7 @@ int main(void) {
 
     EngineResult save_result = rohr_game_state_file_save("saved_game_state.json");
     if(rohr_error_check(save_result)) {
-        fprintf(stderr, "%s\n", rohr_error_message_get(save_result));
+        PRINT_ENGINE_ERROR(save_result);
         rohr_engine_shutdown();
         return 1;
     }
@@ -64,7 +74,7 @@ int main(void) {
         "saved_game_state_template.json"
     );
     if(rohr_error_check(template_result)) {
-        fprintf(stderr, "%s\n", rohr_error_message_get(template_result));
+        PRINT_ENGINE_ERROR(template_result);
     }
     rohr_engine_shutdown();
     return rohr_error_check(template_result) ? 1 : 0;

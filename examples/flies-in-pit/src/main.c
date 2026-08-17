@@ -8,7 +8,8 @@ const float large_fly_control_acceleration = 240.0f;
 const Torque large_fly_control_torque = 2000000.0f;
 
 #define PRINT_ENGINE_ERROR(engine_result) \
-    fprintf(stderr, "%s\n", rohr_error_message_get(engine_result))
+    fprintf(stderr, "error %d: %s\n", (int)(engine_result).result.error, \
+        rohr_error_message_get(engine_result))
 
 int main(void) {
     UIPhysicsDebugPanel debug_panel = {0};
@@ -22,7 +23,14 @@ int main(void) {
             return 1;
         }
     }
-    if(rohr_error_check(rohr_engine_time_per_tick_set(1.0 / 120.0))) return 1;
+    {
+        EngineResult tick_result = rohr_engine_time_per_tick_set(1.0 / 120.0);
+        if(rohr_error_check(tick_result)) {
+            PRINT_ENGINE_ERROR(tick_result);
+            rohr_engine_shutdown();
+            return 1;
+        }
+    }
     {
         EngineResult graphics_result = rohr_graphics_start();
         if(rohr_error_check(graphics_result)) {
@@ -32,8 +40,14 @@ int main(void) {
         }
     }
 
-    if(rohr_error_check(rohr_ui_physics_debug_panel_init(&debug_panel,
-            (FontDescriptor){"assets/debug/JetBrainsMono-BoldItalic.ttf", 11.0f}))) goto fail;
+    {
+        EngineResult debug_result = rohr_ui_physics_debug_panel_init(&debug_panel,
+            (FontDescriptor){"assets/debug/JetBrainsMono-BoldItalic.ttf", 11.0f});
+        if(rohr_error_check(debug_result)) {
+            PRINT_ENGINE_ERROR(debug_result);
+            goto fail;
+        }
+    }
     EngineResult load_result = rohr_game_state_file_load(
         "assets/flies-in-pit/game.json"
     );

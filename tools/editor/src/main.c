@@ -424,7 +424,8 @@ static void editor_window_layout_sync(void) {
 
 static bool editor_result_ok(EngineResult result) {
     if(!rohr_error_check(result)) return true;
-    fprintf(stderr, "%s\n", rohr_error_message_get(result));
+    fprintf(stderr, "error %d: %s\n", (int)result.result.error,
+        rohr_error_message_get(result));
     return false;
 }
 
@@ -512,7 +513,7 @@ static bool editor_text_create(
     if(font == NULL || value == NULL || text == NULL) return false;
     result = rohr_graphics_text_create(font, value, (Color){230, 234, 242, 255});
     if(rohr_error_check(result)) {
-        fprintf(stderr, "%s\n",
+        fprintf(stderr, "error %d: %s\n", (int)result.result.error,
             rohr_error_message_get(result));
         return false;
     }
@@ -1755,7 +1756,11 @@ int main(void) {
             0.0f, 0.0f, EDITOR_VIEWPORT_WIDTH, EDITOR_WINDOW_HEIGHT
         };
         result = rohr_viewport_create(config);
-        if(rohr_error_check(result)) goto fail;
+        if(rohr_error_check(result)) {
+            fprintf(stderr, "error %d: %s\n", (int)result.result.error,
+                rohr_error_message_get(result));
+            goto fail;
+        }
         viewport = result.result.value;
         if(!editor_result_ok(rohr_viewport_camera_clear(viewport)) ||
                 !editor_result_ok(rohr_viewport_disable_set(viewport))) goto fail;
@@ -1766,7 +1771,11 @@ int main(void) {
             .point_size = 12.0f
         });
 
-        if(rohr_error_check(result)) goto fail;
+        if(rohr_error_check(result)) {
+            fprintf(stderr, "error %d: %s\n", (int)result.result.error,
+                rohr_error_message_get(result));
+            goto fail;
+        }
         font = result.result.value;
     }
     {
@@ -1775,7 +1784,11 @@ int main(void) {
             .point_size = 9.0f
         });
 
-        if(rohr_error_check(result)) goto fail;
+        if(rohr_error_check(result)) {
+            fprintf(stderr, "error %d: %s\n", (int)result.result.error,
+                rohr_error_message_get(result));
+            goto fail;
+        }
         notification_font = result.result.value;
     }
     if(!editor_text_create(&font, "Hitbox Editor", &hitbox_editor_label) ||

@@ -3,7 +3,8 @@
 #include "example_runtime.h"
 
 #define PRINT_ENGINE_ERROR(engine_result) \
-    fprintf(stderr, "%s\n", rohr_error_message_get(engine_result))
+    fprintf(stderr, "error %d: %s\n", (int)(engine_result).result.error, \
+        rohr_error_message_get(engine_result))
 
 int main(void) {
     UIPhysicsDebugPanel debug_panel = {0};
