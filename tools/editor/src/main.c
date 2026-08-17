@@ -4934,7 +4934,15 @@ int main(void) {
                     "editor.menu.view", &view_label, view_options,
                 sizeof(view_options) / sizeof(view_options[0]),
                 view_bounds, NULL);
-                if(view_menu.changed && view_menu.selected_index == 1) {
+                if(view_menu.changed && view_menu.selected_index == 0) {
+                    EditorCommand command = {
+                        .type = EDITOR_COMMAND_VIEWPORT_CAMERA,
+                        .data.viewport_camera = {{0.0f, 0.0f}, 1.0f}
+                    };
+                    (void)editor_command_execute(&project, &command);
+                    viewport_state.camera_panning = false;
+                    viewport_state.camera_pan_with_primary = false;
+                } else if(view_menu.changed && view_menu.selected_index == 1) {
                     EditorResult result =
                         editor_visual_settings_panel_grid_visible_set(
                             &visual_settings_panel,
