@@ -1972,6 +1972,9 @@ int main(void) {
         if(notification_panel.report_open &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             notification_panel.report_open = false;
+        } else if(notification_panel.log_open &&
+                rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
+            notification_panel.log_open = false;
         } else if(build_settings_panel.open &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             build_settings_panel.open = false;
@@ -2138,7 +2141,8 @@ int main(void) {
             fmaxf(560.0f, EDITOR_VIEWPORT_WIDTH * 0.84f),
             fminf(500.0f, WINDOW_HEIGHT - EDITOR_MENU_HEIGHT - 68.0f)
         };
-        if(build_settings_panel.open || notification_panel.report_open)
+        if(build_settings_panel.open || notification_panel.report_open ||
+                notification_panel.log_open)
             rohr_ui_modal_set(build_settings_bounds);
         if(panel_scroll_mode != viewport_state.mode) {
             panel_scroll_mode = viewport_state.mode;
@@ -4738,7 +4742,7 @@ int main(void) {
                 if(editor_result_check(result)) editor_result_stderr_print(result);
             }
         }
-        if(!notification_panel.report_open)
+        if(!notification_panel.report_open && !notification_panel.log_open)
             editor_build_settings_panel_draw(&build_settings_panel,
                 &notification_panel, workspace.directory, build_settings_bounds);
         if(build_settings_panel.build_requested) {
@@ -4754,6 +4758,8 @@ int main(void) {
             }
         }
         editor_notification_panel_toast_draw(&notification_panel, WINDOW_HEIGHT);
+        editor_notification_panel_log_draw(&notification_panel,
+            build_settings_bounds);
         editor_notification_panel_report_draw(&notification_panel,
             build_settings_bounds);
         if(close_action != EDITOR_CLOSE_NONE) {
