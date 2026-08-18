@@ -31,12 +31,14 @@ typedef struct EditorAnimationPreview {
 static EditorAnimationPreview *editor_animation_previews;
 static size_t editor_animation_preview_count;
 static size_t editor_animation_preview_capacity;
+static Tick editor_animation_preview_tick;
+static Time editor_animation_preview_time;
 
 static size_t editor_animation_preview_frame_get(const EditorObject *object,
         const EditorAnimatedSprite *animation) {
     EditorAnimationPreview *preview = NULL;
-    Tick tick = rohr_engine_tick_get();
-    Time time = rohr_engine_time_get();
+    Tick tick = editor_animation_preview_tick;
+    Time time = editor_animation_preview_time;
     if(object == NULL || animation == NULL || animation->frame_count == 0) return 0;
     for(size_t i = 0; i < editor_animation_preview_count; i += 1)
         if(editor_animation_previews[i].object == object->id &&
@@ -97,6 +99,8 @@ void editor_viewport_assets_destroy(void) {
     editor_animation_previews = NULL;
     editor_animation_preview_count = 0;
     editor_animation_preview_capacity = 0;
+    editor_animation_preview_tick = 0;
+    editor_animation_preview_time = 0.0;
     editor_asset_root[0] = '\0';
 }
 
@@ -3242,6 +3246,8 @@ void editor_viewport_draw(const EditorProject *project,
     const EditorObject *selected;
 
     if(project == NULL || state == NULL) return;
+    editor_animation_preview_tick += 1;
+    editor_animation_preview_time = (Time)SDL_GetTicksNS() / 1000000000.0;
     selected = NULL;
     for(size_t i = 0; i < project->object_count; i += 1) {
         if(project->objects[i].id == project->selected) selected = &project->objects[i];
