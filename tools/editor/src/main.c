@@ -2040,6 +2040,7 @@ int main(void) {
     bool collision_category_open = false;
     bool collide_with_open = false;
     bool auto_shape_picker_open = false;
+    bool column_frame_multi_edit_open = false;
     bool auto_shape_first_field_was_active = false;
     bool auto_shape_second_field_was_active = false;
     bool auto_shape_third_field_was_active = false;
@@ -2437,6 +2438,9 @@ int main(void) {
         } else if(color_picker.open &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             editor_color_picker_commit(&color_picker);
+        } else if(column_frame_multi_edit_open &&
+                rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
+            column_frame_multi_edit_open = false;
         } else if(!field_editing &&
                 !editor_terminal_panel_focused_check(&terminal_panel) &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
@@ -2613,7 +2617,13 @@ int main(void) {
         Position hierarchy_pointer = rohr_graphics_mouse_screen_position_get();
         MouseButtonState hierarchy_primary =
             mouse.button_states[MOUSE_BUTTON_LEFT];
-        if(viewport_state.selected_item_count > 1) {
+        bool frame_multi_selection = viewport_state.selected_item_count > 1;
+        for(size_t i = 0; i < viewport_state.selected_item_count; i += 1)
+            if(viewport_state.selected_items[i].kind !=
+                    EDITOR_SELECTION_ANIMATION_FRAME) frame_multi_selection = false;
+        if(!frame_multi_selection) column_frame_multi_edit_open = false;
+        if(viewport_state.selected_item_count > 1 &&
+                (!frame_multi_selection || column_frame_multi_edit_open)) {
             EditorBulkColorContext bulk_color = {.picker = &color_picker,
                 .project = &project, .state = &viewport_state,
                 .history = &history};
@@ -5129,10 +5139,25 @@ int main(void) {
                         frame_ref, frame_bounds, frame_result, hierarchy_pointer,
                         hierarchy_primary, panel_scroll_offset,
                         frame + 1 == sprite->frame_count);
-                    if(frame_result.clicked || frame_result.focus_changed)
+                    if(frame_result.double_clicked &&
+                            viewport_state.selected_item_count > 1 &&
+                            editor_viewport_selection_contains(
+                                &viewport_state, frame_ref)) {
+                        column_frame_multi_edit_open = true;
+                    } else if(frame_result.clicked) {
+                        bool additive =
+                            rohr_controller_key_down_get(&keyboard, SDLK_LCTRL) ||
+                            rohr_controller_key_down_get(&keyboard, SDLK_RCTRL);
                         (void)editor_viewport_selection_set(&project, &viewport_state,
-                            frame_ref, viewport_state.selection_modifier);
-                    if(frame_result.double_clicked) {
+                            frame_ref, additive);
+                        column_frame_multi_edit_open = false;
+                    } else if(frame_result.focus_changed) {
+                        (void)editor_viewport_selection_set(&project, &viewport_state,
+                            frame_ref, false);
+                        column_frame_multi_edit_open = false;
+                    }
+                    if(frame_result.double_clicked &&
+                            !column_frame_multi_edit_open) {
                         viewport_state.mode = EDITOR_VIEWPORT_ANIMATION_FRAME;
                         viewport_state.selected_animation_frame = asset->id;
                         break;
