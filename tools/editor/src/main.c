@@ -985,35 +985,15 @@ static int editor_auto_shape_picker_draw(const char *id_prefix, UIRect bounds,
     return -1;
 }
 
-static bool editor_visibility_toggle(const char *id, TextAsset *empty_label,
+static bool editor_visibility_toggle(const char *id, const TextAsset *visible_label,
+    const TextAsset *hidden_label,
     UIRect bounds, EditorProject *project, EditorVisibilityKind kind,
     EditorObjectId object, uint32_t parent, uint32_t item, bool visible) {
     UIButtonResult result;
-    Position center;
-    Color color = {225, 230, 240, 255};
 
-    if(id == NULL || empty_label == NULL || project == NULL) return false;
-    result = rohr_ui_button(id, empty_label, bounds, NULL);
-    center = (Position){bounds.x + bounds.width * 0.5f,
-        bounds.y + bounds.height * 0.5f};
-    if(visible) {
-        editor_icon_line_draw((Position){center.x - 8.0f, center.y},
-            (Position){center.x - 3.0f, center.y - 4.0f}, color);
-        editor_icon_line_draw((Position){center.x - 3.0f, center.y - 4.0f},
-            (Position){center.x + 3.0f, center.y - 4.0f}, color);
-        editor_icon_line_draw((Position){center.x + 3.0f, center.y - 4.0f},
-            (Position){center.x + 8.0f, center.y}, color);
-        editor_icon_line_draw((Position){center.x + 8.0f, center.y},
-            (Position){center.x + 3.0f, center.y + 4.0f}, color);
-        editor_icon_line_draw((Position){center.x + 3.0f, center.y + 4.0f},
-            (Position){center.x - 3.0f, center.y + 4.0f}, color);
-        editor_icon_line_draw((Position){center.x - 3.0f, center.y + 4.0f},
-            (Position){center.x - 8.0f, center.y}, color);
-        (void)rohr_graphics_screen_quad_draw(center, 4.0f, 4.0f, 0.0f, color);
-    } else {
-        editor_icon_line_draw((Position){center.x - 8.0f, center.y},
-            (Position){center.x + 8.0f, center.y}, color);
-    }
+    if(id == NULL || visible_label == NULL || hidden_label == NULL ||
+            project == NULL) return false;
+    result = rohr_ui_button(id, visible ? visible_label : hidden_label, bounds, NULL);
     if(result.clicked) {
         EditorCommand command = {.type = EDITOR_COMMAND_VISIBILITY,
             .data.visibility = {kind, object, parent, item, !visible}};
@@ -1840,7 +1820,8 @@ int main(void) {
     TextAsset add_soft_body_label = {0};
     TextAsset add_node_label = {0};
     TextAsset add_beam_label = {0};
-    TextAsset visibility_icon_label = {0};
+    TextAsset visibility_visible_label = {0};
+    TextAsset visibility_hidden_label = {0};
     TextAsset revolute_label = {0};
     TextAsset weld_label = {0};
     TextAsset spring_label = {0};
@@ -2121,7 +2102,8 @@ int main(void) {
             !editor_text_create(&font, "Add Soft Body", &add_soft_body_label) ||
             !editor_text_create(&font, "Add Node", &add_node_label) ||
             !editor_text_create(&font, "Add Beam", &add_beam_label) ||
-            !editor_text_create(&font, "", &visibility_icon_label) ||
+            !editor_text_create(&font, "x", &visibility_visible_label) ||
+            !editor_text_create(&font, "", &visibility_hidden_label) ||
             !editor_text_create(&font, "Revolute", &revolute_label) ||
             !editor_text_create(&font, "Weld", &weld_label) ||
             !editor_text_create(&font, "Spring", &spring_label) ||
@@ -2588,7 +2570,8 @@ int main(void) {
                     (void)editor_command_execute(&project, &command);
                 }
                 (void)editor_visibility_toggle("editor.rigid_body.visibility",
-                    &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    &visibility_visible_label, &visibility_hidden_label,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         44.0f, 26.0f, 26.0f}, &project,
                     EDITOR_VISIBILITY_RIGID_BODY, selected->id, 0, body->id, body->visible);
                 rohr_ui_label(&x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
@@ -2867,7 +2850,7 @@ int main(void) {
                             snprintf(visibility_id, sizeof(visibility_id),
                                 "editor.hitbox.%u.visibility", box->id);
                             (void)editor_visibility_toggle(visibility_id,
-                                &visibility_icon_label,
+                                &visibility_visible_label, &visibility_hidden_label,
                                 (UIRect){row_x, y, 26.0f, 26.0f}, &project,
                                 EDITOR_VISIBILITY_HITBOX, selected->id, body->id,
                                 box->id, box->visible);
@@ -2935,7 +2918,8 @@ int main(void) {
                     (void)editor_command_execute(&project, &command);
                 }
                 (void)editor_visibility_toggle("editor.hitbox.visibility",
-                    &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    &visibility_visible_label, &visibility_hidden_label,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         47.0f, 26.0f, 26.0f}, &project, EDITOR_VISIBILITY_HITBOX,
                     selected->id, body->id, hitbox->id, hitbox->visible);
             }
@@ -3365,7 +3349,8 @@ int main(void) {
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, 76.0f,
                         EDITOR_TOOLS_WIDTH - 48.0f, 24.0f});
                 (void)editor_visibility_toggle("editor.joint.visibility",
-                    &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
+                    &visibility_visible_label, &visibility_hidden_label,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
                         94.0f, 24.0f, 24.0f}, &project, EDITOR_VISIBILITY_JOINT,
                     selected->id, 0, joint->id, joint->visible);
                 {
@@ -3468,7 +3453,8 @@ int main(void) {
                     snprintf(id, sizeof(id), "editor.anchor.%u", anchor->id);
                     snprintf(visibility_id, sizeof(visibility_id),
                         "editor.anchor.%u.visibility", anchor->id);
-                    (void)editor_visibility_toggle(visibility_id, &visibility_icon_label,
+                    (void)editor_visibility_toggle(visibility_id,
+                        &visibility_visible_label, &visibility_hidden_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
                                 270.0f + (float)(i - anchor_start) * 27.0f,
                                 23.0f, 23.0f}, &project, EDITOR_VISIBILITY_ANCHOR,
@@ -3705,7 +3691,8 @@ int main(void) {
                     (void)editor_command_execute(&project, &command);
                 }
                 (void)editor_visibility_toggle("editor.anchor.visibility",
-                    &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    &visibility_visible_label, &visibility_hidden_label,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         44.0f, 26.0f, 26.0f}, &project, EDITOR_VISIBILITY_ANCHOR,
                     selected->id, 0, anchor->id, anchor->visible);
                 rohr_ui_label(&x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
@@ -3847,7 +3834,8 @@ int main(void) {
                     (void)editor_command_execute(&project, &command);
                 }
                 (void)editor_visibility_toggle("editor.soft_body.visibility",
-                    &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    &visibility_visible_label, &visibility_hidden_label,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         44.0f, 26.0f, 26.0f}, &project, EDITOR_VISIBILITY_SOFT_BODY,
                     selected->id, 0, body->id, body->visible);
                 rohr_ui_label(&x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
@@ -4016,7 +4004,8 @@ int main(void) {
                         if(name == NULL || label == NULL || cache == NULL) continue;
                         if(!editor_named_text_sync(&font, name, label, cache,
                                 EDITOR_OBJECT_NAME_MAX)) goto fail;
-                        (void)editor_visibility_toggle(visibility_id, &visibility_icon_label,
+                        (void)editor_visibility_toggle(visibility_id,
+                            &visibility_visible_label, &visibility_hidden_label,
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, y, 24.0f, 24.0f},
                             &project, visibility_kind, selected->id,
                             body->id, item.id, visible);
@@ -4125,7 +4114,8 @@ int main(void) {
                     (void)editor_command_execute(&project, &command);
                 }
                 (void)editor_visibility_toggle("editor.soft_node.visibility",
-                    &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    &visibility_visible_label, &visibility_hidden_label,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         44.0f, 26.0f, 26.0f}, &project, EDITOR_VISIBILITY_SOFT_NODE,
                     selected->id, body->id, node->id, node->visible);
                 rohr_ui_label(&x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 122.0f, 50.0f, 26.0f});
@@ -4337,7 +4327,8 @@ int main(void) {
                     (void)editor_command_execute(&project, &command);
                 }
                 (void)editor_visibility_toggle("editor.soft_beam.visibility",
-                    &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    &visibility_visible_label, &visibility_hidden_label,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         44.0f, 26.0f, 26.0f}, &project, EDITOR_VISIBILITY_SOFT_BEAM,
                     selected->id, body->id, beam->id, beam->visible);
                 rohr_ui_label(&node_a_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 122.0f, 70.0f, 28.0f});
@@ -4580,7 +4571,8 @@ int main(void) {
                         "%s", selected->name);
                 }
                 (void)editor_visibility_toggle("editor.object.visibility",
-                    &visibility_icon_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    &visibility_visible_label, &visibility_hidden_label,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                         56.0f, 26.0f, 26.0f}, &project, EDITOR_VISIBILITY_OBJECT,
                     selected->id, 0, 0, selected->visible);
                 rohr_ui_label(&object_name_label,
@@ -4713,7 +4705,8 @@ int main(void) {
                         if(name == NULL || label == NULL || cache == NULL) continue;
                         if(!editor_named_text_sync(&font, name, label, cache,
                                 EDITOR_OBJECT_NAME_MAX)) goto fail;
-                        (void)editor_visibility_toggle(visibility_id, &visibility_icon_label,
+                        (void)editor_visibility_toggle(visibility_id,
+                            &visibility_visible_label, &visibility_hidden_label,
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, y, 26.0f, 26.0f},
                             &project, visibility_kind, selected->id, 0, item.id, visible);
                         result = rohr_ui_button(id, label,
@@ -4797,7 +4790,8 @@ int main(void) {
                     "editor.object.%u", object->id);
                 snprintf(visibility_id, sizeof(visibility_id),
                     "editor.object.%u.visibility", object->id);
-                (void)editor_visibility_toggle(visibility_id, &visibility_icon_label,
+                (void)editor_visibility_toggle(visibility_id,
+                    &visibility_visible_label, &visibility_hidden_label,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, y + 1.0f, 26.0f, 26.0f},
                     &project, EDITOR_VISIBILITY_OBJECT, object->id, 0, 0,
                     object->visible);
@@ -5564,7 +5558,8 @@ int main(void) {
     rohr_graphics_text_destroy(&spring_label);
     rohr_graphics_text_destroy(&weld_label);
     rohr_graphics_text_destroy(&revolute_label);
-    rohr_graphics_text_destroy(&visibility_icon_label);
+    rohr_graphics_text_destroy(&visibility_visible_label);
+    rohr_graphics_text_destroy(&visibility_hidden_label);
     rohr_graphics_text_destroy(&add_beam_label);
     rohr_graphics_text_destroy(&add_node_label);
     rohr_graphics_text_destroy(&add_soft_body_label);
@@ -5745,7 +5740,8 @@ fail:
     rohr_graphics_text_destroy(&spring_label);
     rohr_graphics_text_destroy(&weld_label);
     rohr_graphics_text_destroy(&revolute_label);
-    rohr_graphics_text_destroy(&visibility_icon_label);
+    rohr_graphics_text_destroy(&visibility_visible_label);
+    rohr_graphics_text_destroy(&visibility_hidden_label);
     rohr_graphics_text_destroy(&add_beam_label);
     rohr_graphics_text_destroy(&add_node_label);
     rohr_graphics_text_destroy(&add_soft_body_label);
