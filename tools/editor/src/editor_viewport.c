@@ -677,8 +677,7 @@ bool editor_viewport_selection_set(EditorProject *project,
         return false;
     for(size_t i = 0; i < state->selected_item_count; i += 1)
         if(editor_selection_ref_equal(state->selected_items[i], selection)) existing = i;
-    if(!additive || (state->selected_item_count > 0 &&
-            state->selected_items[0].kind != selection.kind)) {
+    if(!additive) {
         state->selected_item_count = 0;
         existing = SIZE_MAX;
     } else if(existing != SIZE_MAX) {
@@ -737,8 +736,6 @@ static bool editor_marquee_selection_add(EditorViewportState *state,
         EditorSelectionRef selection) {
     EditorSelectionRef *items;
     size_t capacity;
-    if(state->selected_item_count > 0 &&
-            state->selected_items[0].kind != selection.kind) return true;
     if(editor_viewport_selection_contains(state, selection)) return true;
     if(state->selected_item_count < state->selected_item_capacity) {
         state->selected_items[state->selected_item_count++] = selection;
@@ -1431,6 +1428,244 @@ bool editor_viewport_auto_shape_update(EditorViewportState *state,
     return false;
 }
 
+static EditorObject *editor_group_object_get(EditorProject *project,
+        EditorObjectId id) {
+    if(project == NULL) return NULL;
+    for(size_t i = 0; i < project->object_count; i += 1)
+        if(project->objects[i].id == id) return &project->objects[i];
+    return NULL;
+}
+
+static EditorSoftBody *editor_group_soft_body_get(EditorObject *object,
+        EditorSoftBodyId id) {
+    if(object == NULL) return NULL;
+    for(size_t i = 0; i < object->soft_body_count; i += 1)
+        if(object->soft_body_items[i].id == id) return &object->soft_body_items[i];
+    return NULL;
+}
+
+static EditorSoftNode *editor_group_soft_node_get(EditorSoftBody *body,
+        EditorSoftNodeId id) {
+    if(body == NULL) return NULL;
+    for(size_t i = 0; i < body->node_count; i += 1)
+        if(body->nodes[i].id == id) return &body->nodes[i];
+    return NULL;
+}
+
+static EditorVertex *editor_group_vertex_get(EditorHitbox *hitbox,
+        EditorVertexId id) {
+    if(hitbox == NULL) return NULL;
+    for(size_t i = 0; i < hitbox->vertex_count; i += 1)
+        if(hitbox->vertices[i].id == id) return &hitbox->vertices[i];
+    return NULL;
+}
+
+static bool editor_group_parent_selected(EditorProject *project,
+        const EditorViewportState *state, EditorSelectionRef ref) {
+    if(editor_viewport_selection_contains(state, (EditorSelectionRef){
+            EDITOR_SELECTION_OBJECT, ref.object, 0, 0, ref.object})) return true;
+    if(ref.kind == EDITOR_SELECTION_VERTEX &&
+            (editor_viewport_selection_contains(state, (EditorSelectionRef){
+                EDITOR_SELECTION_RIGID_BODY, ref.object, 0, 0, ref.parent}) ||
+             editor_viewport_selection_contains(state, (EditorSelectionRef){
+                EDITOR_SELECTION_PARTICLE, ref.object, 0, 0, ref.parent}))) return true;
+    if(ref.kind == EDITOR_SELECTION_SOFT_NODE &&
+            editor_viewport_selection_contains(state, (EditorSelectionRef){
+                EDITOR_SELECTION_SOFT_BODY, ref.object, 0, 0, ref.parent})) return true;
+    if(ref.kind == EDITOR_SELECTION_ANCHOR) {
+        EditorObject *object = editor_group_object_get(project, ref.object);
+        EditorAnchor *anchor = editor_project_anchor_get(object, ref.item);
+        if(anchor != NULL && anchor->position_follows_body &&
+                (editor_viewport_selection_contains(state, (EditorSelectionRef){
+                    EDITOR_SELECTION_RIGID_BODY, ref.object, 0, 0,
+                    anchor->rigid_body}) ||
+                 editor_viewport_selection_contains(state, (EditorSelectionRef){
+                    EDITOR_SELECTION_PARTICLE, ref.object, 0, 0,
+                    anchor->rigid_body}))) return true;
+    }
+    return false;
+}
+
+static bool editor_group_point_get(EditorProject *project,
+        EditorSelectionRef ref, Position *point) {
+    EditorObject *object = editor_group_object_get(project, ref.object);
+    if(object == NULL || point == NULL) return false;
+    if(ref.kind == EDITOR_SELECTION_OBJECT) {
+        *point = object->position;
+        return true;
+    }
+    if(ref.kind == EDITOR_SELECTION_RIGID_BODY ||
+            ref.kind == EDITOR_SELECTION_PARTICLE) {
+        EditorRigidBody *body = editor_project_rigid_body_get(object, ref.item);
+        if(body == NULL) return false;
+        *point = (Position){object->position.x + body->position.x,
+            object->position.y + body->position.y};
+        return true;
+    }
+    if(ref.kind == EDITOR_SELECTION_SOFT_BODY) {
+        EditorSoftBody *body = editor_group_soft_body_get(object, ref.item);
+        if(body == NULL) return false;
+        *point = (Position){object->position.x + body->position.x,
+            object->position.y + body->position.y};
+        return true;
+    }
+    if(ref.kind == EDITOR_SELECTION_ANCHOR) {
+        EditorAnchor *anchor = editor_project_anchor_get(object, ref.item);
+        if(anchor == NULL) return false;
+        *point = editor_anchor_world_get(object, anchor);
+        return true;
+    }
+    if(ref.kind == EDITOR_SELECTION_SOFT_NODE) {
+        EditorSoftBody *body = editor_group_soft_body_get(object, ref.parent);
+        EditorSoftNode *node = editor_group_soft_node_get(body, ref.item);
+        if(body == NULL || node == NULL) return false;
+        *point = editor_soft_node_world_get(object, body, node);
+        return true;
+    }
+    if(ref.kind == EDITOR_SELECTION_VERTEX) {
+        EditorRigidBody *body = editor_project_rigid_body_get(object, ref.parent);
+        EditorHitbox *hitbox = body == NULL ? NULL :
+            editor_project_hitbox_get(body, ref.container);
+        EditorVertex *vertex = editor_group_vertex_get(hitbox, ref.item);
+        if(body == NULL || hitbox == NULL || vertex == NULL) return false;
+        *point = editor_hitbox_vertex_world_get(object, body, hitbox,
+            (uint32_t)(vertex - hitbox->vertices));
+        return true;
+    }
+    return false;
+}
+
+static bool editor_group_pivot_get(EditorProject *project,
+        const EditorViewportState *state, Position *pivot) {
+    Position sum = {0};
+    size_t count = 0;
+    if(project == NULL || state == NULL || pivot == NULL) return false;
+    for(size_t i = 0; i < state->selected_item_count; i += 1) {
+        Position point;
+        EditorSelectionRef ref = state->selected_items[i];
+        if(editor_group_parent_selected(project, state, ref) ||
+                !editor_group_point_get(project, ref, &point)) continue;
+        sum.x += point.x;
+        sum.y += point.y;
+        count += 1;
+    }
+    if(count == 0) return false;
+    *pivot = (Position){sum.x / (float)count, sum.y / (float)count};
+    return true;
+}
+
+static bool editor_group_point_hit(EditorProject *project,
+        const EditorViewportState *state, Position pointer) {
+    float tolerance = 10.0f / editor_view_scale;
+    for(size_t i = state->selected_item_count; i > 0; i -= 1) {
+        EditorSelectionRef ref = state->selected_items[i - 1];
+        EditorObject *object = editor_group_object_get(project, ref.object);
+        Position point;
+        if(editor_group_parent_selected(project, state, ref) || object == NULL) continue;
+        if(ref.kind == EDITOR_SELECTION_OBJECT &&
+                editor_object_visual_point_contains(object, pointer)) return true;
+        if(ref.kind == EDITOR_SELECTION_RIGID_BODY ||
+                ref.kind == EDITOR_SELECTION_PARTICLE) {
+            EditorRigidBody *body = editor_project_rigid_body_get(object, ref.item);
+            EditorMarqueeBounds bounds = body == NULL ? (EditorMarqueeBounds){0} :
+                editor_marquee_rigid_body_bounds_get(object, body);
+            if(bounds.valid && pointer.x >= bounds.left && pointer.x <= bounds.right &&
+                    pointer.y >= bounds.bottom && pointer.y <= bounds.top) return true;
+        } else if(ref.kind == EDITOR_SELECTION_SOFT_BODY) {
+            EditorSoftBody *body = editor_group_soft_body_get(object, ref.item);
+            EditorMarqueeBounds bounds = body == NULL ? (EditorMarqueeBounds){0} :
+                editor_marquee_soft_body_bounds_get(object, body);
+            if(bounds.valid && pointer.x >= bounds.left && pointer.x <= bounds.right &&
+                    pointer.y >= bounds.bottom && pointer.y <= bounds.top) return true;
+        } else if(editor_group_point_get(project, ref, &point) &&
+                hypotf(pointer.x - point.x, pointer.y - point.y) <= tolerance) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static Position editor_group_rotate_point(Position point, Position pivot,
+        float angle) {
+    float cosine = cosf(angle);
+    float sine = sinf(angle);
+    Position local = {point.x - pivot.x, point.y - pivot.y};
+    return (Position){pivot.x + local.x * cosine - local.y * sine,
+        pivot.y + local.x * sine + local.y * cosine};
+}
+
+static bool editor_group_transform_apply(EditorProject *project,
+        const EditorViewportState *state, Vec2D translation, float angle) {
+    bool changed = false;
+    for(size_t i = 0; i < state->selected_item_count; i += 1) {
+        EditorSelectionRef ref = state->selected_items[i];
+        EditorObject *object = editor_group_object_get(project, ref.object);
+        Position world;
+        Position desired;
+        EditorCommand command = {0};
+        if(editor_group_parent_selected(project, state, ref) || object == NULL ||
+                !editor_group_point_get(project, ref, &world)) continue;
+        desired = editor_group_rotate_point((Position){world.x + translation.x,
+            world.y + translation.y}, state->group_pivot, angle);
+        if(ref.kind == EDITOR_SELECTION_OBJECT) {
+            command = (EditorCommand){.type = EDITOR_COMMAND_OBJECT_POSITION,
+                .data.object_position = {object->id, desired}};
+        } else if(ref.kind == EDITOR_SELECTION_RIGID_BODY ||
+                ref.kind == EDITOR_SELECTION_PARTICLE) {
+            EditorRigidBody *body = editor_project_rigid_body_get(object, ref.item);
+            if(body == NULL) continue;
+            command = (EditorCommand){.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
+                .data.rigid_body_transform = {object->id, body->id,
+                    {desired.x - object->position.x, desired.y - object->position.y},
+                    body->rotation + angle}};
+        } else if(ref.kind == EDITOR_SELECTION_SOFT_BODY) {
+            EditorSoftBody *body = editor_group_soft_body_get(object, ref.item);
+            if(body == NULL) continue;
+            command = (EditorCommand){.type = EDITOR_COMMAND_SOFT_BODY_TRANSFORM,
+                .data.soft_body_transform = {object->id, body->id,
+                    {desired.x - object->position.x, desired.y - object->position.y},
+                    body->rotation + angle}};
+        } else if(ref.kind == EDITOR_SELECTION_ANCHOR) {
+            EditorAnchor *anchor = editor_project_anchor_get(object, ref.item);
+            EditorRigidBody *body = anchor == NULL ? NULL :
+                editor_project_rigid_body_get(object, anchor->rigid_body);
+            if(anchor == NULL) continue;
+            command = (EditorCommand){.type = EDITOR_COMMAND_ANCHOR_TRANSFORM,
+                .data.anchor_transform = {object->id, anchor->id,
+                    editor_anchor_world_local_get(object, anchor, body, desired),
+                    anchor->rotation + angle}};
+        } else if(ref.kind == EDITOR_SELECTION_SOFT_NODE) {
+            EditorSoftBody *body = editor_group_soft_body_get(object, ref.parent);
+            EditorSoftNode *node = editor_group_soft_node_get(body, ref.item);
+            if(body == NULL || node == NULL) continue;
+            command = (EditorCommand){.type = EDITOR_COMMAND_SOFT_NODE_POSITION,
+                .data.soft_node_position = {object->id, body->id, node->id,
+                    editor_auto_shape_soft_local_get(object, body, desired)}};
+        } else if(ref.kind == EDITOR_SELECTION_VERTEX) {
+            EditorRigidBody *body = editor_project_rigid_body_get(object, ref.parent);
+            EditorHitbox *hitbox = body == NULL ? NULL :
+                editor_project_hitbox_get(body, ref.container);
+            EditorVertex *vertex = editor_group_vertex_get(hitbox, ref.item);
+            Position local;
+            float cosine;
+            float sine;
+            if(body == NULL || hitbox == NULL || vertex == NULL ||
+                    vertex->position_locked) continue;
+            local = (Position){desired.x - object->position.x - body->position.x,
+                desired.y - object->position.y - body->position.y};
+            cosine = cosf(-body->rotation);
+            sine = sinf(-body->rotation);
+            command = (EditorCommand){.type = EDITOR_COMMAND_VERTEX_POSITION,
+                .data.vertex_position = {object->id, body->id, hitbox->id,
+                    vertex->id, {local.x * cosine - local.y * sine,
+                        local.x * sine + local.y * cosine}}};
+        } else continue;
+        changed = editor_command_execute(project, &command).kind ==
+            ERROR_RESULT_VALUE || changed;
+    }
+    return changed;
+}
+
 bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
     Position pointer, MouseButtonState primary_button,
     MouseButtonState pan_button, bool pan_modifier, float wheel_y,
@@ -1440,6 +1675,11 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
     EditorHitbox *hitbox;
 
     if(state == NULL || project == NULL) return false;
+    if(primary_button == MOUSE_BUTTON_STATE_RELEASED &&
+            (state->group_dragging || state->group_rotating)) {
+        state->group_dragging = false;
+        state->group_rotating = false;
+    }
     object = editor_project_selected_get(project);
     if(pan_button == MOUSE_BUTTON_STATE_RELEASED ||
             (state->camera_pan_with_primary &&
@@ -1498,6 +1738,47 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
         return true;
     }
     pointer = editor_view_screen_to_world(pointer);
+    if(state->group_dragging && primary_button == MOUSE_BUTTON_STATE_DOWN) {
+        Vec2D delta = {pointer.x - state->group_pointer.x,
+            pointer.y - state->group_pointer.y};
+        if(delta.x != 0.0f || delta.y != 0.0f) {
+            (void)editor_group_transform_apply(project, state, delta, 0.0f);
+            state->group_pointer = pointer;
+            state->group_pivot.x += delta.x;
+            state->group_pivot.y += delta.y;
+        }
+        return true;
+    }
+    if(state->group_rotating && primary_button == MOUSE_BUTTON_STATE_DOWN) {
+        float pointer_angle = atan2f(pointer.y - state->group_pivot.y,
+            pointer.x - state->group_pivot.x);
+        float delta = pointer_angle - state->group_pointer_angle;
+        while(delta > 3.14159265359f) delta -= 6.28318530718f;
+        while(delta < -3.14159265359f) delta += 6.28318530718f;
+        if(delta != 0.0f) {
+            (void)editor_group_transform_apply(project, state, (Vec2D){0}, delta);
+            state->group_pointer_angle = pointer_angle;
+        }
+        return true;
+    }
+    if(primary_button == MOUSE_BUTTON_STATE_PRESSED &&
+            state->selected_item_count >= 2 &&
+            editor_group_pivot_get(project, state, &state->group_pivot)) {
+        Position rotation_handle = {state->group_pivot.x,
+            state->group_pivot.y + 40.0f / editor_view_scale};
+        if(hypotf(pointer.x - rotation_handle.x,
+                pointer.y - rotation_handle.y) <= 12.0f / editor_view_scale) {
+            state->group_rotating = true;
+            state->group_pointer_angle = atan2f(pointer.y - state->group_pivot.y,
+                pointer.x - state->group_pivot.x);
+            return true;
+        }
+        if(editor_group_point_hit(project, state, pointer)) {
+            state->group_dragging = true;
+            state->group_pointer = pointer;
+            return true;
+        }
+    }
     if(state->mode == EDITOR_VIEWPORT_HIERARCHY &&
             primary_button == MOUSE_BUTTON_STATE_PRESSED) {
         for(size_t object_index = project->object_count; object_index > 0; object_index -= 1) {
@@ -2434,6 +2715,17 @@ void editor_viewport_draw(const EditorProject *project,
         editor_viewport_particle_fills_draw(selected);
         editor_viewport_object_draw(selected, state, true);
     }
+    if(state->selected_item_count >= 2) {
+        Position pivot;
+        if(editor_group_pivot_get((EditorProject *)project, state, &pivot)) {
+            Position handle = {pivot.x, pivot.y + 40.0f / editor_view_scale};
+            editor_line_draw(pivot, handle, (Color){255, 215, 70, 255});
+            editor_quad_draw(pivot, 7.0f, 7.0f, 0.0f,
+                (Color){255, 215, 70, 255});
+            editor_quad_draw(handle, 12.0f, 12.0f, 0.78539816339f,
+                (Color){255, 215, 70, 255});
+        }
+    }
     if(state->marquee_active) {
         float left = fminf(state->marquee_start.x, state->marquee_end.x);
         float right = fmaxf(state->marquee_start.x, state->marquee_end.x);
@@ -2460,6 +2752,10 @@ bool editor_viewport_selection_nudge(EditorViewportState *state,
 
     if(state == NULL || project == NULL) return false;
     screen_delta.y = -screen_delta.y;
+    if(state->selected_item_count >= 2) {
+        if(!editor_group_pivot_get(project, state, &state->group_pivot)) return false;
+        return editor_group_transform_apply(project, state, screen_delta, 0.0f);
+    }
     object = editor_project_selected_get(project);
     if(object == NULL) return false;
     body = editor_selected_body_get(object, state);

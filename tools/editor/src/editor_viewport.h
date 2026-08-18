@@ -62,6 +62,8 @@ typedef struct EditorViewportState {
     bool dragged_soft_body;
     bool rotated_soft_body;
     bool dragged_origin;
+    bool group_dragging;
+    bool group_rotating;
     bool camera_panning;
     bool camera_pan_with_primary;
     bool marquee_active;
@@ -70,6 +72,9 @@ typedef struct EditorViewportState {
     Position camera_pointer;
     Position marquee_start;
     Position marquee_end;
+    Position group_pointer;
+    Position group_pivot;
+    float group_pointer_angle;
     float rotation_pointer_offset;
     EditorViewportMode mode;
     EditorHierarchySelection selection;

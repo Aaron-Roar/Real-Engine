@@ -71,7 +71,8 @@ int main(void) {
                 state.selected_item_count != 1 ||
                 state.selected_rigid_body != body->id) return 1;
         if(!editor_viewport_selection_set(&project, &state, mixed, true) ||
-                state.selected_item_count != 1 ||
+                state.selected_item_count != 2 ||
+                editor_viewport_selection_homogeneous_check(&state) ||
                 state.selection != EDITOR_SELECTION_SOFT_BODY) return 1;
         editor_viewport_selection_clear(&state);
     }
@@ -181,10 +182,10 @@ int main(void) {
             (Position){center.x - 100.0f, center.y - 100.0f});
         if(!editor_viewport_marquee_finish(&state, &project,
                     (Position){center.x + 100.0f, center.y + 100.0f}) ||
-                state.selected_item_count != 2 ||
+                state.selected_item_count != 4 ||
                 state.selected_items[0].kind != EDITOR_SELECTION_RIGID_BODY ||
-                state.mode != EDITOR_VIEWPORT_RIGID_BODY ||
-                !editor_viewport_selection_homogeneous_check(&state)) return 1;
+                state.mode != EDITOR_VIEWPORT_ANCHOR ||
+                editor_viewport_selection_homogeneous_check(&state)) return 1;
     }
     {
         EditorSelectionRef first = {EDITOR_SELECTION_RIGID_BODY,
@@ -207,12 +208,19 @@ int main(void) {
                 body_b->mass_value != 7.0f)
             return 1;
         editor_history_reset(&history);
-        if(
+        editor_viewport_selection_clear(&state);
+        if(!editor_viewport_selection_set(&project, &state, first, false) ||
+                !editor_viewport_selection_set(&project, &state,
+                    (EditorSelectionRef){EDITOR_SELECTION_SOFT_BODY,
+                        object->id, 0, 0, soft_body->id}, true) ||
+                editor_viewport_selection_homogeneous_check(&state) ||
                 !editor_navigation_multi_selection_delete(
                     &project, &state, &history) ||
-                object->rigid_body_count != 0 || history.undo_count != 1 ||
-                !editor_history_undo(&history) || object->rigid_body_count != 2 ||
-                !editor_history_redo(&history) || object->rigid_body_count != 0)
+                object->rigid_body_count != 1 || object->soft_body_count != 0 ||
+                history.undo_count != 1 || !editor_history_undo(&history) ||
+                object->rigid_body_count != 2 || object->soft_body_count != 1 ||
+                !editor_history_redo(&history) || object->rigid_body_count != 1 ||
+                object->soft_body_count != 0)
             return 1;
     }
     editor_history_destroy(&history);

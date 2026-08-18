@@ -143,6 +143,15 @@ static const EditorBulkProperty origin_properties[] = {
     {"X", EDITOR_BULK_POSITION_X, EDITOR_BULK_FLOAT, 0},
     {"Y", EDITOR_BULK_POSITION_Y, EDITOR_BULK_FLOAT, 0}
 };
+static const EditorBulkProperty mixed_position_properties[] = {
+    {"X", EDITOR_BULK_POSITION_X, EDITOR_BULK_FLOAT, 0},
+    {"Y", EDITOR_BULK_POSITION_Y, EDITOR_BULK_FLOAT, 0}
+};
+static const EditorBulkProperty mixed_transform_properties[] = {
+    {"X", EDITOR_BULK_POSITION_X, EDITOR_BULK_FLOAT, 0},
+    {"Y", EDITOR_BULK_POSITION_Y, EDITOR_BULK_FLOAT, 0},
+    {"Rotation", EDITOR_BULK_ROTATION, EDITOR_BULK_FLOAT, 0}
+};
 
 static bool editor_bulk_text_create(FontAsset *font, const char *value,
         TextAsset *text) {
@@ -176,11 +185,44 @@ static const EditorBulkProperty *editor_bulk_properties_get(
 #undef EDITOR_BULK_LIST
 }
 
+static const EditorBulkProperty *editor_bulk_mixed_properties_get(
+        const EditorViewportState *state, size_t *count) {
+    bool rotation = true;
+    if(state == NULL || count == NULL) return NULL;
+    for(size_t i = 0; i < state->selected_item_count; i += 1) {
+        switch(state->selected_items[i].kind) {
+            case EDITOR_SELECTION_RIGID_BODY:
+            case EDITOR_SELECTION_PARTICLE:
+            case EDITOR_SELECTION_SOFT_BODY:
+            case EDITOR_SELECTION_ANCHOR:
+                break;
+            case EDITOR_SELECTION_OBJECT:
+            case EDITOR_SELECTION_SOFT_NODE:
+            case EDITOR_SELECTION_VERTEX:
+            case EDITOR_SELECTION_ORIGIN:
+                rotation = false;
+                break;
+            default:
+                *count = 0;
+                return NULL;
+        }
+    }
+    if(rotation) {
+        *count = sizeof(mixed_transform_properties) /
+            sizeof(mixed_transform_properties[0]);
+        return mixed_transform_properties;
+    }
+    *count = sizeof(mixed_position_properties) /
+        sizeof(mixed_position_properties[0]);
+    return mixed_position_properties;
+}
+
 float editor_bulk_panel_content_height_get(const EditorViewportState *state) {
     size_t count = 0;
-    if(state == NULL || state->selected_item_count < 2 ||
-            !editor_viewport_selection_homogeneous_check(state)) return 0.0f;
-    (void)editor_bulk_properties_get(state->selected_items[0].kind, &count);
+    if(state == NULL || state->selected_item_count < 2) return 0.0f;
+    if(editor_viewport_selection_homogeneous_check(state))
+        (void)editor_bulk_properties_get(state->selected_items[0].kind, &count);
+    else (void)editor_bulk_mixed_properties_get(state, &count);
     return 150.0f + (float)count * 36.0f;
 }
 
@@ -199,6 +241,16 @@ static EditorItemKind editor_bulk_item_kind_get(EditorHierarchySelection kind) {
         case EDITOR_SELECTION_LINE: return EDITOR_ITEM_LINE;
         default: return EDITOR_ITEM_OBJECT;
     }
+}
+
+static bool editor_bulk_delete_check(const EditorViewportState *state) {
+    if(state == NULL) return false;
+    for(size_t i = 0; i < state->selected_item_count; i += 1) {
+        if(state->selected_items[i].kind == EDITOR_SELECTION_ORIGIN ||
+                state->selected_items[i].kind == EDITOR_SELECTION_SOFT_AREA)
+            return false;
+    }
+    return true;
 }
 
 static bool editor_bulk_float_parse(const char *text, float *value) {
@@ -579,13 +631,16 @@ bool editor_bulk_panel_draw(EditorBulkPanel *panel, EditorProject *project,
     bool editing = false;
     if(panel == NULL || project == NULL || state == NULL || history == NULL ||
             state->selected_item_count < 2) return false;
-    if(!editor_viewport_selection_homogeneous_check(state)) return false;
-    properties = editor_bulk_properties_get(state->selected_items[0].kind,
-        &property_count);
-    if(properties == NULL || property_count > EDITOR_BULK_PROPERTY_MAX) return false;
-    if(panel->kind != state->selected_items[0].kind ||
+    properties = editor_viewport_selection_homogeneous_check(state) ?
+        editor_bulk_properties_get(state->selected_items[0].kind,
+            &property_count) : editor_bulk_mixed_properties_get(state,
+                &property_count);
+    if(property_count > EDITOR_BULK_PROPERTY_MAX) return false;
+    if(panel->kind != (editor_viewport_selection_homogeneous_check(state) ?
+            state->selected_items[0].kind : EDITOR_SELECTION_NONE) ||
             panel->property_count != property_count) {
-        panel->kind = state->selected_items[0].kind;
+        panel->kind = editor_viewport_selection_homogeneous_check(state) ?
+            state->selected_items[0].kind : EDITOR_SELECTION_NONE;
         panel->property_count = property_count;
         memset(panel->values, 0, sizeof(panel->values));
         memset(panel->assigned, 0, sizeof(panel->assigned));
@@ -700,9 +755,7 @@ bool editor_bulk_panel_draw(EditorBulkPanel *panel, EditorProject *project,
             }
         }
     }
-    if(panel->kind != EDITOR_SELECTION_ORIGIN &&
-            panel->kind != EDITOR_SELECTION_PARTICLE &&
-            panel->kind != EDITOR_SELECTION_SOFT_AREA) {
+    if(editor_bulk_delete_check(state)) {
         UIButtonStyle style = rohr_ui_button_style_default_get();
         float y = 96.0f + (float)property_count * 36.0f;
         style.idle = (Color){125, 42, 48, 255};

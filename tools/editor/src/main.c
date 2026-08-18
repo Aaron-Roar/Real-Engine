@@ -1627,6 +1627,22 @@ static bool editor_selected_delete(EditorProject *project,
     return true;
 }
 
+static bool editor_selection_nudge(EditorProject *project,
+        EditorViewportState *viewport_state, EditorHistory *history,
+        Vec2D screen_delta) {
+    bool moved;
+    if(project == NULL || viewport_state == NULL || history == NULL) return false;
+    if(viewport_state->selected_item_count < 2)
+        return editor_viewport_selection_nudge(viewport_state, project, screen_delta);
+    if(!editor_history_transaction_begin(history)) return false;
+    moved = editor_viewport_selection_nudge(viewport_state, project, screen_delta);
+    if(!moved) {
+        editor_history_transaction_cancel(history);
+        return false;
+    }
+    return editor_history_transaction_end(history);
+}
+
 static bool editor_open_item_delete(
     EditorProject *project,
     EditorViewportState *viewport_state
@@ -2233,14 +2249,14 @@ int main(void) {
             bool enter = rohr_controller_key_pressed_get(&keyboard, SDLK_RETURN) ||
                 rohr_controller_key_pressed_get(&keyboard, SDLK_KP_ENTER);
             if(pointer_in_viewport) {
-                if(up) (void)editor_viewport_selection_nudge(
-                    &viewport_state, &project, (Vec2D){0.0f, -1.0f});
-                if(down) (void)editor_viewport_selection_nudge(
-                    &viewport_state, &project, (Vec2D){0.0f, 1.0f});
-                if(left) (void)editor_viewport_selection_nudge(
-                    &viewport_state, &project, (Vec2D){-1.0f, 0.0f});
-                if(right) (void)editor_viewport_selection_nudge(
-                    &viewport_state, &project, (Vec2D){1.0f, 0.0f});
+                if(up) (void)editor_selection_nudge(&project,
+                    &viewport_state, &history, (Vec2D){0.0f, -1.0f});
+                if(down) (void)editor_selection_nudge(&project,
+                    &viewport_state, &history, (Vec2D){0.0f, 1.0f});
+                if(left) (void)editor_selection_nudge(&project,
+                    &viewport_state, &history, (Vec2D){-1.0f, 0.0f});
+                if(right) (void)editor_selection_nudge(&project,
+                    &viewport_state, &history, (Vec2D){1.0f, 0.0f});
                 if(enter && viewport_state.selection != EDITOR_SELECTION_NONE) {
                     (void)editor_navigation_selected_open(&project, &viewport_state);
                 }
@@ -2365,8 +2381,7 @@ int main(void) {
         viewport_state.preview_anchor = 0;
         viewport_state.preview_soft_node = 0;
         field_editing = false;
-        if(viewport_state.selected_item_count > 1 &&
-                editor_viewport_selection_homogeneous_check(&viewport_state)) {
+        if(viewport_state.selected_item_count > 1) {
             EditorBulkColorContext bulk_color = {.picker = &color_picker,
                 .project = &project, .state = &viewport_state,
                 .history = &history};
@@ -5214,6 +5229,8 @@ int main(void) {
                 pointer.y < EDITOR_MENU_HEIGHT ||
                 pointer.y >= EDITOR_VIEWPORT_BOTTOM;
             bool viewport_consumed;
+            bool group_transform_before = viewport_state.group_dragging ||
+                viewport_state.group_rotating;
             bool pan_modifier =
                 rohr_controller_key_down_get(&keyboard, SDLK_LCTRL) ||
                 rohr_controller_key_down_get(&keyboard, SDLK_RCTRL);
@@ -5250,11 +5267,25 @@ int main(void) {
                         viewport_wheel_y, ui_consumed);
                 viewport_state.selection_modifier = false;
             }
+            {
+                bool group_transform_after = viewport_state.group_dragging ||
+                    viewport_state.group_rotating;
+                if(!group_transform_before && group_transform_after) {
+                    if(!editor_history_transaction_begin(&history)) {
+                        viewport_state.group_dragging = false;
+                        viewport_state.group_rotating = false;
+                    }
+                } else if(group_transform_before && !group_transform_after) {
+                    (void)editor_history_transaction_end(&history);
+                }
+            }
 
             if(mouse.button_states[MOUSE_BUTTON_LEFT] ==
                         MOUSE_BUTTON_STATE_PRESSED &&
                     !ui_consumed && viewport_consumed &&
                     !viewport_state.camera_panning &&
+                    !viewport_state.group_dragging &&
+                    !viewport_state.group_rotating &&
                     viewport_state.mode != EDITOR_VIEWPORT_AUTO_SHAPE) {
                 EditorSelectionRef selection;
                 if(editor_viewport_selection_ref_get(

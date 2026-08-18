@@ -9,7 +9,8 @@ static bool editor_selection_remove_command_get(EditorSelectionRef selection,
     if(command == NULL) return false;
     switch(selection.kind) {
         case EDITOR_SELECTION_OBJECT: kind = EDITOR_ITEM_OBJECT; break;
-        case EDITOR_SELECTION_RIGID_BODY: kind = EDITOR_ITEM_RIGID_BODY; break;
+        case EDITOR_SELECTION_RIGID_BODY:
+        case EDITOR_SELECTION_PARTICLE: kind = EDITOR_ITEM_RIGID_BODY; break;
         case EDITOR_SELECTION_HITBOX: kind = EDITOR_ITEM_HITBOX; break;
         case EDITOR_SELECTION_JOINT: kind = EDITOR_ITEM_JOINT; break;
         case EDITOR_SELECTION_ANCHOR: kind = EDITOR_ITEM_ANCHOR; break;
@@ -48,6 +49,38 @@ static int editor_selection_remove_order_compare(const void *first_value,
     return first->item < second->item ? -1 : 1;
 }
 
+static bool editor_selection_removed_with_parent_check(
+        const EditorSelectionRef *items, size_t count,
+        EditorSelectionRef selection) {
+    for(size_t i = 0; i < count; i += 1) {
+        EditorSelectionRef parent = items[i];
+        if(parent.object != selection.object) continue;
+        if(parent.kind == EDITOR_SELECTION_OBJECT &&
+                selection.kind != EDITOR_SELECTION_OBJECT) return true;
+        if((parent.kind == EDITOR_SELECTION_RIGID_BODY ||
+                parent.kind == EDITOR_SELECTION_PARTICLE) &&
+                (selection.kind == EDITOR_SELECTION_RIGID_BODY ||
+                    selection.kind == EDITOR_SELECTION_PARTICLE) &&
+                parent.item == selection.item && parent.kind != selection.kind)
+            return true;
+        if(parent.kind == EDITOR_SELECTION_RIGID_BODY &&
+                (selection.kind == EDITOR_SELECTION_HITBOX ||
+                    selection.kind == EDITOR_SELECTION_VERTEX ||
+                    selection.kind == EDITOR_SELECTION_LINE) &&
+                parent.item == selection.parent) return true;
+        if(parent.kind == EDITOR_SELECTION_HITBOX &&
+                (selection.kind == EDITOR_SELECTION_VERTEX ||
+                    selection.kind == EDITOR_SELECTION_LINE) &&
+                parent.item == selection.container) return true;
+        if(parent.kind == EDITOR_SELECTION_SOFT_BODY &&
+                (selection.kind == EDITOR_SELECTION_SOFT_NODE ||
+                    selection.kind == EDITOR_SELECTION_SOFT_BEAM ||
+                    selection.kind == EDITOR_SELECTION_SOFT_AREA) &&
+                parent.item == selection.parent) return true;
+    }
+    return false;
+}
+
 bool editor_navigation_multi_selection_delete(EditorProject *project,
         EditorViewportState *state, EditorHistory *history) {
     EditorSelectionRef *ordered;
@@ -62,6 +95,8 @@ bool editor_navigation_multi_selection_delete(EditorProject *project,
         editor_selection_remove_order_compare);
     for(size_t i = 0; i < state->selected_item_count; i += 1) {
         EditorCommand command;
+        if(editor_selection_removed_with_parent_check(ordered,
+                state->selected_item_count, ordered[i])) continue;
         if(!editor_selection_remove_command_get(ordered[i], &command)) {
             free(ordered);
             return false;
@@ -74,6 +109,8 @@ bool editor_navigation_multi_selection_delete(EditorProject *project,
     for(size_t i = 0; i < state->selected_item_count; i += 1) {
         EditorCommand command;
         EditorCommandResult result;
+        if(editor_selection_removed_with_parent_check(ordered,
+                state->selected_item_count, ordered[i])) continue;
         (void)editor_selection_remove_command_get(ordered[i], &command);
         result = editor_command_execute(project, &command);
         if(result.kind == ERROR_RESULT_ERROR) {

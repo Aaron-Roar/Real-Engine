@@ -316,6 +316,95 @@ int main(void) {
     editor_command_finished_callback_set(NULL, NULL);
     callback_history = NULL;
 
+    {
+        EditorSelectionRef rigid = {EDITOR_SELECTION_RIGID_BODY,
+            project.objects[0].id, 0, 0, body->id};
+        EditorSelectionRef soft = {EDITOR_SELECTION_SOFT_BODY,
+            project.objects[0].id, 0, 0, soft_body->id};
+        Position handle;
+        Position target;
+        project.objects[0].position = (Position){0};
+        body->position = (Position){-10.0f, 0.0f};
+        body->rotation = 0.0f;
+        soft_body->position = (Position){10.0f, 0.0f};
+        soft_body->rotation = 0.0f;
+        editor_history_reset(&history);
+        editor_viewport_state_init(&viewport);
+        viewport.mode = EDITOR_VIEWPORT_OBJECT;
+        assert(editor_viewport_selection_set(&project, &viewport, rigid, false));
+        assert(editor_viewport_selection_set(&project, &viewport, soft, true));
+        handle = test_world_to_screen((Position){-10.0f, 0.0f});
+        target = test_world_to_screen((Position){-8.0f, 0.0f});
+        assert(editor_viewport_update(&viewport, &project, handle,
+            MOUSE_BUTTON_STATE_PRESSED, MOUSE_BUTTON_STATE_UP,
+            false, 0.0f, false));
+        assert(viewport.group_dragging && viewport.selected_item_count == 2);
+        assert(editor_history_transaction_begin(&history));
+        assert(editor_viewport_update(&viewport, &project, target,
+            MOUSE_BUTTON_STATE_DOWN, MOUSE_BUTTON_STATE_UP,
+            false, 0.0f, false));
+        assert(!editor_viewport_update(&viewport, &project, target,
+            MOUSE_BUTTON_STATE_RELEASED, MOUSE_BUTTON_STATE_UP,
+            false, 0.0f, false));
+        assert(editor_history_transaction_end(&history));
+        assert(fabsf(body->position.x + 8.0f) < 0.001f);
+        assert(fabsf(soft_body->position.x - 12.0f) < 0.001f);
+        assert(history.undo_count == 1);
+        assert(editor_history_undo(&history));
+        body = editor_project_rigid_body_get(&project.objects[0], rigid.item);
+        soft_body = NULL;
+        for(size_t i = 0; i < project.objects[0].soft_body_count; i += 1)
+            if(project.objects[0].soft_body_items[i].id == soft.item)
+                soft_body = &project.objects[0].soft_body_items[i];
+        assert(body != NULL && soft_body != NULL);
+        editor_history_reset(&history);
+        assert(editor_history_transaction_begin(&history));
+        assert(editor_viewport_selection_nudge(&viewport, &project,
+            (Vec2D){2.0f, 0.0f}));
+        assert(editor_history_transaction_end(&history));
+        assert(fabsf(body->position.x + 8.0f) < 0.001f);
+        assert(fabsf(soft_body->position.x - 12.0f) < 0.001f);
+        assert(history.undo_count == 1);
+        assert(editor_history_undo(&history));
+        body = editor_project_rigid_body_get(&project.objects[0], rigid.item);
+        soft_body = NULL;
+        for(size_t i = 0; i < project.objects[0].soft_body_count; i += 1)
+            if(project.objects[0].soft_body_items[i].id == soft.item)
+                soft_body = &project.objects[0].soft_body_items[i];
+        assert(body != NULL && soft_body != NULL);
+        editor_history_reset(&history);
+        handle = test_world_to_screen((Position){0.0f, 40.0f});
+        target = test_world_to_screen((Position){40.0f, 0.0f});
+        assert(editor_viewport_update(&viewport, &project, handle,
+            MOUSE_BUTTON_STATE_PRESSED, MOUSE_BUTTON_STATE_UP,
+            false, 0.0f, false));
+        assert(viewport.group_rotating);
+        assert(editor_history_transaction_begin(&history));
+        assert(editor_viewport_update(&viewport, &project, target,
+            MOUSE_BUTTON_STATE_DOWN, MOUSE_BUTTON_STATE_UP,
+            false, 0.0f, false));
+        assert(!editor_viewport_update(&viewport, &project, target,
+            MOUSE_BUTTON_STATE_RELEASED, MOUSE_BUTTON_STATE_UP,
+            false, 0.0f, false));
+        assert(editor_history_transaction_end(&history));
+        assert(fabsf(body->position.x) < 0.001f &&
+            fabsf(body->position.y - 10.0f) < 0.001f);
+        assert(fabsf(soft_body->position.x) < 0.001f &&
+            fabsf(soft_body->position.y + 10.0f) < 0.001f);
+        assert(fabsf(body->rotation + 1.57079632679f) < 0.001f);
+        assert(fabsf(soft_body->rotation + 1.57079632679f) < 0.001f);
+        assert(history.undo_count == 1);
+        assert(editor_history_undo(&history));
+        body = editor_project_rigid_body_get(&project.objects[0], rigid.item);
+        soft_body = NULL;
+        for(size_t i = 0; i < project.objects[0].soft_body_count; i += 1)
+            if(project.objects[0].soft_body_items[i].id == soft.item)
+                soft_body = &project.objects[0].soft_body_items[i];
+        assert(body != NULL && soft_body != NULL);
+        assert(fabsf(body->position.x + 10.0f) < 0.001f);
+        assert(fabsf(soft_body->position.x - 10.0f) < 0.001f);
+    }
+
     command = (EditorCommand){.type = EDITOR_COMMAND_ITEM_REMOVE,
         .data.item_remove = {.kind = EDITOR_ITEM_OBJECT,
             .object = project.objects[0].id}};
