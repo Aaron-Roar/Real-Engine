@@ -1,6 +1,8 @@
 #include "editor_history.h"
 
 #include <math.h>
+#include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -68,6 +70,7 @@ struct EditorHistoryEntry {
 
 static EditorSoftBody *editor_history_soft_body_get(EditorObject *object,
     EditorSoftBodyId id);
+static void editor_history_entry_destroy(EditorHistoryEntry *entry);
 
 #define EDITOR_HISTORY_BLOCK_SIZE 64
 
@@ -128,6 +131,84 @@ static EditorHistoryAggregateChange *editor_history_aggregate_capture(
     return change;
 }
 
+static EditorHistoryAggregateChange *editor_history_aggregate_recapture(
+        EditorProject *project, const EditorHistoryAggregateChange *source) {
+    EditorObject *object;
+    const void *value = NULL;
+    EditorHistoryAggregateChange *change;
+    if(project == NULL || source == NULL) return NULL;
+    object = editor_object_query_get(project, source->object);
+    if(source->kind == EDITOR_HISTORY_AGGREGATE_OBJECT) value = object;
+    else if(source->kind == EDITOR_HISTORY_AGGREGATE_RIGID_BODY)
+        value = editor_project_rigid_body_get(object, source->item);
+    else value = editor_history_soft_body_get(object, source->item);
+    if(value == NULL) return NULL;
+    change = calloc(1, sizeof(*change));
+    if(change == NULL) return NULL;
+    *change = *source;
+    change->value = malloc(source->size);
+    if(change->value == NULL) {
+        free(change);
+        return NULL;
+    }
+    memcpy(change->value, value, source->size);
+    return change;
+}
+
+static EditorHistoryAggregateChange *editor_history_command_aggregate_capture(
+        EditorProject *project, const EditorCommand *command) {
+    EditorItemKind kind;
+    EditorObjectId object;
+    uint32_t parent;
+    if(project == NULL || command == NULL) return NULL;
+    switch(command->type) {
+        case EDITOR_COMMAND_ITEM_RENAME:
+            kind = command->data.item_rename.kind;
+            object = command->data.item_rename.object;
+            parent = command->data.item_rename.parent;
+            break;
+        case EDITOR_COMMAND_PROPERTY_SET:
+            kind = command->data.property_set.kind;
+            object = command->data.property_set.object;
+            parent = command->data.property_set.parent;
+            break;
+        case EDITOR_COMMAND_COLLISION_FILTER_SET:
+            kind = command->data.collision_filter_set.kind;
+            object = command->data.collision_filter_set.object;
+            parent = command->data.collision_filter_set.parent;
+            break;
+        case EDITOR_COMMAND_RELATIONSHIP_SET:
+            object = command->data.relationship_set.object;
+            if(command->data.relationship_set.kind ==
+                    EDITOR_RELATIONSHIP_SOFT_BEAM_NODE) {
+                kind = EDITOR_ITEM_SOFT_BEAM;
+                parent = command->data.relationship_set.parent;
+            } else {
+                kind = EDITOR_ITEM_JOINT;
+                parent = 0;
+            }
+            break;
+        case EDITOR_COMMAND_AUTO_SHAPE:
+            kind = command->data.auto_shape.kind;
+            object = command->data.auto_shape.object;
+            parent = command->data.auto_shape.parent;
+            if(kind == EDITOR_ITEM_SOFT_BODY) {
+                kind = EDITOR_ITEM_SOFT_NODE;
+                parent = command->data.auto_shape.item;
+            }
+            break;
+        case EDITOR_COMMAND_RIGID_BODY_ORIGIN:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_RIGID_BODY,
+                command->data.origin.object, command->data.origin.body);
+        case EDITOR_COMMAND_SOFT_BODY_ORIGIN:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_SOFT_NODE,
+                command->data.origin.object, command->data.origin.body);
+        default: return NULL;
+    }
+    if(kind == EDITOR_ITEM_OBJECT) return NULL;
+    return editor_history_aggregate_capture(project, kind, object, parent);
+}
+
 static EditorHistoryEntry *editor_history_aggregate_entry_create(
         EditorHistoryAggregateChange *forward,
         EditorHistoryAggregateChange *inverse) {
@@ -150,6 +231,81 @@ static EditorHistoryEntry *editor_history_aggregate_entry_create(
     entry->memory = sizeof(*entry) + sizeof(*entry->commands) +
         sizeof(*forward) + sizeof(*inverse) + forward->size + inverse->size;
     return entry;
+}
+
+static bool editor_history_aggregate_entry_append(EditorHistoryEntry *entry,
+        EditorHistoryAggregateChange *forward,
+        EditorHistoryAggregateChange *inverse) {
+    EditorHistoryCommandPair *commands;
+    if(entry == NULL || forward == NULL || inverse == NULL) return false;
+    commands = realloc(entry->commands,
+        (entry->command_count + 1) * sizeof(*commands));
+    if(commands == NULL) return false;
+    entry->commands = commands;
+    entry->commands[entry->command_count] = (EditorHistoryCommandPair){
+        .forward = {.kind = EDITOR_HISTORY_ACTION_AGGREGATE,
+            .data.aggregate = forward},
+        .inverse = {.kind = EDITOR_HISTORY_ACTION_AGGREGATE,
+            .data.aggregate = inverse}};
+    entry->command_count += 1;
+    entry->memory += sizeof(*commands) + sizeof(*forward) + sizeof(*inverse) +
+        forward->size + inverse->size;
+    return true;
+}
+
+static EditorHistoryAggregateChange *editor_history_object_aggregate_create(
+        const EditorObject *object) {
+    EditorHistoryAggregateChange *change;
+    if(object == NULL) return NULL;
+    change = calloc(1, sizeof(*change));
+    if(change == NULL) return NULL;
+    change->value = malloc(sizeof(*object));
+    if(change->value == NULL) {
+        free(change);
+        return NULL;
+    }
+    memcpy(change->value, object, sizeof(*object));
+    change->kind = EDITOR_HISTORY_AGGREGATE_OBJECT;
+    change->object = object->id;
+    change->size = sizeof(*object);
+    return change;
+}
+
+static EditorHistoryEntry *editor_history_object_differences_create(
+        const EditorProject *before, const EditorProject *after) {
+    EditorHistoryEntry *entry;
+    size_t objects_offset = offsetof(EditorProject, objects);
+    size_t objects_end = objects_offset + sizeof(before->objects);
+    if(before == NULL || after == NULL ||
+            before->object_count != after->object_count ||
+            memcmp(before, after, objects_offset) != 0 ||
+            memcmp((const unsigned char *)before + objects_end,
+                (const unsigned char *)after + objects_end,
+                sizeof(*before) - objects_end) != 0) return NULL;
+    entry = calloc(1, sizeof(*entry));
+    if(entry == NULL) return NULL;
+    entry->kind = EDITOR_HISTORY_ENTRY_COMMANDS;
+    entry->memory = sizeof(*entry);
+    for(size_t i = 0; i < before->object_count; i += 1) {
+        EditorHistoryAggregateChange *forward;
+        EditorHistoryAggregateChange *inverse;
+        if(before->objects[i].id != after->objects[i].id) goto fail;
+        if(memcmp(&before->objects[i], &after->objects[i],
+                sizeof(before->objects[i])) == 0) continue;
+        forward = editor_history_object_aggregate_create(&after->objects[i]);
+        inverse = editor_history_object_aggregate_create(&before->objects[i]);
+        if(forward == NULL || inverse == NULL ||
+                !editor_history_aggregate_entry_append(entry, forward, inverse)) {
+            editor_history_aggregate_destroy(forward);
+            editor_history_aggregate_destroy(inverse);
+            goto fail;
+        }
+    }
+    if(entry->command_count == 0) goto fail;
+    return entry;
+fail:
+    editor_history_entry_destroy(entry);
+    return NULL;
 }
 
 static bool editor_history_block_changed(const unsigned char *before,
@@ -471,6 +627,21 @@ static bool editor_history_inverse_get(EditorProject *project,
     if(project == NULL || command == NULL || inverse == NULL) return false;
     *inverse = *command;
     switch(command->type) {
+        case EDITOR_COMMAND_OBJECT_RENAME:
+            object = editor_object_query_get(project,
+                command->data.object_rename.object);
+            if(object == NULL) return false;
+            snprintf(inverse->data.object_rename.name,
+                sizeof(inverse->data.object_rename.name), "%s", object->name);
+            return true;
+        case EDITOR_COMMAND_ITEM_RENAME:
+            if(command->data.item_rename.kind != EDITOR_ITEM_OBJECT) return false;
+            object = editor_object_query_get(project,
+                command->data.item_rename.object);
+            if(object == NULL) return false;
+            snprintf(inverse->data.item_rename.name,
+                sizeof(inverse->data.item_rename.name), "%s", object->name);
+            return true;
         case EDITOR_COMMAND_OBJECT_POSITION:
             object = editor_object_query_get(project, command->data.object_position.object);
             if(object == NULL) return false;
@@ -651,6 +822,9 @@ void editor_history_command_begin(EditorHistory *history,
             command->data.item_remove.object, command->data.item_remove.parent);
         return;
     }
+    history->pending_aggregate = editor_history_command_aggregate_capture(
+        history->project, command);
+    if(history->pending_aggregate != NULL) return;
     if(editor_history_inverse_get(history->project, command,
             &history->pending_inverse)) {
         history->pending_forward = *command;
@@ -713,14 +887,14 @@ void editor_history_command_finish(EditorHistory *history,
     }
     if(history->pending_aggregate != NULL && command != NULL && result != NULL &&
             result->kind == ERROR_RESULT_VALUE) {
-        EditorItemKind kind = command->type == EDITOR_COMMAND_ITEM_ADD ?
-            command->data.item_add.kind : command->data.item_remove.kind;
-        EditorObjectId object = command->type == EDITOR_COMMAND_ITEM_ADD ?
-            command->data.item_add.object : command->data.item_remove.object;
-        uint32_t parent = command->type == EDITOR_COMMAND_ITEM_ADD ?
-            command->data.item_add.parent : command->data.item_remove.parent;
-        EditorHistoryAggregateChange *after = editor_history_aggregate_capture(
-            history->project, kind, object, parent);
+        EditorHistoryAggregateChange *after = editor_history_aggregate_recapture(
+            history->project, history->pending_aggregate);
+        if(after != NULL && after->size == history->pending_aggregate->size &&
+                memcmp(after->value, history->pending_aggregate->value,
+                    after->size) == 0) {
+            editor_history_aggregate_destroy(after);
+            goto finish;
+        }
         entry = editor_history_aggregate_entry_create(after,
             history->pending_aggregate);
         if(entry != NULL) history->pending_aggregate = NULL;
@@ -837,6 +1011,9 @@ bool editor_history_transaction_end(EditorHistory *history) {
         }
     }
     free(replayed);
+    if(entry == NULL)
+        entry = editor_history_object_differences_create(
+            history->transaction_before, history->project);
     if(entry == NULL)
         entry = editor_history_entry_create(history->transaction_before,
             history->project);
