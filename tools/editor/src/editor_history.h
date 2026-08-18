@@ -6,6 +6,7 @@
 #define EDITOR_HISTORY_CAPACITY 32
 
 typedef struct EditorHistoryEntry EditorHistoryEntry;
+typedef struct EditorHistoryObjectChange EditorHistoryObjectChange;
 
 typedef struct EditorHistory {
     EditorProject *project;
@@ -24,6 +25,7 @@ typedef struct EditorHistory {
     bool restoring;
     EditorCommand pending_forward;
     EditorCommand pending_inverse;
+    EditorHistoryObjectChange *pending_object;
 } EditorHistory;
 
 bool editor_history_init(EditorHistory *history, EditorProject *project);
