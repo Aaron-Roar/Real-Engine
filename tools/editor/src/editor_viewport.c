@@ -1594,6 +1594,66 @@ static Position editor_group_rotate_point(Position point, Position pivot,
         pivot.y + local.x * sine + local.y * cosine};
 }
 
+static bool editor_group_rigid_bodies_connected_check(EditorObject *object,
+        EditorRigidBodyId first, EditorRigidBodyId second) {
+    EditorRigidBodyId queue[EDITOR_RIGID_BODY_MAX];
+    bool visited[EDITOR_RIGID_BODY_MAX] = {false};
+    size_t queue_begin = 0;
+    size_t queue_end = 0;
+    EditorRigidBody *body;
+
+    if(object == NULL || first == 0 || second == 0) return false;
+    if(first == second) return true;
+    body = editor_project_rigid_body_get(object, first);
+    if(body == NULL) return false;
+    visited[(size_t)(body - object->rigid_bodies)] = true;
+    queue[queue_end++] = first;
+    while(queue_begin < queue_end) {
+        EditorRigidBodyId current = queue[queue_begin++];
+        for(size_t i = 0; i < object->joint_count; i += 1) {
+            EditorJoint *joint = &object->joint_items[i];
+            EditorAnchor *a;
+            EditorAnchor *b;
+            EditorRigidBodyId connected;
+            EditorRigidBody *connected_body;
+            size_t connected_index;
+
+            if(joint->kind == EDITOR_JOINT_SPRING) continue;
+            a = editor_project_anchor_get(object, joint->anchor_a);
+            b = editor_project_anchor_get(object, joint->anchor_b);
+            if(a == NULL || b == NULL) continue;
+            if(a->rigid_body == current) connected = b->rigid_body;
+            else if(b->rigid_body == current) connected = a->rigid_body;
+            else continue;
+            if(connected == second) return true;
+            connected_body = editor_project_rigid_body_get(object, connected);
+            if(connected_body == NULL) continue;
+            connected_index = (size_t)(connected_body - object->rigid_bodies);
+            if(visited[connected_index]) continue;
+            visited[connected_index] = true;
+            queue[queue_end++] = connected;
+        }
+    }
+    return false;
+}
+
+static bool editor_group_rigid_body_already_driven(EditorProject *project,
+        const EditorViewportState *state, size_t selected_index,
+        EditorSelectionRef ref) {
+    EditorObject *object = editor_group_object_get(project, ref.object);
+    if(object == NULL) return false;
+    for(size_t i = 0; i < selected_index; i += 1) {
+        EditorSelectionRef previous = state->selected_items[i];
+        if((previous.kind != EDITOR_SELECTION_RIGID_BODY &&
+                previous.kind != EDITOR_SELECTION_PARTICLE) ||
+                previous.object != ref.object ||
+                editor_group_parent_selected(project, state, previous)) continue;
+        if(editor_group_rigid_bodies_connected_check(object,
+                previous.item, ref.item)) return true;
+    }
+    return false;
+}
+
 static bool editor_group_transform_apply(EditorProject *project,
         const EditorViewportState *state, Vec2D translation, float angle) {
     bool changed = false;
@@ -1613,7 +1673,9 @@ static bool editor_group_transform_apply(EditorProject *project,
         } else if(ref.kind == EDITOR_SELECTION_RIGID_BODY ||
                 ref.kind == EDITOR_SELECTION_PARTICLE) {
             EditorRigidBody *body = editor_project_rigid_body_get(object, ref.item);
-            if(body == NULL) continue;
+            if(body == NULL || (angle == 0.0f &&
+                    editor_group_rigid_body_already_driven(project, state, i, ref)))
+                continue;
             command = (EditorCommand){.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
                 .data.rigid_body_transform = {object->id, body->id,
                     {desired.x - object->position.x, desired.y - object->position.y},

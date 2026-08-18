@@ -405,6 +405,43 @@ int main(void) {
         assert(fabsf(soft_body->position.x - 10.0f) < 0.001f);
     }
 
+    {
+        EditorObject *object = &project.objects[0];
+        EditorRigidBody *connected_body = editor_project_rigid_body_add(
+            &project, object);
+        EditorAnchor *first_anchor;
+        EditorAnchor *second_anchor;
+        EditorJoint *joint;
+        EditorSelectionRef first;
+        EditorSelectionRef second;
+
+        assert(connected_body != NULL);
+        body = editor_project_rigid_body_get(object, body->id);
+        assert(body != NULL);
+        body->position = (Position){-10.0f, 0.0f};
+        connected_body->position = (Position){10.0f, 0.0f};
+        first_anchor = editor_project_anchor_add(&project, object,
+            (Position){10.0f, 0.0f}, body->id);
+        second_anchor = editor_project_anchor_add(&project, object,
+            (Position){-10.0f, 0.0f}, connected_body->id);
+        joint = editor_project_joint_add(&project, object, EDITOR_JOINT_WELD);
+        assert(first_anchor != NULL && second_anchor != NULL && joint != NULL);
+        assert(editor_project_joint_anchor_set(object, joint, 0, first_anchor->id));
+        assert(editor_project_joint_anchor_set(object, joint, 1, second_anchor->id));
+        first = (EditorSelectionRef){EDITOR_SELECTION_RIGID_BODY,
+            object->id, 0, 0, body->id};
+        second = (EditorSelectionRef){EDITOR_SELECTION_RIGID_BODY,
+            object->id, 0, 0, connected_body->id};
+        editor_viewport_state_init(&viewport);
+        viewport.mode = EDITOR_VIEWPORT_OBJECT;
+        assert(editor_viewport_selection_set(&project, &viewport, first, false));
+        assert(editor_viewport_selection_set(&project, &viewport, second, true));
+        assert(editor_viewport_selection_nudge(&viewport, &project,
+            (Vec2D){2.0f, 0.0f}));
+        assert(fabsf(body->position.x + 8.0f) < 0.001f);
+        assert(fabsf(connected_body->position.x - 12.0f) < 0.001f);
+    }
+
     command = (EditorCommand){.type = EDITOR_COMMAND_ITEM_REMOVE,
         .data.item_remove = {.kind = EDITOR_ITEM_OBJECT,
             .object = project.objects[0].id}};
