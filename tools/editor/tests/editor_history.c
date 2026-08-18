@@ -373,8 +373,10 @@ int main(void) {
                 soft_body = &project.objects[0].soft_body_items[i];
         assert(body != NULL && soft_body != NULL);
         editor_history_reset(&history);
-        handle = test_world_to_screen((Position){0.0f, 40.0f});
-        target = test_world_to_screen((Position){40.0f, 0.0f});
+        handle = test_world_to_screen((Position){0.0f,
+            EDITOR_VIEWPORT_ROTATION_ARM_LENGTH});
+        target = test_world_to_screen((Position){
+            EDITOR_VIEWPORT_ROTATION_ARM_LENGTH, 0.0f});
         assert(editor_viewport_update(&viewport, &project, handle,
             MOUSE_BUTTON_STATE_PRESSED, MOUSE_BUTTON_STATE_UP,
             false, 0.0f, false));
@@ -442,8 +444,10 @@ int main(void) {
         assert(fabsf(connected_body->position.x - 12.0f) < 0.001f);
 
         {
-            Position shared_handle = test_world_to_screen((Position){2.0f, 40.0f});
-            Position shared_target = test_world_to_screen((Position){42.0f, 0.0f});
+            Position shared_handle = test_world_to_screen((Position){2.0f,
+                EDITOR_VIEWPORT_ROTATION_ARM_LENGTH});
+            Position shared_target = test_world_to_screen((Position){
+                2.0f + EDITOR_VIEWPORT_ROTATION_ARM_LENGTH, 0.0f});
             assert(editor_viewport_update(&viewport, &project, shared_handle,
                 MOUSE_BUTTON_STATE_PRESSED, MOUSE_BUTTON_STATE_UP,
                 false, 0.0f, false));
@@ -467,19 +471,17 @@ int main(void) {
         assert(editor_viewport_selection_set(&project, &viewport, first, false));
         assert(editor_viewport_selection_set(&project, &viewport, second, true));
         {
-            float handle_distance = 30.0f;
-            for(size_t i = 0; i < body->hitbox_count; i += 1) {
-                for(size_t j = 0; j < body->hitboxes[i].vertex_count; j += 1) {
-                    float distance = hypotf(body->hitboxes[i].vertices[j].position.x,
-                        body->hitboxes[i].vertices[j].position.y);
-                    if(distance > handle_distance) handle_distance = distance;
-                }
-            }
-            handle_distance += 28.0f;
+            EditorRigidBody *rotation_body = editor_project_rigid_body_get(
+                object, viewport.selected_rigid_body);
+            Position rotation_center;
+            assert(rotation_body != NULL);
+            rotation_center = rotation_body->position;
             Position own_handle = test_world_to_screen(
-                (Position){10.0f, -handle_distance});
+                (Position){rotation_center.x, rotation_center.y -
+                    EDITOR_VIEWPORT_ROTATION_ARM_LENGTH});
             Position own_target = test_world_to_screen(
-                (Position){10.0f + handle_distance, 0.0f});
+                (Position){rotation_center.x +
+                    EDITOR_VIEWPORT_ROTATION_ARM_LENGTH, rotation_center.y});
             assert(editor_viewport_update(&viewport, &project, own_handle,
                 MOUSE_BUTTON_STATE_PRESSED, MOUSE_BUTTON_STATE_UP,
                 false, 0.0f, false));

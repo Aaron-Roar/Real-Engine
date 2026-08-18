@@ -141,42 +141,20 @@ static Position editor_anchor_world_local_get(const EditorObject *object,
     return local;
 }
 
-static float editor_body_radius_get(const EditorRigidBody *body) {
-    float radius = 30.0f;
-    if(body == NULL) return radius;
-    for(size_t i = 0; i < body->hitbox_count; i += 1) {
-        for(uint32_t j = 0; j < body->hitboxes[i].vertex_count; j += 1) {
-            Position point = body->hitboxes[i].vertices[j].position;
-            float distance = sqrtf(point.x * point.x + point.y * point.y);
-            if(distance > radius) radius = distance;
-        }
-    }
-    return radius;
-}
-
-static float editor_soft_body_radius_get(const EditorSoftBody *body) {
-    float radius = 30.0f;
-    if(body == NULL) return radius;
-    for(size_t i = 0; i < body->node_count; i += 1) {
-        float distance = hypotf(body->nodes[i].position.x, body->nodes[i].position.y);
-        if(distance > radius) radius = distance;
-    }
-    return radius;
-}
-
 static Position editor_soft_body_rotation_handle_get(const EditorObject *object,
     const EditorSoftBody *body) {
-    float distance = editor_soft_body_radius_get(body) + 28.0f;
     return (Position){object->position.x + body->position.x +
-            sinf(body->rotation) * distance,
-        object->position.y + body->position.y - cosf(body->rotation) * distance};
+            sinf(body->rotation) * EDITOR_VIEWPORT_ROTATION_ARM_LENGTH,
+        object->position.y + body->position.y -
+            cosf(body->rotation) * EDITOR_VIEWPORT_ROTATION_ARM_LENGTH};
 }
 
 static Position editor_body_rotation_handle_get(const EditorObject *object,
     const EditorRigidBody *body) {
-    float distance = editor_body_radius_get(body) + 28.0f;
-    return (Position){object->position.x + body->position.x + sinf(body->rotation) * distance,
-        object->position.y + body->position.y - cosf(body->rotation) * distance};
+    return (Position){object->position.x + body->position.x +
+            sinf(body->rotation) * EDITOR_VIEWPORT_ROTATION_ARM_LENGTH,
+        object->position.y + body->position.y -
+            cosf(body->rotation) * EDITOR_VIEWPORT_ROTATION_ARM_LENGTH};
 }
 
 static float editor_segment_distance_squared(Position point, Position start, Position end) {
@@ -1829,8 +1807,9 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
     if(primary_button == MOUSE_BUTTON_STATE_PRESSED &&
             state->selected_item_count >= 2 &&
             editor_group_pivot_get(project, state, &state->group_pivot)) {
+        bool individual_rotation_handle_hit = false;
         Position rotation_handle = {state->group_pivot.x,
-            state->group_pivot.y + 40.0f / editor_view_scale};
+            state->group_pivot.y + EDITOR_VIEWPORT_ROTATION_ARM_LENGTH};
         if(hypotf(pointer.x - rotation_handle.x,
                 pointer.y - rotation_handle.y) <= 12.0f / editor_view_scale) {
             state->group_rotating = true;
@@ -1838,7 +1817,25 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                 pointer.x - state->group_pivot.x);
             return true;
         }
-        if(editor_group_point_hit(project, state, pointer)) {
+        if(state->mode == EDITOR_VIEWPORT_RIGID_BODY) {
+            EditorRigidBody *selected_body = editor_selected_body_get(object, state);
+            if(selected_body != NULL) {
+                Position handle = editor_body_rotation_handle_get(object, selected_body);
+                individual_rotation_handle_hit = hypotf(pointer.x - handle.x,
+                    pointer.y - handle.y) <= 12.0f / editor_view_scale;
+            }
+        } else if(state->mode == EDITOR_VIEWPORT_SOFT_BODY) {
+            EditorSoftBody *selected_body = editor_group_soft_body_get(
+                object, state->selected_soft_body);
+            if(selected_body != NULL) {
+                Position handle = editor_soft_body_rotation_handle_get(
+                    object, selected_body);
+                individual_rotation_handle_hit = hypotf(pointer.x - handle.x,
+                    pointer.y - handle.y) <= 12.0f / editor_view_scale;
+            }
+        }
+        if(!individual_rotation_handle_hit &&
+                editor_group_point_hit(project, state, pointer)) {
             state->group_dragging = true;
             state->group_pointer = pointer;
             return true;
@@ -2803,7 +2800,8 @@ void editor_viewport_draw(const EditorProject *project,
     if(state->selected_item_count >= 2) {
         Position pivot;
         if(editor_group_pivot_get((EditorProject *)project, state, &pivot)) {
-            Position handle = {pivot.x, pivot.y + 40.0f / editor_view_scale};
+            Position handle = {pivot.x,
+                pivot.y + EDITOR_VIEWPORT_ROTATION_ARM_LENGTH};
             editor_line_draw(pivot, handle, (Color){255, 215, 70, 255});
             editor_quad_draw(pivot, 7.0f, 7.0f, 0.0f,
                 (Color){255, 215, 70, 255});
