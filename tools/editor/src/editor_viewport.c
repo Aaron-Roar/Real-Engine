@@ -2791,6 +2791,7 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
 
 static void editor_viewport_particle_fills_draw(const EditorObject *object) {
     if(object == NULL || !object->visible) return;
+    rohr_graphics_layer_set(EDITOR_GRAPHICS_LAYER_RIGID_BODY);
     for(size_t body_index = 0; body_index < object->rigid_body_count; body_index += 1) {
         const EditorRigidBody *body = &object->rigid_bodies[body_index];
         Position center;
@@ -2844,6 +2845,7 @@ static void editor_sprite_outline_draw(Position center, Scale size, Color color)
 
 static void editor_viewport_sprites_draw(const EditorObject *object,
         const EditorViewportState *state, bool object_highlighted) {
+    rohr_graphics_layer_set(EDITOR_GRAPHICS_LAYER_SPRITE);
     for(size_t i = 0; i < object->sprite_count; i += 1) {
         const EditorSprite *sprite = &object->sprites[i];
         TextureAsset *texture;
@@ -2865,6 +2867,7 @@ static void editor_viewport_sprites_draw(const EditorObject *object,
         if(selected) editor_sprite_outline_draw(world, sprite->size,
             (Color){255, 215, 70, 255});
     }
+    rohr_graphics_layer_set(EDITOR_GRAPHICS_LAYER_ANIMATION);
     for(size_t i = 0; i < object->animated_sprite_count; i += 1) {
         const EditorAnimatedSprite *animation = &object->animated_sprite_items[i];
         const EditorAnimationFrame *frame;
@@ -2905,6 +2908,7 @@ static void editor_viewport_object_draw(const EditorObject *object,
 
     editor_viewport_sprites_draw(object, state, object_highlighted);
 
+    rohr_graphics_layer_set(EDITOR_GRAPHICS_LAYER_RIGID_BODY);
     for(size_t body_index = 0; body_index < object->rigid_body_count; body_index += 1) {
         const EditorRigidBody *body = &object->rigid_bodies[body_index];
         if(!body->visible) continue;
@@ -3004,6 +3008,7 @@ static void editor_viewport_object_draw(const EditorObject *object,
         }
     }
 
+    rohr_graphics_layer_set(EDITOR_GRAPHICS_LAYER_SOFT_BODY);
     for(size_t soft_index = 0; soft_index < object->soft_body_count; soft_index += 1) {
         const EditorSoftBody *body = &object->soft_body_items[soft_index];
         bool selected_body = state->selection == EDITOR_SELECTION_SOFT_BODY &&
@@ -3115,6 +3120,7 @@ static void editor_viewport_object_draw(const EditorObject *object,
         }
     }
 
+    rohr_graphics_layer_set(EDITOR_GRAPHICS_LAYER_JOINT);
     for(size_t joint_index = 0; joint_index < object->joint_count; joint_index += 1) {
         const EditorJoint *joint = &object->joint_items[joint_index];
         const EditorAnchor *a = NULL;
@@ -3179,6 +3185,7 @@ void editor_viewport_draw(const EditorProject *project,
         editor_viewport_particle_fills_draw(selected);
         editor_viewport_object_draw(selected, state, true);
     }
+    rohr_graphics_layer_set(EDITOR_GRAPHICS_LAYER_VIEWPORT_CONTROL);
     if(state->selected_item_count >= 2) {
         Position pivot;
         if(editor_group_pivot_get((EditorProject *)project, state, &pivot)) {
@@ -3208,6 +3215,7 @@ void editor_viewport_draw(const EditorProject *project,
         (void)rohr_graphics_screen_rect_draw(right - 1.0f, top, 1.0f,
             bottom - top, border);
     }
+    rohr_graphics_layer_set(EDITOR_GRAPHICS_LAYER_CONTENT);
 }
 
 bool editor_viewport_selection_nudge(EditorViewportState *state,
