@@ -212,6 +212,14 @@ static bool editor_reorder_storage_get(EditorProject *project,
                 object->animated_sprite_count,
                 sizeof(object->animated_sprite_items[0])};
             return true;
+        case EDITOR_SELECTION_ANIMATION_FRAME: {
+            EditorAnimatedSprite *animation = editor_project_animated_sprite_get(
+                object, selection.parent);
+            if(animation == NULL) return false;
+            *storage = (EditorReorderStorage){(unsigned char *)animation->frames,
+                animation->frame_count, sizeof(animation->frames[0])};
+            return true;
+        }
         default: break;
     }
     if(selection.kind == EDITOR_SELECTION_HITBOX) {
@@ -357,8 +365,8 @@ fail:
     return false;
 }
 
-static bool editor_selection_remove_command_get(EditorSelectionRef selection,
-        EditorCommand *command) {
+static bool editor_selection_remove_command_get(EditorProject *project,
+        EditorSelectionRef selection, EditorCommand *command) {
     EditorItemKind kind;
     if(command == NULL) return false;
     if(selection.kind == EDITOR_SELECTION_SPRITE) {
@@ -372,6 +380,20 @@ static bool editor_selection_remove_command_get(EditorSelectionRef selection,
             .data.animated_sprite_remove = {.object = selection.object,
                 .sprite = selection.item}};
         return true;
+    }
+    if(selection.kind == EDITOR_SELECTION_ANIMATION_FRAME) {
+        EditorObject *object = editor_object_query_get(project, selection.object);
+        EditorAnimatedSprite *animation = editor_project_animated_sprite_get(
+            object, selection.parent);
+        if(animation == NULL) return false;
+        for(size_t i = 0; i < animation->frame_count; i += 1) {
+            if(animation->frames[i].id != selection.item) continue;
+            *command = (EditorCommand){.type = EDITOR_COMMAND_ANIMATION_FRAME_REMOVE,
+                .data.animation_frame_remove = {.object = selection.object,
+                    .sprite = selection.parent, .index = i}};
+            return true;
+        }
+        return false;
     }
     switch(selection.kind) {
         case EDITOR_SELECTION_OBJECT: kind = EDITOR_ITEM_OBJECT; break;
@@ -464,7 +486,7 @@ bool editor_navigation_multi_selection_delete(EditorProject *project,
         EditorCommand command;
         if(editor_selection_removed_with_parent_check(ordered,
                 state->selected_item_count, ordered[i])) continue;
-        if(!editor_selection_remove_command_get(ordered[i], &command)) {
+        if(!editor_selection_remove_command_get(project, ordered[i], &command)) {
             free(ordered);
             return false;
         }
@@ -485,7 +507,7 @@ bool editor_navigation_multi_selection_delete(EditorProject *project,
         EditorCommandResult result;
         if(editor_selection_removed_with_parent_check(ordered,
                 state->selected_item_count, ordered[i])) continue;
-        (void)editor_selection_remove_command_get(ordered[i], &command);
+        (void)editor_selection_remove_command_get(project, ordered[i], &command);
         result = editor_command_execute(project, &command);
         if(result.kind == ERROR_RESULT_ERROR) {
             success = false;
@@ -529,6 +551,17 @@ bool editor_navigation_selected_open(EditorProject *project,
             return false;
         state->mode = EDITOR_VIEWPORT_SPRITE;
         return true;
+    }
+    if(state->selection == EDITOR_SELECTION_ANIMATION_FRAME) {
+        EditorAnimatedSprite *animation = editor_project_animated_sprite_get(
+            editor_project_selected_get(project), state->selected_animated_sprite);
+        if(animation == NULL) return false;
+        for(size_t i = 0; i < animation->frame_count; i += 1)
+            if(animation->frames[i].id == state->selected_animation_frame) {
+                state->mode = EDITOR_VIEWPORT_ANIMATION_FRAME;
+                return true;
+            }
+        return false;
     }
     selected = editor_project_selected_get(project);
     if(selected == NULL) return false;
@@ -620,6 +653,9 @@ bool editor_navigation_open_item_selection_set(EditorViewportState *state) {
             return true;
         case EDITOR_VIEWPORT_ANIMATED_SPRITE:
             state->selection = EDITOR_SELECTION_ANIMATED_SPRITE;
+            return true;
+        case EDITOR_VIEWPORT_ANIMATION_FRAME:
+            state->selection = EDITOR_SELECTION_ANIMATION_FRAME;
             return true;
         default:
             return false;

@@ -23,8 +23,8 @@
 #define EDITOR_COLLISION_MASK_MAX 64
 /* Pre-release project schemas remain version 1 until the editor format is stable. */
 #define EDITOR_PROJECT_FORMAT_VERSION 1
-#define EDITOR_NAVIGATION_MODE_MAX 16
-#define EDITOR_NAVIGATION_SELECTION_MAX 15
+#define EDITOR_NAVIGATION_MODE_MAX 17
+#define EDITOR_NAVIGATION_SELECTION_MAX 16
 
 typedef uint32_t EditorObjectId;
 typedef uint32_t EditorVertexId;
@@ -289,6 +289,7 @@ typedef struct EditorNavigationState {
     EditorSoftBeamId soft_beam;
     EditorSpriteId sprite;
     EditorAnimatedSpriteId animated_sprite;
+    EditorSpriteId animation_frame;
     uint32_t origin_kind;
 } EditorNavigationState;
 

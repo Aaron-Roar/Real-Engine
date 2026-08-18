@@ -674,12 +674,19 @@ EditorResult editor_command_cli_named_parse(const EditorProject *project,
                 if(!editor_cli_argument_push(normalized, &normalized_count, rest[i]))
                     goto capacity_error;
             rest_count = 0;
-        } else if(strcmp(action, "frame-delete") == 0) {
+        } else if(strcmp(action, "frame-delete") == 0 ||
+                strcmp(action, "frame-rename") == 0 ||
+                strcmp(action, "frame-path-set") == 0 ||
+                strcmp(action, "frame-size-set") == 0) {
             if(!selectors.frame.id_set) return editor_result_error(
                 EDITOR_ERROR_INVALID_ARGUMENT,
-                "frame-delete requires --frame-index <index>");
+                "frame operation requires --frame-index <index>");
             if(!editor_cli_id_push(normalized, &normalized_count, id_buffers,
                     &id_buffer_count, selectors.frame.id)) goto capacity_error;
+            for(size_t i = 0; i < rest_count; i += 1)
+                if(!editor_cli_argument_push(normalized, &normalized_count, rest[i]))
+                    goto capacity_error;
+            rest_count = 0;
         } else if(strcmp(action, "connect") == 0) {
             if(rest_count != 1 || strcmp(rest[0], "body") != 0)
                 return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,

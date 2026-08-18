@@ -317,6 +317,8 @@ bool editor_project_save(const EditorProject *project, const char *path) {
         yyjson_mut_obj_add_uint(document, value, "sprite", navigation->sprite);
         yyjson_mut_obj_add_uint(document, value, "animated_sprite",
             navigation->animated_sprite);
+        yyjson_mut_obj_add_uint(document, value, "animation_frame",
+            navigation->animation_frame);
         yyjson_mut_obj_add_uint(document, value, "origin_kind", navigation->origin_kind);
         yyjson_mut_obj_add_val(document, root, "navigation", value);
     }
@@ -908,15 +910,21 @@ EditorResult editor_project_load(EditorProject *project, const char *path) {
         if(navigation != NULL) {
             yyjson_val *sprite = yyjson_obj_get(navigation, "sprite");
             yyjson_val *animated = yyjson_obj_get(navigation, "animated_sprite");
+            yyjson_val *frame = yyjson_obj_get(navigation, "animation_frame");
             if((sprite != NULL && (!yyjson_is_uint(sprite) ||
                         yyjson_get_uint(sprite) > UINT32_MAX)) ||
                     (animated != NULL && (!yyjson_is_uint(animated) ||
-                        yyjson_get_uint(animated) > UINT32_MAX))) goto done;
+                        yyjson_get_uint(animated) > UINT32_MAX)) ||
+                    (frame != NULL && (!yyjson_is_uint(frame) ||
+                        yyjson_get_uint(frame) > UINT32_MAX))) goto done;
             if(sprite != NULL)
                 loaded.navigation.sprite = (uint32_t)yyjson_get_uint(sprite);
             if(animated != NULL)
                 loaded.navigation.animated_sprite =
                     (uint32_t)yyjson_get_uint(animated);
+            if(frame != NULL)
+                loaded.navigation.animation_frame =
+                    (uint32_t)yyjson_get_uint(frame);
         }
     }
     if(!editor_json_uint(root, "selected", &loaded.selected) || !yyjson_is_arr(objects) ||

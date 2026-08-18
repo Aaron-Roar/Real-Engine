@@ -23,7 +23,8 @@ typedef enum EditorViewportMode {
     EDITOR_VIEWPORT_VERTEX,
     EDITOR_VIEWPORT_AUTO_SHAPE,
     EDITOR_VIEWPORT_SPRITE,
-    EDITOR_VIEWPORT_ANIMATED_SPRITE
+    EDITOR_VIEWPORT_ANIMATED_SPRITE,
+    EDITOR_VIEWPORT_ANIMATION_FRAME
 } EditorViewportMode;
 
 typedef enum EditorHierarchySelection {
@@ -42,7 +43,8 @@ typedef enum EditorHierarchySelection {
     EDITOR_SELECTION_LINE,
     EDITOR_SELECTION_VERTEX,
     EDITOR_SELECTION_SPRITE,
-    EDITOR_SELECTION_ANIMATED_SPRITE
+    EDITOR_SELECTION_ANIMATED_SPRITE,
+    EDITOR_SELECTION_ANIMATION_FRAME
 } EditorHierarchySelection;
 
 typedef enum EditorOriginKind {
@@ -102,6 +104,7 @@ typedef struct EditorViewportState {
     EditorSoftAreaId selected_soft_area;
     EditorSpriteId selected_sprite;
     EditorAnimatedSpriteId selected_animated_sprite;
+    EditorSpriteId selected_animation_frame;
     EditorSoftAreaId soft_area_candidates[EDITOR_SOFT_AREA_MAX];
     size_t soft_area_candidate_count;
     EditorOriginKind selected_origin_kind;

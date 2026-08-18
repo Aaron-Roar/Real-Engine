@@ -23,7 +23,9 @@ typedef enum EditorBulkTargetKind {
     EDITOR_BULK_VISIBILITY,
     EDITOR_BULK_POSITION_X,
     EDITOR_BULK_POSITION_Y,
-    EDITOR_BULK_ROTATION
+    EDITOR_BULK_ROTATION,
+    EDITOR_BULK_FRAME_WIDTH,
+    EDITOR_BULK_FRAME_HEIGHT
 } EditorBulkTargetKind;
 
 typedef struct EditorBulkProperty {
@@ -148,6 +150,10 @@ static const EditorBulkProperty sprite_properties[] = {
     {"X", EDITOR_BULK_POSITION_X, EDITOR_BULK_FLOAT, 0},
     {"Y", EDITOR_BULK_POSITION_Y, EDITOR_BULK_FLOAT, 0}
 };
+static const EditorBulkProperty animation_frame_properties[] = {
+    {"Width", EDITOR_BULK_FRAME_WIDTH, EDITOR_BULK_FLOAT, 0},
+    {"Height", EDITOR_BULK_FRAME_HEIGHT, EDITOR_BULK_FLOAT, 0}
+};
 static const EditorBulkProperty mixed_position_properties[] = {
     {"X", EDITOR_BULK_POSITION_X, EDITOR_BULK_FLOAT, 0},
     {"Y", EDITOR_BULK_POSITION_Y, EDITOR_BULK_FLOAT, 0}
@@ -187,6 +193,8 @@ static const EditorBulkProperty *editor_bulk_properties_get(
         case EDITOR_SELECTION_ORIGIN: EDITOR_BULK_LIST(origin_properties);
         case EDITOR_SELECTION_SPRITE:
         case EDITOR_SELECTION_ANIMATED_SPRITE: EDITOR_BULK_LIST(sprite_properties);
+        case EDITOR_SELECTION_ANIMATION_FRAME:
+            EDITOR_BULK_LIST(animation_frame_properties);
         default: *count = 0; return NULL;
     }
 #undef EDITOR_BULK_LIST
@@ -345,6 +353,24 @@ static bool editor_bulk_transform_command_get(EditorProject *project,
         *command = (EditorCommand){.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
             .data.rigid_body_transform = {ref.object, ref.item, position, rotation}};
         return true;
+    }
+    if(ref.kind == EDITOR_SELECTION_ANIMATION_FRAME) {
+        EditorAnimatedSprite *animation = editor_project_animated_sprite_get(
+            object, ref.parent);
+        if(animation == NULL) return false;
+        for(size_t i = 0; i < animation->frame_count; i += 1) {
+            Scale size;
+            if(animation->frames[i].id != ref.item) continue;
+            size = animation->frames[i].size;
+            if(target == EDITOR_BULK_FRAME_WIDTH) size.x = value;
+            else if(target == EDITOR_BULK_FRAME_HEIGHT) size.y = value;
+            else return false;
+            *command = (EditorCommand){.type = EDITOR_COMMAND_ANIMATION_FRAME_SIZE_SET,
+                .data.animation_frame_size_set = {.object = ref.object,
+                    .sprite = ref.parent, .index = i, .size = size}};
+            return true;
+        }
+        return false;
     }
     if(ref.kind == EDITOR_SELECTION_ANCHOR) {
         EditorAnchor *anchor = editor_project_anchor_get(object, ref.item);
@@ -583,7 +609,9 @@ static bool editor_bulk_apply(EditorProject *project, EditorViewportState *state
             !editor_bulk_bool_parse(text, &boolean)) return false;
     if((property->target == EDITOR_BULK_POSITION_X ||
             property->target == EDITOR_BULK_POSITION_Y ||
-            property->target == EDITOR_BULK_ROTATION) &&
+            property->target == EDITOR_BULK_ROTATION ||
+            property->target == EDITOR_BULK_FRAME_WIDTH ||
+            property->target == EDITOR_BULK_FRAME_HEIGHT) &&
             !editor_bulk_float_parse(text, &number)) return false;
     if(!editor_history_transaction_begin(history)) return false;
     for(size_t i = 0; i < state->selected_item_count; i += 1)

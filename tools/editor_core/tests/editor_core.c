@@ -992,6 +992,27 @@ static int sprite_commands_test(void) {
             parsed.data.animation_frame_add.size.x != 32.0f ||
             parsed.data.animation_frame_add.size.y != 24.0f) return 1;
 
+    command = (EditorCommand){.type = EDITOR_COMMAND_ANIMATION_FRAME_SIZE_SET,
+        .data.animation_frame_size_set = {.object = object->id,
+            .sprite = animated->id, .index = 0, .size = {48.0f, 36.0f}}};
+    executed = editor_command_execute(&project, &command);
+    if(executed.kind != ERROR_RESULT_VALUE || animated->frames[0].size.x != 48.0f ||
+            animated->frames[0].size.y != 36.0f) return 1;
+    result = editor_command_cli_standard_write(&project, &command, &executed,
+        "project.rohr.json", text, sizeof(text));
+    if(editor_result_check(result) || strstr(text, "--frame-index 0") == NULL ||
+            strstr(text, "frame-size-set 48 36") == NULL) return 1;
+    count = 0;
+    for(char *token = strtok(text, " "); token != NULL && count < 32;
+            token = strtok(NULL, " ")) arguments[count++] = token;
+    result = editor_command_cli_standard_parse(&project, count, arguments, &path,
+        &parsed);
+    if(editor_result_check(result) ||
+            parsed.type != EDITOR_COMMAND_ANIMATION_FRAME_SIZE_SET ||
+            parsed.data.animation_frame_size_set.index != 0 ||
+            parsed.data.animation_frame_size_set.size.x != 48.0f ||
+            parsed.data.animation_frame_size_set.size.y != 36.0f) return 1;
+
     command = (EditorCommand){.type = EDITOR_COMMAND_ANIMATED_SPRITE_BODY_SET,
         .data.animated_sprite_body_set = {.object = object->id,
             .sprite = animated->id, .body = body->id}};

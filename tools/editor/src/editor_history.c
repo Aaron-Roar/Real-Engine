@@ -303,6 +303,15 @@ static EditorHistoryAggregateChange *editor_history_command_aggregate_capture(
         case EDITOR_COMMAND_ANIMATION_FRAME_REMOVE:
             return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
                 command->data.animation_frame_remove.object, 0);
+        case EDITOR_COMMAND_ANIMATION_FRAME_RENAME:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.animation_frame_rename.object, 0);
+        case EDITOR_COMMAND_ANIMATION_FRAME_PATH_SET:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.animation_frame_path_set.object, 0);
+        case EDITOR_COMMAND_ANIMATION_FRAME_SIZE_SET:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.animation_frame_size_set.object, 0);
         case EDITOR_COMMAND_SPRITE_POSITION_SET:
             return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
                 command->data.sprite_position_set.object, 0);

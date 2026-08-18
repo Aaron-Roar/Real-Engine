@@ -481,6 +481,7 @@ static EditorNavigationState editor_navigation_state_get(
         .soft_beam = state->selected_soft_beam,
         .sprite = state->selected_sprite,
         .animated_sprite = state->selected_animated_sprite,
+        .animation_frame = state->selected_animation_frame,
         .origin_kind = (uint32_t)state->selected_origin_kind
     };
 }
@@ -502,6 +503,7 @@ static void editor_navigation_state_apply(EditorProject *project,
     state->selected_soft_beam = navigation->soft_beam;
     state->selected_sprite = navigation->sprite;
     state->selected_animated_sprite = navigation->animated_sprite;
+    state->selected_animation_frame = navigation->animation_frame;
     state->selected_origin_kind = (EditorOriginKind)navigation->origin_kind;
 }
 
@@ -581,6 +583,12 @@ static float editor_panel_content_height_get(const EditorProject *project,
                     object->soft_body_items[i].area_count) * 28.0f);
             }
         }
+    }
+    if(state->mode == EDITOR_VIEWPORT_ANIMATED_SPRITE) {
+        for(size_t i = 0; i < object->animated_sprite_count; i += 1)
+            if(object->animated_sprite_items[i].id == state->selected_animated_sprite)
+                return fmaxf(height, 540.0f +
+                    (float)object->animated_sprite_items[i].frame_count * 30.0f);
     }
     if(state->mode == EDITOR_VIEWPORT_HITBOX) {
         for(size_t body_index = 0; body_index < object->rigid_body_count; body_index += 1) {
@@ -1390,6 +1398,25 @@ static bool editor_single_selected_delete(
     if(project == NULL || viewport_state == NULL) return false;
     selected = editor_project_selected_get(project);
     if(selected == NULL) return false;
+    if(viewport_state->selection == EDITOR_SELECTION_ANIMATION_FRAME) {
+        EditorAnimatedSprite *animation = editor_project_animated_sprite_get(selected,
+            viewport_state->selected_animated_sprite);
+        if(animation == NULL) return false;
+        for(size_t i = 0; i < animation->frame_count; i += 1) {
+            if(animation->frames[i].id != viewport_state->selected_animation_frame)
+                continue;
+            EditorCommand command = {.type = EDITOR_COMMAND_ANIMATION_FRAME_REMOVE,
+                .data.animation_frame_remove = {.object = selected->id,
+                    .sprite = animation->id, .index = i}};
+            if(editor_command_execute(project, &command).kind == ERROR_RESULT_ERROR)
+                return false;
+            viewport_state->mode = EDITOR_VIEWPORT_ANIMATED_SPRITE;
+            viewport_state->selection = EDITOR_SELECTION_ANIMATED_SPRITE;
+            viewport_state->selected_animation_frame = 0;
+            return true;
+        }
+        return false;
+    }
     if(viewport_state->selection == EDITOR_SELECTION_OBJECT) {
         EditorCommand command = {.type = EDITOR_COMMAND_ITEM_REMOVE,
             .data.item_remove = {EDITOR_ITEM_OBJECT, selected->id, 0, 0, 0}};
@@ -1963,6 +1990,7 @@ int main(void) {
     TextAsset left_label = {0};
     TextAsset right_label = {0};
     TextAsset delete_sprite_label = {0};
+    TextAsset delete_frame_label = {0};
     TextAsset delete_animated_sprite_label = {0};
     TextAsset x_field = {0};
     TextAsset y_field = {0};
@@ -2239,6 +2267,7 @@ int main(void) {
             !editor_text_create(&font, "Left", &left_label) ||
             !editor_text_create(&font, "Right", &right_label) ||
             !editor_text_create(&font, "Delete Sprite", &delete_sprite_label) ||
+            !editor_text_create(&font, "Delete Frame", &delete_frame_label) ||
             !editor_text_create(&font, "Delete Animated Sprite",
                 &delete_animated_sprite_label) ||
             !editor_text_create(&font, "", &x_field) ||
@@ -4760,6 +4789,91 @@ int main(void) {
                     }
                 }
             }
+        } else if(viewport_state.mode == EDITOR_VIEWPORT_ANIMATION_FRAME) {
+            EditorObject *selected = editor_project_selected_get(&project);
+            EditorAnimatedSprite *animation = editor_project_animated_sprite_get(selected,
+                viewport_state.selected_animated_sprite);
+            EditorAnimationFrame *frame = NULL;
+            size_t frame_index = 0;
+            if(animation != NULL) for(size_t i = 0; i < animation->frame_count; i += 1) {
+                if(animation->frames[i].id != viewport_state.selected_animation_frame)
+                    continue;
+                frame = &animation->frames[i];
+                frame_index = i;
+                break;
+            }
+            if(frame != NULL) {
+                char edited_name[EDITOR_OBJECT_NAME_MAX];
+                char edited_path[EDITOR_ASSET_PATH_MAX];
+                float width = frame->size.x;
+                float height = frame->size.y;
+                UIButtonStyle delete_style = editor_delete_button_style_get();
+                snprintf(edited_name, sizeof(edited_name), "%s", frame->name);
+                snprintf(edited_path, sizeof(edited_path), "%s", frame->path);
+                if(!editor_named_text_sync(&font, frame->name, &sprite_labels[0],
+                        sprite_cache[0], EDITOR_OBJECT_NAME_MAX)) goto fail;
+                rohr_ui_label(&name_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    42.0f, 70.0f, 28.0f});
+                UIFieldResult name_result = rohr_ui_field("editor.animation_frame.name",
+                    (UIFieldBinding){.kind = UI_FIELD_STRING, .string = edited_name,
+                        .string_capacity = sizeof(edited_name)}, &sprite_labels[0],
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 82.0f, 42.0f,
+                        EDITOR_TOOLS_WIDTH - 92.0f, 28.0f}, NULL);
+                rohr_ui_label(&path_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    80.0f, 70.0f, 28.0f});
+                UIFieldResult path_result = rohr_ui_field("editor.animation_frame.path",
+                    (UIFieldBinding){.kind = UI_FIELD_STRING, .string = edited_path,
+                        .string_capacity = sizeof(edited_path)}, &path_field,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 82.0f, 80.0f,
+                        EDITOR_TOOLS_WIDTH - 92.0f, 28.0f}, NULL);
+                rohr_ui_label(&width_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    118.0f, 70.0f, 28.0f});
+                UIFieldResult width_result = rohr_ui_field("editor.animation_frame.width",
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &width}, &x_field,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 82.0f, 118.0f,
+                        EDITOR_TOOLS_WIDTH - 92.0f, 28.0f}, NULL);
+                rohr_ui_label(&height_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    156.0f, 70.0f, 28.0f});
+                UIFieldResult height_result = rohr_ui_field("editor.animation_frame.height",
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &height}, &y_field,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 82.0f, 156.0f,
+                        EDITOR_TOOLS_WIDTH - 92.0f, 28.0f}, NULL);
+                if(name_result.changed) {
+                    EditorCommand command = {.type = EDITOR_COMMAND_ANIMATION_FRAME_RENAME,
+                        .data.animation_frame_rename = {.object = selected->id,
+                            .sprite = animation->id, .index = frame_index}};
+                    snprintf(command.data.animation_frame_rename.name,
+                        sizeof(command.data.animation_frame_rename.name), "%s", edited_name);
+                    (void)editor_command_execute(&project, &command);
+                }
+                if(path_result.changed && edited_path[0] != '\0') {
+                    EditorCommand command = {.type = EDITOR_COMMAND_ANIMATION_FRAME_PATH_SET,
+                        .data.animation_frame_path_set = {.object = selected->id,
+                            .sprite = animation->id, .index = frame_index}};
+                    snprintf(command.data.animation_frame_path_set.path,
+                        sizeof(command.data.animation_frame_path_set.path), "%s", edited_path);
+                    (void)editor_command_execute(&project, &command);
+                }
+                if(width_result.changed || height_result.changed) {
+                    EditorCommand command = {.type = EDITOR_COMMAND_ANIMATION_FRAME_SIZE_SET,
+                        .data.animation_frame_size_set = {.object = selected->id,
+                            .sprite = animation->id, .index = frame_index,
+                            .size = {width, height}}};
+                    (void)editor_command_execute(&project, &command);
+                }
+                field_editing = name_result.active || path_result.active ||
+                    width_result.active || height_result.active;
+                if(rohr_ui_button("editor.animation_frame.delete", &delete_frame_label,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
+                            editor_panel_delete_y_get(&project, &viewport_state),
+                            EDITOR_TOOLS_WIDTH - 20.0f, 34.0f}, &delete_style).clicked) {
+                    EditorCommand command = {.type = EDITOR_COMMAND_ANIMATION_FRAME_REMOVE,
+                        .data.animation_frame_remove = {.object = selected->id,
+                            .sprite = animation->id, .index = frame_index}};
+                    if(editor_command_execute(&project, &command).kind ==
+                            ERROR_RESULT_VALUE) editor_viewport_back(&viewport_state);
+                }
+            }
         } else if(viewport_state.mode == EDITOR_VIEWPORT_ANIMATED_SPRITE) {
             EditorObject *selected = editor_project_selected_get(&project);
             EditorAnimatedSprite *sprite = editor_project_animated_sprite_get(selected,
@@ -4969,18 +5083,30 @@ int main(void) {
                     EditorAnimationFrame *asset = &sprite->frames[frame];
                     char id[80];
                     size_t asset_index = frame < 64 ? frame : 63;
+                    EditorSelectionRef frame_ref = {EDITOR_SELECTION_ANIMATION_FRAME,
+                        selected->id, sprite->id, 0, asset->id};
+                    UIButtonStyle selected_style = editor_selected_button_style_get();
+                    UIRect frame_bounds = {EDITOR_VIEWPORT_WIDTH + 10.0f,
+                        494.0f + (float)frame * 30.0f,
+                        EDITOR_TOOLS_WIDTH - 20.0f, 26.0f};
+                    UIButtonResult frame_result;
                     (void)editor_named_text_sync(&font, asset->name,
                         &sprite_labels[asset_index], sprite_cache[asset_index],
                         EDITOR_OBJECT_NAME_MAX);
                     snprintf(id, sizeof(id), "editor.animated_sprite.frame.%zu", frame);
-                    if(rohr_ui_button(id, &sprite_labels[asset_index],
-                            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
-                                494.0f + (float)frame * 30.0f,
-                                EDITOR_TOOLS_WIDTH - 20.0f, 26.0f}, NULL).double_clicked) {
-                        EditorCommand command = {.type = EDITOR_COMMAND_ANIMATION_FRAME_REMOVE,
-                            .data.animation_frame_remove = {.object = selected->id,
-                                .sprite = sprite->id, .index = frame}};
-                        (void)editor_command_execute(&project, &command);
+                    frame_result = rohr_ui_button(id, &sprite_labels[asset_index],
+                        frame_bounds, editor_viewport_selection_contains(
+                            &viewport_state, frame_ref) ? &selected_style : NULL);
+                    editor_hierarchy_drag_row(&hierarchy_drag, &viewport_state,
+                        frame_ref, frame_bounds, frame_result, hierarchy_pointer,
+                        hierarchy_primary, panel_scroll_offset,
+                        frame + 1 == sprite->frame_count);
+                    if(frame_result.clicked || frame_result.focus_changed)
+                        (void)editor_viewport_selection_set(&project, &viewport_state,
+                            frame_ref, viewport_state.selection_modifier);
+                    if(frame_result.double_clicked) {
+                        viewport_state.mode = EDITOR_VIEWPORT_ANIMATION_FRAME;
+                        viewport_state.selected_animation_frame = asset->id;
                         break;
                     }
                 }
@@ -6161,6 +6287,7 @@ int main(void) {
     rohr_graphics_text_destroy(&left_label);
     rohr_graphics_text_destroy(&right_label);
     rohr_graphics_text_destroy(&delete_sprite_label);
+    rohr_graphics_text_destroy(&delete_frame_label);
     rohr_graphics_text_destroy(&delete_animated_sprite_label);
     rohr_graphics_text_destroy(&path_field);
     for(size_t i = 0; i < 64; i += 1)
@@ -6366,6 +6493,7 @@ fail:
     rohr_graphics_text_destroy(&left_label);
     rohr_graphics_text_destroy(&right_label);
     rohr_graphics_text_destroy(&delete_sprite_label);
+    rohr_graphics_text_destroy(&delete_frame_label);
     rohr_graphics_text_destroy(&delete_animated_sprite_label);
     rohr_graphics_text_destroy(&path_field);
     for(size_t i = 0; i < 64; i += 1)

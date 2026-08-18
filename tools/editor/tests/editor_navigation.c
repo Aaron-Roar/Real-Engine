@@ -76,7 +76,6 @@ int main(void) {
                 state.selection != EDITOR_SELECTION_SOFT_BODY) return 1;
         editor_viewport_selection_clear(&state);
     }
-
     if(!navigation_mode_open_check(&project, &state, EDITOR_SELECTION_OBJECT,
                 EDITOR_VIEWPORT_OBJECT)) return 1;
     state.selected_rigid_body = body->id;
@@ -318,6 +317,57 @@ int main(void) {
                 !editor_history_redo(&history) || object->rigid_body_count != 1 ||
                 object->soft_body_count != 0)
             return 1;
+    }
+    {
+        EditorObject *frame_object = editor_project_object_add(&project, (Position){0});
+        EditorAnimatedSprite *animation = editor_project_animated_sprite_add(
+            &project, frame_object);
+        EditorAnimatedSpriteId animation_id;
+        EditorSpriteId first_id;
+        EditorSpriteId second_id;
+        EditorSelectionRef first;
+        EditorSelectionRef second;
+        if(frame_object == NULL || animation == NULL ||
+                !editor_project_animation_frame_add(&project, animation,
+                    "first", "assets/first.png", (Scale){16.0f, 16.0f}) ||
+                !editor_project_animation_frame_add(&project, animation,
+                    "second", "assets/second.png", (Scale){24.0f, 24.0f})) return 1;
+        animation_id = animation->id;
+        first_id = animation->frames[0].id;
+        second_id = animation->frames[1].id;
+        first = (EditorSelectionRef){EDITOR_SELECTION_ANIMATION_FRAME,
+            frame_object->id, animation_id, 0, first_id};
+        second = (EditorSelectionRef){EDITOR_SELECTION_ANIMATION_FRAME,
+            frame_object->id, animation_id, 0, second_id};
+        if(!editor_viewport_selection_set(&project, &state, first, false) ||
+                !editor_viewport_selection_set(&project, &state, second, true) ||
+                state.selected_item_count != 2) return 1;
+        editor_viewport_selection_clear(&state);
+        if(!editor_viewport_selection_set(&project, &state, second, false) ||
+                !editor_navigation_selection_reorder(&project, &state,
+                    second, first, false, &history) ||
+                animation->frames[0].id != second_id || history.undo_count != 1 ||
+                !editor_history_undo(&history)) return 1;
+        frame_object = editor_project_selected_get(&project);
+        animation = editor_project_animated_sprite_get(frame_object, animation_id);
+        if(animation == NULL || animation->frames[0].id != first_id ||
+                !editor_history_redo(&history)) return 1;
+        frame_object = editor_project_selected_get(&project);
+        animation = editor_project_animated_sprite_get(frame_object, animation_id);
+        if(animation == NULL || animation->frames[0].id != second_id) return 1;
+        editor_history_reset(&history);
+        editor_viewport_selection_clear(&state);
+        if(!editor_viewport_selection_set(&project, &state, first, false) ||
+                !editor_viewport_selection_set(&project, &state, second, true) ||
+                !editor_navigation_multi_selection_delete(&project, &state, &history))
+            return 1;
+        frame_object = editor_project_selected_get(&project);
+        animation = editor_project_animated_sprite_get(frame_object, animation_id);
+        if(animation == NULL || animation->frame_count != 0 ||
+                history.undo_count != 1 || !editor_history_undo(&history)) return 1;
+        frame_object = editor_project_selected_get(&project);
+        animation = editor_project_animated_sprite_get(frame_object, animation_id);
+        if(animation == NULL || animation->frame_count != 2) return 1;
     }
     editor_history_destroy(&history);
     editor_viewport_state_destroy(&state);

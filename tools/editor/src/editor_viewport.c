@@ -654,6 +654,10 @@ bool editor_viewport_selection_ref_get(const EditorProject *project,
         case EDITOR_SELECTION_ANIMATED_SPRITE:
             selection->item = state->selected_animated_sprite;
             return selection->item != 0;
+        case EDITOR_SELECTION_ANIMATION_FRAME:
+            selection->parent = state->selected_animated_sprite;
+            selection->item = state->selected_animation_frame;
+            return selection->parent != 0 && selection->item != 0;
         case EDITOR_SELECTION_ORIGIN:
             selection->parent = state->selected_origin_kind;
             selection->item = state->selected_origin_kind == EDITOR_ORIGIN_RIGID_BODY ?
@@ -724,6 +728,10 @@ static bool editor_viewport_selection_primary_apply(EditorProject *project,
             break;
         case EDITOR_SELECTION_ANIMATED_SPRITE:
             state->selected_animated_sprite = selection.item;
+            break;
+        case EDITOR_SELECTION_ANIMATION_FRAME:
+            state->selected_animated_sprite = selection.parent;
+            state->selected_animation_frame = selection.item;
             break;
         case EDITOR_SELECTION_ORIGIN:
             state->selected_origin_kind = (EditorOriginKind)selection.parent;
@@ -1254,6 +1262,9 @@ void editor_viewport_back(EditorViewportState *state) {
             state->mode == EDITOR_VIEWPORT_ANIMATED_SPRITE) {
         state->mode = EDITOR_VIEWPORT_OBJECT;
         state->selection = EDITOR_SELECTION_OBJECT;
+    } else if(state->mode == EDITOR_VIEWPORT_ANIMATION_FRAME) {
+        state->mode = EDITOR_VIEWPORT_ANIMATED_SPRITE;
+        state->selection = EDITOR_SELECTION_ANIMATED_SPRITE;
     } else if(state->mode == EDITOR_VIEWPORT_SOFT_NODE ||
             state->mode == EDITOR_VIEWPORT_SOFT_BEAM ||
             state->mode == EDITOR_VIEWPORT_SOFT_AREA) {

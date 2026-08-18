@@ -47,7 +47,10 @@ typedef enum EditorCommandType {
     EDITOR_COMMAND_ANIMATED_SPRITE_FOLLOW_ROTATION_SET,
     EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET,
     EDITOR_COMMAND_ANIMATION_FRAME_ADD,
-    EDITOR_COMMAND_ANIMATION_FRAME_REMOVE
+    EDITOR_COMMAND_ANIMATION_FRAME_REMOVE,
+    EDITOR_COMMAND_ANIMATION_FRAME_RENAME,
+    EDITOR_COMMAND_ANIMATION_FRAME_PATH_SET,
+    EDITOR_COMMAND_ANIMATION_FRAME_SIZE_SET
 } EditorCommandType;
 
 typedef enum EditorItemKind {
@@ -316,6 +319,12 @@ typedef struct EditorCommand {
             Scale size; } animation_frame_add;
         struct { EditorObjectId object; EditorAnimatedSpriteId sprite; size_t index; }
             animation_frame_remove;
+        struct { EditorObjectId object; EditorAnimatedSpriteId sprite; size_t index;
+            char name[EDITOR_OBJECT_NAME_MAX]; } animation_frame_rename;
+        struct { EditorObjectId object; EditorAnimatedSpriteId sprite; size_t index;
+            char path[EDITOR_ASSET_PATH_MAX]; } animation_frame_path_set;
+        struct { EditorObjectId object; EditorAnimatedSpriteId sprite; size_t index;
+            Scale size; } animation_frame_size_set;
     } data;
 } EditorCommand;
 
