@@ -1655,7 +1655,8 @@ static bool editor_group_rigid_body_already_driven(EditorProject *project,
 }
 
 static bool editor_group_transform_apply(EditorProject *project,
-        const EditorViewportState *state, Vec2D translation, float angle) {
+        const EditorViewportState *state, Vec2D translation, float angle,
+        bool rotate_about_group_pivot) {
     bool changed = false;
     for(size_t i = 0; i < state->selected_item_count; i += 1) {
         EditorSelectionRef ref = state->selected_items[i];
@@ -1665,16 +1666,17 @@ static bool editor_group_transform_apply(EditorProject *project,
         EditorCommand command = {0};
         if(editor_group_parent_selected(project, state, ref) || object == NULL ||
                 !editor_group_point_get(project, ref, &world)) continue;
-        desired = editor_group_rotate_point((Position){world.x + translation.x,
-            world.y + translation.y}, state->group_pivot, angle);
+        desired = (Position){world.x + translation.x, world.y + translation.y};
+        if(rotate_about_group_pivot)
+            desired = editor_group_rotate_point(desired, state->group_pivot, angle);
         if(ref.kind == EDITOR_SELECTION_OBJECT) {
             command = (EditorCommand){.type = EDITOR_COMMAND_OBJECT_POSITION,
                 .data.object_position = {object->id, desired}};
         } else if(ref.kind == EDITOR_SELECTION_RIGID_BODY ||
                 ref.kind == EDITOR_SELECTION_PARTICLE) {
             EditorRigidBody *body = editor_project_rigid_body_get(object, ref.item);
-            if(body == NULL || (angle == 0.0f &&
-                    editor_group_rigid_body_already_driven(project, state, i, ref)))
+            if(body == NULL || editor_group_rigid_body_already_driven(
+                    project, state, i, ref))
                 continue;
             command = (EditorCommand){.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
                 .data.rigid_body_transform = {object->id, body->id,
@@ -1804,7 +1806,7 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
         Vec2D delta = {pointer.x - state->group_pointer.x,
             pointer.y - state->group_pointer.y};
         if(delta.x != 0.0f || delta.y != 0.0f) {
-            (void)editor_group_transform_apply(project, state, delta, 0.0f);
+            (void)editor_group_transform_apply(project, state, delta, 0.0f, false);
             state->group_pointer = pointer;
             state->group_pivot.x += delta.x;
             state->group_pivot.y += delta.y;
@@ -1818,7 +1820,8 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
         while(delta > 3.14159265359f) delta -= 6.28318530718f;
         while(delta < -3.14159265359f) delta += 6.28318530718f;
         if(delta != 0.0f) {
-            (void)editor_group_transform_apply(project, state, (Vec2D){0}, delta);
+            (void)editor_group_transform_apply(project, state,
+                (Vec2D){0}, delta, true);
             state->group_pointer_angle = pointer_angle;
         }
         return true;
@@ -1978,14 +1981,24 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
         for(size_t i = 0; i < object->soft_body_count; i += 1) {
             EditorSoftBody *soft_body = &object->soft_body_items[i];
             Position center;
+            float rotation;
             if(soft_body->id != state->selected_soft_body) continue;
             center = (Position){object->position.x + soft_body->position.x,
                 object->position.y + soft_body->position.y};
+            rotation = atan2f(pointer.y - center.y, pointer.x - center.x) +
+                state->rotation_pointer_offset;
+            if(state->selected_item_count >= 2) {
+                float delta = rotation - soft_body->rotation;
+                while(delta > 3.14159265359f) delta -= 6.28318530718f;
+                while(delta < -3.14159265359f) delta += 6.28318530718f;
+                if(delta != 0.0f)
+                    (void)editor_group_transform_apply(project, state,
+                        (Vec2D){0}, delta, false);
+                return true;
+            }
             EditorCommand command = {.type = EDITOR_COMMAND_SOFT_BODY_TRANSFORM,
                 .data.soft_body_transform = {object->id, soft_body->id,
-                    soft_body->position,
-                    atan2f(pointer.y - center.y, pointer.x - center.x) +
-                        state->rotation_pointer_offset}};
+                    soft_body->position, rotation}};
             (void)editor_command_execute(project, &command);
             return true;
         }
@@ -2004,10 +2017,20 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
             primary_button == MOUSE_BUTTON_STATE_PRESSED)) {
         Position center = {object->position.x + body->position.x,
             object->position.y + body->position.y};
+        float rotation = atan2f(pointer.y - center.y, pointer.x - center.x) +
+            state->rotation_pointer_offset;
+        if(state->selected_item_count >= 2) {
+            float delta = rotation - body->rotation;
+            while(delta > 3.14159265359f) delta -= 6.28318530718f;
+            while(delta < -3.14159265359f) delta += 6.28318530718f;
+            if(delta != 0.0f)
+                (void)editor_group_transform_apply(project, state,
+                    (Vec2D){0}, delta, false);
+            return true;
+        }
         EditorCommand command = {.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
             .data.rigid_body_transform = {object->id, body->id, body->position,
-                atan2f(pointer.y - center.y, pointer.x - center.x) +
-                    state->rotation_pointer_offset}};
+                rotation}};
         (void)editor_command_execute(project, &command);
         return true;
     }
@@ -2816,7 +2839,8 @@ bool editor_viewport_selection_nudge(EditorViewportState *state,
     screen_delta.y = -screen_delta.y;
     if(state->selected_item_count >= 2) {
         if(!editor_group_pivot_get(project, state, &state->group_pivot)) return false;
-        return editor_group_transform_apply(project, state, screen_delta, 0.0f);
+        return editor_group_transform_apply(project, state,
+            screen_delta, 0.0f, false);
     }
     object = editor_project_selected_get(project);
     if(object == NULL) return false;
