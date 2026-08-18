@@ -1835,6 +1835,7 @@ int main(void) {
     TextAsset settings_label = {0};
     TextAsset new_label = {0};
     TextAsset open_label = {0};
+    TextAsset load_frame_label = {0};
     TextAsset create_project_label = {0};
     TextAsset save_label = {0};
     TextAsset close_label = {0};
@@ -2135,6 +2136,7 @@ int main(void) {
             !editor_text_create(&font, "Settings", &settings_label) ||
             !editor_text_create(&font, "New Project", &new_label) ||
             !editor_text_create(&font, "Load Project", &open_label) ||
+            !editor_text_create(&font, "Load Frame", &load_frame_label) ||
             !editor_text_create(&font, "Create Project", &create_project_label) ||
             !editor_text_create(&font, "Save", &save_label) ||
             !editor_text_create(&font, "Close", &close_label) ||
@@ -2160,7 +2162,7 @@ int main(void) {
             !editor_text_create(&font, "Add Sprite", &add_sprite_label) ||
             !editor_text_create(&font, "Add Animated Sprite",
                 &add_animated_sprite_label) ||
-            !editor_text_create(&font, "Add Sprite", &add_frame_label) ||
+            !editor_text_create(&font, "Add Frame", &add_frame_label) ||
             !editor_text_create(&font, "None", &none_label) ||
             !editor_text_create(&font, "Add Hitbox", &add_hitbox_label) ||
             !editor_text_create(&font, "Hitbox", &hitbox_label) ||
@@ -4774,6 +4776,8 @@ int main(void) {
                 float ticks = (float)sprite->ticks_per_frame;
                 float seconds = (float)sprite->time_per_frame;
                 float starting = (float)sprite->starting_frame;
+                bool visible = sprite->visible;
+                bool visible_changed;
                 const TextAsset *body_options[EDITOR_RIGID_BODY_MAX + 1];
                 const TextAsset *direction_options[2] = {&left_label, &right_label};
                 size_t body_selected = 0;
@@ -4783,16 +4787,21 @@ int main(void) {
                         &animated_sprite_labels[animated_index],
                         animated_sprite_cache[animated_index],
                         EDITOR_OBJECT_NAME_MAX)) goto fail;
-                rohr_ui_label(&name_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
-                    42.0f, 70.0f, 28.0f});
+                visible_changed = rohr_ui_button("editor.animated_sprite.visible",
+                    visible ? &visibility_visible_label : &visibility_hidden_label,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 44.0f, 26.0f, 26.0f},
+                    NULL).clicked;
+                if(visible_changed) visible = !visible;
+                rohr_ui_label(&name_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 42.0f,
+                    42.0f, 40.0f, 28.0f});
                 UIFieldResult name_result = rohr_ui_field("editor.animated_sprite.name",
                     (UIFieldBinding){.kind = UI_FIELD_STRING, .string = edited_name,
                         .string_capacity = sizeof(edited_name)},
                     &animated_sprite_labels[(size_t)(sprite -
                         selected->animated_sprite_items) < 32 ?
                         (size_t)(sprite - selected->animated_sprite_items) : 0],
-                    (UIRect){EDITOR_VIEWPORT_WIDTH + 82.0f, 42.0f,
-                        EDITOR_TOOLS_WIDTH - 92.0f, 28.0f}, NULL);
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 88.0f, 42.0f,
+                        EDITOR_TOOLS_WIDTH - 96.0f, 28.0f}, NULL);
                 body_options[0] = &none_label;
                 for(size_t i = 0; i < selected->rigid_body_count &&
                         i < EDITOR_RIGID_BODY_MAX; i += 1) {
@@ -4867,13 +4876,9 @@ int main(void) {
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 384.0f,
                         EDITOR_TOOLS_WIDTH - 110.0f, 28.0f}, NULL);
                 bool follow = sprite->follow_body_rotation;
-                bool visible = sprite->visible;
                 bool follow_changed = editor_checkbox("editor.animated_sprite.follow",
                     &follow_rotation_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
                         422.0f, EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, &follow);
-                bool visible_changed = editor_checkbox("editor.animated_sprite.visible",
-                    &terminal_visible_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
-                        458.0f, EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, &visible);
                 if(name_result.changed) {
                     EditorCommand command = {.type = EDITOR_COMMAND_ANIMATED_SPRITE_RENAME,
                         .data.animated_sprite_rename = {.object = selected->id,
@@ -4947,7 +4952,7 @@ int main(void) {
                     position_y.active || sx.active || sy.active ||
                     tick_result.active || time_result.active || start_result.active;
                 if(rohr_ui_button("editor.animated_sprite.add_frame", &add_frame_label,
-                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 496.0f,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 458.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, NULL).clicked) {
                     sprite_browser_object = selected->id;
                     animation_browser_sprite = sprite->id;
@@ -4970,7 +4975,7 @@ int main(void) {
                     snprintf(id, sizeof(id), "editor.animated_sprite.frame.%zu", frame);
                     if(rohr_ui_button(id, &sprite_labels[asset_index],
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
-                                532.0f + (float)frame * 30.0f,
+                                494.0f + (float)frame * 30.0f,
                                 EDITOR_TOOLS_WIDTH - 20.0f, 26.0f}, NULL).double_clicked) {
                         EditorCommand command = {.type = EDITOR_COMMAND_ANIMATION_FRAME_REMOVE,
                             .data.animation_frame_remove = {.object = selected->id,
@@ -5210,16 +5215,17 @@ int main(void) {
                                 (void)editor_command_execute(&project, &command);
                             }
                         } else if(selection_kind == EDITOR_SELECTION_ANIMATED_SPRITE) {
-                            bool changed = editor_checkbox(visibility_id,
-                                &terminal_visible_label,
+                            bool changed = rohr_ui_button(visibility_id,
+                                visible ? &visibility_visible_label :
+                                    &visibility_hidden_label,
                                 (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, y,
-                                    26.0f, 26.0f}, &visible);
+                                    26.0f, 26.0f}, NULL).clicked;
                             if(changed) {
                                 EditorCommand command = {
                                     .type = EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET,
                                     .data.animated_sprite_boolean_set = {
                                         .object = selected->id, .sprite = item.id,
-                                        .enabled = visible}};
+                                        .enabled = !visible}};
                                 (void)editor_command_execute(&project, &command);
                             }
                         } else
@@ -5815,7 +5821,11 @@ int main(void) {
         if(file_browser.active) {
             EditorFileBrowserResult browser_result = editor_file_browser_draw(
                 &file_browser, &file_browser_field,
-                &save_label, &open_label, &create_project_label, &cancel_label,
+                &save_label,
+                workspace_browser_action ==
+                        EDITOR_WORKSPACE_BROWSER_ADD_ANIMATION_FRAME ?
+                    &load_frame_label : &open_label,
+                &create_project_label, &cancel_label,
                 editor_window_width, EDITOR_VIEWPORT_BOTTOM);
             if(browser_result.submitted) {
                 EditorResult load_result = editor_result_value(true);
@@ -6287,6 +6297,7 @@ int main(void) {
     rohr_graphics_text_destroy(&close_label);
     rohr_graphics_text_destroy(&exit_label);
     rohr_graphics_text_destroy(&open_label);
+    rohr_graphics_text_destroy(&load_frame_label);
     rohr_graphics_text_destroy(&create_project_label);
     rohr_graphics_text_destroy(&new_label);
     rohr_graphics_text_destroy(&settings_label);
@@ -6491,6 +6502,7 @@ fail:
     rohr_graphics_text_destroy(&close_label);
     rohr_graphics_text_destroy(&exit_label);
     rohr_graphics_text_destroy(&open_label);
+    rohr_graphics_text_destroy(&load_frame_label);
     rohr_graphics_text_destroy(&create_project_label);
     rohr_graphics_text_destroy(&new_label);
     rohr_graphics_text_destroy(&settings_label);
