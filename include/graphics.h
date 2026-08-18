@@ -349,6 +349,10 @@ AnimationAssetResult graphics_animation_load(AnimationDescriptor anim_desc);
 /** Create sprite runtime state from an animation asset. */
 AnimatedSprite graphics_animated_sprite_create(AnimationAsset asset_ptr, Scale scale);
 
+/** Advance one animated sprite's frame state. */
+void graphics_animated_sprite_update(AnimatedSprite *sprite, Tick current_tick,
+    Time current_time);
+
 /** Attach an animated sprite to an entity. */
 EngineResult graphics_animated_sprite_add(Entity entity, AnimatedSprite sprite);
 

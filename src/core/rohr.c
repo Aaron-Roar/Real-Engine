@@ -308,6 +308,7 @@ void rohr_graphics_text_destroy(TextAsset *text) { graphics_text_destroy(text); 
 bool rohr_graphics_text_draw(const TextAsset *text, Position position) { return graphics_text_draw(text, position); }
 AnimationAssetResult rohr_graphics_animation_load(AnimationDescriptor anim_desc) { return graphics_animation_load(anim_desc); }
 AnimatedSprite rohr_graphics_animated_sprite_create(AnimationAsset asset_ptr, Scale scale) { return graphics_animated_sprite_create(asset_ptr, scale); }
+void rohr_graphics_animated_sprite_update(AnimatedSprite *sprite, Tick current_tick, Time current_time) { graphics_animated_sprite_update(sprite, current_tick, current_time); }
 EngineResult rohr_graphics_animated_sprite_add(Entity entity, AnimatedSprite sprite) { return graphics_animated_sprite_add(entity, sprite); }
 void rohr_graphics_animated_sprites_draw(void) { graphics_animated_sprites_draw(); }
 void rohr_graphics_sprite_frames_update(Tick current_tick, Time current_time) { graphics_sprite_frames_update(current_tick, current_time); }

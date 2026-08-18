@@ -274,6 +274,7 @@ static yyjson_mut_val *editor_json_animated_sprite_write(yyjson_mut_doc *documen
     yyjson_mut_obj_add_bool(document, value, "follow_body_rotation",
         sprite->follow_body_rotation);
     yyjson_mut_obj_add_bool(document, value, "visible", sprite->visible);
+    yyjson_mut_obj_add_bool(document, value, "playing", sprite->playing);
     return value;
 }
 
@@ -735,7 +736,8 @@ static bool editor_json_animated_sprite_read(yyjson_val *value,
             direction > DIRECTION_RIGHT ||
             !editor_json_bool(value, "follow_body_rotation",
                 &sprite->follow_body_rotation) ||
-            !editor_json_bool(value, "visible", &sprite->visible)) return false;
+            !editor_json_bool(value, "visible", &sprite->visible) ||
+            !editor_json_bool(value, "playing", &sprite->playing)) return false;
     time = yyjson_obj_get(value, "time_per_frame");
     frames = yyjson_obj_get(value, "frames");
     if(!yyjson_is_num(time) || yyjson_get_real(time) < 0.0 ||

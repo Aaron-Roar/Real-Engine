@@ -1045,6 +1045,7 @@ property_invalid:
         case EDITOR_COMMAND_ANIMATED_SPRITE_DIRECTION_SET:
         case EDITOR_COMMAND_ANIMATED_SPRITE_FOLLOW_ROTATION_SET:
         case EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET:
+        case EDITOR_COMMAND_ANIMATED_SPRITE_PLAYING_SET:
         case EDITOR_COMMAND_ANIMATION_FRAME_ADD:
         case EDITOR_COMMAND_ANIMATION_FRAME_REMOVE:
         case EDITOR_COMMAND_ANIMATION_FRAME_RENAME:
@@ -1126,6 +1127,8 @@ property_invalid:
                     command->data.animated_sprite_boolean_set.enabled;
             else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET)
                 sprite->visible = command->data.animated_sprite_boolean_set.enabled;
+            else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_PLAYING_SET)
+                sprite->playing = command->data.animated_sprite_boolean_set.enabled;
             else if(command->type == EDITOR_COMMAND_ANIMATION_FRAME_ADD) {
                 if(sprite->frame_count >= MAX_ANIMATIONS_FRAMES ||
                         !editor_project_animation_frame_add(project, sprite,
@@ -1679,14 +1682,17 @@ EditorResult editor_command_cli_parse(int count, char **arguments,
                 return editor_result_value(true);
             }
             if((strcmp(property, "follow-body-rotation") == 0 ||
-                    strcmp(property, "visibility") == 0) && count == 8) {
+                    strcmp(property, "visibility") == 0 ||
+                    strcmp(property, "playing") == 0) && count == 8) {
                 bool enabled;
                 if(!editor_command_bool_parse(arguments[7], &enabled))
                     return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
                         "%s requires true or false", property);
                 command->type = strcmp(property, "visibility") == 0 ?
                     EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET :
-                    EDITOR_COMMAND_ANIMATED_SPRITE_FOLLOW_ROTATION_SET;
+                    strcmp(property, "playing") == 0 ?
+                        EDITOR_COMMAND_ANIMATED_SPRITE_PLAYING_SET :
+                        EDITOR_COMMAND_ANIMATED_SPRITE_FOLLOW_ROTATION_SET;
                 command->data.animated_sprite_boolean_set.object = object;
                 command->data.animated_sprite_boolean_set.sprite = id;
                 command->data.animated_sprite_boolean_set.enabled = enabled;
@@ -2342,6 +2348,7 @@ EditorResult editor_command_cli_write(const EditorCommand *command,
         case EDITOR_COMMAND_ANIMATED_SPRITE_DIRECTION_SET:
         case EDITOR_COMMAND_ANIMATED_SPRITE_FOLLOW_ROTATION_SET:
         case EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET:
+        case EDITOR_COMMAND_ANIMATED_SPRITE_PLAYING_SET:
         case EDITOR_COMMAND_ANIMATION_FRAME_ADD:
         case EDITOR_COMMAND_ANIMATION_FRAME_REMOVE:
         case EDITOR_COMMAND_ANIMATION_FRAME_RENAME:
@@ -2393,10 +2400,13 @@ EditorResult editor_command_cli_write(const EditorCommand *command,
                         "left" : "right");
                 if(!editor_command_text_append(output, output_capacity, &used, values)) goto capacity_error;
             } else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_FOLLOW_ROTATION_SET ||
-                    command->type == EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET) {
+                    command->type == EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET ||
+                    command->type == EDITOR_COMMAND_ANIMATED_SPRITE_PLAYING_SET) {
                 snprintf(values, sizeof(values), " %s %s",
                     command->type == EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET ?
-                        "visibility" : "follow-body-rotation",
+                        "visibility" : command->type ==
+                            EDITOR_COMMAND_ANIMATED_SPRITE_PLAYING_SET ?
+                            "playing" : "follow-body-rotation",
                     command->data.animated_sprite_boolean_set.enabled ? "true" : "false");
                 if(!editor_command_text_append(output, output_capacity, &used, values)) goto capacity_error;
             } else if(command->type == EDITOR_COMMAND_ANIMATION_FRAME_ADD) {

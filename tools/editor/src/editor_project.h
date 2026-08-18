@@ -244,6 +244,7 @@ typedef struct EditorAnimatedSprite {
     Direction direction;
     bool follow_body_rotation;
     bool visible;
+    bool playing;
 } EditorAnimatedSprite;
 
 typedef struct EditorObject {

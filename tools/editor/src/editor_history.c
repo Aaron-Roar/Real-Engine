@@ -295,6 +295,7 @@ static EditorHistoryAggregateChange *editor_history_command_aggregate_capture(
                 command->data.animated_sprite_direction_set.object, 0);
         case EDITOR_COMMAND_ANIMATED_SPRITE_FOLLOW_ROTATION_SET:
         case EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET:
+        case EDITOR_COMMAND_ANIMATED_SPRITE_PLAYING_SET:
             return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
                 command->data.animated_sprite_boolean_set.object, 0);
         case EDITOR_COMMAND_ANIMATION_FRAME_ADD:

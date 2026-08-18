@@ -2383,7 +2383,9 @@ AnimatedSprite graphics_animated_sprite_create(AnimationAsset asset_ptr, Scale s
     return sprite;
 }
 
-void graphics_sprite_frame_update(AnimatedSprite *sprite, Tick current_tick, Time current_time) {
+void graphics_animated_sprite_update(AnimatedSprite *sprite, Tick current_tick,
+        Time current_time) {
+    if(sprite == NULL || sprite->animation.texture_list.amount <= 0) return;
     bool frame_need_update_tick = (sprite->animation.ticks_per_frame <= (current_tick - sprite->last_update_tick)) && (sprite->animation.ticks_per_frame != 0);
     bool frame_need_update_time = (sprite->animation.time_per_frame <= (current_time - sprite->last_update_time) && (sprite->animation.time_per_frame != 0));
 
@@ -2488,7 +2490,8 @@ void graphics_sprite_frames_update(Tick current_tick, Time current_time) {
     RohrComponentMask filter = ROHR_ANIMATED_SPRITE;
     for(int i = 0; i < MAX_ENTITIES; i += 1) {
         if(entity_index_alive_check(i) && entity_index_components_check(i, filter)) {
-            graphics_sprite_frame_update(&animated_sprites[i], current_tick, current_time);
+            graphics_animated_sprite_update(&animated_sprites[i], current_tick,
+                current_time);
         }
     }
 }

@@ -21,6 +21,63 @@ static EditorPreviewTexture *editor_preview_textures;
 static size_t editor_preview_texture_count;
 static size_t editor_preview_texture_capacity;
 
+typedef struct EditorAnimationPreview {
+    EditorObjectId object;
+    EditorAnimatedSpriteId animation;
+    AnimatedSprite runtime;
+    bool was_playing;
+} EditorAnimationPreview;
+
+static EditorAnimationPreview *editor_animation_previews;
+static size_t editor_animation_preview_count;
+static size_t editor_animation_preview_capacity;
+
+static size_t editor_animation_preview_frame_get(const EditorObject *object,
+        const EditorAnimatedSprite *animation) {
+    EditorAnimationPreview *preview = NULL;
+    Tick tick = rohr_engine_tick_get();
+    Time time = rohr_engine_time_get();
+    if(object == NULL || animation == NULL || animation->frame_count == 0) return 0;
+    for(size_t i = 0; i < editor_animation_preview_count; i += 1)
+        if(editor_animation_previews[i].object == object->id &&
+                editor_animation_previews[i].animation == animation->id)
+            preview = &editor_animation_previews[i];
+    if(preview == NULL) {
+        if(editor_animation_preview_count == editor_animation_preview_capacity) {
+            size_t capacity = editor_animation_preview_capacity == 0 ? 8 :
+                editor_animation_preview_capacity * 2;
+            EditorAnimationPreview *items = realloc(editor_animation_previews,
+                capacity * sizeof(*items));
+            if(items == NULL) return 0;
+            editor_animation_previews = items;
+            editor_animation_preview_capacity = capacity;
+        }
+        preview = &editor_animation_previews[editor_animation_preview_count++];
+        *preview = (EditorAnimationPreview){.object = object->id,
+            .animation = animation->id};
+    }
+    preview->runtime.animation.texture_list.amount = (int)animation->frame_count;
+    preview->runtime.animation.ticks_per_frame = animation->ticks_per_frame;
+    preview->runtime.animation.time_per_frame = animation->time_per_frame;
+    if(!animation->playing) {
+        preview->runtime.animation_frame = 0;
+        preview->runtime.last_update_tick = tick;
+        preview->runtime.last_update_time = time;
+    } else {
+        if(!preview->was_playing) {
+            preview->runtime.animation_frame = 0;
+            preview->runtime.last_update_tick = tick;
+            preview->runtime.last_update_time = time;
+        }
+        rohr_graphics_animated_sprite_update(&preview->runtime, tick, time);
+    }
+    preview->was_playing = animation->playing;
+    if(preview->runtime.animation_frame < 0 ||
+            (size_t)preview->runtime.animation_frame >= animation->frame_count)
+        preview->runtime.animation_frame = 0;
+    return (size_t)preview->runtime.animation_frame;
+}
+
 static Position editor_sprite_world_get(const EditorObject *object,
     const EditorSprite *sprite);
 static Position editor_animated_sprite_world_get(const EditorObject *object,
@@ -36,6 +93,10 @@ void editor_viewport_assets_destroy(void) {
     editor_preview_textures = NULL;
     editor_preview_texture_count = 0;
     editor_preview_texture_capacity = 0;
+    free(editor_animation_previews);
+    editor_animation_previews = NULL;
+    editor_animation_preview_count = 0;
+    editor_animation_preview_capacity = 0;
     editor_asset_root[0] = '\0';
 }
 
@@ -2882,6 +2943,7 @@ static void editor_viewport_sprites_draw(const EditorObject *object,
     for(size_t i = 0; i < object->animated_sprite_count; i += 1) {
         const EditorAnimatedSprite *animation = &object->animated_sprite_items[i];
         const EditorAnimationFrame *frame;
+        size_t preview_frame;
         TextureAsset *texture;
         Position world;
         Scale size;
@@ -2889,7 +2951,8 @@ static void editor_viewport_sprites_draw(const EditorObject *object,
         float rotation;
         bool selected;
         if(!animation->visible || animation->frame_count == 0) continue;
-        frame = &animation->frames[0];
+        preview_frame = editor_animation_preview_frame_get(object, animation);
+        frame = &animation->frames[preview_frame];
         texture = editor_preview_texture_get(frame->path);
         world = editor_animated_sprite_world_get(object, animation, &rotation);
         size = (Scale){frame->size.x * animation->scale.x,

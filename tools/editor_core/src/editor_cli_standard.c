@@ -280,7 +280,9 @@ static EditorResult cli_sprite_command_write(const EditorProject *project,
             ADD("direction"); ADD(command->data.animated_sprite_direction_set.direction == DIRECTION_LEFT ? "left" : "right");
         } else {
             ADD(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET ?
-                "visibility" : "follow-body-rotation");
+                "visibility" : command->type ==
+                    EDITOR_COMMAND_ANIMATED_SPRITE_PLAYING_SET ?
+                    "playing" : "follow-body-rotation");
             ADD(command->data.animated_sprite_boolean_set.enabled ? "true" : "false");
         }
     }

@@ -587,7 +587,7 @@ static float editor_panel_content_height_get(const EditorProject *project,
     if(state->mode == EDITOR_VIEWPORT_ANIMATED_SPRITE) {
         for(size_t i = 0; i < object->animated_sprite_count; i += 1)
             if(object->animated_sprite_items[i].id == state->selected_animated_sprite)
-                return fmaxf(height, 540.0f +
+                return fmaxf(height, 576.0f +
                     (float)object->animated_sprite_items[i].frame_count * 30.0f);
     }
     if(state->mode == EDITOR_VIEWPORT_HITBOX) {
@@ -1987,6 +1987,7 @@ int main(void) {
     TextAsset starting_frame_label = {0};
     TextAsset direction_label = {0};
     TextAsset follow_rotation_label = {0};
+    TextAsset playing_label = {0};
     TextAsset left_label = {0};
     TextAsset right_label = {0};
     TextAsset delete_sprite_label = {0};
@@ -2264,6 +2265,7 @@ int main(void) {
             !editor_text_create(&font, "Starting Frame", &starting_frame_label) ||
             !editor_text_create(&font, "Direction", &direction_label) ||
             !editor_text_create(&font, "Follow Body Rotation", &follow_rotation_label) ||
+            !editor_text_create(&font, "Playing", &playing_label) ||
             !editor_text_create(&font, "Left", &left_label) ||
             !editor_text_create(&font, "Right", &right_label) ||
             !editor_text_create(&font, "Delete Sprite", &delete_sprite_label) ||
@@ -4990,9 +4992,13 @@ int main(void) {
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 384.0f,
                         EDITOR_TOOLS_WIDTH - 110.0f, 28.0f}, NULL);
                 bool follow = sprite->follow_body_rotation;
+                bool playing = sprite->playing;
                 bool follow_changed = editor_checkbox("editor.animated_sprite.follow",
                     &follow_rotation_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
                         422.0f, EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, &follow);
+                bool playing_changed = editor_checkbox("editor.animated_sprite.playing",
+                    &playing_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
+                        458.0f, EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, &playing);
                 if(name_result.changed) {
                     EditorCommand command = {.type = EDITOR_COMMAND_ANIMATED_SPRITE_RENAME,
                         .data.animated_sprite_rename = {.object = selected->id,
@@ -5053,20 +5059,22 @@ int main(void) {
                                     DIRECTION_RIGHT}};
                     (void)editor_command_execute(&project, &command);
                 }
-                if(follow_changed || visible_changed) {
+                if(follow_changed || visible_changed || playing_changed) {
                     EditorCommand command = {.type = follow_changed ?
                         EDITOR_COMMAND_ANIMATED_SPRITE_FOLLOW_ROTATION_SET :
-                        EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET,
+                        visible_changed ? EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET :
+                            EDITOR_COMMAND_ANIMATED_SPRITE_PLAYING_SET,
                         .data.animated_sprite_boolean_set = {.object = selected->id,
                             .sprite = sprite->id,
-                            .enabled = follow_changed ? follow : visible}};
+                            .enabled = follow_changed ? follow :
+                                visible_changed ? visible : playing}};
                     (void)editor_command_execute(&project, &command);
                 }
                 field_editing = name_result.active || position_x.active ||
                     position_y.active || sx.active || sy.active ||
                     tick_result.active || time_result.active || start_result.active;
                 if(rohr_ui_button("editor.animated_sprite.add_frame", &add_frame_label,
-                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 458.0f,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 494.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, NULL).clicked) {
                     sprite_browser_object = selected->id;
                     animation_browser_sprite = sprite->id;
@@ -5088,7 +5096,7 @@ int main(void) {
                         selected->id, sprite->id, 0, asset->id};
                     UIButtonStyle selected_style = editor_selected_button_style_get();
                     UIRect frame_bounds = {EDITOR_VIEWPORT_WIDTH + 10.0f,
-                        494.0f + (float)frame * 30.0f,
+                        530.0f + (float)frame * 30.0f,
                         EDITOR_TOOLS_WIDTH - 20.0f, 26.0f};
                     UIButtonResult frame_result;
                     (void)editor_named_text_sync(&font, asset->name,
@@ -6314,6 +6322,7 @@ int main(void) {
     rohr_graphics_text_destroy(&starting_frame_label);
     rohr_graphics_text_destroy(&direction_label);
     rohr_graphics_text_destroy(&follow_rotation_label);
+    rohr_graphics_text_destroy(&playing_label);
     rohr_graphics_text_destroy(&left_label);
     rohr_graphics_text_destroy(&right_label);
     rohr_graphics_text_destroy(&delete_sprite_label);
@@ -6520,6 +6529,7 @@ fail:
     rohr_graphics_text_destroy(&starting_frame_label);
     rohr_graphics_text_destroy(&direction_label);
     rohr_graphics_text_destroy(&follow_rotation_label);
+    rohr_graphics_text_destroy(&playing_label);
     rohr_graphics_text_destroy(&left_label);
     rohr_graphics_text_destroy(&right_label);
     rohr_graphics_text_destroy(&delete_sprite_label);

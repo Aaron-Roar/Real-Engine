@@ -1345,6 +1345,10 @@ AnimationAssetResult rohr_graphics_animation_load(AnimationDescriptor anim_desc)
  */
 AnimatedSprite rohr_graphics_animated_sprite_create(AnimationAsset asset_ptr, Scale scale);
 
+/** Advance one animated sprite's frame state without attaching it to an entity. */
+void rohr_graphics_animated_sprite_update(AnimatedSprite *sprite, Tick current_tick,
+    Time current_time);
+
 /**
  * @brief Adds an animated sprite to an entity.
  * @param entity Entity to modify.
