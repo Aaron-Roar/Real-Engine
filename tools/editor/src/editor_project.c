@@ -992,7 +992,77 @@ EditorSoftNode *editor_project_soft_node_add(EditorProject *project, EditorSoftB
         .visible = true
     };
     snprintf(node->name, sizeof(node->name), "node_%u", node->id);
+    body->hierarchy[body->hierarchy_count++] = (EditorSoftHierarchyItem){
+        EDITOR_SOFT_HIERARCHY_NODE, node->id};
     return node;
+}
+
+static bool editor_project_soft_hierarchy_item_exists(const EditorSoftBody *body,
+        EditorSoftHierarchyItem item) {
+    if(item.kind == EDITOR_SOFT_HIERARCHY_NODE) {
+        for(size_t i = 0; i < body->node_count; i += 1)
+            if(body->nodes[i].id == item.id) return true;
+    } else if(item.kind == EDITOR_SOFT_HIERARCHY_BEAM) {
+        for(size_t i = 0; i < body->beam_count; i += 1)
+            if(body->beams[i].id == item.id) return true;
+    } else if(item.kind == EDITOR_SOFT_HIERARCHY_AREA) {
+        for(size_t i = 0; i < body->area_count; i += 1)
+            if(body->areas[i].id == item.id) return true;
+    }
+    return false;
+}
+
+static void editor_project_soft_hierarchy_item_add(EditorSoftBody *body,
+        EditorSoftHierarchyItemKind kind, uint32_t id) {
+    if(body == NULL || id == 0 ||
+            body->hierarchy_count >= EDITOR_SOFT_BODY_HIERARCHY_MAX) return;
+    body->hierarchy[body->hierarchy_count++] = (EditorSoftHierarchyItem){kind, id};
+}
+
+void editor_project_soft_body_hierarchy_sync(EditorSoftBody *body) {
+    size_t output = 0;
+    if(body == NULL) return;
+    for(size_t i = 0; i < body->hierarchy_count; i += 1) {
+        bool duplicate = false;
+        if(!editor_project_soft_hierarchy_item_exists(body, body->hierarchy[i])) continue;
+        for(size_t j = 0; j < output; j += 1)
+            if(body->hierarchy[j].kind == body->hierarchy[i].kind &&
+                    body->hierarchy[j].id == body->hierarchy[i].id) duplicate = true;
+        if(!duplicate) body->hierarchy[output++] = body->hierarchy[i];
+    }
+    body->hierarchy_count = output;
+    for(size_t i = 0; i < body->node_count; i += 1) {
+        EditorSoftHierarchyItem item = {EDITOR_SOFT_HIERARCHY_NODE, body->nodes[i].id};
+        bool found = false;
+        for(size_t j = 0; j < body->hierarchy_count; j += 1)
+            if(body->hierarchy[j].kind == item.kind && body->hierarchy[j].id == item.id)
+                found = true;
+        if(!found) editor_project_soft_hierarchy_item_add(body, item.kind, item.id);
+    }
+    for(size_t i = 0; i < body->beam_count; i += 1) {
+        EditorSoftHierarchyItem item = {EDITOR_SOFT_HIERARCHY_BEAM, body->beams[i].id};
+        bool found = false;
+        for(size_t j = 0; j < body->hierarchy_count; j += 1)
+            if(body->hierarchy[j].kind == item.kind && body->hierarchy[j].id == item.id)
+                found = true;
+        if(!found) editor_project_soft_hierarchy_item_add(body, item.kind, item.id);
+    }
+    for(size_t i = 0; i < body->area_count; i += 1) {
+        EditorSoftHierarchyItem item = {EDITOR_SOFT_HIERARCHY_AREA, body->areas[i].id};
+        bool found = false;
+        for(size_t j = 0; j < body->hierarchy_count; j += 1)
+            if(body->hierarchy[j].kind == item.kind && body->hierarchy[j].id == item.id)
+                found = true;
+        if(!found) editor_project_soft_hierarchy_item_add(body, item.kind, item.id);
+    }
+}
+
+size_t editor_project_soft_body_hierarchy_index_get(const EditorSoftBody *body,
+        EditorSoftHierarchyItemKind kind, uint32_t id) {
+    if(body == NULL) return SIZE_MAX;
+    for(size_t i = 0; i < body->hierarchy_count; i += 1)
+        if(body->hierarchy[i].kind == kind && body->hierarchy[i].id == id) return i;
+    return SIZE_MAX;
 }
 
 bool editor_project_soft_node_remove(EditorProject *project, EditorSoftBody *body,
@@ -1011,6 +1081,7 @@ bool editor_project_soft_node_remove(EditorProject *project, EditorSoftBody *bod
         body->node_count -= 1;
         body->nodes[body->node_count] = (EditorSoftNode){0};
         editor_project_soft_areas_sync(project, body);
+        editor_project_soft_body_hierarchy_sync(body);
         return true;
     }
     return false;
@@ -1040,6 +1111,7 @@ EditorSoftBeam *editor_project_soft_beam_add(EditorProject *project, EditorSoftB
         .visible = true
     };
     snprintf(beam->name, sizeof(beam->name), "beam_%u", beam->id);
+    editor_project_soft_hierarchy_item_add(body, EDITOR_SOFT_HIERARCHY_BEAM, beam->id);
     editor_project_soft_areas_sync(project, body);
     return beam;
 }
@@ -1055,6 +1127,7 @@ bool editor_project_soft_beam_remove(EditorProject *project, EditorSoftBody *bod
         body->beam_count -= 1;
         body->beams[body->beam_count] = (EditorSoftBeam){0};
         editor_project_soft_areas_sync(project, body);
+        editor_project_soft_body_hierarchy_sync(body);
         return true;
     }
     return false;
@@ -1194,6 +1267,7 @@ void editor_project_soft_areas_sync(EditorProject *project, EditorSoftBody *body
     for(size_t i = body->area_count; i < EDITOR_SOFT_AREA_MAX; i += 1) {
         body->areas[i] = (EditorSoftArea){0};
     }
+    editor_project_soft_body_hierarchy_sync(body);
 }
 
 static float editor_soft_triangle_cross(Position a, Position b, Position c) {

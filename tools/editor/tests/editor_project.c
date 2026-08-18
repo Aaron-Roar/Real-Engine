@@ -532,6 +532,12 @@ int main(void) {
                 loaded_object->hierarchy_count != object->hierarchy_count ||
                 memcmp(loaded_object->hierarchy, object->hierarchy,
                     object->hierarchy_count * sizeof(object->hierarchy[0])) != 0 ||
+                loaded_object->soft_body_items[0].hierarchy_count !=
+                    object->soft_body_items[0].hierarchy_count ||
+                memcmp(loaded_object->soft_body_items[0].hierarchy,
+                    object->soft_body_items[0].hierarchy,
+                    object->soft_body_items[0].hierarchy_count *
+                        sizeof(object->soft_body_items[0].hierarchy[0])) != 0 ||
                 !position_equal(loaded_object->soft_body_items[0].position,
                     (Position){8.0f, 9.0f}) ||
                 fabsf(loaded_object->soft_body_items[0].rotation - 0.75f) > 0.001f ||

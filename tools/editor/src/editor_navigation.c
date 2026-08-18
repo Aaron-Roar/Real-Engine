@@ -9,6 +9,9 @@ typedef struct EditorReorderStorage {
     size_t stride;
 } EditorReorderStorage;
 
+static bool editor_selection_equal(EditorSelectionRef first,
+    EditorSelectionRef second);
+
 static bool editor_selection_sibling_check(EditorSelectionRef first,
         EditorSelectionRef second) {
     bool object_children = (first.kind == EDITOR_SELECTION_RIGID_BODY ||
@@ -17,9 +20,78 @@ static bool editor_selection_sibling_check(EditorSelectionRef first,
         (second.kind == EDITOR_SELECTION_RIGID_BODY ||
             second.kind == EDITOR_SELECTION_JOINT ||
             second.kind == EDITOR_SELECTION_SOFT_BODY);
-    return (first.kind == second.kind || object_children) &&
+    bool soft_children = (first.kind == EDITOR_SELECTION_SOFT_NODE ||
+            first.kind == EDITOR_SELECTION_SOFT_BEAM ||
+            first.kind == EDITOR_SELECTION_SOFT_AREA) &&
+        (second.kind == EDITOR_SELECTION_SOFT_NODE ||
+            second.kind == EDITOR_SELECTION_SOFT_BEAM ||
+            second.kind == EDITOR_SELECTION_SOFT_AREA);
+    return (first.kind == second.kind || object_children || soft_children) &&
         first.object == second.object &&
         first.parent == second.parent && first.container == second.container;
+}
+
+static EditorSoftHierarchyItemKind editor_soft_hierarchy_kind_get(
+        EditorHierarchySelection kind) {
+    if(kind == EDITOR_SELECTION_SOFT_BEAM) return EDITOR_SOFT_HIERARCHY_BEAM;
+    if(kind == EDITOR_SELECTION_SOFT_AREA) return EDITOR_SOFT_HIERARCHY_AREA;
+    return EDITOR_SOFT_HIERARCHY_NODE;
+}
+
+static EditorSelectionRef editor_soft_hierarchy_selection_get(
+        EditorObjectId object, EditorSoftBodyId body, EditorSoftHierarchyItem item) {
+    EditorHierarchySelection kind = EDITOR_SELECTION_SOFT_NODE;
+    if(item.kind == EDITOR_SOFT_HIERARCHY_BEAM) kind = EDITOR_SELECTION_SOFT_BEAM;
+    else if(item.kind == EDITOR_SOFT_HIERARCHY_AREA) kind = EDITOR_SELECTION_SOFT_AREA;
+    return (EditorSelectionRef){kind, object, body, 0, item.id};
+}
+
+static bool editor_soft_body_hierarchy_reorder(EditorProject *project,
+        EditorViewportState *state, EditorSelectionRef source,
+        EditorSelectionRef target, bool after, EditorHistory *history) {
+    EditorObject *object = editor_object_query_get(project, source.object);
+    EditorSoftBody *body = NULL;
+    EditorSoftHierarchyItem ordered[EDITOR_SOFT_BODY_HIERARCHY_MAX];
+    EditorSoftHierarchyItem selected_items[EDITOR_SOFT_BODY_HIERARCHY_MAX];
+    EditorSoftHierarchyItem remaining[EDITOR_SOFT_BODY_HIERARCHY_MAX];
+    size_t selected_count = 0;
+    size_t remaining_count = 0;
+    size_t target_index;
+    size_t insertion = 0;
+    bool source_selected;
+    if(object == NULL) return false;
+    for(size_t i = 0; i < object->soft_body_count; i += 1)
+        if(object->soft_body_items[i].id == source.parent) body = &object->soft_body_items[i];
+    if(body == NULL) return false;
+    editor_project_soft_body_hierarchy_sync(body);
+    target_index = editor_project_soft_body_hierarchy_index_get(body,
+        editor_soft_hierarchy_kind_get(target.kind), target.item);
+    if(target_index == SIZE_MAX) return false;
+    source_selected = editor_viewport_selection_contains(state, source);
+    for(size_t i = 0; i < body->hierarchy_count; i += 1) {
+        EditorSelectionRef ref = editor_soft_hierarchy_selection_get(object->id,
+            body->id, body->hierarchy[i]);
+        if((source_selected && editor_viewport_selection_contains(state, ref)) ||
+                (!source_selected && editor_selection_equal(ref, source)))
+            selected_items[selected_count++] = body->hierarchy[i];
+        else remaining[remaining_count++] = body->hierarchy[i];
+    }
+    if(selected_count == 0) return false;
+    for(size_t i = 0; i < target_index + (after ? 1u : 0u); i += 1) {
+        EditorSelectionRef ref = editor_soft_hierarchy_selection_get(object->id,
+            body->id, body->hierarchy[i]);
+        if(!((source_selected && editor_viewport_selection_contains(state, ref)) ||
+                (!source_selected && editor_selection_equal(ref, source)))) insertion += 1;
+    }
+    memcpy(ordered, remaining, insertion * sizeof(*ordered));
+    memcpy(&ordered[insertion], selected_items, selected_count * sizeof(*ordered));
+    memcpy(&ordered[insertion + selected_count], &remaining[insertion],
+        (remaining_count - insertion) * sizeof(*ordered));
+    if(memcmp(ordered, body->hierarchy,
+            body->hierarchy_count * sizeof(*ordered)) == 0) return false;
+    if(history != NULL && !editor_history_transaction_begin(history)) return false;
+    memcpy(body->hierarchy, ordered, body->hierarchy_count * sizeof(*ordered));
+    return history == NULL || editor_history_transaction_end(history);
 }
 
 static bool editor_selection_equal(EditorSelectionRef first,
@@ -179,6 +251,15 @@ bool editor_navigation_selection_reorder(EditorProject *project,
                     target.kind == EDITOR_SELECTION_SOFT_BODY) &&
                 source.object == target.object && source.parent == 0)
         return editor_object_hierarchy_reorder(project, state, source,
+            target, after, history);
+    if((source.kind == EDITOR_SELECTION_SOFT_NODE ||
+                source.kind == EDITOR_SELECTION_SOFT_BEAM ||
+                source.kind == EDITOR_SELECTION_SOFT_AREA) &&
+            (target.kind == EDITOR_SELECTION_SOFT_NODE ||
+                target.kind == EDITOR_SELECTION_SOFT_BEAM ||
+                target.kind == EDITOR_SELECTION_SOFT_AREA) &&
+            source.parent == target.parent)
+        return editor_soft_body_hierarchy_reorder(project, state, source,
             target, after, history);
     if(!editor_reorder_storage_get(project, source, &storage) ||
             storage.count < 2) return false;

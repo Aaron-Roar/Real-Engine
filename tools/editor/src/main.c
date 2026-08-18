@@ -1667,6 +1667,11 @@ static bool editor_hierarchy_object_child_check(EditorHierarchySelection kind) {
         kind == EDITOR_SELECTION_SOFT_BODY;
 }
 
+static bool editor_hierarchy_soft_child_check(EditorHierarchySelection kind) {
+    return kind == EDITOR_SELECTION_SOFT_NODE ||
+        kind == EDITOR_SELECTION_SOFT_BEAM || kind == EDITOR_SELECTION_SOFT_AREA;
+}
+
 static void editor_hierarchy_drag_row(EditorHierarchyDragState *drag,
         const EditorViewportState *selection, EditorSelectionRef ref,
         UIRect bounds, UIButtonResult result, Position pointer,
@@ -1704,7 +1709,9 @@ static void editor_hierarchy_drag_row(EditorHierarchyDragState *drag,
     if(drag->dragging && pointer_in_row &&
             (ref.kind == drag->source.kind ||
                 (editor_hierarchy_object_child_check(ref.kind) &&
-                    editor_hierarchy_object_child_check(drag->source.kind))) &&
+                    editor_hierarchy_object_child_check(drag->source.kind)) ||
+                (editor_hierarchy_soft_child_check(ref.kind) &&
+                    editor_hierarchy_soft_child_check(drag->source.kind))) &&
             ref.object == drag->source.object &&
             ref.parent == drag->source.parent &&
             ref.container == drag->source.container) {
@@ -3944,9 +3951,13 @@ int main(void) {
                     }
                 }
                     {
-                        float y = 476.0f;
-                    for(size_t i = 0; i < body->node_count; i += 1, y += 28.0f) {
+                        float y;
+                    editor_project_soft_body_hierarchy_sync(body);
+                    for(size_t i = 0; i < body->node_count; i += 1) {
                         EditorSoftNode *node = &body->nodes[i];
+                        size_t hierarchy_index = editor_project_soft_body_hierarchy_index_get(
+                            body, EDITOR_SOFT_HIERARCHY_NODE, node->id);
+                        y = 476.0f + (float)hierarchy_index * 28.0f;
                         UIButtonStyle selected_style = editor_selected_button_style_get();
                         char id[64];
                         char visibility_id[72];
@@ -3975,7 +3986,8 @@ int main(void) {
                                 (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, y,
                                     EDITOR_TOOLS_WIDTH - 48.0f, 24.0f}, result,
                                 hierarchy_pointer, hierarchy_primary,
-                                panel_scroll_offset, i + 1 == body->node_count);
+                                panel_scroll_offset,
+                                hierarchy_index + 1 == body->hierarchy_count);
                             if(result.clicked || result.focus_changed) {
                                 viewport_state.selection = EDITOR_SELECTION_SOFT_NODE;
                                 viewport_state.selected_soft_node = node->id;
@@ -3984,8 +3996,11 @@ int main(void) {
                             }
                         }
                     }
-                    for(size_t i = 0; i < body->beam_count; i += 1, y += 28.0f) {
+                    for(size_t i = 0; i < body->beam_count; i += 1) {
                         EditorSoftBeam *beam = &body->beams[i];
+                        size_t hierarchy_index = editor_project_soft_body_hierarchy_index_get(
+                            body, EDITOR_SOFT_HIERARCHY_BEAM, beam->id);
+                        y = 476.0f + (float)hierarchy_index * 28.0f;
                         UIButtonStyle selected_style = editor_selected_button_style_get();
                         char id[64];
                         char visibility_id[72];
@@ -4014,7 +4029,8 @@ int main(void) {
                                 (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, y,
                                     EDITOR_TOOLS_WIDTH - 48.0f, 24.0f}, result,
                                 hierarchy_pointer, hierarchy_primary,
-                                panel_scroll_offset, i + 1 == body->beam_count);
+                                panel_scroll_offset,
+                                hierarchy_index + 1 == body->hierarchy_count);
                             if(result.clicked || result.focus_changed) {
                                 viewport_state.selection = EDITOR_SELECTION_SOFT_BEAM;
                                 viewport_state.selected_soft_beam = beam->id;
@@ -4023,8 +4039,11 @@ int main(void) {
                             }
                         }
                     }
-                    for(size_t i = 0; i < body->area_count; i += 1, y += 28.0f) {
+                    for(size_t i = 0; i < body->area_count; i += 1) {
                         EditorSoftArea *area = &body->areas[i];
+                        size_t hierarchy_index = editor_project_soft_body_hierarchy_index_get(
+                            body, EDITOR_SOFT_HIERARCHY_AREA, area->id);
+                        y = 476.0f + (float)hierarchy_index * 28.0f;
                         UIButtonStyle selected_style = editor_selected_button_style_get();
                         char id[64];
                         char visibility_id[72];
@@ -4053,7 +4072,8 @@ int main(void) {
                                 (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, y,
                                     EDITOR_TOOLS_WIDTH - 48.0f, 24.0f}, result,
                                 hierarchy_pointer, hierarchy_primary,
-                                panel_scroll_offset, i + 1 == body->area_count);
+                                panel_scroll_offset,
+                                hierarchy_index + 1 == body->hierarchy_count);
                             if(result.clicked || result.focus_changed) {
                                 viewport_state.selection = EDITOR_SELECTION_SOFT_AREA;
                                 viewport_state.selected_soft_area = area->id;

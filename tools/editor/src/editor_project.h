@@ -166,6 +166,20 @@ typedef struct EditorSoftArea {
     bool visible;
 } EditorSoftArea;
 
+#define EDITOR_SOFT_BODY_HIERARCHY_MAX \
+    (EDITOR_SOFT_NODE_MAX + EDITOR_SOFT_BEAM_MAX + EDITOR_SOFT_AREA_MAX)
+
+typedef enum EditorSoftHierarchyItemKind {
+    EDITOR_SOFT_HIERARCHY_NODE,
+    EDITOR_SOFT_HIERARCHY_BEAM,
+    EDITOR_SOFT_HIERARCHY_AREA
+} EditorSoftHierarchyItemKind;
+
+typedef struct EditorSoftHierarchyItem {
+    EditorSoftHierarchyItemKind kind;
+    uint32_t id;
+} EditorSoftHierarchyItem;
+
 typedef struct EditorSoftBody {
     EditorSoftBodyId id;
     char name[EDITOR_OBJECT_NAME_MAX];
@@ -181,6 +195,8 @@ typedef struct EditorSoftBody {
     size_t beam_count;
     EditorSoftArea areas[EDITOR_SOFT_AREA_MAX];
     size_t area_count;
+    EditorSoftHierarchyItem hierarchy[EDITOR_SOFT_BODY_HIERARCHY_MAX];
+    size_t hierarchy_count;
 } EditorSoftBody;
 
 typedef struct EditorObject {
@@ -298,6 +314,9 @@ bool editor_project_anchor_rigid_body_set(EditorObject *object, EditorAnchor *an
     EditorRigidBodyId rigid_body);
 EditorSoftBody *editor_project_soft_body_add(EditorProject *project, EditorObject *object);
 bool editor_project_soft_body_remove(EditorObject *object, EditorSoftBodyId id);
+void editor_project_soft_body_hierarchy_sync(EditorSoftBody *body);
+size_t editor_project_soft_body_hierarchy_index_get(const EditorSoftBody *body,
+    EditorSoftHierarchyItemKind kind, uint32_t id);
 bool editor_project_soft_body_origin_set(EditorSoftBody *body, Position position);
 EditorSoftNode *editor_project_soft_node_add(EditorProject *project, EditorSoftBody *body,
     Position position);

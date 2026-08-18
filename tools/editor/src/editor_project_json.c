@@ -169,6 +169,7 @@ static yyjson_mut_val *editor_json_soft_body_write(yyjson_mut_doc *document,
     yyjson_mut_val *nodes = yyjson_mut_arr(document);
     yyjson_mut_val *beams = yyjson_mut_arr(document);
     yyjson_mut_val *areas = yyjson_mut_arr(document);
+    yyjson_mut_val *hierarchy = yyjson_mut_arr(document);
     yyjson_mut_obj_add_uint(document, value, "id", body->id);
     yyjson_mut_obj_add_strcpy(document, value, "name", body->name);
     yyjson_mut_obj_add_val(document, value, "position",
@@ -226,9 +227,16 @@ static yyjson_mut_val *editor_json_soft_body_write(yyjson_mut_doc *document,
         yyjson_mut_obj_add_bool(document, item, "visible", area->visible);
         yyjson_mut_arr_add_val(areas, item);
     }
+    for(size_t i = 0; i < body->hierarchy_count; i += 1) {
+        yyjson_mut_val *item = yyjson_mut_obj(document);
+        yyjson_mut_obj_add_uint(document, item, "kind", body->hierarchy[i].kind);
+        yyjson_mut_obj_add_uint(document, item, "id", body->hierarchy[i].id);
+        yyjson_mut_arr_add_val(hierarchy, item);
+    }
     yyjson_mut_obj_add_val(document, value, "nodes", nodes);
     yyjson_mut_obj_add_val(document, value, "beams", beams);
     yyjson_mut_obj_add_val(document, value, "areas", areas);
+    yyjson_mut_obj_add_val(document, value, "hierarchy", hierarchy);
     return value;
 }
 
@@ -478,6 +486,7 @@ static bool editor_json_soft_body_read(yyjson_val *value, EditorSoftBody *body,
     yyjson_val *nodes = yyjson_obj_get(value, "nodes");
     yyjson_val *beams = yyjson_obj_get(value, "beams");
     yyjson_val *areas = yyjson_obj_get(value, "areas");
+    yyjson_val *hierarchy = yyjson_obj_get(value, "hierarchy");
     yyjson_val *rotation = yyjson_obj_get(value, "rotation");
     *body = (EditorSoftBody){
         .node_color = UINT32_C(0xffaa46ff),
@@ -492,6 +501,8 @@ static bool editor_json_soft_body_read(yyjson_val *value, EditorSoftBody *body,
             yyjson_arr_size(beams) > EDITOR_SOFT_BEAM_MAX) return false;
     if(areas != NULL && (!yyjson_is_arr(areas) ||
             yyjson_arr_size(areas) > EDITOR_SOFT_AREA_MAX)) return false;
+    if(hierarchy != NULL && (!yyjson_is_arr(hierarchy) ||
+            yyjson_arr_size(hierarchy) > EDITOR_SOFT_BODY_HIERARCHY_MAX)) return false;
     if(yyjson_obj_get(value, "node_color") != NULL &&
             (!editor_json_uint(value, "node_color", &body->node_color) ||
             !editor_json_uint(value, "beam_color", &body->beam_color) ||
@@ -596,6 +607,25 @@ static bool editor_json_soft_body_read(yyjson_val *value, EditorSoftBody *body,
         }
     }
     editor_project_soft_areas_sync(project, body);
+    if(hierarchy != NULL) {
+        body->hierarchy_count = yyjson_arr_size(hierarchy);
+        for(size_t i = 0; i < body->hierarchy_count; i += 1) {
+            yyjson_val *item = yyjson_arr_get(hierarchy, i);
+            uint32_t kind;
+            if(!yyjson_is_obj(item) || !editor_json_uint(item, "kind", &kind) ||
+                    kind > EDITOR_SOFT_HIERARCHY_AREA ||
+                    !editor_json_uint(item, "id", &body->hierarchy[i].id) ||
+                    body->hierarchy[i].id == 0) return false;
+            body->hierarchy[i].kind = (EditorSoftHierarchyItemKind)kind;
+        }
+    }
+    {
+        size_t serialized_count = body->hierarchy_count;
+        size_t expected_count = body->node_count + body->beam_count + body->area_count;
+        editor_project_soft_body_hierarchy_sync(body);
+        if(hierarchy != NULL && (body->hierarchy_count != serialized_count ||
+                body->hierarchy_count != expected_count)) return false;
+    }
     if(project->next_soft_body_id <= body->id) project->next_soft_body_id = body->id + 1;
     return true;
 }

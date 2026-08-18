@@ -188,6 +188,25 @@ int main(void) {
                 editor_viewport_selection_homogeneous_check(&state)) return 1;
     }
     {
+        EditorSelectionRef node_ref = {EDITOR_SELECTION_SOFT_NODE,
+            object->id, soft_body->id, 0, node_a->id};
+        EditorSelectionRef beam_ref = {EDITOR_SELECTION_SOFT_BEAM,
+            object->id, soft_body->id, 0, beam->id};
+        editor_history_reset(&history);
+        editor_viewport_selection_clear(&state);
+        if(!editor_navigation_selection_reorder(&project, &state,
+                node_ref, beam_ref, true, &history) ||
+                editor_project_soft_body_hierarchy_index_get(soft_body,
+                    EDITOR_SOFT_HIERARCHY_NODE, node_a->id) <=
+                editor_project_soft_body_hierarchy_index_get(soft_body,
+                    EDITOR_SOFT_HIERARCHY_BEAM, beam->id) ||
+                history.undo_count != 1 || !editor_history_undo(&history) ||
+                editor_project_soft_body_hierarchy_index_get(soft_body,
+                    EDITOR_SOFT_HIERARCHY_NODE, node_a->id) >=
+                editor_project_soft_body_hierarchy_index_get(soft_body,
+                    EDITOR_SOFT_HIERARCHY_BEAM, beam->id)) return 1;
+    }
+    {
         EditorRigidBody *body_c = editor_project_rigid_body_add(&project, object);
         EditorRigidBodyId body_id = body->id;
         EditorRigidBodyId body_b_id = body_b->id;
