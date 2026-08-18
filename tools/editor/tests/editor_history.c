@@ -73,6 +73,17 @@ int main(void) {
     assert(strcmp(project.objects[0].name, "Car") == 0);
 
     editor_history_reset(&history);
+    command = (EditorCommand){.type = EDITOR_COMMAND_COLLISION_MASK_ADD};
+    snprintf(command.data.collision_mask_add.name,
+        sizeof(command.data.collision_mask_add.name), "vehicle");
+    editor_history_command_begin(&history, &project, &command);
+    result = editor_command_execute(&project, &command);
+    editor_history_command_finish(&history, &command, &result);
+    assert(result.kind == ERROR_RESULT_VALUE && project.collision_mask_count == 2);
+    assert(editor_history_undo(&history) && project.collision_mask_count == 1);
+    assert(editor_history_redo(&history) && project.collision_mask_count == 2);
+
+    editor_history_reset(&history);
     command = (EditorCommand){.type = EDITOR_COMMAND_ITEM_ADD,
         .data.item_add = {.kind = EDITOR_ITEM_RIGID_BODY,
             .object = project.objects[0].id}};
@@ -599,6 +610,7 @@ int main(void) {
     }
 
     editor_viewport_state_destroy(&viewport);
+    assert(history.snapshot_fallback_count == 0);
     editor_history_destroy(&history);
     return 0;
 }

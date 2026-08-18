@@ -8,6 +8,7 @@
 typedef struct EditorHistoryEntry EditorHistoryEntry;
 typedef struct EditorHistoryObjectChange EditorHistoryObjectChange;
 typedef struct EditorHistoryAggregateChange EditorHistoryAggregateChange;
+typedef struct EditorHistoryCollisionChange EditorHistoryCollisionChange;
 
 typedef struct EditorHistory {
     EditorProject *project;
@@ -18,16 +19,19 @@ typedef struct EditorHistory {
     EditorHistoryEntry *redo[EDITOR_HISTORY_CAPACITY];
     size_t undo_count;
     size_t redo_count;
+    size_t snapshot_fallback_count;
     bool continuous;
     bool continuous_recorded;
     bool recorded_since_continuous_update;
     bool transaction_active;
+    bool transaction_untyped;
     bool pending_command_valid;
     bool restoring;
     EditorCommand pending_forward;
     EditorCommand pending_inverse;
     EditorHistoryObjectChange *pending_object;
     EditorHistoryAggregateChange *pending_aggregate;
+    EditorHistoryCollisionChange *pending_collision;
 } EditorHistory;
 
 bool editor_history_init(EditorHistory *history, EditorProject *project);
