@@ -319,6 +319,8 @@ int main(void) {
             return 1;
     }
     {
+        editor_history_reset(&history);
+        editor_viewport_selection_clear(&state);
         EditorObject *frame_object = editor_project_object_add(&project, (Position){0});
         EditorAnimatedSprite *animation = editor_project_animated_sprite_add(
             &project, frame_object);

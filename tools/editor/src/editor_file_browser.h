@@ -10,6 +10,7 @@
 typedef enum EditorFileBrowserMode {
     EDITOR_FILE_BROWSER_OPEN,
     EDITOR_FILE_BROWSER_OPEN_PNG,
+    EDITOR_FILE_BROWSER_OPEN_PNG_MULTI,
     EDITOR_FILE_BROWSER_SAVE,
     EDITOR_FILE_BROWSER_DIRECTORY,
     EDITOR_FILE_BROWSER_CREATE_DIRECTORY
@@ -41,11 +42,15 @@ typedef struct EditorFileBrowser {
     float scroll_offset;
     float preview_scroll_offset;
     bool refresh_pending;
+    bool entry_selected[EDITOR_FILE_BROWSER_ENTRY_MAX];
+    size_t selection_anchor;
+    bool selection_anchor_valid;
 } EditorFileBrowser;
 
 typedef struct EditorFileBrowserResult {
     bool submitted;
     bool cancelled;
+    size_t selected_count;
     char path[EDITOR_FILE_BROWSER_PATH_MAX + EDITOR_FILE_BROWSER_NAME_MAX];
 } EditorFileBrowserResult;
 
@@ -56,6 +61,8 @@ bool editor_file_browser_open(EditorFileBrowser *browser, EditorFileBrowserMode 
 bool editor_file_browser_selection_clear(EditorFileBrowser *browser);
 bool editor_file_browser_directory_path_get(const EditorFileBrowser *browser,
     char *path, size_t capacity);
+bool editor_file_browser_selected_path_get(const EditorFileBrowser *browser,
+    size_t selected_index, char *path, size_t capacity);
 EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
     TextAsset *field_display, const TextAsset *save_label,
     const TextAsset *open_label, const TextAsset *create_label,

@@ -51,13 +51,15 @@ static SDL_EnumerationResult SDLCALL editor_file_browser_entry_add(void *userdat
             browser->mode == EDITOR_FILE_BROWSER_CREATE_DIRECTORY) &&
             info.type != SDL_PATHTYPE_DIRECTORY) return SDL_ENUM_CONTINUE;
     if(info.type != SDL_PATHTYPE_DIRECTORY &&
-            browser->mode == EDITOR_FILE_BROWSER_OPEN_PNG &&
+            (browser->mode == EDITOR_FILE_BROWSER_OPEN_PNG ||
+                browser->mode == EDITOR_FILE_BROWSER_OPEN_PNG_MULTI) &&
             !editor_file_browser_extension_check(filename, ".png"))
         return SDL_ENUM_CONTINUE;
     if(info.type != SDL_PATHTYPE_DIRECTORY &&
             browser->mode != EDITOR_FILE_BROWSER_DIRECTORY &&
             browser->mode != EDITOR_FILE_BROWSER_CREATE_DIRECTORY &&
             browser->mode != EDITOR_FILE_BROWSER_OPEN_PNG &&
+            browser->mode != EDITOR_FILE_BROWSER_OPEN_PNG_MULTI &&
             !editor_file_browser_extension_check(filename, ".json"))
         return SDL_ENUM_CONTINUE;
     if(length == 0 || length >= EDITOR_FILE_BROWSER_NAME_MAX) return SDL_ENUM_CONTINUE;
@@ -121,6 +123,8 @@ static bool editor_file_browser_refresh(EditorFileBrowser *browser) {
     }
     browser->entry_count = 0;
     browser->scroll_offset = 0.0f;
+    memset(browser->entry_selected, 0, sizeof(browser->entry_selected));
+    browser->selection_anchor_valid = false;
     if(!SDL_EnumerateDirectory(browser->directory,
             editor_file_browser_entry_add, browser)) return false;
     qsort(browser->entries, browser->entry_count, sizeof(browser->entries[0]),
@@ -153,6 +157,18 @@ static void editor_file_browser_preview_clear(EditorFileBrowser *browser) {
 
 bool editor_file_browser_selection_clear(EditorFileBrowser *browser) {
     if(browser == NULL) return false;
+    if(browser->mode == EDITOR_FILE_BROWSER_OPEN_PNG_MULTI) {
+        bool selected = false;
+        for(size_t i = 0; i < browser->entry_count; i += 1) {
+            selected = selected || browser->entry_selected[i];
+            browser->entry_selected[i] = false;
+        }
+        browser->selection_anchor_valid = false;
+        if(selected) {
+            browser->filename[0] = '\0';
+            return true;
+        }
+    }
     if(browser->preview_selected_path[0] != '\0') {
         browser->preview_selected_path[0] = '\0';
         browser->preview_selected_directory = false;
@@ -161,6 +177,19 @@ bool editor_file_browser_selection_clear(EditorFileBrowser *browser) {
     if(browser->selected_directory[0] != '\0') {
         editor_file_browser_preview_clear(browser);
         return true;
+    }
+    return false;
+}
+
+bool editor_file_browser_selected_path_get(const EditorFileBrowser *browser,
+        size_t selected_index, char *path, size_t capacity) {
+    size_t found = 0;
+    if(browser == NULL || path == NULL || capacity == 0) return false;
+    for(size_t i = 0; i < browser->entry_count; i += 1) {
+        if(!browser->entry_selected[i] || browser->entries[i].directory) continue;
+        if(found++ != selected_index) continue;
+        return editor_file_browser_path_join(path, capacity, browser->directory,
+            browser->entries[i].name);
     }
     return false;
 }
@@ -295,6 +324,7 @@ EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
     float list_height;
     float field_y;
     float action_y;
+    size_t multi_selected_count = 0;
     if(browser == NULL || !browser->active || field_display == NULL) return result;
     if(browser->refresh_pending) {
         browser->refresh_pending = false;
@@ -345,10 +375,11 @@ EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
         char entry_path[EDITOR_FILE_BROWSER_PATH_MAX];
         UIButtonResult interaction;
         UIButtonStyle selected_style = editor_file_browser_selected_style_get();
-        bool selected = browser->entries[i].directory &&
-            editor_file_browser_path_join(entry_path, sizeof(entry_path),
-                browser->directory, browser->entries[i].name) &&
-            strcmp(entry_path, browser->selected_directory) == 0;
+        bool have_entry_path = editor_file_browser_path_join(entry_path,
+            sizeof(entry_path), browser->directory, browser->entries[i].name);
+        bool selected = browser->mode == EDITOR_FILE_BROWSER_OPEN_PNG_MULTI ?
+            browser->entry_selected[i] : browser->entries[i].directory &&
+                have_entry_path && strcmp(entry_path, browser->selected_directory) == 0;
         snprintf(id, sizeof(id), "editor.file_browser.entry.%zu", i);
         interaction = rohr_ui_button(id, &browser->entry_labels[i],
             (UIRect){dialog.x + 14.0f, dialog.y + 82.0f + (float)i * 32.0f,
@@ -369,8 +400,44 @@ EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
                 }
             }
         } else {
-            snprintf(browser->filename, sizeof(browser->filename), "%s",
-                browser->entries[i].name);
+            if(browser->mode == EDITOR_FILE_BROWSER_OPEN_PNG_MULTI) {
+                SDL_Keymod modifiers = SDL_GetModState();
+                bool control = (modifiers & SDL_KMOD_CTRL) != 0;
+                bool shift = (modifiers & SDL_KMOD_SHIFT) != 0;
+                if(shift && browser->selection_anchor_valid) {
+                    size_t first = browser->selection_anchor < i ?
+                        browser->selection_anchor : i;
+                    size_t last = browser->selection_anchor > i ?
+                        browser->selection_anchor : i;
+                    if(!control) memset(browser->entry_selected, 0,
+                        sizeof(browser->entry_selected));
+                    for(size_t item = first; item <= last; item += 1)
+                        if(!browser->entries[item].directory)
+                            browser->entry_selected[item] = true;
+                } else if(control) {
+                    browser->entry_selected[i] = !browser->entry_selected[i];
+                    browser->selection_anchor = i;
+                    browser->selection_anchor_valid = true;
+                } else {
+                    memset(browser->entry_selected, 0,
+                        sizeof(browser->entry_selected));
+                    browser->entry_selected[i] = true;
+                    browser->selection_anchor = i;
+                    browser->selection_anchor_valid = true;
+                }
+                {
+                    size_t count = 0;
+                    for(size_t item = 0; item < browser->entry_count; item += 1)
+                        if(browser->entry_selected[item]) count += 1;
+                    if(count == 1) snprintf(browser->filename,
+                        sizeof(browser->filename), "%s", browser->entries[i].name);
+                    else snprintf(browser->filename, sizeof(browser->filename),
+                        "%zu frames selected", count);
+                }
+            } else {
+                snprintf(browser->filename, sizeof(browser->filename), "%s",
+                    browser->entries[i].name);
+            }
         }
     }
     rohr_ui_scroll_region_end();
@@ -474,13 +541,18 @@ EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
             (UIRect){dialog.x + 174.0f, field_y,
                 dialog.width - 188.0f, 34.0f}, NULL);
     } else if(browser->mode == EDITOR_FILE_BROWSER_OPEN ||
-            browser->mode == EDITOR_FILE_BROWSER_OPEN_PNG) {
+            browser->mode == EDITOR_FILE_BROWSER_OPEN_PNG ||
+            browser->mode == EDITOR_FILE_BROWSER_OPEN_PNG_MULTI) {
         (void)rohr_graphics_text_value_set(field_display, browser->filename);
         rohr_ui_button_disabled((UIRect){dialog.x + 14.0f, field_y,
             dialog.width - 28.0f, 30.0f}, NULL);
         rohr_ui_label(field_display, (UIRect){dialog.x + 14.0f, field_y,
             dialog.width - 28.0f, 30.0f});
     }
+    if(browser->mode == EDITOR_FILE_BROWSER_OPEN_PNG_MULTI)
+        for(size_t i = 0; i < browser->entry_count; i += 1)
+            if(browser->entry_selected[i] && !browser->entries[i].directory)
+                multi_selected_count += 1;
     if(rohr_ui_button("editor.file_browser.submit",
             browser->mode == EDITOR_FILE_BROWSER_SAVE ? save_label :
                 (browser->mode == EDITOR_FILE_BROWSER_CREATE_DIRECTORY ?
@@ -498,10 +570,17 @@ EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
                     browser->directory, browser->filename)) ||
              (browser->mode != EDITOR_FILE_BROWSER_DIRECTORY &&
                 browser->mode != EDITOR_FILE_BROWSER_CREATE_DIRECTORY &&
-                browser->filename[0] != '\0' &&
-                editor_file_browser_path_join(result.path, sizeof(result.path),
-                    browser->directory, browser->filename)))) {
+                ((browser->mode == EDITOR_FILE_BROWSER_OPEN_PNG_MULTI &&
+                    multi_selected_count > 0 &&
+                    editor_file_browser_selected_path_get(browser, 0,
+                        result.path, sizeof(result.path))) ||
+                 (browser->mode != EDITOR_FILE_BROWSER_OPEN_PNG_MULTI &&
+                    browser->filename[0] != '\0' &&
+                    editor_file_browser_path_join(result.path, sizeof(result.path),
+                        browser->directory, browser->filename)))))) {
         result.submitted = true;
+        result.selected_count = browser->mode ==
+            EDITOR_FILE_BROWSER_OPEN_PNG_MULTI ? multi_selected_count : 1;
         browser->active = false;
     }
     if(rohr_ui_button("editor.file_browser.cancel", cancel_label,

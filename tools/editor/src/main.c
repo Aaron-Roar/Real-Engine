@@ -5073,7 +5073,8 @@ int main(void) {
                     workspace_browser_action =
                         EDITOR_WORKSPACE_BROWSER_ADD_ANIMATION_FRAME;
                     if(!editor_file_browser_open(&file_browser,
-                            EDITOR_FILE_BROWSER_OPEN_PNG, workspace.directory, &font)) {
+                            EDITOR_FILE_BROWSER_OPEN_PNG_MULTI,
+                            workspace.directory, &font)) {
                         sprite_browser_object = 0;
                         animation_browser_sprite = 0;
                         workspace_browser_action = EDITOR_WORKSPACE_BROWSER_NONE;
@@ -5959,39 +5960,68 @@ int main(void) {
                 EditorWorkspaceCommand command = {0};
                 if(workspace_browser_action ==
                         EDITOR_WORKSPACE_BROWSER_ADD_ANIMATION_FRAME) {
-                    const char *sprite_path = editor_project_relative_path_get(
-                        workspace.directory, browser_result.path);
-                    EditorCommand add_command = {.type = EDITOR_COMMAND_ANIMATION_FRAME_ADD,
-                        .data.animation_frame_add = {.object = sprite_browser_object,
-                            .sprite = animation_browser_sprite,
-                            .size = {64.0f, 64.0f}}};
-                    EditorCommandResult added;
-
                     opened = sprite_browser_object != EDITOR_OBJECT_INVALID &&
-                        animation_browser_sprite != 0;
-                    if(opened && strlen(sprite_path) >=
-                            sizeof(add_command.data.animation_frame_add.path)) {
-                        load_result = editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
-                            "Animation sprite path is too long: %s", browser_result.path);
-                        opened = false;
-                    } else if(opened) {
+                        animation_browser_sprite != 0 &&
+                        browser_result.selected_count > 0;
+                    if(opened) {
                         EditorObject *frame_object = editor_project_selected_get(&project);
                         EditorAnimatedSprite *animation = frame_object == NULL ||
                             frame_object->id != sprite_browser_object ? NULL :
                             editor_project_animated_sprite_get(frame_object,
                                 animation_browser_sprite);
-                        snprintf(add_command.data.animation_frame_add.name,
-                            sizeof(add_command.data.animation_frame_add.name), "sprite_%zu",
-                            animation == NULL ? 1 : animation->frame_count + 1);
-                        snprintf(add_command.data.animation_frame_add.path,
-                            sizeof(add_command.data.animation_frame_add.path), "%s",
-                            sprite_path);
-                        added = editor_command_execute(&project, &add_command);
-                        opened = added.kind == ERROR_RESULT_VALUE;
-                        if(!opened) {
-                            load_result.kind = ERROR_RESULT_ERROR;
-                            load_result.result.error = added.result.error;
+                        size_t starting_count = animation == NULL ? 0 :
+                            animation->frame_count;
+                        if(animation == NULL || !editor_history_transaction_begin(&history) ||
+                                !editor_history_transaction_object_track(&history,
+                                    sprite_browser_object)) {
+                            load_result = editor_result_error(EDITOR_ERROR_CAPACITY,
+                                "Could not start animation frame import");
+                            opened = false;
                         }
+                        for(size_t i = 0; opened &&
+                                i < browser_result.selected_count; i += 1) {
+                            char selected_path[EDITOR_FILE_BROWSER_PATH_MAX +
+                                EDITOR_FILE_BROWSER_NAME_MAX];
+                            const char *relative_path;
+                            EditorCommand add_command = {
+                                .type = EDITOR_COMMAND_ANIMATION_FRAME_ADD,
+                                .data.animation_frame_add = {
+                                    .object = sprite_browser_object,
+                                    .sprite = animation_browser_sprite,
+                                    .size = {64.0f, 64.0f}}};
+                            EditorCommandResult added;
+                            if(!editor_file_browser_selected_path_get(&file_browser, i,
+                                    selected_path, sizeof(selected_path))) {
+                                load_result = editor_result_error(EDITOR_ERROR_NOT_FOUND,
+                                    "Selected animation frame path was not found");
+                                opened = false;
+                                break;
+                            }
+                            relative_path = editor_project_relative_path_get(
+                                workspace.directory, selected_path);
+                            if(strlen(relative_path) >=
+                                    sizeof(add_command.data.animation_frame_add.path)) {
+                                load_result = editor_result_error(
+                                    EDITOR_ERROR_INVALID_ARGUMENT,
+                                    "Animation frame path is too long: %s", selected_path);
+                                opened = false;
+                                break;
+                            }
+                            snprintf(add_command.data.animation_frame_add.name,
+                                sizeof(add_command.data.animation_frame_add.name),
+                                "frame_%zu", starting_count + i + 1);
+                            snprintf(add_command.data.animation_frame_add.path,
+                                sizeof(add_command.data.animation_frame_add.path), "%s",
+                                relative_path);
+                            added = editor_command_execute(&project, &add_command);
+                            if(added.kind == ERROR_RESULT_ERROR) {
+                                load_result.kind = ERROR_RESULT_ERROR;
+                                load_result.result.error = added.result.error;
+                                opened = false;
+                            }
+                        }
+                        if(opened) opened = editor_history_transaction_end(&history);
+                        else editor_history_transaction_cancel(&history);
                     }
                     sprite_browser_object = 0;
                     animation_browser_sprite = 0;
