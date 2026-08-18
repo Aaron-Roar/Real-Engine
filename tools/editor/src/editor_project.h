@@ -17,6 +17,8 @@
 #define EDITOR_SOFT_BEAM_MAX 128
 #define EDITOR_SOFT_AREA_MAX 128
 #define EDITOR_SOFT_AREA_NODE_MAX EDITOR_SOFT_NODE_MAX
+#define EDITOR_OBJECT_HIERARCHY_MAX \
+    (EDITOR_RIGID_BODY_MAX + EDITOR_JOINT_MAX + EDITOR_SOFT_BODY_MAX)
 #define EDITOR_COLLISION_MASK_MAX 64
 /* Pre-release project schemas remain version 1 until the editor format is stable. */
 #define EDITOR_PROJECT_FORMAT_VERSION 1
@@ -31,6 +33,17 @@ typedef uint32_t EditorSoftBodyId;
 typedef uint32_t EditorSoftNodeId;
 typedef uint32_t EditorSoftBeamId;
 typedef uint32_t EditorSoftAreaId;
+
+typedef enum EditorHierarchyItemKind {
+    EDITOR_HIERARCHY_RIGID_BODY,
+    EDITOR_HIERARCHY_JOINT,
+    EDITOR_HIERARCHY_SOFT_BODY
+} EditorHierarchyItemKind;
+
+typedef struct EditorHierarchyItem {
+    EditorHierarchyItemKind kind;
+    uint32_t id;
+} EditorHierarchyItem;
 
 #define EDITOR_OBJECT_INVALID 0
 
@@ -183,6 +196,8 @@ typedef struct EditorObject {
     size_t anchor_count;
     EditorSoftBody soft_body_items[EDITOR_SOFT_BODY_MAX];
     size_t soft_body_count;
+    EditorHierarchyItem hierarchy[EDITOR_OBJECT_HIERARCHY_MAX];
+    size_t hierarchy_count;
 } EditorObject;
 
 typedef struct EditorNavigationState {
@@ -237,6 +252,9 @@ bool editor_project_object_remove(EditorProject *project, EditorObjectId id);
 EditorObject *editor_project_selected_get(EditorProject *project);
 bool editor_project_object_select(EditorProject *project, EditorObjectId id);
 void editor_project_selection_clear(EditorProject *project);
+void editor_project_object_hierarchy_sync(EditorObject *object);
+size_t editor_project_object_hierarchy_index_get(const EditorObject *object,
+    EditorHierarchyItemKind kind, uint32_t id);
 EditorRigidBody *editor_project_rigid_body_add(EditorProject *project,
     EditorObject *object);
 EditorRigidBody *editor_project_rigid_body_get(EditorObject *object,

@@ -1643,6 +1643,114 @@ static bool editor_selection_nudge(EditorProject *project,
     return editor_history_transaction_end(history);
 }
 
+typedef struct EditorHierarchyDragState {
+    bool active;
+    bool dragging;
+    bool target_valid;
+    bool transaction_active;
+    bool source_was_selected;
+    bool target_after;
+    float start_y;
+    EditorSelectionRef source;
+    EditorSelectionRef target;
+} EditorHierarchyDragState;
+
+static bool editor_hierarchy_ref_equal(EditorSelectionRef first,
+        EditorSelectionRef second) {
+    return first.kind == second.kind && first.object == second.object &&
+        first.parent == second.parent && first.container == second.container &&
+        first.item == second.item;
+}
+
+static bool editor_hierarchy_object_child_check(EditorHierarchySelection kind) {
+    return kind == EDITOR_SELECTION_RIGID_BODY || kind == EDITOR_SELECTION_JOINT ||
+        kind == EDITOR_SELECTION_SOFT_BODY;
+}
+
+static void editor_hierarchy_drag_row(EditorHierarchyDragState *drag,
+        const EditorViewportState *selection, EditorSelectionRef ref,
+        UIRect bounds, UIButtonResult result, Position pointer,
+        MouseButtonState primary, float scroll_offset, bool last) {
+    bool pointer_in_row;
+    if(drag == NULL || selection == NULL) return;
+    bounds.y -= scroll_offset;
+    if(!drag->active && result.pressed && primary == MOUSE_BUTTON_STATE_PRESSED) {
+        drag->active = true;
+        drag->source = ref;
+        drag->target = ref;
+        drag->target_valid = true;
+        drag->start_y = pointer.y;
+        drag->source_was_selected = editor_viewport_selection_contains(selection, ref);
+    }
+    if(!drag->active || (primary != MOUSE_BUTTON_STATE_PRESSED &&
+            primary != MOUSE_BUTTON_STATE_DOWN)) return;
+    if(fabsf(pointer.y - drag->start_y) >= 4.0f) drag->dragging = true;
+    if(drag->dragging && (editor_viewport_selection_contains(selection, ref) ||
+            editor_hierarchy_ref_equal(drag->source, ref))) {
+        Color border = {255, 215, 70, 255};
+        (void)rohr_graphics_screen_rect_draw(bounds.x, bounds.y,
+            bounds.width, 2.0f, border);
+        (void)rohr_graphics_screen_rect_draw(bounds.x,
+            bounds.y + bounds.height - 2.0f, bounds.width, 2.0f, border);
+        (void)rohr_graphics_screen_rect_draw(bounds.x, bounds.y,
+            2.0f, bounds.height, border);
+        (void)rohr_graphics_screen_rect_draw(
+            bounds.x + bounds.width - 2.0f, bounds.y,
+            2.0f, bounds.height, border);
+    }
+    pointer_in_row = pointer.x >= bounds.x &&
+        pointer.x <= bounds.x + bounds.width && pointer.y >= bounds.y &&
+        (pointer.y <= bounds.y + bounds.height || last);
+    if(drag->dragging && pointer_in_row &&
+            (ref.kind == drag->source.kind ||
+                (editor_hierarchy_object_child_check(ref.kind) &&
+                    editor_hierarchy_object_child_check(drag->source.kind))) &&
+            ref.object == drag->source.object &&
+            ref.parent == drag->source.parent &&
+            ref.container == drag->source.container) {
+        drag->target = ref;
+        drag->target_valid = true;
+        drag->target_after = last &&
+            pointer.y >= bounds.y + bounds.height * 0.5f;
+    }
+}
+
+static bool editor_hierarchy_drag_update(EditorHierarchyDragState *drag,
+        EditorProject *project, EditorViewportState *selection,
+        EditorHistory *history, MouseButtonState primary) {
+    bool changed = false;
+    if(drag == NULL || !drag->active) return false;
+    if(drag->dragging && !drag->source_was_selected &&
+            !editor_viewport_selection_contains(selection, drag->source)) {
+        (void)editor_viewport_selection_set(project, selection,
+            drag->source, false);
+        changed = true;
+    }
+    if(drag->dragging && drag->target_valid &&
+            !editor_hierarchy_ref_equal(drag->source, drag->target) &&
+            (primary == MOUSE_BUTTON_STATE_PRESSED ||
+                primary == MOUSE_BUTTON_STATE_DOWN)) {
+        if(!drag->transaction_active) {
+            if(!editor_history_transaction_begin(history)) return false;
+            drag->transaction_active = true;
+        }
+        changed = editor_navigation_selection_reorder(project, selection,
+            drag->source, drag->target, drag->target_after, NULL);
+    }
+    if(primary == MOUSE_BUTTON_STATE_RELEASED) {
+        if(drag->transaction_active) {
+            if(!editor_history_transaction_end(history))
+                editor_history_transaction_cancel(history);
+            else changed = true;
+        }
+        if(drag->dragging && !drag->source_was_selected)
+            (void)editor_viewport_selection_set(project, selection,
+                drag->source, false);
+        *drag = (EditorHierarchyDragState){0};
+    }
+    return changed;
+}
+
 static bool editor_open_item_delete(
     EditorProject *project,
     EditorViewportState *viewport_state
@@ -1829,6 +1937,7 @@ int main(void) {
     bool hidden_compile_pending = false;
     char hidden_build_directory[EDITOR_WORKSPACE_PATH_MAX] = {0};
     EditorHistory history = {0};
+    EditorHierarchyDragState hierarchy_drag = {0};
     EditorWorkspaceBrowserAction workspace_browser_action =
         EDITOR_WORKSPACE_BROWSER_NONE;
     char startup_directory[EDITOR_FILE_BROWSER_PATH_MAX] = {0};
@@ -2381,6 +2490,9 @@ int main(void) {
         viewport_state.preview_anchor = 0;
         viewport_state.preview_soft_node = 0;
         field_editing = false;
+        Position hierarchy_pointer = rohr_graphics_mouse_screen_position_get();
+        MouseButtonState hierarchy_primary =
+            mouse.button_states[MOUSE_BUTTON_LEFT];
         if(viewport_state.selected_item_count > 1) {
             EditorBulkColorContext bulk_color = {.picker = &color_picker,
                 .project = &project, .state = &viewport_state,
@@ -2760,6 +2872,13 @@ int main(void) {
                                         EDITOR_SELECTION_HITBOX, selected->id,
                                         body->id, 0, box->id) ?
                                     &selected_style : NULL);
+                            editor_hierarchy_drag_row(&hierarchy_drag, &viewport_state,
+                                (EditorSelectionRef){EDITOR_SELECTION_HITBOX,
+                                    selected->id, body->id, 0, box->id},
+                                (UIRect){row_x + 32.0f, y,
+                                    row_width - 32.0f, 26.0f}, result,
+                                hierarchy_pointer, hierarchy_primary,
+                                panel_scroll_offset, i + 1 == body->hitbox_count);
                             if(result.clicked || result.focus_changed) {
                                 viewport_state.selection = EDITOR_SELECTION_HITBOX;
                                 viewport_state.selected_hitbox = box->id;
@@ -3356,6 +3475,14 @@ int main(void) {
                                     EDITOR_SELECTION_ANCHOR, selected->id,
                                     0, 0, anchor->id) ?
                                 &selected_style : NULL);
+                    editor_hierarchy_drag_row(&hierarchy_drag, &viewport_state,
+                        (EditorSelectionRef){EDITOR_SELECTION_ANCHOR,
+                            selected->id, 0, 0, anchor->id},
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f,
+                            270.0f + (float)(i - anchor_start) * 27.0f,
+                            EDITOR_TOOLS_WIDTH - 48.0f, 23.0f}, result,
+                        hierarchy_pointer, hierarchy_primary, panel_scroll_offset,
+                        i + 1 == selected->anchor_count);
                     if(result.clicked || result.focus_changed) {
                         viewport_state.selection = EDITOR_SELECTION_ANCHOR;
                         viewport_state.selected_anchor = anchor->id;
@@ -3842,6 +3969,13 @@ int main(void) {
                                         EDITOR_SELECTION_SOFT_NODE, selected->id,
                                         body->id, 0, node->id) ?
                                     &selected_style : NULL);
+                            editor_hierarchy_drag_row(&hierarchy_drag, &viewport_state,
+                                (EditorSelectionRef){EDITOR_SELECTION_SOFT_NODE,
+                                    selected->id, body->id, 0, node->id},
+                                (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, y,
+                                    EDITOR_TOOLS_WIDTH - 48.0f, 24.0f}, result,
+                                hierarchy_pointer, hierarchy_primary,
+                                panel_scroll_offset, i + 1 == body->node_count);
                             if(result.clicked || result.focus_changed) {
                                 viewport_state.selection = EDITOR_SELECTION_SOFT_NODE;
                                 viewport_state.selected_soft_node = node->id;
@@ -3874,6 +4008,13 @@ int main(void) {
                                         EDITOR_SELECTION_SOFT_BEAM, selected->id,
                                         body->id, 0, beam->id) ?
                                     &selected_style : NULL);
+                            editor_hierarchy_drag_row(&hierarchy_drag, &viewport_state,
+                                (EditorSelectionRef){EDITOR_SELECTION_SOFT_BEAM,
+                                    selected->id, body->id, 0, beam->id},
+                                (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, y,
+                                    EDITOR_TOOLS_WIDTH - 48.0f, 24.0f}, result,
+                                hierarchy_pointer, hierarchy_primary,
+                                panel_scroll_offset, i + 1 == body->beam_count);
                             if(result.clicked || result.focus_changed) {
                                 viewport_state.selection = EDITOR_SELECTION_SOFT_BEAM;
                                 viewport_state.selected_soft_beam = beam->id;
@@ -3906,6 +4047,13 @@ int main(void) {
                                         EDITOR_SELECTION_SOFT_AREA, selected->id,
                                         body->id, 0, area->id) ?
                                     &selected_style : NULL);
+                            editor_hierarchy_drag_row(&hierarchy_drag, &viewport_state,
+                                (EditorSelectionRef){EDITOR_SELECTION_SOFT_AREA,
+                                    selected->id, body->id, 0, area->id},
+                                (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, y,
+                                    EDITOR_TOOLS_WIDTH - 48.0f, 24.0f}, result,
+                                hierarchy_pointer, hierarchy_primary,
+                                panel_scroll_offset, i + 1 == body->area_count);
                             if(result.clicked || result.focus_changed) {
                                 viewport_state.selection = EDITOR_SELECTION_SOFT_AREA;
                                 viewport_state.selected_soft_area = area->id;
@@ -4510,9 +4658,13 @@ int main(void) {
                     }
                 }
                 {
-                    float y = 250.0f;
-                    for(size_t i = 0; i < selected->rigid_body_count; i += 1, y += 30.0f) {
+                    float y;
+                    editor_project_object_hierarchy_sync(selected);
+                    for(size_t i = 0; i < selected->rigid_body_count; i += 1) {
                         EditorRigidBody *body = &selected->rigid_bodies[i];
+                        size_t hierarchy_index = editor_project_object_hierarchy_index_get(
+                            selected, EDITOR_HIERARCHY_RIGID_BODY, body->id);
+                        y = 250.0f + (float)hierarchy_index * 30.0f;
                         UIButtonStyle selected_style = editor_selected_button_style_get();
                         UIButtonResult result;
                         char id[64];
@@ -4536,6 +4688,13 @@ int main(void) {
                                     EDITOR_SELECTION_RIGID_BODY, selected->id,
                                     0, 0, body->id) ?
                                 &selected_style : NULL);
+                        editor_hierarchy_drag_row(&hierarchy_drag, &viewport_state,
+                            (EditorSelectionRef){EDITOR_SELECTION_RIGID_BODY,
+                                selected->id, 0, 0, body->id},
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 42.0f, y,
+                                EDITOR_TOOLS_WIDTH - 50.0f, 26.0f}, result,
+                            hierarchy_pointer, hierarchy_primary, panel_scroll_offset,
+                            hierarchy_index + 1 == selected->hierarchy_count);
                         if(result.clicked || result.focus_changed) {
                             viewport_state.selection = EDITOR_SELECTION_RIGID_BODY;
                             viewport_state.selected_rigid_body = body->id;
@@ -4543,8 +4702,11 @@ int main(void) {
                                 &project, &viewport_state);
                         }
                     }
-                    for(size_t i = 0; i < selected->joint_count; i += 1, y += 30.0f) {
+                    for(size_t i = 0; i < selected->joint_count; i += 1) {
                         EditorJoint *joint = &selected->joint_items[i];
+                        size_t hierarchy_index = editor_project_object_hierarchy_index_get(
+                            selected, EDITOR_HIERARCHY_JOINT, joint->id);
+                        y = 250.0f + (float)hierarchy_index * 30.0f;
                         UIButtonStyle selected_style = editor_selected_button_style_get();
                         UIButtonResult result;
                         char id[64];
@@ -4567,6 +4729,13 @@ int main(void) {
                                     EDITOR_SELECTION_JOINT, selected->id,
                                     0, 0, joint->id) ?
                                 &selected_style : NULL);
+                        editor_hierarchy_drag_row(&hierarchy_drag, &viewport_state,
+                            (EditorSelectionRef){EDITOR_SELECTION_JOINT,
+                                selected->id, 0, 0, joint->id},
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 42.0f, y,
+                                EDITOR_TOOLS_WIDTH - 50.0f, 26.0f}, result,
+                            hierarchy_pointer, hierarchy_primary, panel_scroll_offset,
+                            hierarchy_index + 1 == selected->hierarchy_count);
                         if(result.clicked || result.focus_changed) {
                             viewport_state.selection = EDITOR_SELECTION_JOINT;
                             viewport_state.selected_joint = joint->id;
@@ -4574,8 +4743,11 @@ int main(void) {
                                 &project, &viewport_state);
                         }
                     }
-                    for(size_t i = 0; i < selected->soft_body_count; i += 1, y += 30.0f) {
+                    for(size_t i = 0; i < selected->soft_body_count; i += 1) {
                         EditorSoftBody *body = &selected->soft_body_items[i];
+                        size_t hierarchy_index = editor_project_object_hierarchy_index_get(
+                            selected, EDITOR_HIERARCHY_SOFT_BODY, body->id);
+                        y = 250.0f + (float)hierarchy_index * 30.0f;
                         UIButtonStyle selected_style = editor_selected_button_style_get();
                         UIButtonResult result;
                         char id[64];
@@ -4598,6 +4770,13 @@ int main(void) {
                                     EDITOR_SELECTION_SOFT_BODY, selected->id,
                                     0, 0, body->id) ?
                                 &selected_style : NULL);
+                        editor_hierarchy_drag_row(&hierarchy_drag, &viewport_state,
+                            (EditorSelectionRef){EDITOR_SELECTION_SOFT_BODY,
+                                selected->id, 0, 0, body->id},
+                            (UIRect){EDITOR_VIEWPORT_WIDTH + 42.0f, y,
+                                EDITOR_TOOLS_WIDTH - 50.0f, 26.0f}, result,
+                            hierarchy_pointer, hierarchy_primary, panel_scroll_offset,
+                            hierarchy_index + 1 == selected->hierarchy_count);
                         if(result.clicked || result.focus_changed) {
                             viewport_state.selection = EDITOR_SELECTION_SOFT_BODY;
                             viewport_state.selected_soft_body = body->id;
@@ -4677,6 +4856,13 @@ int main(void) {
                     object_button_id, &object_name_labels[i],
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, y,
                         EDITOR_TOOLS_WIDTH - 48.0f, 28.0f}, style);
+                editor_hierarchy_drag_row(&hierarchy_drag, &viewport_state,
+                    (EditorSelectionRef){EDITOR_SELECTION_OBJECT,
+                        object->id, 0, 0, object->id},
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, y,
+                        EDITOR_TOOLS_WIDTH - 48.0f, 28.0f}, object_result,
+                    hierarchy_pointer, hierarchy_primary, panel_scroll_offset,
+                    i + 1 == project.object_count);
                 }
                 if(object_result.clicked || object_result.focus_changed) {
                     (void)editor_project_object_select(&project, object->id);
@@ -4687,6 +4873,9 @@ int main(void) {
                 }
             }
         }
+        if(editor_hierarchy_drag_update(&hierarchy_drag, &project,
+                &viewport_state, &history, hierarchy_primary))
+            pointer_selection_handled = true;
         rohr_ui_scroll_region_end();
         rohr_graphics_screen_clip_clear();
         (void)rohr_graphics_screen_clip_set(

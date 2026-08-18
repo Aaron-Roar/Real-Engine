@@ -295,6 +295,7 @@ bool editor_project_save(const EditorProject *project, const char *path) {
         yyjson_mut_val *anchors = yyjson_mut_arr(document);
         yyjson_mut_val *joint_values = yyjson_mut_arr(document);
         yyjson_mut_val *soft_body_values = yyjson_mut_arr(document);
+        yyjson_mut_val *hierarchy = yyjson_mut_arr(document);
         yyjson_mut_obj_add_uint(document, value, "id", object->id);
         yyjson_mut_obj_add_strcpy(document, value, "name", object->name);
         yyjson_mut_obj_add_val(document, value, "position",
@@ -312,10 +313,17 @@ bool editor_project_save(const EditorProject *project, const char *path) {
         for(size_t j = 0; j < object->soft_body_count; j += 1)
             yyjson_mut_arr_add_val(soft_body_values, editor_json_soft_body_write(document,
                 &object->soft_body_items[j]));
+        for(size_t j = 0; j < object->hierarchy_count; j += 1) {
+            yyjson_mut_val *item = yyjson_mut_obj(document);
+            yyjson_mut_obj_add_uint(document, item, "kind", object->hierarchy[j].kind);
+            yyjson_mut_obj_add_uint(document, item, "id", object->hierarchy[j].id);
+            yyjson_mut_arr_add_val(hierarchy, item);
+        }
         yyjson_mut_obj_add_val(document, value, "rigid_bodies", bodies);
         yyjson_mut_obj_add_val(document, value, "anchors", anchors);
         yyjson_mut_obj_add_val(document, value, "joints", joint_values);
         yyjson_mut_obj_add_val(document, value, "soft_bodies", soft_body_values);
+        yyjson_mut_obj_add_val(document, value, "hierarchy", hierarchy);
         yyjson_mut_arr_add_val(objects, value);
     }
     yyjson_mut_obj_add_val(document, root, "objects", objects);
@@ -747,6 +755,7 @@ EditorResult editor_project_load(EditorProject *project, const char *path) {
         yyjson_val *anchors = yyjson_obj_get(value, "anchors");
         yyjson_val *joint_values = yyjson_obj_get(value, "joints");
         yyjson_val *soft_body_values = yyjson_obj_get(value, "soft_bodies");
+        yyjson_val *hierarchy = yyjson_obj_get(value, "hierarchy");
         if(!yyjson_is_obj(value) || !editor_json_uint(value, "id", &object->id) ||
                 object->id == 0 || !editor_json_name(value, object->name) ||
                 !editor_json_position_read(yyjson_obj_get(value, "position"), &object->position) ||
@@ -756,7 +765,9 @@ EditorResult editor_project_load(EditorProject *project, const char *path) {
                 !yyjson_is_arr(joint_values) ||
                     yyjson_arr_size(joint_values) > EDITOR_JOINT_MAX ||
                 !yyjson_is_arr(soft_body_values) ||
-                    yyjson_arr_size(soft_body_values) > EDITOR_SOFT_BODY_MAX) goto done;
+                    yyjson_arr_size(soft_body_values) > EDITOR_SOFT_BODY_MAX ||
+                (hierarchy != NULL && (!yyjson_is_arr(hierarchy) ||
+                    yyjson_arr_size(hierarchy) > EDITOR_OBJECT_HIERARCHY_MAX))) goto done;
         editor_project_object_name_format(object->name, sizeof(object->name), object->name);
         object->rigid_body_count = yyjson_arr_size(bodies);
         object->anchor_count = yyjson_arr_size(anchors);
@@ -774,6 +785,26 @@ EditorResult editor_project_load(EditorProject *project, const char *path) {
         for(size_t j = 0; j < object->soft_body_count; j += 1)
             if(!editor_json_soft_body_read(yyjson_arr_get(soft_body_values, j),
                     &object->soft_body_items[j], &loaded)) goto done;
+        if(hierarchy != NULL) {
+            object->hierarchy_count = yyjson_arr_size(hierarchy);
+            for(size_t j = 0; j < object->hierarchy_count; j += 1) {
+                yyjson_val *item = yyjson_arr_get(hierarchy, j);
+                uint32_t kind;
+                if(!yyjson_is_obj(item) || !editor_json_uint(item, "kind", &kind) ||
+                        kind > EDITOR_HIERARCHY_SOFT_BODY ||
+                        !editor_json_uint(item, "id", &object->hierarchy[j].id) ||
+                        object->hierarchy[j].id == 0) goto done;
+                object->hierarchy[j].kind = (EditorHierarchyItemKind)kind;
+            }
+        }
+        {
+            size_t serialized_count = object->hierarchy_count;
+            size_t expected_count = object->rigid_body_count + object->joint_count +
+                object->soft_body_count;
+            editor_project_object_hierarchy_sync(object);
+            if(hierarchy != NULL && (object->hierarchy_count != serialized_count ||
+                    object->hierarchy_count != expected_count)) goto done;
+        }
         if(loaded.next_id <= object->id) loaded.next_id = object->id + 1;
     }
     if(!editor_json_references_valid(&loaded)) {

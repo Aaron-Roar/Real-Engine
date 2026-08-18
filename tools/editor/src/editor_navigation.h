@@ -11,5 +11,8 @@ void editor_navigation_current_selection_clear(EditorProject *project,
     EditorViewportState *state);
 bool editor_navigation_multi_selection_delete(EditorProject *project,
     EditorViewportState *state, EditorHistory *history);
+bool editor_navigation_selection_reorder(EditorProject *project,
+    EditorViewportState *state, EditorSelectionRef source,
+    EditorSelectionRef target, bool after, EditorHistory *history);
 
 #endif

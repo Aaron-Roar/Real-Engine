@@ -529,6 +529,9 @@ int main(void) {
                 loaded_object->anchor_count != object->anchor_count ||
                 loaded_object->joint_count != object->joint_count ||
                 loaded_object->soft_body_count != object->soft_body_count ||
+                loaded_object->hierarchy_count != object->hierarchy_count ||
+                memcmp(loaded_object->hierarchy, object->hierarchy,
+                    object->hierarchy_count * sizeof(object->hierarchy[0])) != 0 ||
                 !position_equal(loaded_object->soft_body_items[0].position,
                     (Position){8.0f, 9.0f}) ||
                 fabsf(loaded_object->soft_body_items[0].rotation - 0.75f) > 0.001f ||

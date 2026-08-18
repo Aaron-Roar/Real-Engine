@@ -188,6 +188,83 @@ int main(void) {
                 editor_viewport_selection_homogeneous_check(&state)) return 1;
     }
     {
+        EditorRigidBody *body_c = editor_project_rigid_body_add(&project, object);
+        EditorRigidBodyId body_id = body->id;
+        EditorRigidBodyId body_b_id = body_b->id;
+        EditorRigidBodyId body_c_id;
+        EditorSelectionRef first = {EDITOR_SELECTION_RIGID_BODY,
+            object->id, 0, 0, body_id};
+        EditorSelectionRef second = {EDITOR_SELECTION_RIGID_BODY,
+            object->id, 0, 0, body_b_id};
+        EditorSelectionRef third;
+        if(body_c == NULL) return 1;
+        body_c_id = body_c->id;
+        third = (EditorSelectionRef){EDITOR_SELECTION_RIGID_BODY,
+            object->id, 0, 0, body_c_id};
+        editor_history_reset(&history);
+        editor_viewport_selection_clear(&state);
+        if(!editor_navigation_selection_reorder(&project, &state,
+                second, first, false, &history) ||
+                object->hierarchy[0].id != body_b_id ||
+                object->hierarchy[1].id != body_id ||
+                history.undo_count != 1 || !editor_history_undo(&history) ||
+                object->hierarchy[0].id != body_id ||
+                object->hierarchy[1].id != body_b_id) return 1;
+        editor_history_reset(&history);
+        if(!editor_viewport_selection_set(&project, &state, first, false) ||
+                !editor_viewport_selection_set(&project, &state, second, true) ||
+                !editor_navigation_selection_reorder(&project, &state,
+                    first, third, true, &history) ||
+                editor_project_object_hierarchy_index_get(object,
+                    EDITOR_HIERARCHY_RIGID_BODY, body_c_id) >=
+                    editor_project_object_hierarchy_index_get(object,
+                        EDITOR_HIERARCHY_RIGID_BODY, body_id) ||
+                editor_project_object_hierarchy_index_get(object,
+                    EDITOR_HIERARCHY_RIGID_BODY, body_id) + 1 !=
+                    editor_project_object_hierarchy_index_get(object,
+                        EDITOR_HIERARCHY_RIGID_BODY, body_b_id) ||
+                history.undo_count != 1 || !editor_history_undo(&history) ||
+                object->hierarchy[0].id != body_id ||
+                object->hierarchy[1].id != body_b_id ||
+                editor_project_object_hierarchy_index_get(object,
+                    EDITOR_HIERARCHY_RIGID_BODY, body_c_id) != 4) return 1;
+        editor_history_reset(&history);
+        editor_viewport_selection_clear(&state);
+        if(!editor_viewport_selection_set(&project, &state, second, false) ||
+                !editor_viewport_selection_set(&project, &state, third, true) ||
+                !editor_navigation_selection_reorder(&project, &state,
+                    second, first, false, &history) ||
+                object->hierarchy[0].id != body_b_id ||
+                object->hierarchy[1].id != body_c_id ||
+                object->hierarchy[2].id != body_id ||
+                !editor_history_undo(&history)) return 1;
+        editor_history_reset(&history);
+        editor_viewport_selection_clear(&state);
+        if(!editor_navigation_selection_reorder(&project, &state,
+                first, third, true, &history) ||
+                editor_project_object_hierarchy_index_get(object,
+                    EDITOR_HIERARCHY_RIGID_BODY, body_id) + 1 !=
+                    object->hierarchy_count ||
+                !editor_history_undo(&history)) return 1;
+        editor_viewport_selection_clear(&state);
+        if(!editor_project_rigid_body_remove(object, body_c_id)) return 1;
+        editor_history_reset(&history);
+        {
+            EditorSelectionRef joint_ref = {EDITOR_SELECTION_JOINT,
+                object->id, 0, 0, joint->id};
+            EditorSelectionRef soft_ref = {EDITOR_SELECTION_SOFT_BODY,
+                object->id, 0, 0, soft_body->id};
+            if(!editor_navigation_selection_reorder(&project, &state,
+                    joint_ref, soft_ref, true, &history) ||
+                    editor_project_object_hierarchy_index_get(object,
+                        EDITOR_HIERARCHY_JOINT, joint->id) <=
+                    editor_project_object_hierarchy_index_get(object,
+                        EDITOR_HIERARCHY_SOFT_BODY, soft_body->id) ||
+                    !editor_history_undo(&history)) return 1;
+            editor_history_reset(&history);
+        }
+    }
+    {
         EditorSelectionRef first = {EDITOR_SELECTION_RIGID_BODY,
             object->id, 0, 0, body->id};
         EditorSelectionRef second = {EDITOR_SELECTION_RIGID_BODY,

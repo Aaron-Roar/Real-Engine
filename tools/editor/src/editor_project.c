@@ -243,6 +243,79 @@ EditorRigidBody editor_project_rigid_body_default_get(void) {
     };
 }
 
+static bool editor_project_hierarchy_item_exists(const EditorObject *object,
+        EditorHierarchyItem item) {
+    if(object == NULL || item.id == 0) return false;
+    if(item.kind == EDITOR_HIERARCHY_RIGID_BODY) {
+        for(size_t i = 0; i < object->rigid_body_count; i += 1)
+            if(object->rigid_bodies[i].id == item.id) return true;
+    } else if(item.kind == EDITOR_HIERARCHY_JOINT) {
+        for(size_t i = 0; i < object->joint_count; i += 1)
+            if(object->joint_items[i].id == item.id) return true;
+    } else if(item.kind == EDITOR_HIERARCHY_SOFT_BODY) {
+        for(size_t i = 0; i < object->soft_body_count; i += 1)
+            if(object->soft_body_items[i].id == item.id) return true;
+    }
+    return false;
+}
+
+static void editor_project_hierarchy_item_add(EditorObject *object,
+        EditorHierarchyItemKind kind, uint32_t id) {
+    if(object == NULL || id == 0 ||
+            object->hierarchy_count >= EDITOR_OBJECT_HIERARCHY_MAX) return;
+    object->hierarchy[object->hierarchy_count++] = (EditorHierarchyItem){kind, id};
+}
+
+void editor_project_object_hierarchy_sync(EditorObject *object) {
+    size_t output = 0;
+    if(object == NULL) return;
+    for(size_t i = 0; i < object->hierarchy_count; i += 1) {
+        bool duplicate = false;
+        if(!editor_project_hierarchy_item_exists(object, object->hierarchy[i])) continue;
+        for(size_t j = 0; j < output; j += 1)
+            if(object->hierarchy[j].kind == object->hierarchy[i].kind &&
+                    object->hierarchy[j].id == object->hierarchy[i].id)
+                duplicate = true;
+        if(duplicate) continue;
+        object->hierarchy[output++] = object->hierarchy[i];
+    }
+    object->hierarchy_count = output;
+    for(size_t i = 0; i < object->rigid_body_count; i += 1) {
+        EditorHierarchyItem item = {EDITOR_HIERARCHY_RIGID_BODY,
+            object->rigid_bodies[i].id};
+        bool found = false;
+        for(size_t j = 0; j < output; j += 1)
+            if(object->hierarchy[j].kind == item.kind &&
+                    object->hierarchy[j].id == item.id) found = true;
+        if(!found) editor_project_hierarchy_item_add(object, item.kind, item.id);
+    }
+    for(size_t i = 0; i < object->joint_count; i += 1) {
+        EditorHierarchyItem item = {EDITOR_HIERARCHY_JOINT, object->joint_items[i].id};
+        bool found = false;
+        for(size_t j = 0; j < object->hierarchy_count; j += 1)
+            if(object->hierarchy[j].kind == item.kind &&
+                    object->hierarchy[j].id == item.id) found = true;
+        if(!found) editor_project_hierarchy_item_add(object, item.kind, item.id);
+    }
+    for(size_t i = 0; i < object->soft_body_count; i += 1) {
+        EditorHierarchyItem item = {EDITOR_HIERARCHY_SOFT_BODY,
+            object->soft_body_items[i].id};
+        bool found = false;
+        for(size_t j = 0; j < object->hierarchy_count; j += 1)
+            if(object->hierarchy[j].kind == item.kind &&
+                    object->hierarchy[j].id == item.id) found = true;
+        if(!found) editor_project_hierarchy_item_add(object, item.kind, item.id);
+    }
+}
+
+size_t editor_project_object_hierarchy_index_get(const EditorObject *object,
+        EditorHierarchyItemKind kind, uint32_t id) {
+    if(object == NULL) return SIZE_MAX;
+    for(size_t i = 0; i < object->hierarchy_count; i += 1)
+        if(object->hierarchy[i].kind == kind && object->hierarchy[i].id == id) return i;
+    return SIZE_MAX;
+}
+
 Position editor_project_particle_center_get(const EditorRigidBody *body) {
     const EditorHitbox *hitbox;
     float twice_area = 0.0f;
@@ -322,6 +395,7 @@ EditorRigidBody *editor_project_rigid_body_add(EditorProject *project,
         object->rigid_bodies[object->rigid_body_count] = (EditorRigidBody){0};
         return NULL;
     }
+    editor_project_hierarchy_item_add(object, EDITOR_HIERARCHY_RIGID_BODY, body->id);
     return body;
 }
 
@@ -354,6 +428,7 @@ bool editor_project_rigid_body_remove(EditorObject *object, EditorRigidBodyId id
         }
         object->rigid_body_count -= 1;
         object->rigid_bodies[object->rigid_body_count] = (EditorRigidBody){0};
+        editor_project_object_hierarchy_sync(object);
         return true;
     }
     return false;
@@ -794,6 +869,7 @@ EditorJoint *editor_project_joint_add(EditorProject *project, EditorObject *obje
     *joint = editor_project_joint_default_get(kind);
     joint->id = project->next_joint_id++;
     snprintf(joint->name, sizeof(joint->name), "joint_%u", joint->id);
+    editor_project_hierarchy_item_add(object, EDITOR_HIERARCHY_JOINT, joint->id);
     return joint;
 }
 
@@ -806,6 +882,7 @@ bool editor_project_joint_remove(EditorObject *object, EditorJointId id) {
         }
         object->joint_count -= 1;
         object->joint_items[object->joint_count] = (EditorJoint){0};
+        editor_project_object_hierarchy_sync(object);
         return true;
     }
     return false;
@@ -852,6 +929,7 @@ EditorSoftBody *editor_project_soft_body_add(EditorProject *project, EditorObjec
         .visible = true
     };
     snprintf(body->name, sizeof(body->name), "soft_body_%u", body->id);
+    editor_project_hierarchy_item_add(object, EDITOR_HIERARCHY_SOFT_BODY, body->id);
     return body;
 }
 
@@ -864,6 +942,7 @@ bool editor_project_soft_body_remove(EditorObject *object, EditorSoftBodyId id) 
         }
         object->soft_body_count -= 1;
         object->soft_body_items[object->soft_body_count] = (EditorSoftBody){0};
+        editor_project_object_hierarchy_sync(object);
         return true;
     }
     return false;
