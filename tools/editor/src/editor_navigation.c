@@ -89,7 +89,8 @@ static bool editor_soft_body_hierarchy_reorder(EditorProject *project,
         (remaining_count - insertion) * sizeof(*ordered));
     if(memcmp(ordered, body->hierarchy,
             body->hierarchy_count * sizeof(*ordered)) == 0) return false;
-    if(history != NULL && !editor_history_transaction_begin(history)) return false;
+    if(history != NULL && (!editor_history_transaction_begin(history) ||
+            !editor_history_transaction_object_track(history, source.object))) return false;
     memcpy(body->hierarchy, ordered, body->hierarchy_count * sizeof(*ordered));
     return history == NULL || editor_history_transaction_end(history);
 }
@@ -157,7 +158,8 @@ static bool editor_object_hierarchy_reorder(EditorProject *project,
         (remaining_count - insertion) * sizeof(*ordered));
     if(memcmp(ordered, object->hierarchy,
             object->hierarchy_count * sizeof(*ordered)) == 0) return false;
-    if(history != NULL && !editor_history_transaction_begin(history)) return false;
+    if(history != NULL && (!editor_history_transaction_begin(history) ||
+            !editor_history_transaction_object_track(history, source.object))) return false;
     memcpy(object->hierarchy, ordered,
         object->hierarchy_count * sizeof(*ordered));
     return history == NULL || editor_history_transaction_end(history);
@@ -322,7 +324,10 @@ bool editor_navigation_selection_reorder(EditorProject *project,
     if(output != storage.count ||
             memcmp(storage.items, ordered, storage.count * storage.stride) == 0)
         goto fail;
-    if(history != NULL && !editor_history_transaction_begin(history)) goto fail;
+    if(history != NULL && (!editor_history_transaction_begin(history) ||
+            (source.kind == EDITOR_SELECTION_OBJECT ?
+                !editor_history_transaction_object_order_track(history) :
+                !editor_history_transaction_object_track(history, source.object)))) goto fail;
     memcpy(storage.items, ordered, storage.count * storage.stride);
     free(selected);
     free(ordered);
@@ -438,6 +443,13 @@ bool editor_navigation_multi_selection_delete(EditorProject *project,
         free(ordered);
         return false;
     }
+    for(size_t i = 0; i < state->selected_item_count; i += 1)
+        if(!editor_history_transaction_object_track(history,
+                state->selected_items[i].object)) {
+            editor_history_transaction_cancel(history);
+            free(ordered);
+            return false;
+        }
     for(size_t i = 0; i < state->selected_item_count; i += 1) {
         EditorCommand command;
         EditorCommandResult result;

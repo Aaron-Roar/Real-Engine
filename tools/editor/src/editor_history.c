@@ -1,28 +1,16 @@
 #include "editor_history.h"
 
 #include <math.h>
-#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-typedef struct EditorHistoryChange {
-    size_t offset;
-    size_t size;
-    unsigned char *before;
-    unsigned char *after;
-} EditorHistoryChange;
-
-typedef enum EditorHistoryEntryKind {
-    EDITOR_HISTORY_ENTRY_CHANGES,
-    EDITOR_HISTORY_ENTRY_COMMANDS
-} EditorHistoryEntryKind;
 
 typedef enum EditorHistoryActionKind {
     EDITOR_HISTORY_ACTION_COMMAND,
     EDITOR_HISTORY_ACTION_OBJECT,
     EDITOR_HISTORY_ACTION_AGGREGATE,
-    EDITOR_HISTORY_ACTION_COLLISION
+    EDITOR_HISTORY_ACTION_COLLISION,
+    EDITOR_HISTORY_ACTION_OBJECT_ORDER
 } EditorHistoryActionKind;
 
 typedef enum EditorHistoryAggregateKind {
@@ -37,12 +25,19 @@ struct EditorHistoryAggregateChange {
     uint32_t item;
     void *value;
     size_t size;
+    bool tracked;
 };
 
 struct EditorHistoryCollisionChange {
     EditorCollisionMask masks[EDITOR_COLLISION_MASK_MAX];
     size_t count;
 };
+
+typedef struct EditorHistoryObjectOrderChange {
+    EditorObjectId ids[EDITOR_OBJECT_MAX];
+    size_t count;
+    bool tracked;
+} EditorHistoryObjectOrderChange;
 
 struct EditorHistoryObjectChange {
     bool present;
@@ -58,6 +53,7 @@ typedef struct EditorHistoryAction {
         EditorHistoryObjectChange *object;
         EditorHistoryAggregateChange *aggregate;
         EditorHistoryCollisionChange *collision;
+        EditorHistoryObjectOrderChange *order;
     } data;
 } EditorHistoryAction;
 
@@ -67,9 +63,6 @@ typedef struct EditorHistoryCommandPair {
 } EditorHistoryCommandPair;
 
 struct EditorHistoryEntry {
-    EditorHistoryEntryKind kind;
-    EditorHistoryChange *changes;
-    size_t change_count;
     size_t memory;
     EditorHistoryCommandPair *commands;
     size_t command_count;
@@ -78,14 +71,6 @@ struct EditorHistoryEntry {
 static EditorSoftBody *editor_history_soft_body_get(EditorObject *object,
     EditorSoftBodyId id);
 static void editor_history_entry_destroy(EditorHistoryEntry *entry);
-
-#define EDITOR_HISTORY_BLOCK_SIZE 64
-
-static size_t editor_history_block_size_get(size_t offset) {
-    size_t remaining = sizeof(EditorProject) - offset;
-    return remaining < EDITOR_HISTORY_BLOCK_SIZE ? remaining :
-        EDITOR_HISTORY_BLOCK_SIZE;
-}
 
 static void editor_history_aggregate_destroy(EditorHistoryAggregateChange *change) {
     if(change == NULL) return;
@@ -228,7 +213,6 @@ static EditorHistoryEntry *editor_history_aggregate_entry_create(
         free(entry);
         return NULL;
     }
-    entry->kind = EDITOR_HISTORY_ENTRY_COMMANDS;
     entry->commands[0] = (EditorHistoryCommandPair){
         .forward = {.kind = EDITOR_HISTORY_ACTION_AGGREGATE,
             .data.aggregate = forward},
@@ -278,59 +262,9 @@ static EditorHistoryAggregateChange *editor_history_object_aggregate_create(
     return change;
 }
 
-static EditorHistoryEntry *editor_history_object_differences_create(
-        const EditorProject *before, const EditorProject *after) {
-    EditorHistoryEntry *entry;
-    size_t objects_offset = offsetof(EditorProject, objects);
-    size_t objects_end = objects_offset + sizeof(before->objects);
-    if(before == NULL || after == NULL ||
-            before->object_count != after->object_count ||
-            memcmp(before, after, objects_offset) != 0 ||
-            memcmp((const unsigned char *)before + objects_end,
-                (const unsigned char *)after + objects_end,
-                sizeof(*before) - objects_end) != 0) return NULL;
-    entry = calloc(1, sizeof(*entry));
-    if(entry == NULL) return NULL;
-    entry->kind = EDITOR_HISTORY_ENTRY_COMMANDS;
-    entry->memory = sizeof(*entry);
-    for(size_t i = 0; i < before->object_count; i += 1) {
-        EditorHistoryAggregateChange *forward;
-        EditorHistoryAggregateChange *inverse;
-        if(before->objects[i].id != after->objects[i].id) goto fail;
-        if(memcmp(&before->objects[i], &after->objects[i],
-                sizeof(before->objects[i])) == 0) continue;
-        forward = editor_history_object_aggregate_create(&after->objects[i]);
-        inverse = editor_history_object_aggregate_create(&before->objects[i]);
-        if(forward == NULL || inverse == NULL ||
-                !editor_history_aggregate_entry_append(entry, forward, inverse)) {
-            editor_history_aggregate_destroy(forward);
-            editor_history_aggregate_destroy(inverse);
-            goto fail;
-        }
-    }
-    if(entry->command_count == 0) goto fail;
-    return entry;
-fail:
-    editor_history_entry_destroy(entry);
-    return NULL;
-}
-
-static bool editor_history_block_changed(const unsigned char *before,
-        const unsigned char *after, size_t offset) {
-    return memcmp(&before[offset], &after[offset],
-        editor_history_block_size_get(offset)) != 0;
-}
-
 static void editor_history_entry_destroy(EditorHistoryEntry *entry) {
     if(entry == NULL) return;
-    if(entry->kind == EDITOR_HISTORY_ENTRY_CHANGES) {
-        for(size_t i = 0; i < entry->change_count; i += 1) {
-            free(entry->changes[i].before);
-            free(entry->changes[i].after);
-        }
-        free(entry->changes);
-    } else {
-        for(size_t i = 0; i < entry->command_count; i += 1) {
+    for(size_t i = 0; i < entry->command_count; i += 1) {
             if(entry->commands[i].forward.kind == EDITOR_HISTORY_ACTION_OBJECT)
                 free(entry->commands[i].forward.data.object);
             if(entry->commands[i].inverse.kind == EDITOR_HISTORY_ACTION_OBJECT)
@@ -349,9 +283,12 @@ static void editor_history_entry_destroy(EditorHistoryEntry *entry) {
                 free(entry->commands[i].forward.data.collision);
             if(entry->commands[i].inverse.kind == EDITOR_HISTORY_ACTION_COLLISION)
                 free(entry->commands[i].inverse.data.collision);
-        }
-        free(entry->commands);
+            if(entry->commands[i].forward.kind == EDITOR_HISTORY_ACTION_OBJECT_ORDER)
+                free(entry->commands[i].forward.data.order);
+            if(entry->commands[i].inverse.kind == EDITOR_HISTORY_ACTION_OBJECT_ORDER)
+                free(entry->commands[i].inverse.data.order);
     }
+    free(entry->commands);
     free(entry);
 }
 
@@ -376,65 +313,6 @@ static bool editor_history_stack_push(EditorHistoryEntry **items, size_t *count,
     items[*count] = entry;
     *count += 1;
     return true;
-}
-
-static EditorHistoryEntry *editor_history_entry_create(
-        const EditorProject *before, const EditorProject *after) {
-    const unsigned char *before_bytes = (const unsigned char *)before;
-    const unsigned char *after_bytes = (const unsigned char *)after;
-    EditorHistoryEntry *entry;
-    size_t change_count = 0;
-    size_t index = 0;
-    if(before == NULL || after == NULL) return NULL;
-    while(index < sizeof(*before)) {
-        if(!editor_history_block_changed(before_bytes, after_bytes, index)) {
-            index += editor_history_block_size_get(index);
-            continue;
-        }
-        change_count += 1;
-        while(index < sizeof(*before) &&
-                editor_history_block_changed(before_bytes, after_bytes, index))
-            index += editor_history_block_size_get(index);
-    }
-    if(change_count == 0) return NULL;
-    entry = calloc(1, sizeof(*entry));
-    if(entry == NULL) return NULL;
-    entry->changes = calloc(change_count, sizeof(*entry->changes));
-    if(entry->changes == NULL) {
-        free(entry);
-        return NULL;
-    }
-    entry->change_count = change_count;
-    entry->kind = EDITOR_HISTORY_ENTRY_CHANGES;
-    entry->memory = sizeof(*entry) + change_count * sizeof(*entry->changes);
-    index = 0;
-    change_count = 0;
-    while(index < sizeof(*before)) {
-        size_t begin;
-        EditorHistoryChange *change;
-        if(!editor_history_block_changed(before_bytes, after_bytes, index)) {
-            index += editor_history_block_size_get(index);
-            continue;
-        }
-        begin = index;
-        while(index < sizeof(*before) &&
-                editor_history_block_changed(before_bytes, after_bytes, index))
-            index += editor_history_block_size_get(index);
-        change = &entry->changes[change_count];
-        change->offset = begin;
-        change->size = index - begin;
-        change->before = malloc(change->size);
-        change->after = malloc(change->size);
-        if(change->before == NULL || change->after == NULL) {
-            editor_history_entry_destroy(entry);
-            return NULL;
-        }
-        memcpy(change->before, &before_bytes[begin], change->size);
-        memcpy(change->after, &after_bytes[begin], change->size);
-        entry->memory += change->size * 2;
-        change_count += 1;
-    }
-    return entry;
 }
 
 static void editor_history_action_apply(EditorProject *project,
@@ -470,6 +348,25 @@ static void editor_history_action_apply(EditorProject *project,
         project->collision_mask_count = change->count;
         return;
     }
+    if(action->kind == EDITOR_HISTORY_ACTION_OBJECT_ORDER) {
+        EditorHistoryObjectOrderChange *change = action->data.order;
+        EditorObject *ordered;
+        if(change == NULL || change->count != project->object_count) return;
+        ordered = malloc(change->count * sizeof(*ordered));
+        if(ordered == NULL) return;
+        for(size_t i = 0; i < change->count; i += 1) {
+            EditorObject *object = editor_object_query_get(project, change->ids[i]);
+            if(object == NULL) {
+                free(ordered);
+                return;
+            }
+            ordered[i] = *object;
+        }
+        memcpy(project->objects, ordered,
+            change->count * sizeof(project->objects[0]));
+        free(ordered);
+        return;
+    }
     if(action->data.object == NULL) return;
     if(action->data.object->present) {
         size_t index = action->data.object->index;
@@ -494,25 +391,16 @@ static void editor_history_action_apply(EditorProject *project,
 
 static void editor_history_entry_apply(EditorProject *project,
         const EditorHistoryEntry *entry, bool forward, EditorHistory *history) {
-    unsigned char *bytes = (unsigned char *)project;
     if(project == NULL || entry == NULL) return;
-    if(entry->kind == EDITOR_HISTORY_ENTRY_COMMANDS) {
-        if(history != NULL) history->restoring = true;
-        if(forward) {
-            for(size_t i = 0; i < entry->command_count; i += 1)
-                editor_history_action_apply(project, &entry->commands[i].forward);
-        } else {
-            for(size_t i = entry->command_count; i > 0; i -= 1)
-                editor_history_action_apply(project, &entry->commands[i - 1].inverse);
-        }
-        if(history != NULL) history->restoring = false;
-        return;
+    if(history != NULL) history->restoring = true;
+    if(forward) {
+        for(size_t i = 0; i < entry->command_count; i += 1)
+            editor_history_action_apply(project, &entry->commands[i].forward);
+    } else {
+        for(size_t i = entry->command_count; i > 0; i -= 1)
+            editor_history_action_apply(project, &entry->commands[i - 1].inverse);
     }
-    for(size_t i = 0; i < entry->change_count; i += 1) {
-        const EditorHistoryChange *change = &entry->changes[i];
-        memcpy(&bytes[change->offset], forward ? change->after : change->before,
-            change->size);
-    }
+    if(history != NULL) history->restoring = false;
 }
 
 static EditorHistoryEntry *editor_history_command_entry_create(
@@ -526,7 +414,6 @@ static EditorHistoryEntry *editor_history_command_entry_create(
         free(entry);
         return NULL;
     }
-    entry->kind = EDITOR_HISTORY_ENTRY_COMMANDS;
     entry->commands[0] = (EditorHistoryCommandPair){
         .forward = {.kind = EDITOR_HISTORY_ACTION_COMMAND,
             .data.command = *forward},
@@ -540,8 +427,7 @@ static EditorHistoryEntry *editor_history_command_entry_create(
 static bool editor_history_command_entry_append(EditorHistoryEntry *entry,
         const EditorCommand *forward, const EditorCommand *inverse) {
     EditorHistoryCommandPair *commands;
-    if(entry == NULL || entry->kind != EDITOR_HISTORY_ENTRY_COMMANDS ||
-            forward == NULL || inverse == NULL) return false;
+    if(entry == NULL || forward == NULL || inverse == NULL) return false;
     commands = realloc(entry->commands,
         (entry->command_count + 1) * sizeof(*commands));
     if(commands == NULL) return false;
@@ -566,7 +452,6 @@ static EditorHistoryEntry *editor_history_object_entry_create(
         free(entry);
         return NULL;
     }
-    entry->kind = EDITOR_HISTORY_ENTRY_COMMANDS;
     entry->commands[0].forward.data.object = malloc(sizeof(forward));
     entry->commands[0].inverse.data.object = malloc(sizeof(inverse));
     if(entry->commands[0].forward.data.object == NULL ||
@@ -610,7 +495,6 @@ static EditorHistoryEntry *editor_history_collision_entry_create(
         free(entry);
         return NULL;
     }
-    entry->kind = EDITOR_HISTORY_ENTRY_COMMANDS;
     entry->commands[0] = (EditorHistoryCommandPair){
         .forward = {.kind = EDITOR_HISTORY_ACTION_COLLISION,
             .data.collision = forward},
@@ -827,11 +711,9 @@ void editor_history_destroy(EditorHistory *history) {
     if(history == NULL) return;
     editor_history_stack_clear(history->undo, &history->undo_count);
     editor_history_stack_clear(history->redo, &history->redo_count);
-    free(history->pending);
     free(history->pending_object);
     editor_history_aggregate_destroy(history->pending_aggregate);
     free(history->pending_collision);
-    free(history->transaction_before);
     editor_history_entry_destroy(history->transaction_commands);
     memset(history, 0, sizeof(*history));
 }
@@ -840,8 +722,6 @@ void editor_history_reset(EditorHistory *history) {
     if(history == NULL || history->project == NULL) return;
     editor_history_stack_clear(history->undo, &history->undo_count);
     editor_history_stack_clear(history->redo, &history->redo_count);
-    free(history->pending);
-    history->pending = NULL;
     free(history->pending_object);
     history->pending_object = NULL;
     editor_history_aggregate_destroy(history->pending_aggregate);
@@ -849,8 +729,6 @@ void editor_history_reset(EditorHistory *history) {
     free(history->pending_collision);
     history->pending_collision = NULL;
     history->pending_command_valid = false;
-    free(history->transaction_before);
-    history->transaction_before = NULL;
     editor_history_entry_destroy(history->transaction_commands);
     history->transaction_commands = NULL;
     history->transaction_active = false;
@@ -863,8 +741,6 @@ void editor_history_reset(EditorHistory *history) {
 void editor_history_command_begin(EditorHistory *history,
         const EditorProject *project, const EditorCommand *command) {
     if(history == NULL || history->restoring) return;
-    free(history->pending);
-    history->pending = NULL;
     free(history->pending_object);
     history->pending_object = NULL;
     editor_history_aggregate_destroy(history->pending_aggregate);
@@ -923,9 +799,6 @@ void editor_history_command_begin(EditorHistory *history,
         history->pending_command_valid = true;
         return;
     }
-    history->pending = malloc(sizeof(*history->pending));
-    if(history->pending != NULL)
-        memcpy(history->pending, project, sizeof(*project));
 }
 
 void editor_history_command_finish(EditorHistory *history,
@@ -954,8 +827,8 @@ void editor_history_command_finish(EditorHistory *history,
                 forward.selected = history->project->selected;
                 inverse.present = true;
             }
-            if(!editor_history_object_entry_append(history->transaction_commands,
-                    forward, inverse)) history->transaction_untyped = true;
+            (void)editor_history_object_entry_append(
+                history->transaction_commands, forward, inverse);
         } else if(history->pending_aggregate != NULL && command != NULL && result != NULL &&
                 result->kind == ERROR_RESULT_VALUE) {
             EditorHistoryAggregateChange *after = editor_history_aggregate_recapture(
@@ -964,7 +837,6 @@ void editor_history_command_finish(EditorHistory *history,
                     history->transaction_commands, after,
                     history->pending_aggregate)) {
                 editor_history_aggregate_destroy(after);
-                history->transaction_untyped = true;
             } else history->pending_aggregate = NULL;
         } else if(history->pending_command_valid && command != NULL && result != NULL &&
                 result->kind == ERROR_RESULT_VALUE &&
@@ -972,10 +844,6 @@ void editor_history_command_finish(EditorHistory *history,
                     &history->pending_inverse))
             (void)editor_history_command_entry_append(history->transaction_commands,
                 command, &history->pending_inverse);
-        else if(result != NULL && result->kind == ERROR_RESULT_VALUE)
-            history->transaction_untyped = true;
-        free(history->pending);
-        history->pending = NULL;
         free(history->pending_object);
         history->pending_object = NULL;
         editor_history_aggregate_destroy(history->pending_aggregate);
@@ -1053,9 +921,7 @@ void editor_history_command_finish(EditorHistory *history,
         if(editor_history_command_value_equal(command, &history->pending_inverse))
             goto finish;
         if(history->continuous && history->continuous_recorded &&
-                history->undo_count > 0 &&
-                history->undo[history->undo_count - 1]->kind ==
-                    EDITOR_HISTORY_ENTRY_COMMANDS) {
+                history->undo_count > 0) {
             history->undo[history->undo_count - 1]->commands[
                 history->undo[history->undo_count - 1]->command_count - 1]
                 .forward.data.command = *command;
@@ -1069,34 +935,8 @@ void editor_history_command_finish(EditorHistory *history,
                 if(history->continuous) history->continuous_recorded = true;
             } else if(entry != NULL) editor_history_entry_destroy(entry);
         }
-    } else if(history->pending != NULL && command != NULL && result != NULL &&
-            result->kind == ERROR_RESULT_VALUE) {
-        if(history->continuous && history->continuous_recorded &&
-                history->undo_count > 0) {
-            EditorHistoryEntry *previous = history->undo[history->undo_count - 1];
-            editor_history_entry_apply(history->pending, previous, false, history);
-            entry = editor_history_entry_create(history->pending, history->project);
-            if(entry != NULL) history->snapshot_fallback_count += 1;
-            if(entry != NULL) {
-                history->undo[history->undo_count - 1] = entry;
-                editor_history_entry_destroy(previous);
-            }
-        } else {
-            entry = editor_history_entry_create(history->pending, history->project);
-            if(entry != NULL) history->snapshot_fallback_count += 1;
-            if(entry != NULL && editor_history_stack_push(history->undo,
-                    &history->undo_count, entry)) {
-                editor_history_stack_clear(history->redo, &history->redo_count);
-                history->recorded_since_continuous_update = true;
-                if(history->continuous) history->continuous_recorded = true;
-            } else if(entry != NULL) {
-                editor_history_entry_destroy(entry);
-            }
-        }
     }
 finish:
-    free(history->pending);
-    history->pending = NULL;
     free(history->pending_object);
     history->pending_object = NULL;
     editor_history_aggregate_destroy(history->pending_aggregate);
@@ -1119,65 +959,148 @@ void editor_history_continuous_set(EditorHistory *history, bool continuous) {
 bool editor_history_transaction_begin(EditorHistory *history) {
     if(history == NULL || history->project == NULL || history->transaction_active)
         return false;
-    history->transaction_before = malloc(sizeof(*history->transaction_before));
-    if(history->transaction_before == NULL) return false;
-    memcpy(history->transaction_before, history->project,
-        sizeof(*history->transaction_before));
     history->transaction_commands = calloc(1,
         sizeof(*history->transaction_commands));
-    if(history->transaction_commands == NULL) {
-        free(history->transaction_before);
-        history->transaction_before = NULL;
-        return false;
-    }
-    history->transaction_commands->kind = EDITOR_HISTORY_ENTRY_COMMANDS;
+    if(history->transaction_commands == NULL) return false;
     history->transaction_commands->memory =
         sizeof(*history->transaction_commands);
-    history->transaction_untyped = false;
     history->transaction_active = true;
+    return true;
+}
+
+bool editor_history_transaction_object_track(EditorHistory *history,
+        EditorObjectId object_id) {
+    EditorObject *object;
+    EditorHistoryAggregateChange *forward;
+    EditorHistoryAggregateChange *inverse;
+    if(history == NULL || !history->transaction_active ||
+            history->transaction_commands == NULL) return false;
+    for(size_t i = 0; i < history->transaction_commands->command_count; i += 1) {
+        EditorHistoryAction *action =
+            &history->transaction_commands->commands[i].inverse;
+        if(action->kind == EDITOR_HISTORY_ACTION_AGGREGATE &&
+                action->data.aggregate != NULL &&
+                action->data.aggregate->kind == EDITOR_HISTORY_AGGREGATE_OBJECT &&
+                action->data.aggregate->object == object_id) return true;
+    }
+    object = editor_object_query_get(history->project, object_id);
+    if(object == NULL) return false;
+    forward = editor_history_object_aggregate_create(object);
+    inverse = editor_history_object_aggregate_create(object);
+    if(forward == NULL || inverse == NULL) {
+        editor_history_aggregate_destroy(forward);
+        editor_history_aggregate_destroy(inverse);
+        return false;
+    }
+    forward->tracked = true;
+    if(!editor_history_aggregate_entry_append(history->transaction_commands,
+            forward, inverse)) {
+        editor_history_aggregate_destroy(forward);
+        editor_history_aggregate_destroy(inverse);
+        return false;
+    }
+    return true;
+}
+
+static EditorHistoryObjectOrderChange *editor_history_object_order_capture(
+        const EditorProject *project) {
+    EditorHistoryObjectOrderChange *change;
+    if(project == NULL) return NULL;
+    change = calloc(1, sizeof(*change));
+    if(change == NULL) return NULL;
+    change->count = project->object_count;
+    for(size_t i = 0; i < project->object_count; i += 1)
+        change->ids[i] = project->objects[i].id;
+    return change;
+}
+
+bool editor_history_transaction_object_order_track(EditorHistory *history) {
+    EditorHistoryObjectOrderChange *forward;
+    EditorHistoryObjectOrderChange *inverse;
+    EditorHistoryCommandPair *commands;
+    EditorHistoryEntry *entry;
+    if(history == NULL || !history->transaction_active ||
+            history->transaction_commands == NULL) return false;
+    entry = history->transaction_commands;
+    forward = editor_history_object_order_capture(history->project);
+    inverse = editor_history_object_order_capture(history->project);
+    if(forward == NULL || inverse == NULL) goto fail;
+    commands = realloc(entry->commands,
+        (entry->command_count + 1) * sizeof(*commands));
+    if(commands == NULL) goto fail;
+    forward->tracked = true;
+    entry->commands = commands;
+    entry->commands[entry->command_count] = (EditorHistoryCommandPair){
+        .forward = {.kind = EDITOR_HISTORY_ACTION_OBJECT_ORDER,
+            .data.order = forward},
+        .inverse = {.kind = EDITOR_HISTORY_ACTION_OBJECT_ORDER,
+            .data.order = inverse}};
+    entry->command_count += 1;
+    entry->memory += sizeof(*commands) + sizeof(*forward) + sizeof(*inverse);
+    return true;
+fail:
+    free(forward);
+    free(inverse);
+    return false;
+}
+
+static bool editor_history_transaction_tracks_finalize(EditorHistory *history) {
+    EditorHistoryEntry *entry;
+    size_t output = 0;
+    if(history == NULL || history->transaction_commands == NULL) return false;
+    entry = history->transaction_commands;
+    for(size_t i = 0; i < entry->command_count; i += 1) {
+        EditorHistoryCommandPair pair = entry->commands[i];
+        if(pair.forward.kind == EDITOR_HISTORY_ACTION_AGGREGATE &&
+                pair.forward.data.aggregate != NULL &&
+                pair.forward.data.aggregate->tracked) {
+            EditorHistoryAggregateChange *updated =
+                editor_history_aggregate_recapture(history->project,
+                    pair.inverse.data.aggregate);
+            if(updated == NULL) return false;
+            editor_history_aggregate_destroy(pair.forward.data.aggregate);
+            pair.forward.data.aggregate = updated;
+            if(updated->size == pair.inverse.data.aggregate->size &&
+                    memcmp(updated->value, pair.inverse.data.aggregate->value,
+                        updated->size) == 0) {
+                editor_history_aggregate_destroy(pair.forward.data.aggregate);
+                editor_history_aggregate_destroy(pair.inverse.data.aggregate);
+                continue;
+            }
+        } else if(pair.forward.kind == EDITOR_HISTORY_ACTION_OBJECT_ORDER &&
+                pair.forward.data.order != NULL &&
+                pair.forward.data.order->tracked) {
+            EditorHistoryObjectOrderChange *updated =
+                editor_history_object_order_capture(history->project);
+            if(updated == NULL) return false;
+            free(pair.forward.data.order);
+            pair.forward.data.order = updated;
+            if(memcmp(updated->ids, pair.inverse.data.order->ids,
+                    updated->count * sizeof(updated->ids[0])) == 0) {
+                free(pair.forward.data.order);
+                free(pair.inverse.data.order);
+                continue;
+            }
+        }
+        entry->commands[output++] = pair;
+    }
+    entry->command_count = output;
     return true;
 }
 
 bool editor_history_transaction_end(EditorHistory *history) {
     EditorHistoryEntry *entry;
-    EditorProject *replayed = NULL;
     if(history == NULL || history->project == NULL ||
-            !history->transaction_active || history->transaction_before == NULL)
+            !history->transaction_active || history->transaction_commands == NULL)
         return false;
-    entry = NULL;
-    if(history->transaction_commands != NULL &&
-            history->transaction_commands->command_count > 0 &&
-            !history->transaction_untyped) {
-        entry = history->transaction_commands;
-        history->transaction_commands = NULL;
-    } else if(history->transaction_commands != NULL &&
-            history->transaction_commands->command_count > 0) {
-        replayed = malloc(sizeof(*replayed));
-        if(replayed != NULL) {
-            memcpy(replayed, history->transaction_before, sizeof(*replayed));
-            editor_history_entry_apply(replayed, history->transaction_commands,
-                true, history);
-            if(memcmp(replayed, history->project, sizeof(*replayed)) == 0) {
-                entry = history->transaction_commands;
-                history->transaction_commands = NULL;
-            }
-        }
-    }
-    free(replayed);
-    if(entry == NULL)
-        entry = editor_history_object_differences_create(
-            history->transaction_before, history->project);
-    if(entry == NULL)
-        entry = editor_history_entry_create(history->transaction_before,
-            history->project);
-    if(entry != NULL && entry->kind == EDITOR_HISTORY_ENTRY_CHANGES)
-        history->snapshot_fallback_count += 1;
-    free(history->transaction_before);
-    history->transaction_before = NULL;
-    history->transaction_active = false;
-    editor_history_entry_destroy(history->transaction_commands);
+    if(!editor_history_transaction_tracks_finalize(history)) return false;
+    entry = history->transaction_commands;
     history->transaction_commands = NULL;
-    if(entry == NULL) return true;
+    history->transaction_active = false;
+    if(entry->command_count == 0) {
+        editor_history_entry_destroy(entry);
+        return true;
+    }
     if(!editor_history_stack_push(history->undo, &history->undo_count, entry)) {
         editor_history_entry_destroy(entry);
         return false;
@@ -1191,11 +1114,9 @@ bool editor_history_transaction_end(EditorHistory *history) {
 
 void editor_history_transaction_cancel(EditorHistory *history) {
     if(history == NULL) return;
-    if(history->project != NULL && history->transaction_before != NULL)
-        memcpy(history->project, history->transaction_before,
-            sizeof(*history->project));
-    free(history->transaction_before);
-    history->transaction_before = NULL;
+    if(history->project != NULL && history->transaction_commands != NULL)
+        editor_history_entry_apply(history->project,
+            history->transaction_commands, false, history);
     editor_history_entry_destroy(history->transaction_commands);
     history->transaction_commands = NULL;
     history->transaction_active = false;

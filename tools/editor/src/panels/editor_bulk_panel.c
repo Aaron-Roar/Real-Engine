@@ -488,6 +488,12 @@ bool editor_bulk_property_set(EditorProject *project, EditorViewportState *state
     if(project == NULL || state == NULL || history == NULL || property == NULL ||
             state->selected_item_count < 2 ||
             !editor_history_transaction_begin(history)) return false;
+    for(size_t i = 0; i < state->selected_item_count; i += 1)
+        if(!editor_history_transaction_object_track(history,
+                state->selected_items[i].object)) {
+            editor_history_transaction_cancel(history);
+            return false;
+        }
     for(size_t i = 0; i < state->selected_item_count; i += 1) {
         EditorSelectionRef ref = state->selected_items[i];
         EditorPropertySetCommand set = *property;
@@ -525,6 +531,12 @@ static bool editor_bulk_apply(EditorProject *project, EditorViewportState *state
             property->target == EDITOR_BULK_ROTATION) &&
             !editor_bulk_float_parse(text, &number)) return false;
     if(!editor_history_transaction_begin(history)) return false;
+    for(size_t i = 0; i < state->selected_item_count; i += 1)
+        if(!editor_history_transaction_object_track(history,
+                state->selected_items[i].object)) {
+            editor_history_transaction_cancel(history);
+            return false;
+        }
     for(size_t i = 0; i < state->selected_item_count; i += 1) {
         EditorCommand command;
         EditorCommandResult result;

@@ -1615,6 +1615,12 @@ static bool editor_selection_nudge(EditorProject *project,
     if(viewport_state->selected_item_count < 2)
         return editor_viewport_selection_nudge(viewport_state, project, screen_delta);
     if(!editor_history_transaction_begin(history)) return false;
+    for(size_t i = 0; i < viewport_state->selected_item_count; i += 1)
+        if(!editor_history_transaction_object_track(history,
+                viewport_state->selected_items[i].object)) {
+            editor_history_transaction_cancel(history);
+            return false;
+        }
     moved = editor_viewport_selection_nudge(viewport_state, project, screen_delta);
     if(!moved) {
         editor_history_transaction_cancel(history);
@@ -1719,6 +1725,13 @@ static bool editor_hierarchy_drag_update(EditorHierarchyDragState *drag,
                 primary == MOUSE_BUTTON_STATE_DOWN)) {
         if(!drag->transaction_active) {
             if(!editor_history_transaction_begin(history)) return false;
+            if(!(drag->source.kind == EDITOR_SELECTION_OBJECT ?
+                    editor_history_transaction_object_order_track(history) :
+                    editor_history_transaction_object_track(history,
+                        drag->source.object))) {
+                editor_history_transaction_cancel(history);
+                return false;
+            }
             drag->transaction_active = true;
         }
         changed = editor_navigation_selection_reorder(project, selection,
@@ -5422,7 +5435,17 @@ int main(void) {
                         viewport_state.group_rotating = false;
                         viewport_state.rotated_body = false;
                         viewport_state.rotated_soft_body = false;
-                    }
+                    } else for(size_t i = 0;
+                            i < viewport_state.selected_item_count; i += 1)
+                        if(!editor_history_transaction_object_track(&history,
+                                viewport_state.selected_items[i].object)) {
+                            editor_history_transaction_cancel(&history);
+                            viewport_state.group_dragging = false;
+                            viewport_state.group_rotating = false;
+                            viewport_state.rotated_body = false;
+                            viewport_state.rotated_soft_body = false;
+                            break;
+                        }
                 } else if(group_transform_before && !group_transform_after) {
                     (void)editor_history_transaction_end(&history);
                 }

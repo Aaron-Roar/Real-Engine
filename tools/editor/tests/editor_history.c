@@ -382,6 +382,7 @@ int main(void) {
             false, 0.0f, false));
         assert(viewport.group_dragging && viewport.selected_item_count == 2);
         assert(editor_history_transaction_begin(&history));
+        assert(editor_history_transaction_object_track(&history, rigid.object));
         assert(editor_viewport_update(&viewport, &project, target,
             MOUSE_BUTTON_STATE_DOWN, MOUSE_BUTTON_STATE_UP,
             false, 0.0f, false));
@@ -401,6 +402,7 @@ int main(void) {
         assert(body != NULL && soft_body != NULL);
         editor_history_reset(&history);
         assert(editor_history_transaction_begin(&history));
+        assert(editor_history_transaction_object_track(&history, rigid.object));
         assert(editor_viewport_selection_nudge(&viewport, &project,
             (Vec2D){2.0f, 0.0f}));
         assert(editor_history_transaction_end(&history));
@@ -424,6 +426,7 @@ int main(void) {
             false, 0.0f, false));
         assert(viewport.group_rotating);
         assert(editor_history_transaction_begin(&history));
+        assert(editor_history_transaction_object_track(&history, rigid.object));
         assert(editor_viewport_update(&viewport, &project, target,
             MOUSE_BUTTON_STATE_DOWN, MOUSE_BUTTON_STATE_UP,
             false, 0.0f, false));
@@ -610,7 +613,6 @@ int main(void) {
     }
 
     editor_viewport_state_destroy(&viewport);
-    assert(history.snapshot_fallback_count == 0);
     editor_history_destroy(&history);
     return 0;
 }

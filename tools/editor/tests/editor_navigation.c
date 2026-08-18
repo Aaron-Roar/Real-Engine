@@ -319,7 +319,6 @@ int main(void) {
                 object->soft_body_count != 0)
             return 1;
     }
-    if(history.snapshot_fallback_count != 0) return 1;
     editor_history_destroy(&history);
     editor_viewport_state_destroy(&state);
     return 0;

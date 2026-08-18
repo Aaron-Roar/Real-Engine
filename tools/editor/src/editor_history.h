@@ -12,19 +12,15 @@ typedef struct EditorHistoryCollisionChange EditorHistoryCollisionChange;
 
 typedef struct EditorHistory {
     EditorProject *project;
-    EditorProject *pending;
-    EditorProject *transaction_before;
     EditorHistoryEntry *transaction_commands;
     EditorHistoryEntry *undo[EDITOR_HISTORY_CAPACITY];
     EditorHistoryEntry *redo[EDITOR_HISTORY_CAPACITY];
     size_t undo_count;
     size_t redo_count;
-    size_t snapshot_fallback_count;
     bool continuous;
     bool continuous_recorded;
     bool recorded_since_continuous_update;
     bool transaction_active;
-    bool transaction_untyped;
     bool pending_command_valid;
     bool restoring;
     EditorCommand pending_forward;
@@ -43,6 +39,9 @@ void editor_history_command_finish(EditorHistory *history,
     const EditorCommand *command, const EditorCommandResult *result);
 void editor_history_continuous_set(EditorHistory *history, bool continuous);
 bool editor_history_transaction_begin(EditorHistory *history);
+bool editor_history_transaction_object_track(EditorHistory *history,
+    EditorObjectId object);
+bool editor_history_transaction_object_order_track(EditorHistory *history);
 bool editor_history_transaction_end(EditorHistory *history);
 void editor_history_transaction_cancel(EditorHistory *history);
 bool editor_history_undo(EditorHistory *history);
