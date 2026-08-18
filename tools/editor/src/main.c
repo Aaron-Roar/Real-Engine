@@ -1996,6 +1996,13 @@ int main(void) {
     TextAsset x_field = {0};
     TextAsset y_field = {0};
     TextAsset length_field = {0};
+    TextAsset animated_position_x_field = {0};
+    TextAsset animated_position_y_field = {0};
+    TextAsset animated_scale_x_field = {0};
+    TextAsset animated_scale_y_field = {0};
+    TextAsset animated_ticks_field = {0};
+    TextAsset animated_time_field = {0};
+    TextAsset animated_starting_frame_field = {0};
     TextAsset path_field = {0};
     TextAsset object_name_labels[EDITOR_OBJECT_MAX] = {0};
     char object_name_cache[EDITOR_OBJECT_MAX][EDITOR_OBJECT_NAME_MAX] = {{0}};
@@ -2275,6 +2282,13 @@ int main(void) {
             !editor_text_create(&font, "", &x_field) ||
             !editor_text_create(&font, "", &y_field) ||
             !editor_text_create(&font, "", &length_field) ||
+            !editor_text_create(&font, "", &animated_position_x_field) ||
+            !editor_text_create(&font, "", &animated_position_y_field) ||
+            !editor_text_create(&font, "", &animated_scale_x_field) ||
+            !editor_text_create(&font, "", &animated_scale_y_field) ||
+            !editor_text_create(&font, "", &animated_ticks_field) ||
+            !editor_text_create(&font, "", &animated_time_field) ||
+            !editor_text_create(&font, "", &animated_starting_frame_field) ||
             !editor_text_create(&font, "", &path_field) ||
             !editor_origin_panel_create(&origin_panel, &font) ||
             !editor_bulk_panel_create(&bulk_panel, &font) ||
@@ -4940,7 +4954,7 @@ int main(void) {
                 UIFieldResult position_x = rohr_ui_field(
                     "editor.animated_sprite.x",
                     (UIFieldBinding){.kind = UI_FIELD_FLOAT,
-                        .number = &edited_position.x}, &x_field,
+                        .number = &edited_position.x}, &animated_position_x_field,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 118.0f,
                         EDITOR_TOOLS_WIDTH - 110.0f, 28.0f}, NULL);
                 rohr_ui_label(&y_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
@@ -4948,40 +4962,45 @@ int main(void) {
                 UIFieldResult position_y = rohr_ui_field(
                     "editor.animated_sprite.y",
                     (UIFieldBinding){.kind = UI_FIELD_FLOAT,
-                        .number = &edited_position.y}, &y_field,
+                        .number = &edited_position.y}, &animated_position_y_field,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 156.0f,
                         EDITOR_TOOLS_WIDTH - 110.0f, 28.0f}, NULL);
                 rohr_ui_label(&scale_x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     194.0f, 90.0f, 28.0f});
                 UIFieldResult sx = rohr_ui_field("editor.animated_sprite.scale_x",
-                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &scale_x}, &x_field,
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &scale_x},
+                    &animated_scale_x_field,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 194.0f,
                         EDITOR_TOOLS_WIDTH - 110.0f, 28.0f}, NULL);
                 rohr_ui_label(&scale_y_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     232.0f, 90.0f, 28.0f});
                 UIFieldResult sy = rohr_ui_field("editor.animated_sprite.scale_y",
-                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &scale_y}, &y_field,
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &scale_y},
+                    &animated_scale_y_field,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 232.0f,
                         EDITOR_TOOLS_WIDTH - 110.0f, 28.0f}, NULL);
                 rohr_ui_label(&ticks_per_frame_label,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 270.0f, 110.0f, 28.0f});
                 UIFieldResult tick_result = rohr_ui_field(
                     "editor.animated_sprite.ticks",
-                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &ticks}, &length_field,
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &ticks},
+                    &animated_ticks_field,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 120.0f, 270.0f,
                         EDITOR_TOOLS_WIDTH - 130.0f, 28.0f}, NULL);
                 rohr_ui_label(&time_per_frame_label,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 308.0f, 110.0f, 28.0f});
                 UIFieldResult time_result = rohr_ui_field(
                     "editor.animated_sprite.seconds",
-                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &seconds}, &length_field,
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &seconds},
+                    &animated_time_field,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 120.0f, 308.0f,
                         EDITOR_TOOLS_WIDTH - 130.0f, 28.0f}, NULL);
                 rohr_ui_label(&starting_frame_label,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 346.0f, 110.0f, 28.0f});
                 UIFieldResult start_result = rohr_ui_field(
                     "editor.animated_sprite.start",
-                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &starting}, &length_field,
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &starting},
+                    &animated_starting_frame_field,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 120.0f, 346.0f,
                         EDITOR_TOOLS_WIDTH - 130.0f, 28.0f}, NULL);
                 rohr_ui_label(&direction_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
@@ -6407,6 +6426,13 @@ int main(void) {
         rohr_graphics_text_destroy(&soft_area_labels[i]);
     }
     rohr_graphics_text_destroy(&vertices_label);
+    rohr_graphics_text_destroy(&animated_starting_frame_field);
+    rohr_graphics_text_destroy(&animated_time_field);
+    rohr_graphics_text_destroy(&animated_ticks_field);
+    rohr_graphics_text_destroy(&animated_scale_y_field);
+    rohr_graphics_text_destroy(&animated_scale_x_field);
+    rohr_graphics_text_destroy(&animated_position_y_field);
+    rohr_graphics_text_destroy(&animated_position_x_field);
     rohr_graphics_text_destroy(&length_field);
     rohr_graphics_text_destroy(&y_field);
     rohr_graphics_text_destroy(&x_field);
@@ -6614,6 +6640,13 @@ fail:
         rohr_graphics_text_destroy(&soft_area_labels[i]);
     }
     rohr_graphics_text_destroy(&vertices_label);
+    rohr_graphics_text_destroy(&animated_starting_frame_field);
+    rohr_graphics_text_destroy(&animated_time_field);
+    rohr_graphics_text_destroy(&animated_ticks_field);
+    rohr_graphics_text_destroy(&animated_scale_y_field);
+    rohr_graphics_text_destroy(&animated_scale_x_field);
+    rohr_graphics_text_destroy(&animated_position_y_field);
+    rohr_graphics_text_destroy(&animated_position_x_field);
     rohr_graphics_text_destroy(&length_field);
     rohr_graphics_text_destroy(&y_field);
     rohr_graphics_text_destroy(&x_field);
