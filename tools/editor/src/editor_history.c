@@ -74,8 +74,27 @@ static void editor_history_entry_destroy(EditorHistoryEntry *entry);
 
 static void editor_history_aggregate_destroy(EditorHistoryAggregateChange *change) {
     if(change == NULL) return;
+    if(change->value != NULL) {
+        if(change->kind == EDITOR_HISTORY_AGGREGATE_OBJECT)
+            editor_project_object_destroy(change->value);
+        else if(change->kind == EDITOR_HISTORY_AGGREGATE_RIGID_BODY)
+            editor_project_rigid_body_destroy(change->value);
+        else editor_project_soft_body_destroy(change->value);
+    }
     free(change->value);
     free(change);
+}
+
+static bool editor_history_aggregate_value_clone(
+        EditorHistoryAggregateChange *change, const void *value) {
+    if(change == NULL || value == NULL) return false;
+    change->value = calloc(1, change->size);
+    if(change->value == NULL) return false;
+    if(change->kind == EDITOR_HISTORY_AGGREGATE_OBJECT)
+        return editor_project_object_clone(change->value, value);
+    if(change->kind == EDITOR_HISTORY_AGGREGATE_RIGID_BODY)
+        return editor_project_rigid_body_clone(change->value, value);
+    return editor_project_soft_body_clone(change->value, value);
 }
 
 static EditorHistoryAggregateChange *editor_history_aggregate_capture(
@@ -110,16 +129,14 @@ static EditorHistoryAggregateChange *editor_history_aggregate_capture(
     }
     change = calloc(1, sizeof(*change));
     if(change == NULL) return NULL;
-    change->value = malloc(size);
-    if(change->value == NULL) {
-        free(change);
-        return NULL;
-    }
-    memcpy(change->value, value, size);
     change->kind = aggregate_kind;
     change->object = object_id;
     change->item = item;
     change->size = size;
+    if(!editor_history_aggregate_value_clone(change, value)) {
+        editor_history_aggregate_destroy(change);
+        return NULL;
+    }
     return change;
 }
 
@@ -250,15 +267,13 @@ static EditorHistoryAggregateChange *editor_history_object_aggregate_create(
     if(object == NULL) return NULL;
     change = calloc(1, sizeof(*change));
     if(change == NULL) return NULL;
-    change->value = malloc(sizeof(*object));
-    if(change->value == NULL) {
-        free(change);
-        return NULL;
-    }
-    memcpy(change->value, object, sizeof(*object));
     change->kind = EDITOR_HISTORY_AGGREGATE_OBJECT;
     change->object = object->id;
     change->size = sizeof(*object);
+    if(!editor_history_aggregate_value_clone(change, object)) {
+        editor_history_aggregate_destroy(change);
+        return NULL;
+    }
     return change;
 }
 
@@ -270,14 +285,12 @@ static void editor_history_entry_destroy(EditorHistoryEntry *entry) {
             if(entry->commands[i].inverse.kind == EDITOR_HISTORY_ACTION_OBJECT)
                 free(entry->commands[i].inverse.data.object);
             if(entry->commands[i].forward.kind == EDITOR_HISTORY_ACTION_AGGREGATE) {
-                if(entry->commands[i].forward.data.aggregate != NULL)
-                    free(entry->commands[i].forward.data.aggregate->value);
-                free(entry->commands[i].forward.data.aggregate);
+                editor_history_aggregate_destroy(
+                    entry->commands[i].forward.data.aggregate);
             }
             if(entry->commands[i].inverse.kind == EDITOR_HISTORY_ACTION_AGGREGATE) {
-                if(entry->commands[i].inverse.data.aggregate != NULL)
-                    free(entry->commands[i].inverse.data.aggregate->value);
-                free(entry->commands[i].inverse.data.aggregate);
+                editor_history_aggregate_destroy(
+                    entry->commands[i].inverse.data.aggregate);
             }
             if(entry->commands[i].forward.kind == EDITOR_HISTORY_ACTION_COLLISION)
                 free(entry->commands[i].forward.data.collision);
@@ -328,16 +341,31 @@ static void editor_history_action_apply(EditorProject *project,
         if(change == NULL || change->value == NULL) return;
         object = editor_object_query_get(project, change->object);
         if(change->kind == EDITOR_HISTORY_AGGREGATE_OBJECT) {
-            if(object != NULL && change->size == sizeof(*object))
-                memcpy(object, change->value, change->size);
+            if(object != NULL && change->size == sizeof(*object)) {
+                EditorObject restored = {0};
+                if(editor_project_object_clone(&restored, change->value)) {
+                    editor_project_object_destroy(object);
+                    *object = restored;
+                }
+            }
         } else if(change->kind == EDITOR_HISTORY_AGGREGATE_RIGID_BODY) {
             EditorRigidBody *body = editor_project_rigid_body_get(object, change->item);
-            if(body != NULL && change->size == sizeof(*body))
-                memcpy(body, change->value, change->size);
+            if(body != NULL && change->size == sizeof(*body)) {
+                EditorRigidBody restored = {0};
+                if(editor_project_rigid_body_clone(&restored, change->value)) {
+                    editor_project_rigid_body_destroy(body);
+                    *body = restored;
+                }
+            }
         } else {
             EditorSoftBody *body = editor_history_soft_body_get(object, change->item);
-            if(body != NULL && change->size == sizeof(*body))
-                memcpy(body, change->value, change->size);
+            if(body != NULL && change->size == sizeof(*body)) {
+                EditorSoftBody restored = {0};
+                if(editor_project_soft_body_clone(&restored, change->value)) {
+                    editor_project_soft_body_destroy(body);
+                    *body = restored;
+                }
+            }
         }
         return;
     }

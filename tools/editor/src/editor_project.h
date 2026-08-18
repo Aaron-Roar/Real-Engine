@@ -255,6 +255,17 @@ typedef struct EditorProject {
 } EditorProject;
 
 void editor_project_init(EditorProject *project);
+void editor_project_destroy(EditorProject *project);
+bool editor_project_clone(EditorProject *destination, const EditorProject *source);
+void editor_project_object_destroy(EditorObject *object);
+bool editor_project_object_clone(EditorObject *destination,
+    const EditorObject *source);
+void editor_project_rigid_body_destroy(EditorRigidBody *body);
+bool editor_project_rigid_body_clone(EditorRigidBody *destination,
+    const EditorRigidBody *source);
+void editor_project_soft_body_destroy(EditorSoftBody *body);
+bool editor_project_soft_body_clone(EditorSoftBody *destination,
+    const EditorSoftBody *source);
 void editor_project_object_name_format(char *output, size_t capacity,
     const char *input);
 void editor_project_property_name_format(char *output, size_t capacity,

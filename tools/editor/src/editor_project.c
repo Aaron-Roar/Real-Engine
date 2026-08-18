@@ -143,6 +143,60 @@ void editor_project_init(EditorProject *project) {
     };
 }
 
+void editor_project_rigid_body_destroy(EditorRigidBody *body) {
+    if(body == NULL) return;
+    *body = (EditorRigidBody){0};
+}
+
+bool editor_project_rigid_body_clone(EditorRigidBody *destination,
+        const EditorRigidBody *source) {
+    if(destination == NULL || source == NULL) return false;
+    *destination = *source;
+    return true;
+}
+
+void editor_project_soft_body_destroy(EditorSoftBody *body) {
+    if(body == NULL) return;
+    *body = (EditorSoftBody){0};
+}
+
+bool editor_project_soft_body_clone(EditorSoftBody *destination,
+        const EditorSoftBody *source) {
+    if(destination == NULL || source == NULL) return false;
+    *destination = *source;
+    return true;
+}
+
+void editor_project_object_destroy(EditorObject *object) {
+    if(object == NULL) return;
+    for(size_t i = 0; i < object->rigid_body_count; i += 1)
+        editor_project_rigid_body_destroy(&object->rigid_bodies[i]);
+    for(size_t i = 0; i < object->soft_body_count; i += 1)
+        editor_project_soft_body_destroy(&object->soft_body_items[i]);
+    *object = (EditorObject){0};
+}
+
+bool editor_project_object_clone(EditorObject *destination,
+        const EditorObject *source) {
+    if(destination == NULL || source == NULL) return false;
+    *destination = *source;
+    return true;
+}
+
+void editor_project_destroy(EditorProject *project) {
+    if(project == NULL) return;
+    for(size_t i = 0; i < project->object_count; i += 1)
+        editor_project_object_destroy(&project->objects[i]);
+    *project = (EditorProject){0};
+}
+
+bool editor_project_clone(EditorProject *destination,
+        const EditorProject *source) {
+    if(destination == NULL || source == NULL) return false;
+    *destination = *source;
+    return true;
+}
+
 bool editor_project_collision_mask_add(EditorProject *project, const char *name,
     size_t *index) {
     char formatted[EDITOR_OBJECT_NAME_MAX];
