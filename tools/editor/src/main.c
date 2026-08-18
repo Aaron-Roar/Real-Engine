@@ -5230,7 +5230,10 @@ int main(void) {
                 pointer.y >= EDITOR_VIEWPORT_BOTTOM;
             bool viewport_consumed;
             bool group_transform_before = viewport_state.group_dragging ||
-                viewport_state.group_rotating;
+                viewport_state.group_rotating ||
+                (viewport_state.selected_item_count >= 2 &&
+                    (viewport_state.rotated_body ||
+                        viewport_state.rotated_soft_body));
             bool pan_modifier =
                 rohr_controller_key_down_get(&keyboard, SDLK_LCTRL) ||
                 rohr_controller_key_down_get(&keyboard, SDLK_RCTRL);
@@ -5269,11 +5272,16 @@ int main(void) {
             }
             {
                 bool group_transform_after = viewport_state.group_dragging ||
-                    viewport_state.group_rotating;
+                    viewport_state.group_rotating ||
+                    (viewport_state.selected_item_count >= 2 &&
+                        (viewport_state.rotated_body ||
+                            viewport_state.rotated_soft_body));
                 if(!group_transform_before && group_transform_after) {
                     if(!editor_history_transaction_begin(&history)) {
                         viewport_state.group_dragging = false;
                         viewport_state.group_rotating = false;
+                        viewport_state.rotated_body = false;
+                        viewport_state.rotated_soft_body = false;
                     }
                 } else if(group_transform_before && !group_transform_after) {
                     (void)editor_history_transaction_end(&history);
@@ -5286,6 +5294,8 @@ int main(void) {
                     !viewport_state.camera_panning &&
                     !viewport_state.group_dragging &&
                     !viewport_state.group_rotating &&
+                    !viewport_state.rotated_body &&
+                    !viewport_state.rotated_soft_body &&
                     viewport_state.mode != EDITOR_VIEWPORT_AUTO_SHAPE) {
                 EditorSelectionRef selection;
                 if(editor_viewport_selection_ref_get(
