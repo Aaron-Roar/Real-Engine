@@ -179,6 +179,23 @@ static EditorHistoryEntry *editor_history_command_entry_create(
     return entry;
 }
 
+static bool editor_history_command_entry_append(EditorHistoryEntry *entry,
+        const EditorCommand *forward, const EditorCommand *inverse) {
+    EditorHistoryCommandPair *commands;
+    if(entry == NULL || entry->kind != EDITOR_HISTORY_ENTRY_COMMANDS ||
+            forward == NULL || inverse == NULL) return false;
+    commands = realloc(entry->commands,
+        (entry->command_count + 1) * sizeof(*commands));
+    if(commands == NULL) return false;
+    entry->commands = commands;
+    entry->commands[entry->command_count] =
+        (EditorHistoryCommandPair){*forward, *inverse};
+    entry->command_count += 1;
+    entry->memory = sizeof(*entry) +
+        entry->command_count * sizeof(*entry->commands);
+    return true;
+}
+
 static bool editor_history_command_value_equal(const EditorCommand *first,
         const EditorCommand *second) {
     if(first == NULL || second == NULL || first->type != second->type) return false;
@@ -341,6 +358,7 @@ void editor_history_destroy(EditorHistory *history) {
     editor_history_stack_clear(history->redo, &history->redo_count);
     free(history->pending);
     free(history->transaction_before);
+    editor_history_entry_destroy(history->transaction_commands);
     memset(history, 0, sizeof(*history));
 }
 
@@ -353,6 +371,8 @@ void editor_history_reset(EditorHistory *history) {
     history->pending_command_valid = false;
     free(history->transaction_before);
     history->transaction_before = NULL;
+    editor_history_entry_destroy(history->transaction_commands);
+    history->transaction_commands = NULL;
     history->transaction_active = false;
     history->continuous = false;
     history->continuous_recorded = false;
@@ -363,7 +383,6 @@ void editor_history_reset(EditorHistory *history) {
 void editor_history_command_begin(EditorHistory *history,
         const EditorProject *project, const EditorCommand *command) {
     if(history == NULL || history->restoring) return;
-    if(history->transaction_active) return;
     free(history->pending);
     history->pending = NULL;
     history->pending_command_valid = false;
@@ -383,7 +402,18 @@ void editor_history_command_finish(EditorHistory *history,
         const EditorCommand *command, const EditorCommandResult *result) {
     EditorHistoryEntry *entry = NULL;
     if(history == NULL || history->project == NULL || history->restoring) return;
-    if(history->transaction_active) return;
+    if(history->transaction_active) {
+        if(history->pending_command_valid && command != NULL && result != NULL &&
+                result->kind == ERROR_RESULT_VALUE &&
+                !editor_history_command_value_equal(command,
+                    &history->pending_inverse))
+            (void)editor_history_command_entry_append(history->transaction_commands,
+                command, &history->pending_inverse);
+        free(history->pending);
+        history->pending = NULL;
+        history->pending_command_valid = false;
+        return;
+    }
     if(history->pending_command_valid && command != NULL && result != NULL &&
             result->kind == ERROR_RESULT_VALUE) {
         if(editor_history_command_value_equal(command, &history->pending_inverse))
@@ -450,19 +480,49 @@ bool editor_history_transaction_begin(EditorHistory *history) {
     if(history->transaction_before == NULL) return false;
     memcpy(history->transaction_before, history->project,
         sizeof(*history->transaction_before));
+    history->transaction_commands = calloc(1,
+        sizeof(*history->transaction_commands));
+    if(history->transaction_commands == NULL) {
+        free(history->transaction_before);
+        history->transaction_before = NULL;
+        return false;
+    }
+    history->transaction_commands->kind = EDITOR_HISTORY_ENTRY_COMMANDS;
+    history->transaction_commands->memory =
+        sizeof(*history->transaction_commands);
     history->transaction_active = true;
     return true;
 }
 
 bool editor_history_transaction_end(EditorHistory *history) {
     EditorHistoryEntry *entry;
+    EditorProject *replayed = NULL;
     if(history == NULL || history->project == NULL ||
             !history->transaction_active || history->transaction_before == NULL)
         return false;
-    entry = editor_history_entry_create(history->transaction_before, history->project);
+    entry = NULL;
+    if(history->transaction_commands != NULL &&
+            history->transaction_commands->command_count > 0) {
+        replayed = malloc(sizeof(*replayed));
+        if(replayed != NULL) {
+            memcpy(replayed, history->transaction_before, sizeof(*replayed));
+            editor_history_entry_apply(replayed, history->transaction_commands,
+                true, history);
+            if(memcmp(replayed, history->project, sizeof(*replayed)) == 0) {
+                entry = history->transaction_commands;
+                history->transaction_commands = NULL;
+            }
+        }
+    }
+    free(replayed);
+    if(entry == NULL)
+        entry = editor_history_entry_create(history->transaction_before,
+            history->project);
     free(history->transaction_before);
     history->transaction_before = NULL;
     history->transaction_active = false;
+    editor_history_entry_destroy(history->transaction_commands);
+    history->transaction_commands = NULL;
     if(entry == NULL) return true;
     if(!editor_history_stack_push(history->undo, &history->undo_count, entry)) {
         editor_history_entry_destroy(entry);
@@ -482,6 +542,8 @@ void editor_history_transaction_cancel(EditorHistory *history) {
             sizeof(*history->project));
     free(history->transaction_before);
     history->transaction_before = NULL;
+    editor_history_entry_destroy(history->transaction_commands);
+    history->transaction_commands = NULL;
     history->transaction_active = false;
 }
 

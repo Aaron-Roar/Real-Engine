@@ -11,6 +11,7 @@ typedef struct EditorHistory {
     EditorProject *project;
     EditorProject *pending;
     EditorProject *transaction_before;
+    EditorHistoryEntry *transaction_commands;
     EditorHistoryEntry *undo[EDITOR_HISTORY_CAPACITY];
     EditorHistoryEntry *redo[EDITOR_HISTORY_CAPACITY];
     size_t undo_count;

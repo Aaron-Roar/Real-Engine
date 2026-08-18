@@ -541,6 +541,9 @@ int main(void) {
         assert(second != NULL);
         second_id = second->id;
         editor_history_reset(&history);
+        callback_history = &history;
+        editor_command_executing_callback_set(history_begin, NULL);
+        editor_command_finished_callback_set(history_finish, NULL);
         assert(editor_history_transaction_begin(&history));
         command = (EditorCommand){.type = EDITOR_COMMAND_OBJECT_POSITION,
             .data.object_position = {.object = first_id,
@@ -553,12 +556,16 @@ int main(void) {
         assert(result.kind == ERROR_RESULT_VALUE);
         assert(editor_history_transaction_end(&history));
         assert(history.undo_count == 1);
+        assert(editor_history_memory_get(&history) < 8192);
         assert(editor_history_undo(&history));
         assert(project.objects[0].position.x == 0.0f);
         assert(project.objects[1].position.x == 0.0f);
         assert(editor_history_redo(&history));
         assert(project.objects[0].position.x == 10.0f);
         assert(project.objects[1].position.x == 30.0f);
+        editor_command_executing_callback_set(NULL, NULL);
+        editor_command_finished_callback_set(NULL, NULL);
+        callback_history = NULL;
     }
 
     editor_viewport_state_destroy(&viewport);
