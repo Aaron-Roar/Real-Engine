@@ -3951,134 +3951,103 @@ int main(void) {
                     }
                 }
                     {
-                        float y;
                     editor_project_soft_body_hierarchy_sync(body);
-                    for(size_t i = 0; i < body->node_count; i += 1) {
-                        EditorSoftNode *node = &body->nodes[i];
-                        size_t hierarchy_index = editor_project_soft_body_hierarchy_index_get(
-                            body, EDITOR_SOFT_HIERARCHY_NODE, node->id);
-                        y = 476.0f + (float)hierarchy_index * 28.0f;
+                    for(size_t hierarchy_index = 0;
+                            hierarchy_index < body->hierarchy_count;
+                            hierarchy_index += 1) {
+                        EditorSoftHierarchyItem item = body->hierarchy[hierarchy_index];
                         UIButtonStyle selected_style = editor_selected_button_style_get();
+                        EditorHierarchySelection selection_kind;
+                        EditorVisibilityKind visibility_kind;
+                        TextAsset *label = NULL;
+                        const char *name = NULL;
+                        char *cache = NULL;
+                        bool visible = false;
+                        bool item_selected = false;
+                        float y = 476.0f + (float)hierarchy_index * 28.0f;
                         char id[64];
                         char visibility_id[72];
-                        if(!editor_named_text_sync(&font, node->name, &soft_node_labels[i],
-                                soft_node_cache[i], EDITOR_OBJECT_NAME_MAX)) goto fail;
-                        snprintf(id, sizeof(id), "editor.soft_node.%u", node->id);
-                        snprintf(visibility_id, sizeof(visibility_id),
-                            "editor.soft_node.%u.visibility", node->id);
-                        (void)editor_visibility_toggle(visibility_id, &visibility_icon_label,
-                            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, y, 24.0f, 24.0f},
-                            &project, EDITOR_VISIBILITY_SOFT_NODE, selected->id,
-                            body->id, node->id, node->visible);
-                        {
-                            UIButtonResult result = rohr_ui_button(id, &soft_node_labels[i],
-                                (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, y,
-                                    EDITOR_TOOLS_WIDTH - 48.0f, 24.0f},
-                                (viewport_state.selection == EDITOR_SELECTION_SOFT_NODE &&
-                                    viewport_state.selected_soft_node == node->id) ||
-                                    editor_selection_path_check(&viewport_state,
-                                        EDITOR_SELECTION_SOFT_NODE, selected->id,
-                                        body->id, 0, node->id) ?
-                                    &selected_style : NULL);
-                            editor_hierarchy_drag_row(&hierarchy_drag, &viewport_state,
-                                (EditorSelectionRef){EDITOR_SELECTION_SOFT_NODE,
-                                    selected->id, body->id, 0, node->id},
-                                (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, y,
-                                    EDITOR_TOOLS_WIDTH - 48.0f, 24.0f}, result,
-                                hierarchy_pointer, hierarchy_primary,
-                                panel_scroll_offset,
-                                hierarchy_index + 1 == body->hierarchy_count);
-                            if(result.clicked || result.focus_changed) {
-                                viewport_state.selection = EDITOR_SELECTION_SOFT_NODE;
-                                viewport_state.selected_soft_node = node->id;
-                                if(result.double_clicked) (void)editor_navigation_selected_open(
-                                    &project, &viewport_state);
-                            }
+                        if(item.kind == EDITOR_SOFT_HIERARCHY_NODE) {
+                            for(size_t i = 0; i < body->node_count; i += 1)
+                                if(body->nodes[i].id == item.id) {
+                                    name = body->nodes[i].name;
+                                    visible = body->nodes[i].visible;
+                                    label = &soft_node_labels[i];
+                                    cache = soft_node_cache[i];
+                                }
+                            selection_kind = EDITOR_SELECTION_SOFT_NODE;
+                            visibility_kind = EDITOR_VISIBILITY_SOFT_NODE;
+                            item_selected = viewport_state.selection == selection_kind &&
+                                viewport_state.selected_soft_node == item.id;
+                            snprintf(id, sizeof(id), "editor.soft_node.%u", item.id);
+                            snprintf(visibility_id, sizeof(visibility_id),
+                                "editor.soft_node.%u.visibility", item.id);
+                        } else if(item.kind == EDITOR_SOFT_HIERARCHY_BEAM) {
+                            for(size_t i = 0; i < body->beam_count; i += 1)
+                                if(body->beams[i].id == item.id) {
+                                    name = body->beams[i].name;
+                                    visible = body->beams[i].visible;
+                                    label = &soft_beam_labels[i];
+                                    cache = soft_beam_cache[i];
+                                }
+                            selection_kind = EDITOR_SELECTION_SOFT_BEAM;
+                            visibility_kind = EDITOR_VISIBILITY_SOFT_BEAM;
+                            item_selected = viewport_state.selection == selection_kind &&
+                                viewport_state.selected_soft_beam == item.id;
+                            snprintf(id, sizeof(id), "editor.soft_beam.%u", item.id);
+                            snprintf(visibility_id, sizeof(visibility_id),
+                                "editor.soft_beam.%u.visibility", item.id);
+                        } else {
+                            for(size_t i = 0; i < body->area_count; i += 1)
+                                if(body->areas[i].id == item.id) {
+                                    name = body->areas[i].name;
+                                    visible = body->areas[i].visible;
+                                    label = &soft_area_labels[i];
+                                    cache = soft_area_cache[i];
+                                }
+                            selection_kind = EDITOR_SELECTION_SOFT_AREA;
+                            visibility_kind = EDITOR_VISIBILITY_SOFT_AREA;
+                            item_selected = viewport_state.selection == selection_kind &&
+                                viewport_state.selected_soft_area == item.id;
+                            snprintf(id, sizeof(id), "editor.soft_area.%u", item.id);
+                            snprintf(visibility_id, sizeof(visibility_id),
+                                "editor.soft_area.%u.visibility", item.id);
                         }
-                    }
-                    for(size_t i = 0; i < body->beam_count; i += 1) {
-                        EditorSoftBeam *beam = &body->beams[i];
-                        size_t hierarchy_index = editor_project_soft_body_hierarchy_index_get(
-                            body, EDITOR_SOFT_HIERARCHY_BEAM, beam->id);
-                        y = 476.0f + (float)hierarchy_index * 28.0f;
-                        UIButtonStyle selected_style = editor_selected_button_style_get();
-                        char id[64];
-                        char visibility_id[72];
-                        if(!editor_named_text_sync(&font, beam->name, &soft_beam_labels[i],
-                                soft_beam_cache[i], EDITOR_OBJECT_NAME_MAX)) goto fail;
-                        snprintf(id, sizeof(id), "editor.soft_beam.%u", beam->id);
-                        snprintf(visibility_id, sizeof(visibility_id),
-                            "editor.soft_beam.%u.visibility", beam->id);
+                        if(name == NULL || label == NULL || cache == NULL) continue;
+                        if(!editor_named_text_sync(&font, name, label, cache,
+                                EDITOR_OBJECT_NAME_MAX)) goto fail;
                         (void)editor_visibility_toggle(visibility_id, &visibility_icon_label,
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, y, 24.0f, 24.0f},
-                            &project, EDITOR_VISIBILITY_SOFT_BEAM, selected->id,
-                            body->id, beam->id, beam->visible);
+                            &project, visibility_kind, selected->id,
+                            body->id, item.id, visible);
                         {
-                            UIButtonResult result = rohr_ui_button(id, &soft_beam_labels[i],
+                            UIButtonResult result = rohr_ui_button(id, label,
                                 (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, y,
                                     EDITOR_TOOLS_WIDTH - 48.0f, 24.0f},
-                                (viewport_state.selection == EDITOR_SELECTION_SOFT_BEAM &&
-                                    viewport_state.selected_soft_beam == beam->id) ||
+                                item_selected ||
                                     editor_selection_path_check(&viewport_state,
-                                        EDITOR_SELECTION_SOFT_BEAM, selected->id,
-                                        body->id, 0, beam->id) ?
+                                        selection_kind, selected->id,
+                                        body->id, 0, item.id) ?
                                     &selected_style : NULL);
                             editor_hierarchy_drag_row(&hierarchy_drag, &viewport_state,
-                                (EditorSelectionRef){EDITOR_SELECTION_SOFT_BEAM,
-                                    selected->id, body->id, 0, beam->id},
+                                (EditorSelectionRef){selection_kind,
+                                    selected->id, body->id, 0, item.id},
                                 (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, y,
                                     EDITOR_TOOLS_WIDTH - 48.0f, 24.0f}, result,
                                 hierarchy_pointer, hierarchy_primary,
                                 panel_scroll_offset,
                                 hierarchy_index + 1 == body->hierarchy_count);
                             if(result.clicked || result.focus_changed) {
-                                viewport_state.selection = EDITOR_SELECTION_SOFT_BEAM;
-                                viewport_state.selected_soft_beam = beam->id;
-                                if(result.double_clicked) (void)editor_navigation_selected_open(
-                                    &project, &viewport_state);
-                            }
-                        }
-                    }
-                    for(size_t i = 0; i < body->area_count; i += 1) {
-                        EditorSoftArea *area = &body->areas[i];
-                        size_t hierarchy_index = editor_project_soft_body_hierarchy_index_get(
-                            body, EDITOR_SOFT_HIERARCHY_AREA, area->id);
-                        y = 476.0f + (float)hierarchy_index * 28.0f;
-                        UIButtonStyle selected_style = editor_selected_button_style_get();
-                        char id[64];
-                        char visibility_id[72];
-                        if(!editor_named_text_sync(&font, area->name, &soft_area_labels[i],
-                                soft_area_cache[i], EDITOR_OBJECT_NAME_MAX)) goto fail;
-                        snprintf(id, sizeof(id), "editor.soft_area.%u", area->id);
-                        snprintf(visibility_id, sizeof(visibility_id),
-                            "editor.soft_area.%u.visibility", area->id);
-                        (void)editor_visibility_toggle(visibility_id, &visibility_icon_label,
-                            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, y, 24.0f, 24.0f},
-                            &project, EDITOR_VISIBILITY_SOFT_AREA, selected->id,
-                            body->id, area->id, area->visible);
-                        {
-                            UIButtonResult result = rohr_ui_button(id, &soft_area_labels[i],
-                                (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, y,
-                                    EDITOR_TOOLS_WIDTH - 48.0f, 24.0f},
-                                (viewport_state.selection == EDITOR_SELECTION_SOFT_AREA &&
-                                    viewport_state.selected_soft_area == area->id) ||
-                                    editor_selection_path_check(&viewport_state,
-                                        EDITOR_SELECTION_SOFT_AREA, selected->id,
-                                        body->id, 0, area->id) ?
-                                    &selected_style : NULL);
-                            editor_hierarchy_drag_row(&hierarchy_drag, &viewport_state,
-                                (EditorSelectionRef){EDITOR_SELECTION_SOFT_AREA,
-                                    selected->id, body->id, 0, area->id},
-                                (UIRect){EDITOR_VIEWPORT_WIDTH + 40.0f, y,
-                                    EDITOR_TOOLS_WIDTH - 48.0f, 24.0f}, result,
-                                hierarchy_pointer, hierarchy_primary,
-                                panel_scroll_offset,
-                                hierarchy_index + 1 == body->hierarchy_count);
-                            if(result.clicked || result.focus_changed) {
-                                viewport_state.selection = EDITOR_SELECTION_SOFT_AREA;
-                                viewport_state.selected_soft_area = area->id;
-                                viewport_state.soft_area_candidates[0] = area->id;
-                                viewport_state.soft_area_candidate_count = 1;
+                                viewport_state.selection = selection_kind;
+                                if(selection_kind == EDITOR_SELECTION_SOFT_NODE)
+                                    viewport_state.selected_soft_node = item.id;
+                                else if(selection_kind == EDITOR_SELECTION_SOFT_BEAM)
+                                    viewport_state.selected_soft_beam = item.id;
+                                else {
+                                    viewport_state.selected_soft_area = item.id;
+                                    viewport_state.soft_area_candidates[0] = item.id;
+                                    viewport_state.soft_area_candidate_count = 1;
+                                }
                                 if(result.double_clicked) (void)editor_navigation_selected_open(
                                     &project, &viewport_state);
                             }
@@ -4678,128 +4647,96 @@ int main(void) {
                     }
                 }
                 {
-                    float y;
                     editor_project_object_hierarchy_sync(selected);
-                    for(size_t i = 0; i < selected->rigid_body_count; i += 1) {
-                        EditorRigidBody *body = &selected->rigid_bodies[i];
-                        size_t hierarchy_index = editor_project_object_hierarchy_index_get(
-                            selected, EDITOR_HIERARCHY_RIGID_BODY, body->id);
-                        y = 250.0f + (float)hierarchy_index * 30.0f;
+                    for(size_t hierarchy_index = 0;
+                            hierarchy_index < selected->hierarchy_count;
+                            hierarchy_index += 1) {
+                        EditorHierarchyItem item = selected->hierarchy[hierarchy_index];
                         UIButtonStyle selected_style = editor_selected_button_style_get();
                         UIButtonResult result;
+                        EditorHierarchySelection selection_kind;
+                        EditorVisibilityKind visibility_kind;
+                        TextAsset *label = NULL;
+                        const char *name = NULL;
+                        char *cache = NULL;
+                        bool visible = false;
+                        bool item_selected = false;
+                        float y = 250.0f + (float)hierarchy_index * 30.0f;
                         char id[64];
                         char visibility_id[72];
-                        if(!editor_named_text_sync(&font, body->name,
-                                &rigid_body_labels[i], rigid_body_cache[i],
+                        if(item.kind == EDITOR_HIERARCHY_RIGID_BODY) {
+                            for(size_t i = 0; i < selected->rigid_body_count; i += 1)
+                                if(selected->rigid_bodies[i].id == item.id) {
+                                    name = selected->rigid_bodies[i].name;
+                                    visible = selected->rigid_bodies[i].visible;
+                                    label = &rigid_body_labels[i];
+                                    cache = rigid_body_cache[i];
+                                }
+                            selection_kind = EDITOR_SELECTION_RIGID_BODY;
+                            visibility_kind = EDITOR_VISIBILITY_RIGID_BODY;
+                            item_selected = viewport_state.selection == selection_kind &&
+                                viewport_state.selected_rigid_body == item.id;
+                            snprintf(id, sizeof(id), "editor.rigid_body.%u", item.id);
+                            snprintf(visibility_id, sizeof(visibility_id),
+                                "editor.rigid_body.%u.visibility", item.id);
+                        } else if(item.kind == EDITOR_HIERARCHY_JOINT) {
+                            for(size_t i = 0; i < selected->joint_count; i += 1)
+                                if(selected->joint_items[i].id == item.id) {
+                                    name = selected->joint_items[i].name;
+                                    visible = selected->joint_items[i].visible;
+                                    label = &joint_labels[i];
+                                    cache = joint_cache[i];
+                                }
+                            selection_kind = EDITOR_SELECTION_JOINT;
+                            visibility_kind = EDITOR_VISIBILITY_JOINT;
+                            item_selected = viewport_state.selection == selection_kind &&
+                                viewport_state.selected_joint == item.id;
+                            snprintf(id, sizeof(id), "editor.joint.%u", item.id);
+                            snprintf(visibility_id, sizeof(visibility_id),
+                                "editor.joint.%u.visibility", item.id);
+                        } else {
+                            for(size_t i = 0; i < selected->soft_body_count; i += 1)
+                                if(selected->soft_body_items[i].id == item.id) {
+                                    name = selected->soft_body_items[i].name;
+                                    visible = selected->soft_body_items[i].visible;
+                                    label = &soft_body_labels[i];
+                                    cache = soft_body_cache[i];
+                                }
+                            selection_kind = EDITOR_SELECTION_SOFT_BODY;
+                            visibility_kind = EDITOR_VISIBILITY_SOFT_BODY;
+                            item_selected = viewport_state.selection == selection_kind &&
+                                viewport_state.selected_soft_body == item.id;
+                            snprintf(id, sizeof(id), "editor.soft_body.%u", item.id);
+                            snprintf(visibility_id, sizeof(visibility_id),
+                                "editor.soft_body.%u.visibility", item.id);
+                        }
+                        if(name == NULL || label == NULL || cache == NULL) continue;
+                        if(!editor_named_text_sync(&font, name, label, cache,
                                 EDITOR_OBJECT_NAME_MAX)) goto fail;
-                        snprintf(id, sizeof(id), "editor.rigid_body.%u", body->id);
-                        snprintf(visibility_id, sizeof(visibility_id),
-                            "editor.rigid_body.%u.visibility", body->id);
                         (void)editor_visibility_toggle(visibility_id, &visibility_icon_label,
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, y, 26.0f, 26.0f},
-                            &project, EDITOR_VISIBILITY_RIGID_BODY, selected->id,
-                            0, body->id, body->visible);
-                        result = rohr_ui_button(id, &rigid_body_labels[i],
+                            &project, visibility_kind, selected->id, 0, item.id, visible);
+                        result = rohr_ui_button(id, label,
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 42.0f, y,
                                 EDITOR_TOOLS_WIDTH - 50.0f, 26.0f},
-                            (viewport_state.selection == EDITOR_SELECTION_RIGID_BODY &&
-                                viewport_state.selected_rigid_body == body->id) ||
+                            item_selected ||
                                 editor_selection_path_check(&viewport_state,
-                                    EDITOR_SELECTION_RIGID_BODY, selected->id,
-                                    0, 0, body->id) ?
+                                    selection_kind, selected->id, 0, 0, item.id) ?
                                 &selected_style : NULL);
                         editor_hierarchy_drag_row(&hierarchy_drag, &viewport_state,
-                            (EditorSelectionRef){EDITOR_SELECTION_RIGID_BODY,
-                                selected->id, 0, 0, body->id},
+                            (EditorSelectionRef){selection_kind,
+                                selected->id, 0, 0, item.id},
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 42.0f, y,
                                 EDITOR_TOOLS_WIDTH - 50.0f, 26.0f}, result,
                             hierarchy_pointer, hierarchy_primary, panel_scroll_offset,
                             hierarchy_index + 1 == selected->hierarchy_count);
                         if(result.clicked || result.focus_changed) {
-                            viewport_state.selection = EDITOR_SELECTION_RIGID_BODY;
-                            viewport_state.selected_rigid_body = body->id;
-                            if(result.double_clicked) (void)editor_navigation_selected_open(
-                                &project, &viewport_state);
-                        }
-                    }
-                    for(size_t i = 0; i < selected->joint_count; i += 1) {
-                        EditorJoint *joint = &selected->joint_items[i];
-                        size_t hierarchy_index = editor_project_object_hierarchy_index_get(
-                            selected, EDITOR_HIERARCHY_JOINT, joint->id);
-                        y = 250.0f + (float)hierarchy_index * 30.0f;
-                        UIButtonStyle selected_style = editor_selected_button_style_get();
-                        UIButtonResult result;
-                        char id[64];
-                        char visibility_id[72];
-                        if(!editor_named_text_sync(&font, joint->name, &joint_labels[i],
-                                joint_cache[i], EDITOR_OBJECT_NAME_MAX)) goto fail;
-                        snprintf(id, sizeof(id), "editor.joint.%u", joint->id);
-                        snprintf(visibility_id, sizeof(visibility_id),
-                            "editor.joint.%u.visibility", joint->id);
-                        (void)editor_visibility_toggle(visibility_id, &visibility_icon_label,
-                            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, y, 26.0f, 26.0f},
-                            &project, EDITOR_VISIBILITY_JOINT, selected->id,
-                            0, joint->id, joint->visible);
-                        result = rohr_ui_button(id, &joint_labels[i],
-                            (UIRect){EDITOR_VIEWPORT_WIDTH + 42.0f, y,
-                                EDITOR_TOOLS_WIDTH - 50.0f, 26.0f},
-                            (viewport_state.selection == EDITOR_SELECTION_JOINT &&
-                                viewport_state.selected_joint == joint->id) ||
-                                editor_selection_path_check(&viewport_state,
-                                    EDITOR_SELECTION_JOINT, selected->id,
-                                    0, 0, joint->id) ?
-                                &selected_style : NULL);
-                        editor_hierarchy_drag_row(&hierarchy_drag, &viewport_state,
-                            (EditorSelectionRef){EDITOR_SELECTION_JOINT,
-                                selected->id, 0, 0, joint->id},
-                            (UIRect){EDITOR_VIEWPORT_WIDTH + 42.0f, y,
-                                EDITOR_TOOLS_WIDTH - 50.0f, 26.0f}, result,
-                            hierarchy_pointer, hierarchy_primary, panel_scroll_offset,
-                            hierarchy_index + 1 == selected->hierarchy_count);
-                        if(result.clicked || result.focus_changed) {
-                            viewport_state.selection = EDITOR_SELECTION_JOINT;
-                            viewport_state.selected_joint = joint->id;
-                            if(result.double_clicked) (void)editor_navigation_selected_open(
-                                &project, &viewport_state);
-                        }
-                    }
-                    for(size_t i = 0; i < selected->soft_body_count; i += 1) {
-                        EditorSoftBody *body = &selected->soft_body_items[i];
-                        size_t hierarchy_index = editor_project_object_hierarchy_index_get(
-                            selected, EDITOR_HIERARCHY_SOFT_BODY, body->id);
-                        y = 250.0f + (float)hierarchy_index * 30.0f;
-                        UIButtonStyle selected_style = editor_selected_button_style_get();
-                        UIButtonResult result;
-                        char id[64];
-                        char visibility_id[72];
-                        if(!editor_named_text_sync(&font, body->name, &soft_body_labels[i],
-                                soft_body_cache[i], EDITOR_OBJECT_NAME_MAX)) goto fail;
-                        snprintf(id, sizeof(id), "editor.soft_body.%u", body->id);
-                        snprintf(visibility_id, sizeof(visibility_id),
-                            "editor.soft_body.%u.visibility", body->id);
-                        (void)editor_visibility_toggle(visibility_id, &visibility_icon_label,
-                            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, y, 26.0f, 26.0f},
-                            &project, EDITOR_VISIBILITY_SOFT_BODY, selected->id,
-                            0, body->id, body->visible);
-                        result = rohr_ui_button(id, &soft_body_labels[i],
-                            (UIRect){EDITOR_VIEWPORT_WIDTH + 42.0f, y,
-                                EDITOR_TOOLS_WIDTH - 50.0f, 26.0f},
-                            (viewport_state.selection == EDITOR_SELECTION_SOFT_BODY &&
-                                viewport_state.selected_soft_body == body->id) ||
-                                editor_selection_path_check(&viewport_state,
-                                    EDITOR_SELECTION_SOFT_BODY, selected->id,
-                                    0, 0, body->id) ?
-                                &selected_style : NULL);
-                        editor_hierarchy_drag_row(&hierarchy_drag, &viewport_state,
-                            (EditorSelectionRef){EDITOR_SELECTION_SOFT_BODY,
-                                selected->id, 0, 0, body->id},
-                            (UIRect){EDITOR_VIEWPORT_WIDTH + 42.0f, y,
-                                EDITOR_TOOLS_WIDTH - 50.0f, 26.0f}, result,
-                            hierarchy_pointer, hierarchy_primary, panel_scroll_offset,
-                            hierarchy_index + 1 == selected->hierarchy_count);
-                        if(result.clicked || result.focus_changed) {
-                            viewport_state.selection = EDITOR_SELECTION_SOFT_BODY;
-                            viewport_state.selected_soft_body = body->id;
+                            viewport_state.selection = selection_kind;
+                            if(selection_kind == EDITOR_SELECTION_RIGID_BODY)
+                                viewport_state.selected_rigid_body = item.id;
+                            else if(selection_kind == EDITOR_SELECTION_JOINT)
+                                viewport_state.selected_joint = item.id;
+                            else viewport_state.selected_soft_body = item.id;
                             if(result.double_clicked) (void)editor_navigation_selected_open(
                                 &project, &viewport_state);
                         }
