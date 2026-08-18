@@ -190,6 +190,34 @@ static bool editor_workspace_starter_project_init(EditorProject *project) {
     EditorObject *starter;
     EditorRigidBody *floor_body;
     EditorRigidBody *box_body;
+    EditorRigidBody *chassis_body;
+    EditorRigidBody *wheel_body;
+    EditorRigidBody *welded_body;
+    EditorRigidBody *spring_body;
+    EditorRigidBody *particle_body;
+    EditorAnchor *chassis_pin;
+    EditorAnchor *wheel_pin;
+    EditorAnchor *chassis_weld;
+    EditorAnchor *welded_anchor;
+    EditorAnchor *chassis_spring;
+    EditorAnchor *spring_anchor;
+    EditorJoint *joint;
+    EditorSoftBody *soft_body;
+    EditorSoftNode *soft_nodes[4];
+    EditorSprite *sprite;
+    EditorAnimatedSprite *animation;
+    EditorRigidBodyId box_id;
+    EditorRigidBodyId chassis_id;
+    EditorRigidBodyId wheel_id;
+    EditorRigidBodyId welded_id;
+    EditorRigidBodyId spring_id;
+    EditorRigidBodyId particle_id;
+    EditorAnchorId chassis_pin_id;
+    EditorAnchorId wheel_pin_id;
+    EditorAnchorId chassis_weld_id;
+    EditorAnchorId welded_anchor_id;
+    EditorAnchorId chassis_spring_id;
+    EditorAnchorId spring_anchor_id;
 
     if(project == NULL) return false;
     editor_project_init(project);
@@ -216,6 +244,153 @@ static bool editor_workspace_starter_project_init(EditorProject *project) {
     box_body->gravity_enabled = true;
     editor_workspace_hitbox_rectangle_set(project, &box_body->hitboxes[0],
         50.0f, 50.0f);
+    box_id = box_body->id;
+
+    chassis_body = editor_project_rigid_body_add(project, starter);
+    if(chassis_body == NULL) return false;
+    chassis_id = chassis_body->id;
+    wheel_body = editor_project_rigid_body_add(project, starter);
+    if(wheel_body == NULL) return false;
+    wheel_id = wheel_body->id;
+    welded_body = editor_project_rigid_body_add(project, starter);
+    if(welded_body == NULL) return false;
+    welded_id = welded_body->id;
+    spring_body = editor_project_rigid_body_add(project, starter);
+    if(spring_body == NULL) return false;
+    spring_id = spring_body->id;
+    particle_body = editor_project_rigid_body_add(project, starter);
+    if(particle_body == NULL) return false;
+    particle_id = particle_body->id;
+    chassis_body = editor_project_rigid_body_get(starter, chassis_id);
+    wheel_body = editor_project_rigid_body_get(starter, wheel_id);
+    welded_body = editor_project_rigid_body_get(starter, welded_id);
+    spring_body = editor_project_rigid_body_get(starter, spring_id);
+    particle_body = editor_project_rigid_body_get(starter, particle_id);
+    snprintf(chassis_body->name, sizeof(chassis_body->name), "joint_chassis");
+    chassis_body->position = (Position){-220.0f, 20.0f};
+    editor_workspace_hitbox_rectangle_set(project, &chassis_body->hitboxes[0],
+        120.0f, 30.0f);
+    snprintf(wheel_body->name, sizeof(wheel_body->name), "revolute_wheel");
+    wheel_body->position = (Position){-160.0f, 20.0f};
+    editor_workspace_hitbox_rectangle_set(project, &wheel_body->hitboxes[0],
+        42.0f, 42.0f);
+    snprintf(welded_body->name, sizeof(welded_body->name), "welded_body");
+    welded_body->position = (Position){-280.0f, 20.0f};
+    editor_workspace_hitbox_rectangle_set(project, &welded_body->hitboxes[0],
+        38.0f, 50.0f);
+    snprintf(spring_body->name, sizeof(spring_body->name), "spring_body");
+    spring_body->position = (Position){-220.0f, 125.0f};
+    editor_workspace_hitbox_rectangle_set(project, &spring_body->hitboxes[0],
+        42.0f, 42.0f);
+    snprintf(particle_body->name, sizeof(particle_body->name), "particle_body");
+    particle_body->position = (Position){100.0f, 20.0f};
+    particle_body->particle = true;
+    particle_body->particle_auto_fit = false;
+    particle_body->particle_radius = 28.0f;
+
+    chassis_pin = editor_project_anchor_add(project, starter,
+        (Position){60.0f, 0.0f}, chassis_body->id);
+    if(chassis_pin == NULL) return false;
+    chassis_pin_id = chassis_pin->id;
+    wheel_pin = editor_project_anchor_add(project, starter,
+        (Position){0.0f, 0.0f}, wheel_body->id);
+    if(wheel_pin == NULL) return false;
+    wheel_pin_id = wheel_pin->id;
+    chassis_weld = editor_project_anchor_add(project, starter,
+        (Position){-60.0f, 0.0f}, chassis_body->id);
+    if(chassis_weld == NULL) return false;
+    chassis_weld_id = chassis_weld->id;
+    welded_anchor = editor_project_anchor_add(project, starter,
+        (Position){0.0f, 0.0f}, welded_body->id);
+    if(welded_anchor == NULL) return false;
+    welded_anchor_id = welded_anchor->id;
+    chassis_spring = editor_project_anchor_add(project, starter,
+        (Position){0.0f, 0.0f}, chassis_body->id);
+    if(chassis_spring == NULL) return false;
+    chassis_spring_id = chassis_spring->id;
+    spring_anchor = editor_project_anchor_add(project, starter,
+        (Position){0.0f, 0.0f}, spring_body->id);
+    if(spring_anchor == NULL) return false;
+    spring_anchor_id = spring_anchor->id;
+    if(editor_project_anchor_add(project, starter,
+            (Position){300.0f, 190.0f}, 0) == NULL) return false;
+    chassis_pin = editor_project_anchor_get(starter, chassis_pin_id);
+    wheel_pin = editor_project_anchor_get(starter, wheel_pin_id);
+    chassis_weld = editor_project_anchor_get(starter, chassis_weld_id);
+    welded_anchor = editor_project_anchor_get(starter, welded_anchor_id);
+    chassis_spring = editor_project_anchor_get(starter, chassis_spring_id);
+    spring_anchor = editor_project_anchor_get(starter, spring_anchor_id);
+    snprintf(chassis_pin->name, sizeof(chassis_pin->name), "chassis_pin");
+    snprintf(wheel_pin->name, sizeof(wheel_pin->name), "wheel_pin");
+    snprintf(chassis_weld->name, sizeof(chassis_weld->name), "chassis_weld");
+    snprintf(welded_anchor->name, sizeof(welded_anchor->name), "welded_anchor");
+    snprintf(chassis_spring->name, sizeof(chassis_spring->name), "chassis_spring");
+    snprintf(spring_anchor->name, sizeof(spring_anchor->name), "spring_anchor");
+    snprintf(starter->anchors[starter->anchor_count - 1].name,
+        sizeof(starter->anchors[starter->anchor_count - 1].name), "world_anchor");
+
+    joint = editor_project_joint_add(project, starter, EDITOR_JOINT_REVOLUTE);
+    if(joint == NULL) return false;
+    snprintf(joint->name, sizeof(joint->name), "revolute_joint");
+    joint->anchor_a = chassis_pin_id;
+    joint->anchor_b = wheel_pin_id;
+    joint = editor_project_joint_add(project, starter, EDITOR_JOINT_WELD);
+    if(joint == NULL) return false;
+    snprintf(joint->name, sizeof(joint->name), "weld_joint");
+    joint->anchor_a = chassis_weld_id;
+    joint->anchor_b = welded_anchor_id;
+    joint = editor_project_joint_add(project, starter, EDITOR_JOINT_SPRING);
+    if(joint == NULL) return false;
+    snprintf(joint->name, sizeof(joint->name), "spring_joint");
+    joint->anchor_a = chassis_spring_id;
+    joint->anchor_b = spring_anchor_id;
+    joint->rest_length = 105.0f;
+
+    soft_body = editor_project_soft_body_add(project, starter);
+    if(soft_body == NULL) return false;
+    snprintf(soft_body->name, sizeof(soft_body->name), "soft_body");
+    soft_body->position = (Position){220.0f, 80.0f};
+    soft_nodes[0] = editor_project_soft_node_add(project, soft_body,
+        (Position){-45.0f, -45.0f});
+    soft_nodes[1] = editor_project_soft_node_add(project, soft_body,
+        (Position){45.0f, -45.0f});
+    soft_nodes[2] = editor_project_soft_node_add(project, soft_body,
+        (Position){45.0f, 45.0f});
+    soft_nodes[3] = editor_project_soft_node_add(project, soft_body,
+        (Position){-45.0f, 45.0f});
+    for(size_t i = 0; i < 4; i += 1) if(soft_nodes[i] == NULL) return false;
+    for(size_t i = 0; i < 4; i += 1)
+        if(editor_project_soft_beam_add(project, soft_body, soft_nodes[i]->id,
+                soft_nodes[(i + 1) % 4]->id) == NULL) return false;
+    if(editor_project_soft_beam_add(project, soft_body,
+            soft_nodes[0]->id, soft_nodes[2]->id) == NULL) return false;
+
+    sprite = editor_project_sprite_add(project, starter, "standalone_sprite",
+        "assets/tutorial_frame_1.png");
+    if(sprite == NULL) return false;
+    sprite->position = (Position){220.0f, -100.0f};
+    sprite->size = (Scale){64.0f, 64.0f};
+
+    animation = editor_project_animated_sprite_add(project, starter);
+    if(animation == NULL) return false;
+    snprintf(animation->name, sizeof(animation->name), "attached_animation");
+    animation->rigid_body = box_id;
+    animation->time_per_frame = 0.2;
+    animation->playing = true;
+    if(!editor_project_animation_frame_add(project, animation, "frame_1",
+            "assets/tutorial_frame_1.png", (Scale){64.0f, 64.0f}) ||
+            !editor_project_animation_frame_add(project, animation, "frame_2",
+                "assets/tutorial_frame_2.png", (Scale){64.0f, 64.0f})) return false;
+    animation = editor_project_animated_sprite_add(project, starter);
+    if(animation == NULL) return false;
+    snprintf(animation->name, sizeof(animation->name), "free_animation");
+    animation->editor_position = (Position){340.0f, 80.0f};
+    animation->time_per_frame = 0.2;
+    animation->playing = true;
+    if(!editor_project_animation_frame_add(project, animation, "frame_1",
+            "assets/tutorial_frame_1.png", (Scale){64.0f, 64.0f}) ||
+            !editor_project_animation_frame_add(project, animation, "frame_2",
+                "assets/tutorial_frame_2.png", (Scale){64.0f, 64.0f})) return false;
     editor_project_selection_clear(project);
     return true;
 }
@@ -510,6 +685,12 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 sprite_index += 1)
             fprintf(header, "    Entity sprite_%s;\n",
                 object->sprites[sprite_index].name);
+        for(size_t sprite_index = 0; sprite_index < object->animated_sprite_count;
+                sprite_index += 1)
+            if(editor_workspace_body_get(object,
+                    object->animated_sprite_items[sprite_index].rigid_body) == NULL)
+                fprintf(header, "    Entity animation_%s;\n",
+                    object->animated_sprite_items[sprite_index].name);
         fprintf(header,
             "} %s;\n\n"
             "EngineResult %s_create(%s *object, Position position);\n"
@@ -580,8 +761,22 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
             const EditorAnimatedSprite *sprite = &object->animated_sprite_items[sprite_index];
             const EditorRigidBody *body = editor_workspace_body_get(object,
                 sprite->rigid_body);
-            if(body == NULL || sprite->frame_count == 0 ||
+            char target[EDITOR_OBJECT_NAME_MAX + 24];
+            if(sprite->frame_count == 0 ||
                     sprite->frame_count > MAX_ANIMATIONS_FRAMES) continue;
+            if(body == NULL) {
+                snprintf(target, sizeof(target), "animation_%s", sprite->name);
+                fprintf(source,
+                    "    { EntityResult added = rohr_entity_add();\n"
+                    "      if(rohr_error_check(added)) { result = rohr_error_result_error("
+                    "added.result.error); goto fail; }\n"
+                    "      object->%s = added.result.value;\n"
+                    "      result = rohr_physics_position_set(object->%s, "
+                    "(Position){position.x + %#.9gf, position.y + %#.9gf});\n"
+                    "      if(rohr_error_check(result)) goto fail; }\n",
+                    target, target, sprite->editor_position.x,
+                    sprite->editor_position.y);
+            } else snprintf(target, sizeof(target), "%s", body->name);
             fprintf(source,
                 "    { AnimationDescriptor descriptor = {.amount_of_descriptors = %zu, "
                 ".ticks_per_frame = UINT64_C(%llu), .time_per_frame = %.17g, "
@@ -613,7 +808,7 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 sprite->direction == DIRECTION_LEFT ? "DIRECTION_LEFT" :
                     "DIRECTION_RIGHT",
                 sprite->follow_body_rotation ? "true" : "false",
-                sprite->visible ? "true" : "false", body->name);
+                sprite->visible ? "true" : "false", target);
         }
         for(size_t anchor_index = 0; anchor_index < object->anchor_count; anchor_index += 1) {
             const EditorAnchor *anchor = &object->anchors[anchor_index];
@@ -839,6 +1034,15 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 "(void)rohr_entity_delete(object->sprite_%s);\n",
                 sprite->name, sprite->name);
         }
+        for(size_t sprite_index = 0; sprite_index < object->animated_sprite_count;
+                sprite_index += 1) {
+            const EditorAnimatedSprite *sprite = &object->animated_sprite_items[sprite_index];
+            if(editor_workspace_body_get(object, sprite->rigid_body) != NULL) continue;
+            fprintf(source,
+                "    if(object->animation_%s != ENTITY_INVALID) "
+                "(void)rohr_entity_delete(object->animation_%s);\n",
+                sprite->name, sprite->name);
+        }
         for(size_t anchor_index = 0; anchor_index < object->anchor_count; anchor_index += 1) {
             const EditorAnchor *anchor = &object->anchors[anchor_index];
             if(editor_workspace_body_get(object, anchor->rigid_body) == NULL ||
@@ -1002,6 +1206,33 @@ static bool editor_workspace_config_template_copy(const EditorWorkspace *workspa
     return written && closed;
 }
 
+static bool editor_workspace_starter_assets_copy(const EditorWorkspace *workspace) {
+    static const char *names[] = {"tutorial_frame_1.png", "tutorial_frame_2.png"};
+    static const char *development_names[] = {
+        "examples/flies-around-ball/assets/elder-fly/flying/f1.png",
+        "examples/flies-around-ball/assets/elder-fly/flying/f2.png"
+    };
+    char relative[EDITOR_WORKSPACE_PATH_MAX];
+    char source[EDITOR_WORKSPACE_PATH_MAX * 2];
+    char destination[EDITOR_WORKSPACE_PATH_MAX * 2];
+    for(size_t i = 0; i < sizeof(names) / sizeof(names[0]); i += 1) {
+        EditorResult result;
+        if(snprintf(relative, sizeof(relative), "starter-assets/%s", names[i]) >=
+                (int)sizeof(relative)) return false;
+        result = editor_config_sdk_path_get(source, sizeof(source), relative, false);
+        if(editor_result_check(result) || source[0] == '\0') {
+            if(snprintf(source, sizeof(source), "%s/%s", ROHR_DEVELOPMENT_SOURCE_DIR,
+                    development_names[i]) >= (int)sizeof(source)) return false;
+        }
+        if(!editor_workspace_path_join(relative, sizeof(relative),
+                workspace->config.asset_directory, names[i]) ||
+                !editor_workspace_path_join(destination, sizeof(destination),
+                    workspace->directory, relative) ||
+                !SDL_CopyFile(source, destination)) return false;
+    }
+    return true;
+}
+
 bool editor_workspace_save(const EditorWorkspace *workspace,
     const EditorProject *project) {
     char path[EDITOR_WORKSPACE_PATH_MAX * 2];
@@ -1045,6 +1276,8 @@ EditorResult editor_workspace_create(EditorWorkspace *workspace, EditorProject *
     }
     if(!editor_workspace_starter_project_init(project)) return editor_result_error(
         EDITOR_ERROR_SCHEMA_INVALID, "Could not initialize the starter project");
+    if(!editor_workspace_starter_assets_copy(&created)) return editor_result_error(
+        EDITOR_ERROR_FILE_IO, "Could not copy starter assets under: %s", directory);
     if(!editor_workspace_save(&created, project)) return editor_result_error(
         EDITOR_ERROR_FILE_IO, "Could not save the initial project state under: %s", directory);
     if(!editor_workspace_scaffold_write(&created)) return editor_result_error(

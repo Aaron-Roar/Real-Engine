@@ -204,6 +204,14 @@ install(FILES
     config/project-editor.lua
     DESTINATION ${CMAKE_INSTALL_DATADIR}/rohr)
 install(FILES
+    examples/flies-around-ball/assets/elder-fly/flying/f1.png
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/rohr/starter-assets
+    RENAME tutorial_frame_1.png)
+install(FILES
+    examples/flies-around-ball/assets/elder-fly/flying/f2.png
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/rohr/starter-assets
+    RENAME tutorial_frame_2.png)
+install(FILES
     config/editor_gui_settings.lua
     DESTINATION config)
 install(FILES lib/lua/LICENSE

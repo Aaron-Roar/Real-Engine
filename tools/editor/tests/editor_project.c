@@ -855,7 +855,9 @@ int main(void) {
 
     {
         static EditorProject creation_project;
+        static EditorProject reloaded_project;
         EditorWorkspace creation_workspace = {0};
+        EditorWorkspace reloaded_workspace = {0};
         const char *fixture = "/tmp/rohr_editor_config_creation_test";
         char path[2048];
         SDL_PathInfo info;
@@ -864,11 +866,45 @@ int main(void) {
         workspace_fixture_remove(fixture);
         result = editor_workspace_create(&creation_workspace, &creation_project, fixture);
         snprintf(path, sizeof(path), "%s/editor.lua", fixture);
-        if(editor_result_check(result) || !SDL_GetPathInfo(path, &info) ||
+        if(editor_result_check(result) || creation_project.object_count != 1 ||
+                creation_project.objects[0].rigid_body_count != 7 ||
+                creation_project.objects[0].joint_count != 3 ||
+                creation_project.objects[0].anchor_count != 7 ||
+                creation_project.objects[0].soft_body_count != 1 ||
+                creation_project.objects[0].sprite_count != 1 ||
+                creation_project.objects[0].animated_sprite_count != 2 ||
+                creation_project.objects[0].animated_sprite_items[0].rigid_body == 0 ||
+                creation_project.objects[0].animated_sprite_items[1].rigid_body != 0 ||
+                !SDL_GetPathInfo(path, &info) ||
                 info.type != SDL_PATHTYPE_FILE) {
             workspace_fixture_remove(fixture);
             return 1;
         }
+        snprintf(path, sizeof(path), "%s/assets/tutorial_frame_1.png", fixture);
+        if(!SDL_GetPathInfo(path, &info) || info.type != SDL_PATHTYPE_FILE) {
+            workspace_fixture_remove(fixture);
+            return 1;
+        }
+        snprintf(path, sizeof(path), "%s/src/generated/project_objects.h", fixture);
+        if(!file_contains(path, "Entity animation_free_animation;")) {
+            workspace_fixture_remove(fixture);
+            return 1;
+        }
+        result = editor_workspace_load(&reloaded_workspace, &reloaded_project, fixture);
+        if(editor_result_check(result) || reloaded_project.object_count != 1 ||
+                reloaded_project.objects[0].rigid_body_count != 7 ||
+                reloaded_project.objects[0].joint_count != 3 ||
+                reloaded_project.objects[0].anchor_count != 7 ||
+                reloaded_project.objects[0].soft_body_count != 1 ||
+                reloaded_project.objects[0].sprite_count != 1 ||
+                reloaded_project.objects[0].animated_sprite_count != 2 ||
+                reloaded_project.objects[0].animated_sprite_items[0].rigid_body == 0 ||
+                reloaded_project.objects[0].animated_sprite_items[1].rigid_body != 0) {
+            workspace_fixture_remove(fixture);
+            return 1;
+        }
+        editor_project_destroy(&reloaded_project);
+        editor_project_destroy(&creation_project);
         workspace_fixture_remove(fixture);
     }
 
