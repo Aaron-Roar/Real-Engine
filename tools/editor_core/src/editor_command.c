@@ -274,16 +274,28 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
                     command->data.auto_shape.item);
                 if(hitbox == NULL) return editor_command_not_found("hitbox",
                     command->data.auto_shape.item);
-                return editor_command_result_from(editor_auto_shape_hitbox_apply(
-                    hitbox, &command->data.auto_shape.config));
+                return editor_command_result_from(
+                    command->data.auto_shape.point_count == 0 ?
+                    editor_auto_shape_hitbox_apply(hitbox,
+                        &command->data.auto_shape.config) :
+                    editor_auto_shape_hitbox_points_apply(hitbox,
+                        &command->data.auto_shape.config,
+                        command->data.auto_shape.points,
+                        command->data.auto_shape.point_count));
             }
             if(command->data.auto_shape.kind == EDITOR_ITEM_SOFT_BODY) {
                 EditorSoftBody *body = editor_command_soft_body_get(object,
                     command->data.auto_shape.item);
                 if(body == NULL) return editor_command_not_found("soft body",
                     command->data.auto_shape.item);
-                return editor_command_result_from(editor_auto_shape_soft_body_apply(
-                    body, &command->data.auto_shape.config));
+                return editor_command_result_from(
+                    command->data.auto_shape.point_count == 0 ?
+                    editor_auto_shape_soft_body_apply(body,
+                        &command->data.auto_shape.config) :
+                    editor_auto_shape_soft_body_points_apply(body,
+                        &command->data.auto_shape.config,
+                        command->data.auto_shape.points,
+                        command->data.auto_shape.point_count));
             }
             return editor_command_error(editor_result_error(
                 EDITOR_ERROR_INVALID_ARGUMENT,
@@ -1607,7 +1619,7 @@ visibility_invalid:
             strcmp(action, "auto-shape") == 0) {
         bool hitbox = strcmp(domain, "hitbox") == 0;
         int base = hitbox ? 7 : 6;
-        if(count != base + 6 ||
+        if(count < base + 6 ||
                 !editor_command_uint_parse(arguments[4],
                     &command->data.auto_shape.object) ||
                 !editor_command_uint_parse(arguments[5],
@@ -1628,6 +1640,21 @@ visibility_invalid:
                     &command->data.auto_shape.config.apex_offset))
             return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
                 "invalid %s auto-shape command", domain);
+        if(count > base + 6) {
+            if(strcmp(arguments[base + 6], "points") != 0 ||
+                    count == base + 7 ||
+                    (size_t)(count - base - 7) > EDITOR_SOFT_NODE_MAX)
+                return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                    "invalid %s auto-shape point selection", domain);
+            for(int i = base + 7; i < count; i += 1) {
+                uint32_t point;
+                if(!editor_command_uint_parse(arguments[i], &point))
+                    return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                        "auto-shape point identifiers must be integers");
+                command->data.auto_shape.points[
+                    command->data.auto_shape.point_count++] = point;
+            }
+        }
         command->type = EDITOR_COMMAND_AUTO_SHAPE;
         command->data.auto_shape.kind = hitbox ? EDITOR_ITEM_HITBOX :
             EDITOR_ITEM_SOFT_BODY;
@@ -1696,7 +1723,7 @@ static bool editor_command_shell_text_append(char *output, size_t capacity,
 EditorResult editor_command_cli_write(const EditorCommand *command,
         const char *document_path, char *output, size_t output_capacity) {
     const char *domain;
-    char values[512];
+    char values[2048];
     size_t used = 0;
     if(command == NULL || document_path == NULL || output == NULL ||
             output_capacity == 0)
@@ -1901,6 +1928,23 @@ EditorResult editor_command_cli_write(const EditorCommand *command,
                 command->data.auto_shape.config.height,
                 command->data.auto_shape.config.radius,
                 command->data.auto_shape.config.apex_offset);
+            if(command->data.auto_shape.point_count > 0) {
+                size_t value_used = strlen(values);
+                int written = snprintf(values + value_used,
+                    sizeof(values) - value_used, " points");
+                if(written < 0 || (size_t)written >= sizeof(values) - value_used)
+                    goto capacity_error;
+                value_used += (size_t)written;
+                for(size_t i = 0; i < command->data.auto_shape.point_count; i += 1) {
+                    written = snprintf(values + value_used,
+                        sizeof(values) - value_used, " %u",
+                        command->data.auto_shape.points[i]);
+                    if(written < 0 ||
+                            (size_t)written >= sizeof(values) - value_used)
+                        goto capacity_error;
+                    value_used += (size_t)written;
+                }
+            }
             break;
         }
         case EDITOR_COMMAND_RIGID_BODY_ORIGIN:

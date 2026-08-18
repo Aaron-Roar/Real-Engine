@@ -1284,6 +1284,23 @@ static Position editor_auto_shape_soft_local_get(const EditorObject *object,
         local.x * sine + local.y * cosine};
 }
 
+static bool editor_auto_shape_point_index_get(const EditorViewportState *state,
+        uint32_t point, size_t fallback_index, size_t *point_index,
+        size_t *point_count) {
+    if(state == NULL || point_index == NULL || point_count == NULL) return false;
+    if(state->auto_shape_point_count == 0) {
+        *point_index = fallback_index;
+        return true;
+    }
+    *point_count = state->auto_shape_point_count;
+    for(size_t i = 0; i < state->auto_shape_point_count; i += 1) {
+        if(state->auto_shape_points[i] != point) continue;
+        *point_index = i;
+        return true;
+    }
+    return false;
+}
+
 bool editor_viewport_auto_shape_update(EditorViewportState *state,
         EditorProject *project, EditorAutoShapeConfig *config, Position pointer,
         MouseButtonState primary_button, MouseButtonState pan_button,
@@ -1315,10 +1332,16 @@ bool editor_viewport_auto_shape_update(EditorViewportState *state,
             return false;
         if(state->dragged_vertex >= 0 &&
                 primary_button == MOUSE_BUTTON_STATE_DOWN) {
+            size_t point_count = hitbox->vertex_count;
+            size_t point_index;
             Position desired = {world_pointer.x - state->drag_offset.x,
                 world_pointer.y - state->drag_offset.y};
+            if(!editor_auto_shape_point_index_get(state,
+                    hitbox->vertices[state->dragged_vertex].id,
+                    (size_t)state->dragged_vertex, &point_index, &point_count))
+                return true;
             EditorResult adjusted = editor_auto_shape_control_set(config,
-                hitbox->vertex_count, (size_t)state->dragged_vertex,
+                point_count, point_index,
                 editor_auto_shape_rigid_local_get(object, body, desired));
             EditorCommand command;
             if(editor_result_check(adjusted)) return true;
@@ -1326,6 +1349,9 @@ bool editor_viewport_auto_shape_update(EditorViewportState *state,
                 .data.auto_shape = {.kind = EDITOR_ITEM_HITBOX,
                     .object = object->id, .parent = body->id, .item = hitbox->id,
                     .config = *config}};
+            command.data.auto_shape.point_count = state->auto_shape_point_count;
+            memcpy(command.data.auto_shape.points, state->auto_shape_points,
+                state->auto_shape_point_count * sizeof(*state->auto_shape_points));
             (void)editor_command_execute(project, &command);
             return true;
         }
@@ -1333,9 +1359,13 @@ bool editor_viewport_auto_shape_update(EditorViewportState *state,
         for(size_t i = 0; i < hitbox->vertex_count; i += 1) {
             Position control;
             Vec2D delta;
+            size_t point_count = hitbox->vertex_count;
+            size_t point_index;
             if(hitbox->vertices[i].position_locked ||
+                    !editor_auto_shape_point_index_get(state,
+                        hitbox->vertices[i].id, i, &point_index, &point_count) ||
                     !editor_auto_shape_control_check(config,
-                        hitbox->vertex_count, i)) continue;
+                        point_count, point_index)) continue;
             control = editor_hitbox_vertex_world_get(object, body, hitbox, (uint32_t)i);
             delta = (Vec2D){world_pointer.x - control.x, world_pointer.y - control.y};
             if(delta.x * delta.x + delta.y * delta.y >
@@ -1354,16 +1384,25 @@ bool editor_viewport_auto_shape_update(EditorViewportState *state,
                 body = &object->soft_body_items[i];
         if(body == NULL || !body->visible) return false;
         if(state->dragged_vertex >= 0 && primary_button == MOUSE_BUTTON_STATE_DOWN) {
+            size_t point_count = body->node_count;
+            size_t point_index;
             Position desired = {world_pointer.x - state->drag_offset.x,
                 world_pointer.y - state->drag_offset.y};
+            if(!editor_auto_shape_point_index_get(state,
+                    body->nodes[state->dragged_vertex].id,
+                    (size_t)state->dragged_vertex, &point_index, &point_count))
+                return true;
             EditorResult adjusted = editor_auto_shape_control_set(config,
-                body->node_count, (size_t)state->dragged_vertex,
+                point_count, point_index,
                 editor_auto_shape_soft_local_get(object, body, desired));
             EditorCommand command;
             if(editor_result_check(adjusted)) return true;
             command = (EditorCommand){.type = EDITOR_COMMAND_AUTO_SHAPE,
                 .data.auto_shape = {.kind = EDITOR_ITEM_SOFT_BODY,
                     .object = object->id, .item = body->id, .config = *config}};
+            command.data.auto_shape.point_count = state->auto_shape_point_count;
+            memcpy(command.data.auto_shape.points, state->auto_shape_points,
+                state->auto_shape_point_count * sizeof(*state->auto_shape_points));
             (void)editor_command_execute(project, &command);
             return true;
         }
@@ -1371,8 +1410,13 @@ bool editor_viewport_auto_shape_update(EditorViewportState *state,
         for(size_t i = 0; i < body->node_count; i += 1) {
             Position control;
             Vec2D delta;
-            if(!body->nodes[i].visible || !editor_auto_shape_control_check(
-                    config, body->node_count, i)) continue;
+            size_t point_count = body->node_count;
+            size_t point_index;
+            if(!body->nodes[i].visible ||
+                    !editor_auto_shape_point_index_get(state, body->nodes[i].id,
+                        i, &point_index, &point_count) ||
+                    !editor_auto_shape_control_check(config,
+                        point_count, point_index)) continue;
             control = editor_soft_node_world_get(object, body, &body->nodes[i]);
             delta = (Vec2D){world_pointer.x - control.x, world_pointer.y - control.y};
             if(delta.x * delta.x + delta.y * delta.y >

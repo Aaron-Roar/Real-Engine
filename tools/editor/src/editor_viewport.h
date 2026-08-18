@@ -91,6 +91,8 @@ typedef struct EditorViewportState {
     size_t soft_area_candidate_count;
     EditorOriginKind selected_origin_kind;
     EditorViewportMode auto_shape_parent_mode;
+    uint32_t auto_shape_points[EDITOR_SOFT_NODE_MAX];
+    size_t auto_shape_point_count;
     EditorRigidBodyId preview_rigid_body;
     EditorAnchorId preview_anchor;
     EditorSoftNodeId preview_soft_node;

@@ -147,6 +147,68 @@ EditorResult editor_auto_shape_soft_body_apply(EditorSoftBody *body,
     return editor_result_value(true);
 }
 
+EditorResult editor_auto_shape_hitbox_points_apply(EditorHitbox *hitbox,
+        const EditorAutoShapeConfig *config, const EditorVertexId *points,
+        size_t point_count) {
+    Position output_positions[EDITOR_HITBOX_VERTEX_MAX];
+    bool found[EDITOR_HITBOX_VERTEX_MAX] = {0};
+    size_t indices[EDITOR_HITBOX_VERTEX_MAX];
+    EditorResult result;
+    if(hitbox == NULL || points == NULL || point_count > EDITOR_HITBOX_VERTEX_MAX)
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "auto shape received invalid hitbox points");
+    result = editor_auto_shape_positions_get(config, output_positions, point_count);
+    if(editor_result_check(result)) return result;
+    for(size_t point = 0; point < point_count; point += 1) {
+        for(size_t vertex = 0; vertex < hitbox->vertex_count; vertex += 1) {
+            if(hitbox->vertices[vertex].id != points[point]) continue;
+            if(found[vertex]) return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                "auto shape contains a duplicate hitbox vertex");
+            indices[point] = vertex;
+            found[vertex] = true;
+            goto next_hitbox_point;
+        }
+        return editor_result_error(EDITOR_ERROR_NOT_FOUND,
+            "auto shape hitbox vertex was not found");
+next_hitbox_point:
+        continue;
+    }
+    for(size_t point = 0; point < point_count; point += 1)
+        hitbox->vertices[indices[point]].position = output_positions[point];
+    return editor_result_value(true);
+}
+
+EditorResult editor_auto_shape_soft_body_points_apply(EditorSoftBody *body,
+        const EditorAutoShapeConfig *config, const EditorSoftNodeId *points,
+        size_t point_count) {
+    Position output_positions[EDITOR_SOFT_NODE_MAX];
+    bool found[EDITOR_SOFT_NODE_MAX] = {0};
+    size_t indices[EDITOR_SOFT_NODE_MAX];
+    EditorResult result;
+    if(body == NULL || points == NULL || point_count > EDITOR_SOFT_NODE_MAX)
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "auto shape received invalid soft-body nodes");
+    result = editor_auto_shape_positions_get(config, output_positions, point_count);
+    if(editor_result_check(result)) return result;
+    for(size_t point = 0; point < point_count; point += 1) {
+        for(size_t node = 0; node < body->node_count; node += 1) {
+            if(body->nodes[node].id != points[point]) continue;
+            if(found[node]) return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                "auto shape contains a duplicate soft-body node");
+            indices[point] = node;
+            found[node] = true;
+            goto next_soft_body_point;
+        }
+        return editor_result_error(EDITOR_ERROR_NOT_FOUND,
+            "auto shape soft-body node was not found");
+next_soft_body_point:
+        continue;
+    }
+    for(size_t point = 0; point < point_count; point += 1)
+        body->nodes[indices[point]].position = output_positions[point];
+    return editor_result_value(true);
+}
+
 bool editor_auto_shape_control_check(const EditorAutoShapeConfig *config,
         size_t point_count, size_t point_index) {
     if(config == NULL || point_index >= point_count) return false;

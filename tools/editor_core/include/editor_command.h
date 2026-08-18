@@ -222,6 +222,8 @@ typedef struct EditorCommand {
             uint32_t parent;
             uint32_t item;
             EditorAutoShapeConfig config;
+            uint32_t points[EDITOR_SOFT_NODE_MAX];
+            size_t point_count;
         } auto_shape;
         struct {
             EditorObjectId object;

@@ -54,6 +54,23 @@ static int auto_shape_test(void) {
         if(fabsf(distance - 3.0f) > 0.001f ||
                 soft_body.nodes[i].id != node_ids[i]) return 1;
     }
+    {
+        EditorVertexId selected_vertices[] = {11, 13, 15};
+        EditorSoftNodeId selected_nodes[] = {21, 23, 25, 26};
+        hitbox.vertices[1].position = (Position){91.0f, 92.0f};
+        hitbox.vertices[3].position = (Position){93.0f, 94.0f};
+        if(editor_result_check(editor_auto_shape_hitbox_points_apply(&hitbox,
+                    &triangle, selected_vertices, 3)) ||
+                !position_near(hitbox.vertices[1].position, 91.0f, 92.0f) ||
+                !position_near(hitbox.vertices[3].position, 93.0f, 94.0f) ||
+                !position_near(hitbox.vertices[0].position, 0.0f, -2.0f)) return 1;
+        soft_body.nodes[1].position = (Position){81.0f, 82.0f};
+        soft_body.nodes[3].position = (Position){83.0f, 84.0f};
+        if(editor_result_check(editor_auto_shape_soft_body_points_apply(&soft_body,
+                    &circle, selected_nodes, 4)) ||
+                !position_near(soft_body.nodes[1].position, 81.0f, 82.0f) ||
+                !position_near(soft_body.nodes[3].position, 83.0f, 84.0f)) return 1;
+    }
     hitbox.vertex_count = 3;
     if(!editor_result_check(editor_auto_shape_hitbox_apply(&hitbox, &rectangle)) ||
             editor_result_check(editor_auto_shape_hitbox_apply(&hitbox, &triangle)) ||
@@ -118,9 +135,11 @@ static int auto_shape_command_test(void) {
     EditorResult parsed_result;
     const char *path;
     char output[1024];
+    char point_ids[3][16];
     char *arguments[] = {"editor-cli", "--soft-body", "cloth",
         "--object", "ShapeObject", "--property", "auto-shape",
-        "circle", "isosceles", "100", "100", "25", "0"};
+        "circle", "isosceles", "100", "100", "25", "0", "points",
+        "1", "2", "3"};
 
     editor_project_init(&project);
     object = editor_project_object_add(&project, (Position){0});
@@ -136,12 +155,20 @@ static int auto_shape_command_test(void) {
     for(size_t i = 0; i < 4; i += 1)
         if(editor_project_soft_node_add(&project, soft_body, (Position){0}) == NULL)
             return 1;
+    for(size_t i = 0; i < 3; i += 1) {
+        snprintf(point_ids[i], sizeof(point_ids[i]), "%u", soft_body->nodes[i].id);
+        arguments[14 + i] = point_ids[i];
+    }
     command = (EditorCommand){.type = EDITOR_COMMAND_AUTO_SHAPE,
         .data.auto_shape = {.kind = EDITOR_ITEM_HITBOX,
             .object = object->id, .parent = body->id, .item = hitbox->id,
             .config = {.kind = EDITOR_AUTO_SHAPE_CIRCLE, .radius = 12.0f,
                 .width = 100.0f, .height = 100.0f,
                 .triangle_kind = EDITOR_AUTO_TRIANGLE_ISOSCELES}}};
+    command.data.auto_shape.points[0] = hitbox->vertices[0].id;
+    command.data.auto_shape.points[1] = hitbox->vertices[1].id;
+    command.data.auto_shape.points[2] = hitbox->vertices[2].id;
+    command.data.auto_shape.point_count = 3;
     result = editor_command_execute(&project, &command);
     if(result.kind != ERROR_RESULT_VALUE ||
             !position_near(hitbox->vertices[0].position, 0.0f, -12.0f)) return 1;
@@ -149,14 +176,16 @@ static int auto_shape_command_test(void) {
         "project.rohr.json", output, sizeof(output));
     if(editor_result_check(parsed_result) ||
             strstr(output, "--property auto-shape circle") == NULL ||
-            strstr(output, "--hitbox frame_hitbox") == NULL) return 1;
+            strstr(output, "--hitbox frame_hitbox") == NULL ||
+            strstr(output, "points") == NULL) return 1;
     parsed_result = editor_command_cli_standard_parse(&project,
         (int)(sizeof(arguments) / sizeof(arguments[0])), arguments, &path, &parsed);
     if(editor_result_check(parsed_result) || parsed.type != EDITOR_COMMAND_AUTO_SHAPE ||
             parsed.data.auto_shape.kind != EDITOR_ITEM_SOFT_BODY ||
             parsed.data.auto_shape.item != soft_body->id ||
             parsed.data.auto_shape.config.kind != EDITOR_AUTO_SHAPE_CIRCLE ||
-            parsed.data.auto_shape.config.radius != 25.0f) return 1;
+            parsed.data.auto_shape.config.radius != 25.0f ||
+            parsed.data.auto_shape.point_count != 3) return 1;
     return editor_command_execute(&project, &parsed).kind == ERROR_RESULT_VALUE ? 0 : 1;
 }
 

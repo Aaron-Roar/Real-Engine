@@ -1276,6 +1276,9 @@ static bool editor_auto_shape_apply(EditorProject *project,
     if(object == NULL || state == NULL) return false;
     command.data.auto_shape.object = object->id;
     command.data.auto_shape.config = config;
+    command.data.auto_shape.point_count = state->auto_shape_point_count;
+    memcpy(command.data.auto_shape.points, state->auto_shape_points,
+        state->auto_shape_point_count * sizeof(*state->auto_shape_points));
     if(parent_mode == EDITOR_VIEWPORT_HITBOX) {
         EditorRigidBody *body = editor_selected_body_get(object, state);
         EditorHitbox *hitbox = editor_selected_hitbox_get(object, state);
@@ -1295,6 +1298,35 @@ static bool editor_auto_shape_apply(EditorProject *project,
         return false;
     }
     return true;
+}
+
+static size_t editor_auto_shape_hitbox_points_capture(
+        EditorViewportState *state, const EditorObject *object,
+        const EditorRigidBody *body, const EditorHitbox *hitbox) {
+    if(state == NULL || object == NULL || body == NULL || hitbox == NULL) return 0;
+    state->auto_shape_point_count = 0;
+    for(size_t vertex = 0; vertex < hitbox->vertex_count; vertex += 1) {
+        if(!editor_selection_path_check(state, EDITOR_SELECTION_VERTEX,
+                object->id, body->id, hitbox->id,
+                hitbox->vertices[vertex].id)) continue;
+        state->auto_shape_points[state->auto_shape_point_count++] =
+            hitbox->vertices[vertex].id;
+    }
+    return state->auto_shape_point_count;
+}
+
+static size_t editor_auto_shape_soft_body_points_capture(
+        EditorViewportState *state, const EditorObject *object,
+        const EditorSoftBody *body) {
+    if(state == NULL || object == NULL || body == NULL) return 0;
+    state->auto_shape_point_count = 0;
+    for(size_t node = 0; node < body->node_count; node += 1) {
+        if(!editor_selection_path_check(state, EDITOR_SELECTION_SOFT_NODE,
+                object->id, body->id, 0, body->nodes[node].id)) continue;
+        state->auto_shape_points[state->auto_shape_point_count++] =
+            body->nodes[node].id;
+    }
+    return state->auto_shape_point_count;
 }
 
 static EditorSoftNode *editor_selected_soft_node_get(EditorSoftBody *body,
@@ -2846,11 +2878,15 @@ int main(void) {
                     }
                 }
                 if(auto_shape_picker_open) {
+                    size_t auto_shape_point_count =
+                        editor_auto_shape_hitbox_points_capture(&viewport_state,
+                            selected, body, hitbox);
                     int selected_shape = editor_auto_shape_picker_draw(
                         "editor.hitbox.auto_shape.option",
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 110.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 62.0f},
-                        hitbox->vertex_count, &triangle_label,
+                        auto_shape_point_count > 0 ? auto_shape_point_count :
+                            hitbox->vertex_count, &triangle_label,
                         &rectangle_label, &circle_label);
                     if(selected_shape >= 0) {
                         auto_shape_config.kind = (EditorAutoShapeKind)selected_shape;
@@ -3868,11 +3904,15 @@ int main(void) {
                     }
                 }
                 if(auto_shape_picker_open) {
+                    size_t auto_shape_point_count =
+                        editor_auto_shape_soft_body_points_capture(&viewport_state,
+                            selected, body);
                     int selected_shape = editor_auto_shape_picker_draw(
                         "editor.soft_body.auto_shape.option",
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 394.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 62.0f},
-                        body->node_count, &triangle_label,
+                        auto_shape_point_count > 0 ? auto_shape_point_count :
+                            body->node_count, &triangle_label,
                         &rectangle_label, &circle_label);
                     if(selected_shape >= 0) {
                         auto_shape_config.kind = (EditorAutoShapeKind)selected_shape;

@@ -30,6 +30,12 @@ EditorResult editor_auto_shape_hitbox_apply(EditorHitbox *hitbox,
     const EditorAutoShapeConfig *config);
 EditorResult editor_auto_shape_soft_body_apply(EditorSoftBody *body,
     const EditorAutoShapeConfig *config);
+EditorResult editor_auto_shape_hitbox_points_apply(EditorHitbox *hitbox,
+    const EditorAutoShapeConfig *config, const EditorVertexId *points,
+    size_t point_count);
+EditorResult editor_auto_shape_soft_body_points_apply(EditorSoftBody *body,
+    const EditorAutoShapeConfig *config, const EditorSoftNodeId *points,
+    size_t point_count);
 bool editor_auto_shape_control_check(const EditorAutoShapeConfig *config,
     size_t point_count, size_t point_index);
 EditorResult editor_auto_shape_control_set(EditorAutoShapeConfig *config,

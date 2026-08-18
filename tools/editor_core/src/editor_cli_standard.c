@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define CLI_MAX 48
+#define CLI_MAX 128
 #define CLI_TEXT 1024
 
 static bool cli_selector_flag(const char *value) {
