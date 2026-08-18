@@ -58,9 +58,10 @@ typedef struct EditorHitbox {
     EditorHitboxId id;
     char name[EDITOR_OBJECT_NAME_MAX];
     bool visible;
-    EditorVertex vertices[EDITOR_HITBOX_VERTEX_MAX];
-    char line_names[EDITOR_HITBOX_VERTEX_MAX][EDITOR_OBJECT_NAME_MAX];
+    EditorVertex *vertices;
+    char (*line_names)[EDITOR_OBJECT_NAME_MAX];
     uint32_t vertex_count;
+    size_t vertex_capacity;
 } EditorHitbox;
 
 typedef struct EditorRigidBody {
@@ -85,8 +86,9 @@ typedef struct EditorRigidBody {
     uint32_t surface_color;
     RohrCollisionCategoryMask collision_category;
     RohrCollisionCategoryMask collision_with;
-    EditorHitbox hitboxes[EDITOR_BODY_HITBOX_MAX];
+    EditorHitbox *hitboxes;
     size_t hitbox_count;
+    size_t hitbox_capacity;
 } EditorRigidBody;
 
 typedef struct EditorCollisionMask {
@@ -159,8 +161,9 @@ typedef struct EditorSoftBeam {
 typedef struct EditorSoftArea {
     EditorSoftAreaId id;
     char name[EDITOR_OBJECT_NAME_MAX];
-    EditorSoftNodeId nodes[EDITOR_SOFT_AREA_NODE_MAX];
+    EditorSoftNodeId *nodes;
     size_t node_count;
+    size_t node_capacity;
     uint32_t color;
     bool color_overridden;
     bool visible;
@@ -189,14 +192,18 @@ typedef struct EditorSoftBody {
     uint32_t node_color;
     uint32_t beam_color;
     uint32_t area_color;
-    EditorSoftNode nodes[EDITOR_SOFT_NODE_MAX];
+    EditorSoftNode *nodes;
     size_t node_count;
-    EditorSoftBeam beams[EDITOR_SOFT_BEAM_MAX];
+    size_t node_capacity;
+    EditorSoftBeam *beams;
     size_t beam_count;
-    EditorSoftArea areas[EDITOR_SOFT_AREA_MAX];
+    size_t beam_capacity;
+    EditorSoftArea *areas;
     size_t area_count;
-    EditorSoftHierarchyItem hierarchy[EDITOR_SOFT_BODY_HIERARCHY_MAX];
+    size_t area_capacity;
+    EditorSoftHierarchyItem *hierarchy;
     size_t hierarchy_count;
+    size_t hierarchy_capacity;
 } EditorSoftBody;
 
 typedef struct EditorObject {
@@ -204,16 +211,21 @@ typedef struct EditorObject {
     char name[EDITOR_OBJECT_NAME_MAX];
     Position position;
     bool visible;
-    EditorRigidBody rigid_bodies[EDITOR_RIGID_BODY_MAX];
+    EditorRigidBody *rigid_bodies;
     size_t rigid_body_count;
-    EditorJoint joint_items[EDITOR_JOINT_MAX];
+    size_t rigid_body_capacity;
+    EditorJoint *joint_items;
     size_t joint_count;
-    EditorAnchor anchors[EDITOR_ANCHOR_MAX];
+    size_t joint_capacity;
+    EditorAnchor *anchors;
     size_t anchor_count;
-    EditorSoftBody soft_body_items[EDITOR_SOFT_BODY_MAX];
+    size_t anchor_capacity;
+    EditorSoftBody *soft_body_items;
     size_t soft_body_count;
-    EditorHierarchyItem hierarchy[EDITOR_OBJECT_HIERARCHY_MAX];
+    size_t soft_body_capacity;
+    EditorHierarchyItem *hierarchy;
     size_t hierarchy_count;
+    size_t hierarchy_capacity;
 } EditorObject;
 
 typedef struct EditorNavigationState {
@@ -237,10 +249,12 @@ typedef struct EditorProject {
     float viewport_camera_zoom;
     bool viewport_local_view;
     EditorNavigationState navigation;
-    EditorCollisionMask collision_masks[EDITOR_COLLISION_MASK_MAX];
+    EditorCollisionMask *collision_masks;
     size_t collision_mask_count;
-    EditorObject objects[EDITOR_OBJECT_MAX];
+    size_t collision_mask_capacity;
+    EditorObject *objects;
     size_t object_count;
+    size_t object_capacity;
     EditorObjectId next_id;
     EditorVertexId next_vertex_id;
     EditorRigidBodyId next_rigid_body_id;
@@ -260,11 +274,17 @@ bool editor_project_clone(EditorProject *destination, const EditorProject *sourc
 void editor_project_object_destroy(EditorObject *object);
 bool editor_project_object_clone(EditorObject *destination,
     const EditorObject *source);
+bool editor_project_object_copy_set(EditorObject *destination,
+    const EditorObject *source);
 void editor_project_rigid_body_destroy(EditorRigidBody *body);
 bool editor_project_rigid_body_clone(EditorRigidBody *destination,
     const EditorRigidBody *source);
+bool editor_project_rigid_body_copy_set(EditorRigidBody *destination,
+    const EditorRigidBody *source);
 void editor_project_soft_body_destroy(EditorSoftBody *body);
 bool editor_project_soft_body_clone(EditorSoftBody *destination,
+    const EditorSoftBody *source);
+bool editor_project_soft_body_copy_set(EditorSoftBody *destination,
     const EditorSoftBody *source);
 void editor_project_object_name_format(char *output, size_t capacity,
     const char *input);

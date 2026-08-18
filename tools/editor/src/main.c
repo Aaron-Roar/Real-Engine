@@ -5539,6 +5539,7 @@ int main(void) {
     editor_operation_history = NULL;
     editor_viewport_state_destroy(&viewport_state);
     editor_history_destroy(&history);
+    editor_project_destroy(&project);
     if(hidden_build_process != NULL) SDL_DestroyProcess(hidden_build_process);
     editor_terminal_panel_destroy(&terminal_panel);
     editor_build_settings_panel_destroy(&build_settings_panel);
@@ -5721,6 +5722,7 @@ fail:
     editor_operation_history = NULL;
     editor_viewport_state_destroy(&viewport_state);
     editor_history_destroy(&history);
+    editor_project_destroy(&project);
     if(hidden_build_process != NULL) SDL_DestroyProcess(hidden_build_process);
     editor_terminal_panel_destroy(&terminal_panel);
     editor_build_settings_panel_destroy(&build_settings_panel);

@@ -51,9 +51,6 @@ static bool editor_soft_body_hierarchy_reorder(EditorProject *project,
         EditorSelectionRef target, bool after, EditorHistory *history) {
     EditorObject *object = editor_object_query_get(project, source.object);
     EditorSoftBody *body = NULL;
-    EditorSoftHierarchyItem ordered[EDITOR_SOFT_BODY_HIERARCHY_MAX];
-    EditorSoftHierarchyItem selected_items[EDITOR_SOFT_BODY_HIERARCHY_MAX];
-    EditorSoftHierarchyItem remaining[EDITOR_SOFT_BODY_HIERARCHY_MAX];
     size_t selected_count = 0;
     size_t remaining_count = 0;
     size_t target_index;
@@ -64,6 +61,10 @@ static bool editor_soft_body_hierarchy_reorder(EditorProject *project,
         if(object->soft_body_items[i].id == source.parent) body = &object->soft_body_items[i];
     if(body == NULL) return false;
     editor_project_soft_body_hierarchy_sync(body);
+    if(body->hierarchy_count == 0) return false;
+    EditorSoftHierarchyItem ordered[body->hierarchy_count];
+    EditorSoftHierarchyItem selected_items[body->hierarchy_count];
+    EditorSoftHierarchyItem remaining[body->hierarchy_count];
     target_index = editor_project_soft_body_hierarchy_index_get(body,
         editor_soft_hierarchy_kind_get(target.kind), target.item);
     if(target_index == SIZE_MAX) return false;
@@ -121,9 +122,6 @@ static bool editor_object_hierarchy_reorder(EditorProject *project,
         EditorViewportState *state, EditorSelectionRef source,
         EditorSelectionRef target, bool after, EditorHistory *history) {
     EditorObject *object = editor_object_query_get(project, source.object);
-    EditorHierarchyItem ordered[EDITOR_OBJECT_HIERARCHY_MAX];
-    EditorHierarchyItem selected_items[EDITOR_OBJECT_HIERARCHY_MAX];
-    EditorHierarchyItem remaining[EDITOR_OBJECT_HIERARCHY_MAX];
     size_t selected_count = 0;
     size_t remaining_count = 0;
     size_t target_index;
@@ -131,6 +129,10 @@ static bool editor_object_hierarchy_reorder(EditorProject *project,
     bool source_selected;
     if(object == NULL) return false;
     editor_project_object_hierarchy_sync(object);
+    if(object->hierarchy_count == 0) return false;
+    EditorHierarchyItem ordered[object->hierarchy_count];
+    EditorHierarchyItem selected_items[object->hierarchy_count];
+    EditorHierarchyItem remaining[object->hierarchy_count];
     target_index = editor_project_object_hierarchy_index_get(object,
         editor_hierarchy_kind_get(target.kind), target.item);
     if(target_index == SIZE_MAX) return false;

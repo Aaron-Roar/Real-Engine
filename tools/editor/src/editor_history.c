@@ -1,4 +1,5 @@
 #include "editor_history.h"
+#include "editor_array.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -29,12 +30,12 @@ struct EditorHistoryAggregateChange {
 };
 
 struct EditorHistoryCollisionChange {
-    EditorCollisionMask masks[EDITOR_COLLISION_MASK_MAX];
+    EditorCollisionMask *masks;
     size_t count;
 };
 
 typedef struct EditorHistoryObjectOrderChange {
-    EditorObjectId ids[EDITOR_OBJECT_MAX];
+    EditorObjectId *ids;
     size_t count;
     bool tracked;
 } EditorHistoryObjectOrderChange;
@@ -42,9 +43,37 @@ typedef struct EditorHistoryObjectOrderChange {
 struct EditorHistoryObjectChange {
     bool present;
     size_t index;
-    EditorObject value;
+    EditorObject *value;
     EditorObjectId selected;
 };
+
+static void editor_history_object_change_destroy(EditorHistoryObjectChange *change) {
+    if(change == NULL) return;
+    if(change->value != NULL) {
+        editor_project_object_destroy(change->value);
+        free(change->value);
+    }
+    free(change);
+}
+
+static EditorHistoryObjectChange *editor_history_object_change_clone(
+        const EditorHistoryObjectChange *source) {
+    EditorHistoryObjectChange *change;
+    if(source == NULL) return NULL;
+    change = calloc(1, sizeof(*change));
+    if(change == NULL) return NULL;
+    *change = *source;
+    change->value = NULL;
+    if(source->value != NULL) {
+        change->value = calloc(1, sizeof(*change->value));
+        if(change->value == NULL || !editor_project_object_clone(
+                change->value, source->value)) {
+            editor_history_object_change_destroy(change);
+            return NULL;
+        }
+    }
+    return change;
+}
 
 typedef struct EditorHistoryAction {
     EditorHistoryActionKind kind;
@@ -71,6 +100,7 @@ struct EditorHistoryEntry {
 static EditorSoftBody *editor_history_soft_body_get(EditorObject *object,
     EditorSoftBodyId id);
 static void editor_history_entry_destroy(EditorHistoryEntry *entry);
+static void editor_history_collision_destroy(EditorHistoryCollisionChange *change);
 
 static void editor_history_aggregate_destroy(EditorHistoryAggregateChange *change) {
     if(change == NULL) return;
@@ -155,12 +185,11 @@ static EditorHistoryAggregateChange *editor_history_aggregate_recapture(
     change = calloc(1, sizeof(*change));
     if(change == NULL) return NULL;
     *change = *source;
-    change->value = malloc(source->size);
-    if(change->value == NULL) {
-        free(change);
+    change->value = NULL;
+    if(!editor_history_aggregate_value_clone(change, value)) {
+        editor_history_aggregate_destroy(change);
         return NULL;
     }
-    memcpy(change->value, value, source->size);
     return change;
 }
 
@@ -281,9 +310,11 @@ static void editor_history_entry_destroy(EditorHistoryEntry *entry) {
     if(entry == NULL) return;
     for(size_t i = 0; i < entry->command_count; i += 1) {
             if(entry->commands[i].forward.kind == EDITOR_HISTORY_ACTION_OBJECT)
-                free(entry->commands[i].forward.data.object);
+                editor_history_object_change_destroy(
+                    entry->commands[i].forward.data.object);
             if(entry->commands[i].inverse.kind == EDITOR_HISTORY_ACTION_OBJECT)
-                free(entry->commands[i].inverse.data.object);
+                editor_history_object_change_destroy(
+                    entry->commands[i].inverse.data.object);
             if(entry->commands[i].forward.kind == EDITOR_HISTORY_ACTION_AGGREGATE) {
                 editor_history_aggregate_destroy(
                     entry->commands[i].forward.data.aggregate);
@@ -292,14 +323,22 @@ static void editor_history_entry_destroy(EditorHistoryEntry *entry) {
                 editor_history_aggregate_destroy(
                     entry->commands[i].inverse.data.aggregate);
             }
-            if(entry->commands[i].forward.kind == EDITOR_HISTORY_ACTION_COLLISION)
+            if(entry->commands[i].forward.kind == EDITOR_HISTORY_ACTION_COLLISION) {
+                free(entry->commands[i].forward.data.collision->masks);
                 free(entry->commands[i].forward.data.collision);
-            if(entry->commands[i].inverse.kind == EDITOR_HISTORY_ACTION_COLLISION)
+            }
+            if(entry->commands[i].inverse.kind == EDITOR_HISTORY_ACTION_COLLISION) {
+                free(entry->commands[i].inverse.data.collision->masks);
                 free(entry->commands[i].inverse.data.collision);
-            if(entry->commands[i].forward.kind == EDITOR_HISTORY_ACTION_OBJECT_ORDER)
+            }
+            if(entry->commands[i].forward.kind == EDITOR_HISTORY_ACTION_OBJECT_ORDER) {
+                free(entry->commands[i].forward.data.order->ids);
                 free(entry->commands[i].forward.data.order);
-            if(entry->commands[i].inverse.kind == EDITOR_HISTORY_ACTION_OBJECT_ORDER)
+            }
+            if(entry->commands[i].inverse.kind == EDITOR_HISTORY_ACTION_OBJECT_ORDER) {
+                free(entry->commands[i].inverse.data.order->ids);
                 free(entry->commands[i].inverse.data.order);
+            }
     }
     free(entry->commands);
     free(entry);
@@ -341,38 +380,26 @@ static void editor_history_action_apply(EditorProject *project,
         if(change == NULL || change->value == NULL) return;
         object = editor_object_query_get(project, change->object);
         if(change->kind == EDITOR_HISTORY_AGGREGATE_OBJECT) {
-            if(object != NULL && change->size == sizeof(*object)) {
-                EditorObject restored = {0};
-                if(editor_project_object_clone(&restored, change->value)) {
-                    editor_project_object_destroy(object);
-                    *object = restored;
-                }
-            }
+            if(object != NULL && change->size == sizeof(*object))
+                (void)editor_project_object_copy_set(object, change->value);
         } else if(change->kind == EDITOR_HISTORY_AGGREGATE_RIGID_BODY) {
             EditorRigidBody *body = editor_project_rigid_body_get(object, change->item);
-            if(body != NULL && change->size == sizeof(*body)) {
-                EditorRigidBody restored = {0};
-                if(editor_project_rigid_body_clone(&restored, change->value)) {
-                    editor_project_rigid_body_destroy(body);
-                    *body = restored;
-                }
-            }
+            if(body != NULL && change->size == sizeof(*body))
+                (void)editor_project_rigid_body_copy_set(body, change->value);
         } else {
             EditorSoftBody *body = editor_history_soft_body_get(object, change->item);
-            if(body != NULL && change->size == sizeof(*body)) {
-                EditorSoftBody restored = {0};
-                if(editor_project_soft_body_clone(&restored, change->value)) {
-                    editor_project_soft_body_destroy(body);
-                    *body = restored;
-                }
-            }
+            if(body != NULL && change->size == sizeof(*body))
+                (void)editor_project_soft_body_copy_set(body, change->value);
         }
         return;
     }
     if(action->kind == EDITOR_HISTORY_ACTION_COLLISION) {
         EditorHistoryCollisionChange *change = action->data.collision;
         if(change == NULL) return;
-        memcpy(project->collision_masks, change->masks, sizeof(change->masks));
+        if(!EDITOR_ARRAY_RESERVE(project->collision_masks,
+                project->collision_mask_capacity, change->count)) return;
+        memcpy(project->collision_masks, change->masks,
+            change->count * sizeof(*change->masks));
         project->collision_mask_count = change->count;
         return;
     }
@@ -398,15 +425,25 @@ static void editor_history_action_apply(EditorProject *project,
     if(action->data.object == NULL) return;
     if(action->data.object->present) {
         size_t index = action->data.object->index;
-        if(index > project->object_count ||
-                project->object_count >= EDITOR_OBJECT_MAX) return;
+        if(index > project->object_count || action->data.object->value == NULL ||
+                !EDITOR_ARRAY_RESERVE(project->objects,
+                    project->object_capacity, project->object_count + 1)) return;
         for(size_t i = project->object_count; i > index; i -= 1)
             project->objects[i] = project->objects[i - 1];
-        project->objects[index] = action->data.object->value;
+        project->objects[index] = (EditorObject){0};
+        if(!editor_project_object_clone(&project->objects[index],
+                action->data.object->value)) {
+            for(size_t i = index; i < project->object_count; i += 1)
+                project->objects[i] = project->objects[i + 1];
+            return;
+        }
         project->object_count += 1;
     } else {
         for(size_t index = 0; index < project->object_count; index += 1) {
-            if(project->objects[index].id != action->data.object->value.id) continue;
+            if(action->data.object->value == NULL ||
+                    project->objects[index].id !=
+                        action->data.object->value->id) continue;
+            editor_project_object_destroy(&project->objects[index]);
             for(size_t i = index + 1; i < project->object_count; i += 1)
                 project->objects[i - 1] = project->objects[i];
             project->object_count -= 1;
@@ -480,8 +517,10 @@ static EditorHistoryEntry *editor_history_object_entry_create(
         free(entry);
         return NULL;
     }
-    entry->commands[0].forward.data.object = malloc(sizeof(forward));
-    entry->commands[0].inverse.data.object = malloc(sizeof(inverse));
+    entry->commands[0].forward.data.object =
+        editor_history_object_change_clone(&forward);
+    entry->commands[0].inverse.data.object =
+        editor_history_object_change_clone(&inverse);
     if(entry->commands[0].forward.data.object == NULL ||
             entry->commands[0].inverse.data.object == NULL) {
         editor_history_entry_destroy(entry);
@@ -492,8 +531,6 @@ static EditorHistoryEntry *editor_history_object_entry_create(
             .data.object = entry->commands[0].forward.data.object},
         .inverse = {.kind = EDITOR_HISTORY_ACTION_OBJECT,
             .data.object = entry->commands[0].inverse.data.object}};
-    *entry->commands[0].forward.data.object = forward;
-    *entry->commands[0].inverse.data.object = inverse;
     entry->command_count = 1;
     entry->memory = sizeof(*entry) + sizeof(*entry->commands) +
         sizeof(forward) + sizeof(inverse);
@@ -504,11 +541,25 @@ static EditorHistoryCollisionChange *editor_history_collision_capture(
         const EditorProject *project) {
     EditorHistoryCollisionChange *change;
     if(project == NULL) return NULL;
-    change = malloc(sizeof(*change));
+    change = calloc(1, sizeof(*change));
     if(change == NULL) return NULL;
-    memcpy(change->masks, project->collision_masks, sizeof(change->masks));
     change->count = project->collision_mask_count;
+    if(change->count > 0) {
+        change->masks = malloc(change->count * sizeof(*change->masks));
+        if(change->masks == NULL) {
+            free(change);
+            return NULL;
+        }
+        memcpy(change->masks, project->collision_masks,
+            change->count * sizeof(*change->masks));
+    }
     return change;
+}
+
+static void editor_history_collision_destroy(EditorHistoryCollisionChange *change) {
+    if(change == NULL) return;
+    free(change->masks);
+    free(change);
 }
 
 static EditorHistoryEntry *editor_history_collision_entry_create(
@@ -536,23 +587,23 @@ static EditorHistoryEntry *editor_history_collision_entry_create(
 
 static bool editor_history_object_entry_append(EditorHistoryEntry *entry,
         EditorHistoryObjectChange forward, EditorHistoryObjectChange inverse) {
-    EditorHistoryObjectChange *forward_copy = malloc(sizeof(*forward_copy));
-    EditorHistoryObjectChange *inverse_copy = malloc(sizeof(*inverse_copy));
+    EditorHistoryObjectChange *forward_copy =
+        editor_history_object_change_clone(&forward);
+    EditorHistoryObjectChange *inverse_copy =
+        editor_history_object_change_clone(&inverse);
     EditorHistoryCommandPair *commands;
     if(entry == NULL || forward_copy == NULL || inverse_copy == NULL) {
-        free(forward_copy);
-        free(inverse_copy);
+        editor_history_object_change_destroy(forward_copy);
+        editor_history_object_change_destroy(inverse_copy);
         return false;
     }
     commands = realloc(entry->commands,
         (entry->command_count + 1) * sizeof(*commands));
     if(commands == NULL) {
-        free(forward_copy);
-        free(inverse_copy);
+        editor_history_object_change_destroy(forward_copy);
+        editor_history_object_change_destroy(inverse_copy);
         return false;
     }
-    *forward_copy = forward;
-    *inverse_copy = inverse;
     entry->commands = commands;
     entry->commands[entry->command_count] = (EditorHistoryCommandPair){
         .forward = {.kind = EDITOR_HISTORY_ACTION_OBJECT,
@@ -739,9 +790,9 @@ void editor_history_destroy(EditorHistory *history) {
     if(history == NULL) return;
     editor_history_stack_clear(history->undo, &history->undo_count);
     editor_history_stack_clear(history->redo, &history->redo_count);
-    free(history->pending_object);
+    editor_history_object_change_destroy(history->pending_object);
     editor_history_aggregate_destroy(history->pending_aggregate);
-    free(history->pending_collision);
+    editor_history_collision_destroy(history->pending_collision);
     editor_history_entry_destroy(history->transaction_commands);
     memset(history, 0, sizeof(*history));
 }
@@ -750,11 +801,11 @@ void editor_history_reset(EditorHistory *history) {
     if(history == NULL || history->project == NULL) return;
     editor_history_stack_clear(history->undo, &history->undo_count);
     editor_history_stack_clear(history->redo, &history->redo_count);
-    free(history->pending_object);
+    editor_history_object_change_destroy(history->pending_object);
     history->pending_object = NULL;
     editor_history_aggregate_destroy(history->pending_aggregate);
     history->pending_aggregate = NULL;
-    free(history->pending_collision);
+    editor_history_collision_destroy(history->pending_collision);
     history->pending_collision = NULL;
     history->pending_command_valid = false;
     editor_history_entry_destroy(history->transaction_commands);
@@ -769,11 +820,11 @@ void editor_history_reset(EditorHistory *history) {
 void editor_history_command_begin(EditorHistory *history,
         const EditorProject *project, const EditorCommand *command) {
     if(history == NULL || history->restoring) return;
-    free(history->pending_object);
+    editor_history_object_change_destroy(history->pending_object);
     history->pending_object = NULL;
     editor_history_aggregate_destroy(history->pending_aggregate);
     history->pending_aggregate = NULL;
-    free(history->pending_collision);
+    editor_history_collision_destroy(history->pending_collision);
     history->pending_collision = NULL;
     history->pending_command_valid = false;
     if(project == NULL || !editor_history_command_record_check(command)) return;
@@ -796,11 +847,9 @@ void editor_history_command_begin(EditorHistory *history,
             command->data.object_remove.object : command->data.item_remove.object;
         for(size_t i = 0; i < project->object_count; i += 1) {
             if(project->objects[i].id != id) continue;
-            history->pending_object = malloc(sizeof(*history->pending_object));
-            if(history->pending_object != NULL)
-                *history->pending_object = (EditorHistoryObjectChange){
-                    .present = true, .index = i, .value = project->objects[i],
-                    .selected = project->selected};
+            EditorHistoryObjectChange source = {.present = true, .index = i,
+                .value = &project->objects[i], .selected = project->selected};
+            history->pending_object = editor_history_object_change_clone(&source);
             return;
         }
     }
@@ -844,7 +893,7 @@ void editor_history_command_finish(EditorHistory *history,
                 for(size_t i = 0; i < history->project->object_count; i += 1)
                     if(history->project->objects[i].id == result->result.object) {
                         forward = (EditorHistoryObjectChange){.present = true,
-                            .index = i, .value = history->project->objects[i],
+                            .index = i, .value = &history->project->objects[i],
                             .selected = history->project->selected};
                         inverse = forward;
                         inverse.present = false;
@@ -872,11 +921,11 @@ void editor_history_command_finish(EditorHistory *history,
                     &history->pending_inverse))
             (void)editor_history_command_entry_append(history->transaction_commands,
                 command, &history->pending_inverse);
-        free(history->pending_object);
+        editor_history_object_change_destroy(history->pending_object);
         history->pending_object = NULL;
         editor_history_aggregate_destroy(history->pending_aggregate);
         history->pending_aggregate = NULL;
-        free(history->pending_collision);
+        editor_history_collision_destroy(history->pending_collision);
         history->pending_collision = NULL;
         history->pending_command_valid = false;
         return;
@@ -892,7 +941,7 @@ void editor_history_command_finish(EditorHistory *history,
             for(size_t i = 0; i < history->project->object_count; i += 1)
                 if(history->project->objects[i].id == id) {
                     forward = (EditorHistoryObjectChange){.present = true,
-                        .index = i, .value = history->project->objects[i],
+                        .index = i, .value = &history->project->objects[i],
                         .selected = history->project->selected};
                     inverse = forward;
                     inverse.present = false;
@@ -917,7 +966,7 @@ void editor_history_command_finish(EditorHistory *history,
         entry = editor_history_collision_entry_create(after,
             history->pending_collision);
         if(entry != NULL) history->pending_collision = NULL;
-        else free(after);
+        else editor_history_collision_destroy(after);
         if(entry != NULL && editor_history_stack_push(history->undo,
                 &history->undo_count, entry))
             editor_history_stack_clear(history->redo, &history->redo_count);
@@ -928,12 +977,6 @@ void editor_history_command_finish(EditorHistory *history,
             result->kind == ERROR_RESULT_VALUE) {
         EditorHistoryAggregateChange *after = editor_history_aggregate_recapture(
             history->project, history->pending_aggregate);
-        if(after != NULL && after->size == history->pending_aggregate->size &&
-                memcmp(after->value, history->pending_aggregate->value,
-                    after->size) == 0) {
-            editor_history_aggregate_destroy(after);
-            goto finish;
-        }
         entry = editor_history_aggregate_entry_create(after,
             history->pending_aggregate);
         if(entry != NULL) history->pending_aggregate = NULL;
@@ -965,11 +1008,11 @@ void editor_history_command_finish(EditorHistory *history,
         }
     }
 finish:
-    free(history->pending_object);
+    editor_history_object_change_destroy(history->pending_object);
     history->pending_object = NULL;
     editor_history_aggregate_destroy(history->pending_aggregate);
     history->pending_aggregate = NULL;
-    free(history->pending_collision);
+    editor_history_collision_destroy(history->pending_collision);
     history->pending_collision = NULL;
     history->pending_command_valid = false;
 }
@@ -1037,6 +1080,13 @@ static EditorHistoryObjectOrderChange *editor_history_object_order_capture(
     change = calloc(1, sizeof(*change));
     if(change == NULL) return NULL;
     change->count = project->object_count;
+    if(change->count > 0) {
+        change->ids = malloc(change->count * sizeof(*change->ids));
+        if(change->ids == NULL) {
+            free(change);
+            return NULL;
+        }
+    }
     for(size_t i = 0; i < project->object_count; i += 1)
         change->ids[i] = project->objects[i].id;
     return change;
@@ -1067,6 +1117,8 @@ bool editor_history_transaction_object_order_track(EditorHistory *history) {
     entry->memory += sizeof(*commands) + sizeof(*forward) + sizeof(*inverse);
     return true;
 fail:
+    if(forward != NULL) free(forward->ids);
+    if(inverse != NULL) free(inverse->ids);
     free(forward);
     free(inverse);
     return false;
@@ -1088,23 +1140,20 @@ static bool editor_history_transaction_tracks_finalize(EditorHistory *history) {
             if(updated == NULL) return false;
             editor_history_aggregate_destroy(pair.forward.data.aggregate);
             pair.forward.data.aggregate = updated;
-            if(updated->size == pair.inverse.data.aggregate->size &&
-                    memcmp(updated->value, pair.inverse.data.aggregate->value,
-                        updated->size) == 0) {
-                editor_history_aggregate_destroy(pair.forward.data.aggregate);
-                editor_history_aggregate_destroy(pair.inverse.data.aggregate);
-                continue;
-            }
         } else if(pair.forward.kind == EDITOR_HISTORY_ACTION_OBJECT_ORDER &&
                 pair.forward.data.order != NULL &&
                 pair.forward.data.order->tracked) {
             EditorHistoryObjectOrderChange *updated =
                 editor_history_object_order_capture(history->project);
             if(updated == NULL) return false;
+            free(pair.forward.data.order->ids);
             free(pair.forward.data.order);
             pair.forward.data.order = updated;
-            if(memcmp(updated->ids, pair.inverse.data.order->ids,
+            if(updated->count == pair.inverse.data.order->count &&
+                    memcmp(updated->ids, pair.inverse.data.order->ids,
                     updated->count * sizeof(updated->ids[0])) == 0) {
+                free(pair.forward.data.order->ids);
+                free(pair.inverse.data.order->ids);
                 free(pair.forward.data.order);
                 free(pair.inverse.data.order);
                 continue;

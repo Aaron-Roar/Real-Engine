@@ -1,6 +1,7 @@
 #include "editor_auto_shape.h"
 
 #include <math.h>
+#include <string.h>
 
 #define EDITOR_AUTO_SHAPE_PI 3.14159265358979323846f
 
@@ -120,11 +121,11 @@ EditorResult editor_auto_shape_positions_get(const EditorAutoShapeConfig *config
 
 EditorResult editor_auto_shape_hitbox_apply(EditorHitbox *hitbox,
         const EditorAutoShapeConfig *config) {
-    Position output_positions[EDITOR_HITBOX_VERTEX_MAX];
     EditorResult result;
-    if(hitbox == NULL)
+    if(hitbox == NULL || hitbox->vertex_count == 0)
         return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
             "auto shape requires a hitbox");
+    Position output_positions[hitbox->vertex_count];
     result = editor_auto_shape_positions_get(config, output_positions,
         hitbox->vertex_count);
     if(editor_result_check(result)) return result;
@@ -135,11 +136,11 @@ EditorResult editor_auto_shape_hitbox_apply(EditorHitbox *hitbox,
 
 EditorResult editor_auto_shape_soft_body_apply(EditorSoftBody *body,
         const EditorAutoShapeConfig *config) {
-    Position output_positions[EDITOR_SOFT_NODE_MAX];
     EditorResult result;
-    if(body == NULL)
+    if(body == NULL || body->node_count == 0)
         return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
             "auto shape requires a soft body");
+    Position output_positions[body->node_count];
     result = editor_auto_shape_positions_get(config, output_positions, body->node_count);
     if(editor_result_check(result)) return result;
     for(size_t i = 0; i < body->node_count; i += 1)
@@ -150,13 +151,14 @@ EditorResult editor_auto_shape_soft_body_apply(EditorSoftBody *body,
 EditorResult editor_auto_shape_hitbox_points_apply(EditorHitbox *hitbox,
         const EditorAutoShapeConfig *config, const EditorVertexId *points,
         size_t point_count) {
-    Position output_positions[EDITOR_HITBOX_VERTEX_MAX];
-    bool found[EDITOR_HITBOX_VERTEX_MAX] = {0};
-    size_t indices[EDITOR_HITBOX_VERTEX_MAX];
     EditorResult result;
-    if(hitbox == NULL || points == NULL || point_count > EDITOR_HITBOX_VERTEX_MAX)
+    if(hitbox == NULL || points == NULL || point_count == 0)
         return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
             "auto shape received invalid hitbox points");
+    Position output_positions[point_count];
+    bool found[hitbox->vertex_count];
+    size_t indices[point_count];
+    memset(found, 0, sizeof(found));
     result = editor_auto_shape_positions_get(config, output_positions, point_count);
     if(editor_result_check(result)) return result;
     for(size_t point = 0; point < point_count; point += 1) {
@@ -181,13 +183,14 @@ next_hitbox_point:
 EditorResult editor_auto_shape_soft_body_points_apply(EditorSoftBody *body,
         const EditorAutoShapeConfig *config, const EditorSoftNodeId *points,
         size_t point_count) {
-    Position output_positions[EDITOR_SOFT_NODE_MAX];
-    bool found[EDITOR_SOFT_NODE_MAX] = {0};
-    size_t indices[EDITOR_SOFT_NODE_MAX];
     EditorResult result;
-    if(body == NULL || points == NULL || point_count > EDITOR_SOFT_NODE_MAX)
+    if(body == NULL || points == NULL || point_count == 0)
         return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
             "auto shape received invalid soft-body nodes");
+    Position output_positions[point_count];
+    bool found[body->node_count];
+    size_t indices[point_count];
+    memset(found, 0, sizeof(found));
     result = editor_auto_shape_positions_get(config, output_positions, point_count);
     if(editor_result_check(result)) return result;
     for(size_t point = 0; point < point_count; point += 1) {

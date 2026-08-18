@@ -65,7 +65,7 @@ int main(void) {
     editor_history_command_finish(&history, &command, &result);
     assert(result.kind == ERROR_RESULT_VALUE);
     assert(project.object_count == 1);
-    assert(editor_history_memory_get(&history) < sizeof(project));
+    assert(editor_history_memory_get(&history) < 8192);
     assert(editor_history_undo(&history));
     assert(project.object_count == 0);
     assert(editor_history_redo(&history));

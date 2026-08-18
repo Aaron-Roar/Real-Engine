@@ -1,9 +1,11 @@
 #include "editor_project.h"
+#include "editor_array.h"
 
 #include "yyjson.h"
 
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static yyjson_mut_val *editor_json_position_write(yyjson_mut_doc *document,
@@ -351,8 +353,13 @@ static bool editor_json_hitbox_read(yyjson_val *value, EditorHitbox *hitbox,
             !yyjson_is_arr(vertices) || (lines != NULL && !yyjson_is_arr(lines))) return false;
     editor_project_property_name_format(hitbox->name, sizeof(hitbox->name), hitbox->name);
     count = yyjson_arr_size(vertices);
-    if(count < EDITOR_HITBOX_VERTEX_MIN || count > EDITOR_HITBOX_VERTEX_MAX ||
+    if(count < EDITOR_HITBOX_VERTEX_MIN ||
             (lines != NULL && yyjson_arr_size(lines) != count)) return false;
+    if(!EDITOR_ARRAY_RESERVE(hitbox->vertices, hitbox->vertex_capacity, count))
+        return false;
+    hitbox->line_names = calloc(hitbox->vertex_capacity,
+        sizeof(*hitbox->line_names));
+    if(hitbox->line_names == NULL) return false;
     hitbox->vertex_count = (uint32_t)count;
     for(size_t i = 0; i < count; i += 1) {
         yyjson_val *item = yyjson_arr_get(vertices, i);
@@ -437,7 +444,10 @@ static bool editor_json_body_read(yyjson_val *value, EditorRigidBody *body,
             (collision_category != NULL || collision_with != NULL)) return false;
     editor_project_property_name_format(body->name, sizeof(body->name), body->name);
     count = (uint32_t)yyjson_arr_size(hitboxes);
-    if(count > EDITOR_BODY_HITBOX_MAX) return false;
+    if(!EDITOR_ARRAY_RESERVE(body->hitboxes, body->hitbox_capacity, count))
+        return false;
+    if(count > 0) memset(body->hitboxes, 0,
+        count * sizeof(*body->hitboxes));
     body->hitbox_count = count;
     for(size_t i = 0; i < count; i += 1)
         if(!editor_json_hitbox_read(yyjson_arr_get(hitboxes, i), &body->hitboxes[i], project))
@@ -497,12 +507,9 @@ static bool editor_json_soft_body_read(yyjson_val *value, EditorSoftBody *body,
             !editor_json_name(value, body->name) || !editor_json_position_read(
                 yyjson_obj_get(value, "position"), &body->position) ||
             !editor_json_bool(value, "visible", &body->visible) || !yyjson_is_arr(nodes) ||
-            !yyjson_is_arr(beams) || yyjson_arr_size(nodes) > EDITOR_SOFT_NODE_MAX ||
-            yyjson_arr_size(beams) > EDITOR_SOFT_BEAM_MAX) return false;
-    if(areas != NULL && (!yyjson_is_arr(areas) ||
-            yyjson_arr_size(areas) > EDITOR_SOFT_AREA_MAX)) return false;
-    if(hierarchy != NULL && (!yyjson_is_arr(hierarchy) ||
-            yyjson_arr_size(hierarchy) > EDITOR_SOFT_BODY_HIERARCHY_MAX)) return false;
+            !yyjson_is_arr(beams)) return false;
+    if(areas != NULL && !yyjson_is_arr(areas)) return false;
+    if(hierarchy != NULL && !yyjson_is_arr(hierarchy)) return false;
     if(yyjson_obj_get(value, "node_color") != NULL &&
             (!editor_json_uint(value, "node_color", &body->node_color) ||
             !editor_json_uint(value, "beam_color", &body->beam_color) ||
@@ -513,6 +520,9 @@ static bool editor_json_soft_body_read(yyjson_val *value, EditorSoftBody *body,
     editor_project_property_name_format(body->name, sizeof(body->name), body->name);
     body->node_count = yyjson_arr_size(nodes);
     body->beam_count = yyjson_arr_size(beams);
+    if(!EDITOR_ARRAY_RESERVE(body->nodes, body->node_capacity,
+            body->node_count) || !EDITOR_ARRAY_RESERVE(body->beams,
+                body->beam_capacity, body->beam_count)) return false;
     for(size_t i = 0; i < body->node_count; i += 1) {
         yyjson_val *item = yyjson_arr_get(nodes, i);
         EditorSoftNode *node = &body->nodes[i];
@@ -576,6 +586,10 @@ static bool editor_json_soft_body_read(yyjson_val *value, EditorSoftBody *body,
     }
     if(areas != NULL) {
         body->area_count = yyjson_arr_size(areas);
+        if(!EDITOR_ARRAY_RESERVE(body->areas, body->area_capacity,
+                body->area_count)) return false;
+        if(body->area_count > 0) memset(body->areas, 0,
+            body->area_count * sizeof(*body->areas));
         for(size_t i = 0; i < body->area_count; i += 1) {
             yyjson_val *item = yyjson_arr_get(areas, i);
             yyjson_val *area_nodes = yyjson_obj_get(item, "nodes");
@@ -586,9 +600,11 @@ static bool editor_json_soft_body_read(yyjson_val *value, EditorSoftBody *body,
                     !editor_json_bool(item, "color_overridden", &area->color_overridden) ||
                     !editor_json_bool(item, "visible", &area->visible)) return false;
             if(area_nodes != NULL) {
-                if(!yyjson_is_arr(area_nodes) || yyjson_arr_size(area_nodes) < 3 ||
-                        yyjson_arr_size(area_nodes) > EDITOR_SOFT_AREA_NODE_MAX) return false;
+                if(!yyjson_is_arr(area_nodes) || yyjson_arr_size(area_nodes) < 3)
+                    return false;
                 area->node_count = yyjson_arr_size(area_nodes);
+                if(!EDITOR_ARRAY_RESERVE(area->nodes, area->node_capacity,
+                        area->node_count)) return false;
                 for(size_t node_index = 0; node_index < area->node_count; node_index += 1) {
                     yyjson_val *node = yyjson_arr_get(area_nodes, node_index);
                     if(!yyjson_is_uint(node) || yyjson_get_uint(node) > UINT32_MAX) return false;
@@ -596,6 +612,8 @@ static bool editor_json_soft_body_read(yyjson_val *value, EditorSoftBody *body,
                 }
             } else {
                 area->node_count = 3;
+                if(!EDITOR_ARRAY_RESERVE(area->nodes, area->node_capacity, 3))
+                    return false;
                 if(!editor_json_uint(item, "node_a", &area->nodes[0]) ||
                         !editor_json_uint(item, "node_b", &area->nodes[1]) ||
                         !editor_json_uint(item, "node_c", &area->nodes[2])) return false;
@@ -609,6 +627,8 @@ static bool editor_json_soft_body_read(yyjson_val *value, EditorSoftBody *body,
     editor_project_soft_areas_sync(project, body);
     if(hierarchy != NULL) {
         body->hierarchy_count = yyjson_arr_size(hierarchy);
+        if(!EDITOR_ARRAY_RESERVE(body->hierarchy, body->hierarchy_capacity,
+                body->hierarchy_count)) return false;
         for(size_t i = 0; i < body->hierarchy_count; i += 1) {
             yyjson_val *item = yyjson_arr_get(hierarchy, i);
             uint32_t kind;
@@ -697,6 +717,7 @@ EditorResult editor_project_load(EditorProject *project, const char *path) {
     root = yyjson_doc_get_root(document);
     objects = yyjson_obj_get(root, "objects");
     collision_masks = yyjson_obj_get(root, "collision_masks");
+    editor_project_destroy(&loaded);
     editor_project_init(&loaded);
     if(!yyjson_is_obj(root)) goto done;
     if(!editor_json_uint(root, "format_version", &version)) {
@@ -749,7 +770,6 @@ EditorResult editor_project_load(EditorProject *project, const char *path) {
                 loaded.navigation.origin_kind > 2)) goto done;
     }
     if(!editor_json_uint(root, "selected", &loaded.selected) || !yyjson_is_arr(objects) ||
-            yyjson_arr_size(objects) > EDITOR_OBJECT_MAX ||
             !editor_json_uint(root, "next_object_id", &loaded.next_id) ||
             !editor_json_uint(root, "next_vertex_id", &loaded.next_vertex_id) ||
             !editor_json_uint(root, "next_rigid_body_id", &loaded.next_rigid_body_id) ||
@@ -766,8 +786,11 @@ EditorResult editor_project_load(EditorProject *project, const char *path) {
             loaded.next_soft_body_id == 0 || loaded.next_soft_node_id == 0 ||
             loaded.next_soft_beam_id == 0 || loaded.next_soft_area_id == 0 ||
             !yyjson_is_arr(collision_masks) || yyjson_arr_size(collision_masks) == 0 ||
-            yyjson_arr_size(collision_masks) > EDITOR_COLLISION_MASK_MAX) goto done;
+            yyjson_arr_size(collision_masks) > EDITOR_COLLISION_MASK_MAX)
+        goto done;
     loaded.collision_mask_count = yyjson_arr_size(collision_masks);
+    if(!EDITOR_ARRAY_RESERVE(loaded.collision_masks,
+            loaded.collision_mask_capacity, loaded.collision_mask_count)) goto done;
     for(size_t i = 0; i < loaded.collision_mask_count; i += 1) {
         yyjson_val *name = yyjson_arr_get(collision_masks, i);
         if(!yyjson_is_str(name) || yyjson_get_len(name) == 0 ||
@@ -778,6 +801,10 @@ EditorResult editor_project_load(EditorProject *project, const char *path) {
             sizeof(loaded.collision_masks[i].name), loaded.collision_masks[i].name);
     }
     loaded.object_count = yyjson_arr_size(objects);
+    if(!EDITOR_ARRAY_RESERVE(loaded.objects, loaded.object_capacity,
+            loaded.object_count)) goto done;
+    if(loaded.object_count > 0) memset(loaded.objects, 0,
+        loaded.object_count * sizeof(*loaded.objects));
     for(size_t i = 0; i < loaded.object_count; i += 1) {
         yyjson_val *value = yyjson_arr_get(objects, i);
         EditorObject *object = &loaded.objects[i];
@@ -790,19 +817,30 @@ EditorResult editor_project_load(EditorProject *project, const char *path) {
                 object->id == 0 || !editor_json_name(value, object->name) ||
                 !editor_json_position_read(yyjson_obj_get(value, "position"), &object->position) ||
                 !editor_json_bool(value, "visible", &object->visible) ||
-                !yyjson_is_arr(bodies) || yyjson_arr_size(bodies) > EDITOR_RIGID_BODY_MAX ||
-                !yyjson_is_arr(anchors) || yyjson_arr_size(anchors) > EDITOR_ANCHOR_MAX ||
-                !yyjson_is_arr(joint_values) ||
-                    yyjson_arr_size(joint_values) > EDITOR_JOINT_MAX ||
-                !yyjson_is_arr(soft_body_values) ||
-                    yyjson_arr_size(soft_body_values) > EDITOR_SOFT_BODY_MAX ||
-                (hierarchy != NULL && (!yyjson_is_arr(hierarchy) ||
-                    yyjson_arr_size(hierarchy) > EDITOR_OBJECT_HIERARCHY_MAX))) goto done;
+                !yyjson_is_arr(bodies) || !yyjson_is_arr(anchors) ||
+                !yyjson_is_arr(joint_values) || !yyjson_is_arr(soft_body_values) ||
+                (hierarchy != NULL && !yyjson_is_arr(hierarchy))) goto done;
         editor_project_object_name_format(object->name, sizeof(object->name), object->name);
         object->rigid_body_count = yyjson_arr_size(bodies);
         object->anchor_count = yyjson_arr_size(anchors);
         object->joint_count = yyjson_arr_size(joint_values);
         object->soft_body_count = yyjson_arr_size(soft_body_values);
+        if(!EDITOR_ARRAY_RESERVE(object->rigid_bodies,
+                object->rigid_body_capacity, object->rigid_body_count) ||
+                !EDITOR_ARRAY_RESERVE(object->anchors, object->anchor_capacity,
+                    object->anchor_count) ||
+                !EDITOR_ARRAY_RESERVE(object->joint_items, object->joint_capacity,
+                    object->joint_count) ||
+                !EDITOR_ARRAY_RESERVE(object->soft_body_items,
+                    object->soft_body_capacity, object->soft_body_count)) goto done;
+        if(object->rigid_body_count > 0) memset(object->rigid_bodies, 0,
+            object->rigid_body_count * sizeof(*object->rigid_bodies));
+        if(object->anchor_count > 0) memset(object->anchors, 0,
+            object->anchor_count * sizeof(*object->anchors));
+        if(object->joint_count > 0) memset(object->joint_items, 0,
+            object->joint_count * sizeof(*object->joint_items));
+        if(object->soft_body_count > 0) memset(object->soft_body_items, 0,
+            object->soft_body_count * sizeof(*object->soft_body_items));
         for(size_t j = 0; j < object->rigid_body_count; j += 1)
             if(!editor_json_body_read(yyjson_arr_get(bodies, j),
                     &object->rigid_bodies[j], &loaded)) goto done;
@@ -817,6 +855,8 @@ EditorResult editor_project_load(EditorProject *project, const char *path) {
                     &object->soft_body_items[j], &loaded)) goto done;
         if(hierarchy != NULL) {
             object->hierarchy_count = yyjson_arr_size(hierarchy);
+            if(!EDITOR_ARRAY_RESERVE(object->hierarchy,
+                    object->hierarchy_capacity, object->hierarchy_count)) goto done;
             for(size_t j = 0; j < object->hierarchy_count; j += 1) {
                 yyjson_val *item = yyjson_arr_get(hierarchy, j);
                 uint32_t kind;
@@ -843,7 +883,9 @@ EditorResult editor_project_load(EditorProject *project, const char *path) {
             path);
         goto done;
     }
+    editor_project_destroy(project);
     *project = loaded;
+    loaded = (EditorProject){0};
     result = editor_result_value(true);
 done:
     yyjson_doc_free(document);

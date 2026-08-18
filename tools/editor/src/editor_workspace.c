@@ -634,9 +634,10 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
             }
             for(size_t area_index = 0; area_index < body->area_count; area_index += 1) {
                 const EditorSoftArea *area = &body->areas[area_index];
-                uint32_t triangles[EDITOR_SOFT_AREA_NODE_MAX - 2][3];
+                if(area->node_count < 3) continue;
+                uint32_t triangles[area->node_count - 2][3];
                 size_t triangle_count = editor_project_soft_area_triangulate(
-                    body, area, triangles, EDITOR_SOFT_AREA_NODE_MAX - 2);
+                    body, area, triangles, area->node_count - 2);
                 for(size_t triangle = 0; triangle < triangle_count; triangle += 1) {
                     const EditorSoftNode *node_a = editor_workspace_soft_node_get(
                         body, area->nodes[triangles[triangle][0]]);
@@ -961,12 +962,15 @@ EditorResult editor_workspace_load(EditorWorkspace *workspace, EditorProject *pr
     result = editor_project_load(&loaded_project, path);
     if(editor_result_check(result)) return result;
     *workspace = loaded;
+    editor_project_destroy(project);
     *project = loaded_project;
+    loaded_project = (EditorProject){0};
     return editor_result_value(true);
 }
 
 void editor_workspace_close(EditorWorkspace *workspace, EditorProject *project) {
     if(workspace != NULL) *workspace = (EditorWorkspace){0};
+    editor_project_destroy(project);
     editor_project_init(project);
 }
 

@@ -1,8 +1,10 @@
 #include "editor_project.h"
+#include "editor_array.h"
 
 #include <math.h>
 #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static bool editor_name_c_keyword(const char *name) {
@@ -93,10 +95,26 @@ static uint32_t editor_vertex_count_clamp(uint32_t vertex_count) {
     if(vertex_count < EDITOR_HITBOX_VERTEX_MIN) {
         return EDITOR_HITBOX_VERTEX_MIN;
     }
-    if(vertex_count > EDITOR_HITBOX_VERTEX_MAX) {
-        return EDITOR_HITBOX_VERTEX_MAX;
-    }
     return vertex_count;
+}
+
+static bool editor_hitbox_vertices_reserve(EditorHitbox *hitbox,
+        size_t required) {
+    EditorVertex *vertices;
+    char (*line_names)[EDITOR_OBJECT_NAME_MAX];
+    size_t capacity;
+    if(hitbox == NULL) return false;
+    if(required <= hitbox->vertex_capacity) return true;
+    capacity = hitbox->vertex_capacity == 0 ? 4 : hitbox->vertex_capacity;
+    while(capacity < required) capacity *= 2;
+    vertices = realloc(hitbox->vertices, capacity * sizeof(*vertices));
+    if(vertices == NULL) return false;
+    hitbox->vertices = vertices;
+    line_names = realloc(hitbox->line_names, capacity * sizeof(*line_names));
+    if(line_names == NULL) return false;
+    hitbox->line_names = line_names;
+    hitbox->vertex_capacity = capacity;
+    return true;
 }
 
 static void editor_hitbox_regular_set(EditorProject *project, EditorHitbox *hitbox,
@@ -105,6 +123,7 @@ static void editor_hitbox_regular_set(EditorProject *project, EditorHitbox *hitb
 
     if(project == NULL || hitbox == NULL) return;
     vertex_count = editor_vertex_count_clamp(vertex_count);
+    if(!editor_hitbox_vertices_reserve(hitbox, vertex_count)) return;
     hitbox->visible = true;
     hitbox->vertex_count = vertex_count;
     for(uint32_t i = 0; i < vertex_count; i += 1) {
@@ -128,8 +147,6 @@ void editor_project_init(EditorProject *project) {
     if(project == NULL) return;
     *project = (EditorProject){
         .viewport_camera_zoom = 1.0f,
-        .collision_masks = {{.name = "default"}},
-        .collision_mask_count = 1,
         .next_id = 1,
         .next_vertex_id = 1,
         .next_rigid_body_id = 1,
@@ -141,10 +158,82 @@ void editor_project_init(EditorProject *project) {
         .next_soft_beam_id = 1,
         .next_soft_area_id = 1
     };
+    if(EDITOR_ARRAY_RESERVE(project->collision_masks,
+            project->collision_mask_capacity, EDITOR_COLLISION_MASK_MAX)) {
+        project->collision_masks[0] = (EditorCollisionMask){0};
+        snprintf(project->collision_masks[0].name,
+            sizeof(project->collision_masks[0].name), "default");
+        project->collision_mask_count = 1;
+    }
+    (void)EDITOR_ARRAY_RESERVE(project->objects, project->object_capacity,
+        EDITOR_OBJECT_MAX);
+}
+
+static void editor_project_hitbox_destroy(EditorHitbox *hitbox) {
+    if(hitbox == NULL) return;
+    free(hitbox->vertices);
+    free(hitbox->line_names);
+    *hitbox = (EditorHitbox){0};
+}
+
+static bool editor_project_hitbox_clone(EditorHitbox *destination,
+        const EditorHitbox *source) {
+    if(destination == NULL || source == NULL) return false;
+    *destination = *source;
+    destination->vertices = NULL;
+    destination->line_names = NULL;
+    destination->vertex_capacity = 0;
+    if(source->vertex_count == 0) return true;
+    if(!EDITOR_ARRAY_RESERVE(destination->vertices,
+            destination->vertex_capacity, source->vertex_count)) return false;
+    destination->line_names = calloc(destination->vertex_capacity,
+        sizeof(*destination->line_names));
+    if(destination->line_names == NULL) {
+        editor_project_hitbox_destroy(destination);
+        return false;
+    }
+    memcpy(destination->vertices, source->vertices,
+        source->vertex_count * sizeof(*source->vertices));
+    memcpy(destination->line_names, source->line_names,
+        source->vertex_count * sizeof(*source->line_names));
+    return true;
+}
+
+static bool editor_project_hitbox_copy_set(EditorHitbox *destination,
+        const EditorHitbox *source) {
+    EditorVertex *vertices;
+    char (*line_names)[EDITOR_OBJECT_NAME_MAX];
+    size_t capacity;
+    if(destination == NULL || source == NULL) return false;
+    vertices = destination->vertices;
+    line_names = destination->line_names;
+    capacity = destination->vertex_capacity;
+    destination->vertices = vertices;
+    destination->line_names = line_names;
+    destination->vertex_capacity = capacity;
+    if(!editor_hitbox_vertices_reserve(destination, source->vertex_count))
+        return false;
+    vertices = destination->vertices;
+    line_names = destination->line_names;
+    capacity = destination->vertex_capacity;
+    *destination = *source;
+    destination->vertices = vertices;
+    destination->line_names = line_names;
+    destination->vertex_capacity = capacity;
+    if(source->vertex_count > 0) {
+        memcpy(destination->vertices, source->vertices,
+            source->vertex_count * sizeof(*source->vertices));
+        memcpy(destination->line_names, source->line_names,
+            source->vertex_count * sizeof(*source->line_names));
+    }
+    return true;
 }
 
 void editor_project_rigid_body_destroy(EditorRigidBody *body) {
     if(body == NULL) return;
+    for(size_t i = 0; i < body->hitbox_count; i += 1)
+        editor_project_hitbox_destroy(&body->hitboxes[i]);
+    free(body->hitboxes);
     *body = (EditorRigidBody){0};
 }
 
@@ -152,11 +241,96 @@ bool editor_project_rigid_body_clone(EditorRigidBody *destination,
         const EditorRigidBody *source) {
     if(destination == NULL || source == NULL) return false;
     *destination = *source;
+    destination->hitboxes = NULL;
+    destination->hitbox_count = 0;
+    destination->hitbox_capacity = 0;
+    if(!EDITOR_ARRAY_RESERVE(destination->hitboxes,
+            destination->hitbox_capacity, source->hitbox_count)) return false;
+    for(size_t i = 0; i < source->hitbox_count; i += 1) {
+        if(!editor_project_hitbox_clone(&destination->hitboxes[i],
+                &source->hitboxes[i])) {
+            destination->hitbox_count = i;
+            editor_project_rigid_body_destroy(destination);
+            return false;
+        }
+        destination->hitbox_count += 1;
+    }
+    return true;
+}
+
+bool editor_project_rigid_body_copy_set(EditorRigidBody *destination,
+        const EditorRigidBody *source) {
+    EditorHitbox *hitboxes;
+    size_t capacity;
+    size_t old_count;
+    size_t old_capacity;
+    if(destination == NULL || source == NULL) return false;
+    old_capacity = destination->hitbox_capacity;
+    if(!EDITOR_ARRAY_RESERVE(destination->hitboxes,
+            destination->hitbox_capacity, source->hitbox_count)) return false;
+    if(destination->hitbox_capacity > old_capacity)
+        memset(&destination->hitboxes[old_capacity], 0,
+            (destination->hitbox_capacity - old_capacity) *
+                sizeof(*destination->hitboxes));
+    hitboxes = destination->hitboxes;
+    capacity = destination->hitbox_capacity;
+    old_count = destination->hitbox_count;
+    for(size_t i = 0; i < source->hitbox_count; i += 1)
+        if(!editor_project_hitbox_copy_set(&hitboxes[i],
+                &source->hitboxes[i])) return false;
+    for(size_t i = source->hitbox_count; i < old_count; i += 1)
+        editor_project_hitbox_destroy(&hitboxes[i]);
+    *destination = *source;
+    destination->hitboxes = hitboxes;
+    destination->hitbox_capacity = capacity;
+    return true;
+}
+
+static void editor_project_soft_area_destroy(EditorSoftArea *area) {
+    if(area == NULL) return;
+    free(area->nodes);
+    *area = (EditorSoftArea){0};
+}
+
+static bool editor_project_soft_area_clone(EditorSoftArea *destination,
+        const EditorSoftArea *source) {
+    if(destination == NULL || source == NULL) return false;
+    *destination = *source;
+    destination->nodes = NULL;
+    destination->node_capacity = 0;
+    if(!EDITOR_ARRAY_RESERVE(destination->nodes,
+            destination->node_capacity, source->node_count)) return false;
+    if(source->node_count > 0)
+        memcpy(destination->nodes, source->nodes,
+            source->node_count * sizeof(*source->nodes));
+    return true;
+}
+
+static bool editor_project_soft_area_copy_set(EditorSoftArea *destination,
+        const EditorSoftArea *source) {
+    EditorSoftNodeId *nodes;
+    size_t capacity;
+    if(destination == NULL || source == NULL ||
+            !EDITOR_ARRAY_RESERVE(destination->nodes,
+                destination->node_capacity, source->node_count)) return false;
+    nodes = destination->nodes;
+    capacity = destination->node_capacity;
+    *destination = *source;
+    destination->nodes = nodes;
+    destination->node_capacity = capacity;
+    if(source->node_count > 0) memcpy(destination->nodes, source->nodes,
+        source->node_count * sizeof(*source->nodes));
     return true;
 }
 
 void editor_project_soft_body_destroy(EditorSoftBody *body) {
     if(body == NULL) return;
+    for(size_t i = 0; i < body->area_count; i += 1)
+        editor_project_soft_area_destroy(&body->areas[i]);
+    free(body->nodes);
+    free(body->beams);
+    free(body->areas);
+    free(body->hierarchy);
     *body = (EditorSoftBody){0};
 }
 
@@ -164,6 +338,95 @@ bool editor_project_soft_body_clone(EditorSoftBody *destination,
         const EditorSoftBody *source) {
     if(destination == NULL || source == NULL) return false;
     *destination = *source;
+    destination->nodes = NULL;
+    destination->beams = NULL;
+    destination->areas = NULL;
+    destination->hierarchy = NULL;
+    destination->node_count = 0;
+    destination->beam_count = 0;
+    destination->area_count = 0;
+    destination->hierarchy_count = 0;
+    destination->node_capacity = 0;
+    destination->beam_capacity = 0;
+    destination->area_capacity = 0;
+    destination->hierarchy_capacity = 0;
+    if(!EDITOR_ARRAY_RESERVE(destination->nodes, destination->node_capacity,
+            source->node_count) ||
+            !EDITOR_ARRAY_RESERVE(destination->beams,
+                destination->beam_capacity, source->beam_count) ||
+            !EDITOR_ARRAY_RESERVE(destination->areas,
+                destination->area_capacity, source->area_count) ||
+            !EDITOR_ARRAY_RESERVE(destination->hierarchy,
+                destination->hierarchy_capacity, source->hierarchy_count))
+        goto fail;
+    if(source->node_count > 0) memcpy(destination->nodes, source->nodes,
+        source->node_count * sizeof(*source->nodes));
+    if(source->beam_count > 0) memcpy(destination->beams, source->beams,
+        source->beam_count * sizeof(*source->beams));
+    if(source->hierarchy_count > 0) memcpy(destination->hierarchy,
+        source->hierarchy, source->hierarchy_count * sizeof(*source->hierarchy));
+    destination->node_count = source->node_count;
+    destination->beam_count = source->beam_count;
+    destination->hierarchy_count = source->hierarchy_count;
+    for(size_t i = 0; i < source->area_count; i += 1) {
+        if(!editor_project_soft_area_clone(&destination->areas[i],
+                &source->areas[i])) goto fail;
+        destination->area_count += 1;
+    }
+    return true;
+fail:
+    editor_project_soft_body_destroy(destination);
+    return false;
+}
+
+bool editor_project_soft_body_copy_set(EditorSoftBody *destination,
+        const EditorSoftBody *source) {
+    EditorSoftNode *nodes;
+    EditorSoftBeam *beams;
+    EditorSoftArea *areas;
+    EditorSoftHierarchyItem *hierarchy;
+    size_t node_capacity, beam_capacity, area_capacity, hierarchy_capacity;
+    size_t old_area_count, old_area_capacity;
+    if(destination == NULL || source == NULL) return false;
+    old_area_capacity = destination->area_capacity;
+    if(
+            !EDITOR_ARRAY_RESERVE(destination->nodes,
+                destination->node_capacity, source->node_count) ||
+            !EDITOR_ARRAY_RESERVE(destination->beams,
+                destination->beam_capacity, source->beam_count) ||
+            !EDITOR_ARRAY_RESERVE(destination->areas,
+                destination->area_capacity, source->area_count) ||
+            !EDITOR_ARRAY_RESERVE(destination->hierarchy,
+                destination->hierarchy_capacity, source->hierarchy_count)) return false;
+    if(destination->area_capacity > old_area_capacity)
+        memset(&destination->areas[old_area_capacity], 0,
+            (destination->area_capacity - old_area_capacity) *
+                sizeof(*destination->areas));
+    nodes = destination->nodes; beams = destination->beams;
+    areas = destination->areas; hierarchy = destination->hierarchy;
+    node_capacity = destination->node_capacity;
+    beam_capacity = destination->beam_capacity;
+    area_capacity = destination->area_capacity;
+    hierarchy_capacity = destination->hierarchy_capacity;
+    old_area_count = destination->area_count;
+    if(source->node_count > 0) memcpy(nodes, source->nodes,
+        source->node_count * sizeof(*nodes));
+    if(source->beam_count > 0) memcpy(beams, source->beams,
+        source->beam_count * sizeof(*beams));
+    if(source->hierarchy_count > 0) memcpy(hierarchy, source->hierarchy,
+        source->hierarchy_count * sizeof(*hierarchy));
+    for(size_t i = 0; i < source->area_count; i += 1)
+        if(!editor_project_soft_area_copy_set(&areas[i],
+                &source->areas[i])) return false;
+    for(size_t i = source->area_count; i < old_area_count; i += 1)
+        editor_project_soft_area_destroy(&areas[i]);
+    *destination = *source;
+    destination->nodes = nodes; destination->beams = beams;
+    destination->areas = areas; destination->hierarchy = hierarchy;
+    destination->node_capacity = node_capacity;
+    destination->beam_capacity = beam_capacity;
+    destination->area_capacity = area_capacity;
+    destination->hierarchy_capacity = hierarchy_capacity;
     return true;
 }
 
@@ -173,6 +436,11 @@ void editor_project_object_destroy(EditorObject *object) {
         editor_project_rigid_body_destroy(&object->rigid_bodies[i]);
     for(size_t i = 0; i < object->soft_body_count; i += 1)
         editor_project_soft_body_destroy(&object->soft_body_items[i]);
+    free(object->rigid_bodies);
+    free(object->joint_items);
+    free(object->anchors);
+    free(object->soft_body_items);
+    free(object->hierarchy);
     *object = (EditorObject){0};
 }
 
@@ -180,6 +448,125 @@ bool editor_project_object_clone(EditorObject *destination,
         const EditorObject *source) {
     if(destination == NULL || source == NULL) return false;
     *destination = *source;
+    destination->rigid_bodies = NULL;
+    destination->joint_items = NULL;
+    destination->anchors = NULL;
+    destination->soft_body_items = NULL;
+    destination->hierarchy = NULL;
+    destination->rigid_body_count = 0;
+    destination->soft_body_count = 0;
+    destination->rigid_body_capacity = 0;
+    destination->joint_capacity = 0;
+    destination->anchor_capacity = 0;
+    destination->soft_body_capacity = 0;
+    destination->hierarchy_capacity = 0;
+    if(!EDITOR_ARRAY_RESERVE(destination->rigid_bodies,
+            destination->rigid_body_capacity, source->rigid_body_count) ||
+            !EDITOR_ARRAY_RESERVE(destination->joint_items,
+                destination->joint_capacity, source->joint_count) ||
+            !EDITOR_ARRAY_RESERVE(destination->anchors,
+                destination->anchor_capacity, source->anchor_count) ||
+            !EDITOR_ARRAY_RESERVE(destination->soft_body_items,
+                destination->soft_body_capacity, source->soft_body_count) ||
+            !EDITOR_ARRAY_RESERVE(destination->hierarchy,
+                destination->hierarchy_capacity, source->hierarchy_count))
+        goto fail;
+    if(source->joint_count > 0) memcpy(destination->joint_items,
+        source->joint_items, source->joint_count * sizeof(*source->joint_items));
+    if(source->anchor_count > 0) memcpy(destination->anchors,
+        source->anchors, source->anchor_count * sizeof(*source->anchors));
+    if(source->hierarchy_count > 0) memcpy(destination->hierarchy,
+        source->hierarchy, source->hierarchy_count * sizeof(*source->hierarchy));
+    destination->joint_count = source->joint_count;
+    destination->anchor_count = source->anchor_count;
+    destination->hierarchy_count = source->hierarchy_count;
+    for(size_t i = 0; i < source->rigid_body_count; i += 1) {
+        if(!editor_project_rigid_body_clone(&destination->rigid_bodies[i],
+                &source->rigid_bodies[i])) goto fail;
+        destination->rigid_body_count += 1;
+    }
+    for(size_t i = 0; i < source->soft_body_count; i += 1) {
+        if(!editor_project_soft_body_clone(&destination->soft_body_items[i],
+                &source->soft_body_items[i])) goto fail;
+        destination->soft_body_count += 1;
+    }
+    return true;
+fail:
+    editor_project_object_destroy(destination);
+    return false;
+}
+
+bool editor_project_object_copy_set(EditorObject *destination,
+        const EditorObject *source) {
+    EditorRigidBody *rigid_bodies;
+    EditorJoint *editor_joints;
+    EditorAnchor *anchors;
+    EditorSoftBody *editor_soft_bodies;
+    EditorHierarchyItem *hierarchy;
+    size_t rigid_capacity, joint_capacity, anchor_capacity, soft_capacity;
+    size_t hierarchy_capacity, old_rigid_count, old_soft_count;
+    size_t old_rigid_capacity, old_soft_capacity;
+    if(destination == NULL || source == NULL) return false;
+    old_rigid_capacity = destination->rigid_body_capacity;
+    old_soft_capacity = destination->soft_body_capacity;
+    if(
+            !EDITOR_ARRAY_RESERVE(destination->rigid_bodies,
+                destination->rigid_body_capacity, source->rigid_body_count) ||
+            !EDITOR_ARRAY_RESERVE(destination->joint_items,
+                destination->joint_capacity, source->joint_count) ||
+            !EDITOR_ARRAY_RESERVE(destination->anchors,
+                destination->anchor_capacity, source->anchor_count) ||
+            !EDITOR_ARRAY_RESERVE(destination->soft_body_items,
+                destination->soft_body_capacity, source->soft_body_count) ||
+            !EDITOR_ARRAY_RESERVE(destination->hierarchy,
+                destination->hierarchy_capacity, source->hierarchy_count)) return false;
+    if(destination->rigid_body_capacity > old_rigid_capacity)
+        memset(&destination->rigid_bodies[old_rigid_capacity], 0,
+            (destination->rigid_body_capacity - old_rigid_capacity) *
+                sizeof(*destination->rigid_bodies));
+    if(destination->soft_body_capacity > old_soft_capacity)
+        memset(&destination->soft_body_items[old_soft_capacity], 0,
+            (destination->soft_body_capacity - old_soft_capacity) *
+                sizeof(*destination->soft_body_items));
+    rigid_bodies = destination->rigid_bodies;
+    editor_joints = destination->joint_items;
+    anchors = destination->anchors;
+    editor_soft_bodies = destination->soft_body_items;
+    hierarchy = destination->hierarchy;
+    rigid_capacity = destination->rigid_body_capacity;
+    joint_capacity = destination->joint_capacity;
+    anchor_capacity = destination->anchor_capacity;
+    soft_capacity = destination->soft_body_capacity;
+    hierarchy_capacity = destination->hierarchy_capacity;
+    old_rigid_count = destination->rigid_body_count;
+    old_soft_count = destination->soft_body_count;
+    for(size_t i = 0; i < source->rigid_body_count; i += 1)
+        if(!editor_project_rigid_body_copy_set(&rigid_bodies[i],
+                &source->rigid_bodies[i])) return false;
+    for(size_t i = source->rigid_body_count; i < old_rigid_count; i += 1)
+        editor_project_rigid_body_destroy(&rigid_bodies[i]);
+    for(size_t i = 0; i < source->soft_body_count; i += 1)
+        if(!editor_project_soft_body_copy_set(&editor_soft_bodies[i],
+                &source->soft_body_items[i])) return false;
+    for(size_t i = source->soft_body_count; i < old_soft_count; i += 1)
+        editor_project_soft_body_destroy(&editor_soft_bodies[i]);
+    if(source->joint_count > 0) memcpy(editor_joints, source->joint_items,
+        source->joint_count * sizeof(*editor_joints));
+    if(source->anchor_count > 0) memcpy(anchors, source->anchors,
+        source->anchor_count * sizeof(*anchors));
+    if(source->hierarchy_count > 0) memcpy(hierarchy, source->hierarchy,
+        source->hierarchy_count * sizeof(*hierarchy));
+    *destination = *source;
+    destination->rigid_bodies = rigid_bodies;
+    destination->joint_items = editor_joints;
+    destination->anchors = anchors;
+    destination->soft_body_items = editor_soft_bodies;
+    destination->hierarchy = hierarchy;
+    destination->rigid_body_capacity = rigid_capacity;
+    destination->joint_capacity = joint_capacity;
+    destination->anchor_capacity = anchor_capacity;
+    destination->soft_body_capacity = soft_capacity;
+    destination->hierarchy_capacity = hierarchy_capacity;
     return true;
 }
 
@@ -187,6 +574,8 @@ void editor_project_destroy(EditorProject *project) {
     if(project == NULL) return;
     for(size_t i = 0; i < project->object_count; i += 1)
         editor_project_object_destroy(&project->objects[i]);
+    free(project->collision_masks);
+    free(project->objects);
     *project = (EditorProject){0};
 }
 
@@ -194,7 +583,29 @@ bool editor_project_clone(EditorProject *destination,
         const EditorProject *source) {
     if(destination == NULL || source == NULL) return false;
     *destination = *source;
+    destination->collision_masks = NULL;
+    destination->objects = NULL;
+    destination->collision_mask_count = 0;
+    destination->object_count = 0;
+    destination->collision_mask_capacity = 0;
+    destination->object_capacity = 0;
+    if(!EDITOR_ARRAY_RESERVE(destination->collision_masks,
+            destination->collision_mask_capacity, source->collision_mask_count) ||
+            !EDITOR_ARRAY_RESERVE(destination->objects,
+                destination->object_capacity, source->object_count)) goto fail;
+    if(source->collision_mask_count > 0)
+        memcpy(destination->collision_masks, source->collision_masks,
+            source->collision_mask_count * sizeof(*source->collision_masks));
+    destination->collision_mask_count = source->collision_mask_count;
+    for(size_t i = 0; i < source->object_count; i += 1) {
+        if(!editor_project_object_clone(&destination->objects[i],
+                &source->objects[i])) goto fail;
+        destination->object_count += 1;
+    }
     return true;
+fail:
+    editor_project_destroy(destination);
+    return false;
 }
 
 bool editor_project_collision_mask_add(EditorProject *project, const char *name,
@@ -211,6 +622,9 @@ bool editor_project_collision_mask_add(EditorProject *project, const char *name,
         return false;
     }
     if(index != NULL) *index = project->collision_mask_count;
+    if(!EDITOR_ARRAY_RESERVE(project->collision_masks,
+            project->collision_mask_capacity,
+            project->collision_mask_count + 1)) return false;
     snprintf(project->collision_masks[project->collision_mask_count].name,
         sizeof(project->collision_masks[project->collision_mask_count].name),
         "%s", formatted);
@@ -221,13 +635,38 @@ bool editor_project_collision_mask_add(EditorProject *project, const char *name,
 EditorObject *editor_project_object_add(EditorProject *project, Position position) {
     EditorObject *object;
 
-    if(project == NULL || project->object_count >= EDITOR_OBJECT_MAX) return NULL;
+    if(project == NULL || !EDITOR_ARRAY_RESERVE(project->objects,
+            project->object_capacity, project->object_count + 1)) return NULL;
     object = &project->objects[project->object_count++];
     *object = (EditorObject){
         .id = project->next_id++,
         .position = position,
         .visible = true
     };
+    if(!EDITOR_ARRAY_RESERVE(object->rigid_bodies,
+            object->rigid_body_capacity, EDITOR_RIGID_BODY_MAX) ||
+            !EDITOR_ARRAY_RESERVE(object->joint_items,
+                object->joint_capacity, EDITOR_JOINT_MAX) ||
+            !EDITOR_ARRAY_RESERVE(object->anchors,
+                object->anchor_capacity, EDITOR_ANCHOR_MAX) ||
+            !EDITOR_ARRAY_RESERVE(object->soft_body_items,
+                object->soft_body_capacity, EDITOR_SOFT_BODY_MAX) ||
+            !EDITOR_ARRAY_RESERVE(object->hierarchy,
+                object->hierarchy_capacity, EDITOR_OBJECT_HIERARCHY_MAX)) {
+        editor_project_object_destroy(object);
+        project->object_count -= 1;
+        return NULL;
+    }
+    memset(object->rigid_bodies, 0,
+        object->rigid_body_capacity * sizeof(*object->rigid_bodies));
+    memset(object->joint_items, 0,
+        object->joint_capacity * sizeof(*object->joint_items));
+    memset(object->anchors, 0,
+        object->anchor_capacity * sizeof(*object->anchors));
+    memset(object->soft_body_items, 0,
+        object->soft_body_capacity * sizeof(*object->soft_body_items));
+    memset(object->hierarchy, 0,
+        object->hierarchy_capacity * sizeof(*object->hierarchy));
     snprintf(object->name, sizeof(object->name), "Object%u", object->id);
     project->selected = object->id;
     return object;
@@ -241,6 +680,7 @@ bool editor_project_object_remove(EditorProject *project, EditorObjectId id) {
         if(project->objects[index].id == id) break;
     }
     if(index == project->object_count) return false;
+    editor_project_object_destroy(&project->objects[index]);
     for(size_t i = index + 1; i < project->object_count; i += 1) {
         project->objects[i - 1] = project->objects[i];
     }
@@ -315,8 +755,8 @@ static bool editor_project_hierarchy_item_exists(const EditorObject *object,
 
 static void editor_project_hierarchy_item_add(EditorObject *object,
         EditorHierarchyItemKind kind, uint32_t id) {
-    if(object == NULL || id == 0 ||
-            object->hierarchy_count >= EDITOR_OBJECT_HIERARCHY_MAX) return;
+    if(object == NULL || id == 0 || !EDITOR_ARRAY_RESERVE(object->hierarchy,
+            object->hierarchy_capacity, object->hierarchy_count + 1)) return;
     object->hierarchy[object->hierarchy_count++] = (EditorHierarchyItem){kind, id};
 }
 
@@ -439,9 +879,18 @@ EditorRigidBody *editor_project_rigid_body_add(EditorProject *project,
     EditorRigidBody *body;
 
     if(project == NULL || object == NULL ||
-            object->rigid_body_count >= EDITOR_RIGID_BODY_MAX) return NULL;
+            !EDITOR_ARRAY_RESERVE(object->rigid_bodies,
+                object->rigid_body_capacity,
+                object->rigid_body_count + 1)) return NULL;
     body = &object->rigid_bodies[object->rigid_body_count++];
     *body = editor_project_rigid_body_default_get();
+    if(!EDITOR_ARRAY_RESERVE(body->hitboxes, body->hitbox_capacity,
+            EDITOR_BODY_HITBOX_MAX)) {
+        object->rigid_body_count -= 1;
+        return NULL;
+    }
+    memset(body->hitboxes, 0,
+        body->hitbox_capacity * sizeof(*body->hitboxes));
     body->id = project->next_rigid_body_id++;
     snprintf(body->name, sizeof(body->name), "rigid_body_%u", body->id);
     if(editor_project_hitbox_add(project, body) == NULL) {
@@ -477,6 +926,7 @@ bool editor_project_rigid_body_remove(EditorObject *object, EditorRigidBodyId id
             }
             anchor->rigid_body = 0;
         }
+        editor_project_rigid_body_destroy(&object->rigid_bodies[i]);
         for(size_t j = i + 1; j < object->rigid_body_count; j += 1) {
             object->rigid_bodies[j - 1] = object->rigid_bodies[j];
         }
@@ -530,10 +980,12 @@ EditorAnchor *editor_project_anchor_add(EditorProject *project, EditorObject *ob
     Position position, EditorRigidBodyId rigid_body) {
     EditorAnchor *anchor;
 
-    if(project == NULL || object == NULL || object->anchor_count >= EDITOR_ANCHOR_MAX ||
+    if(project == NULL || object == NULL ||
             (rigid_body != 0 && editor_project_rigid_body_get(object, rigid_body) == NULL)) {
         return NULL;
     }
+    if(!EDITOR_ARRAY_RESERVE(object->anchors, object->anchor_capacity,
+            object->anchor_count + 1)) return NULL;
     anchor = &object->anchors[object->anchor_count++];
     *anchor = (EditorAnchor){.id = project->next_anchor_id++, .position = position,
         .rigid_body = rigid_body, .position_follows_body = rigid_body != 0,
@@ -630,11 +1082,17 @@ bool editor_project_anchor_remove(EditorObject *object, EditorAnchorId id) {
 EditorHitbox *editor_project_hitbox_add(EditorProject *project, EditorRigidBody *body) {
     EditorHitbox *hitbox;
 
-    if(project == NULL || body == NULL || body->hitbox_count >= EDITOR_BODY_HITBOX_MAX) {
+    if(project == NULL || body == NULL ||
+            !EDITOR_ARRAY_RESERVE(body->hitboxes, body->hitbox_capacity,
+                body->hitbox_count + 1)) {
         return NULL;
     }
     hitbox = &body->hitboxes[body->hitbox_count++];
     *hitbox = (EditorHitbox){.id = project->next_hitbox_id++, .visible = true};
+    if(!editor_hitbox_vertices_reserve(hitbox, EDITOR_HITBOX_VERTEX_MAX)) {
+        body->hitbox_count -= 1;
+        return NULL;
+    }
     snprintf(hitbox->name, sizeof(hitbox->name), "hitbox_%u", hitbox->id);
     editor_hitbox_regular_set(project, hitbox, EDITOR_HITBOX_VERTEX_MIN);
     return hitbox;
@@ -652,6 +1110,7 @@ bool editor_project_hitbox_remove(EditorRigidBody *body, EditorHitboxId id) {
     if(body == NULL || id == 0) return false;
     for(size_t i = 0; i < body->hitbox_count; i += 1) {
         if(body->hitboxes[i].id != id) continue;
+        editor_project_hitbox_destroy(&body->hitboxes[i]);
         for(size_t j = i + 1; j < body->hitbox_count; j += 1) {
             body->hitboxes[j - 1] = body->hitboxes[j];
         }
@@ -689,8 +1148,9 @@ bool editor_project_hitbox_vertex_insert(EditorProject *project, EditorHitbox *h
     EditorVertex inserted;
 
     if(project == NULL || hitbox == NULL) return false;
-    if(hitbox->vertex_count >= EDITOR_HITBOX_VERTEX_MAX ||
-            line_index >= hitbox->vertex_count) return false;
+    if(line_index >= hitbox->vertex_count ||
+            !editor_hitbox_vertices_reserve(hitbox,
+                hitbox->vertex_count + 1)) return false;
     second = (line_index + 1) % hitbox->vertex_count;
     inserted = (EditorVertex){
         .id = project->next_vertex_id++,
@@ -866,8 +1326,6 @@ void editor_project_anchor_constraints_apply(EditorObject *object, EditorAnchorI
 
 void editor_project_rigid_body_constraints_apply(EditorObject *object,
     EditorRigidBodyId rigid_body) {
-    bool resolved[EDITOR_RIGID_BODY_MAX] = {false};
-    EditorRigidBodyId queue[EDITOR_RIGID_BODY_MAX];
     size_t queue_begin = 0;
     size_t queue_end = 0;
     EditorRigidBody *body;
@@ -875,6 +1333,9 @@ void editor_project_rigid_body_constraints_apply(EditorObject *object,
     if(object == NULL || rigid_body == 0) return;
     body = editor_project_rigid_body_get(object, rigid_body);
     if(body == NULL) return;
+    bool resolved[object->rigid_body_count];
+    EditorRigidBodyId queue[object->rigid_body_count];
+    memset(resolved, 0, sizeof(resolved));
     resolved[(size_t)(body - object->rigid_bodies)] = true;
     queue[queue_end++] = rigid_body;
     while(queue_begin < queue_end) {
@@ -916,7 +1377,9 @@ EditorJoint *editor_project_joint_add(EditorProject *project, EditorObject *obje
     EditorJointKind kind) {
     EditorJoint *joint;
 
-    if(project == NULL || object == NULL || object->joint_count >= EDITOR_JOINT_MAX) {
+    if(project == NULL || object == NULL ||
+            !EDITOR_ARRAY_RESERVE(object->joint_items, object->joint_capacity,
+                object->joint_count + 1)) {
         return NULL;
     }
     joint = &object->joint_items[object->joint_count++];
@@ -973,7 +1436,9 @@ EditorSoftBody *editor_project_soft_body_add(EditorProject *project, EditorObjec
     EditorSoftBody *body;
 
     if(project == NULL || object == NULL ||
-            object->soft_body_count >= EDITOR_SOFT_BODY_MAX) return NULL;
+            !EDITOR_ARRAY_RESERVE(object->soft_body_items,
+                object->soft_body_capacity,
+                object->soft_body_count + 1)) return NULL;
     body = &object->soft_body_items[object->soft_body_count++];
     *body = (EditorSoftBody){
         .id = project->next_soft_body_id++,
@@ -982,6 +1447,21 @@ EditorSoftBody *editor_project_soft_body_add(EditorProject *project, EditorObjec
         .area_color = UINT32_C(0x505a78ff),
         .visible = true
     };
+    if(!EDITOR_ARRAY_RESERVE(body->nodes, body->node_capacity,
+            EDITOR_SOFT_NODE_MAX) || !EDITOR_ARRAY_RESERVE(body->beams,
+                body->beam_capacity, EDITOR_SOFT_BEAM_MAX) ||
+            !EDITOR_ARRAY_RESERVE(body->areas, body->area_capacity,
+                EDITOR_SOFT_AREA_MAX) || !EDITOR_ARRAY_RESERVE(body->hierarchy,
+                body->hierarchy_capacity, EDITOR_SOFT_BODY_HIERARCHY_MAX)) {
+        editor_project_soft_body_destroy(body);
+        object->soft_body_count -= 1;
+        return NULL;
+    }
+    memset(body->nodes, 0, body->node_capacity * sizeof(*body->nodes));
+    memset(body->beams, 0, body->beam_capacity * sizeof(*body->beams));
+    memset(body->areas, 0, body->area_capacity * sizeof(*body->areas));
+    memset(body->hierarchy, 0,
+        body->hierarchy_capacity * sizeof(*body->hierarchy));
     snprintf(body->name, sizeof(body->name), "soft_body_%u", body->id);
     editor_project_hierarchy_item_add(object, EDITOR_HIERARCHY_SOFT_BODY, body->id);
     return body;
@@ -991,6 +1471,7 @@ bool editor_project_soft_body_remove(EditorObject *object, EditorSoftBodyId id) 
     if(object == NULL || id == 0) return false;
     for(size_t i = 0; i < object->soft_body_count; i += 1) {
         if(object->soft_body_items[i].id != id) continue;
+        editor_project_soft_body_destroy(&object->soft_body_items[i]);
         for(size_t j = i + 1; j < object->soft_body_count; j += 1) {
             object->soft_body_items[j - 1] = object->soft_body_items[j];
         }
@@ -1027,7 +1508,11 @@ EditorSoftNode *editor_project_soft_node_add(EditorProject *project, EditorSoftB
     Position position) {
     EditorSoftNode *node;
 
-    if(project == NULL || body == NULL || body->node_count >= EDITOR_SOFT_NODE_MAX) {
+    if(project == NULL || body == NULL ||
+            !EDITOR_ARRAY_RESERVE(body->nodes, body->node_capacity,
+                body->node_count + 1) ||
+            !EDITOR_ARRAY_RESERVE(body->hierarchy, body->hierarchy_capacity,
+                body->hierarchy_count + 1)) {
         return NULL;
     }
     node = &body->nodes[body->node_count++];
@@ -1068,8 +1553,8 @@ static bool editor_project_soft_hierarchy_item_exists(const EditorSoftBody *body
 
 static void editor_project_soft_hierarchy_item_add(EditorSoftBody *body,
         EditorSoftHierarchyItemKind kind, uint32_t id) {
-    if(body == NULL || id == 0 ||
-            body->hierarchy_count >= EDITOR_SOFT_BODY_HIERARCHY_MAX) return;
+    if(body == NULL || id == 0 || !EDITOR_ARRAY_RESERVE(body->hierarchy,
+            body->hierarchy_capacity, body->hierarchy_count + 1)) return;
     body->hierarchy[body->hierarchy_count++] = (EditorSoftHierarchyItem){kind, id};
 }
 
@@ -1148,7 +1633,8 @@ EditorSoftBeam *editor_project_soft_beam_add(EditorProject *project, EditorSoftB
     bool found_b = node_b == 0;
 
     if(project == NULL || body == NULL || (node_a != 0 && node_a == node_b) ||
-            body->beam_count >= EDITOR_SOFT_BEAM_MAX) return NULL;
+            !EDITOR_ARRAY_RESERVE(body->beams, body->beam_capacity,
+                body->beam_count + 1)) return NULL;
     for(size_t i = 0; i < body->node_count; i += 1) {
         if(body->nodes[i].id == node_a) found_a = true;
         if(body->nodes[i].id == node_b) found_b = true;
@@ -1226,24 +1712,29 @@ static float editor_soft_area_signed_twice_get(const EditorSoftBody *body,
 }
 
 void editor_project_soft_areas_sync(EditorProject *project, EditorSoftBody *body) {
-    EditorSoftArea previous[EDITOR_SOFT_AREA_MAX];
-    bool visited[EDITOR_SOFT_BEAM_MAX][2] = {{false}};
+    EditorSoftArea *previous;
+    bool *visited;
+    EditorSoftNodeId *nodes;
     size_t previous_count;
 
     if(project == NULL || body == NULL) return;
+    previous = body->areas;
     previous_count = body->area_count;
-    memcpy(previous, body->areas, sizeof(previous));
+    body->areas = NULL;
     body->area_count = 0;
+    body->area_capacity = 0;
+    visited = calloc(body->beam_count * 2, sizeof(*visited));
+    nodes = malloc((body->beam_count + 1) * sizeof(*nodes));
+    if((body->beam_count > 0 && visited == NULL) || nodes == NULL) goto finish;
     for(size_t start_beam = 0; start_beam < body->beam_count; start_beam += 1) {
         for(size_t start_direction = 0; start_direction < 2; start_direction += 1) {
-            EditorSoftNodeId nodes[EDITOR_SOFT_AREA_NODE_MAX];
             size_t node_count = 0;
             size_t beam = start_beam;
             size_t direction = start_direction;
             EditorSoftNodeId start = start_direction == 0 ?
                 body->beams[start_beam].node_a : body->beams[start_beam].node_b;
             bool closed = false;
-            if(visited[start_beam][start_direction] || start == 0) continue;
+            if(visited[start_beam * 2 + start_direction] || start == 0) continue;
             nodes[node_count++] = start;
             for(size_t step = 0; step < body->beam_count * 2; step += 1) {
                 EditorSoftNodeId from = direction == 0 ?
@@ -1256,13 +1747,13 @@ void editor_project_soft_areas_sync(EditorProject *project, EditorSoftBody *body
                 float best_turn = INFINITY;
                 size_t next_beam = SIZE_MAX;
                 size_t next_direction = 0;
-                visited[beam][direction] = true;
+                visited[beam * 2 + direction] = true;
                 if(from_node == NULL || to_node == NULL || to == 0) break;
                 if(to == start && node_count >= 3) {
                     closed = true;
                     break;
                 }
-                if(node_count >= EDITOR_SOFT_AREA_NODE_MAX) break;
+                if(node_count >= body->beam_count + 1) break;
                 nodes[node_count++] = to;
                 incoming_angle = atan2f(from_node->position.y - to_node->position.y,
                     from_node->position.x - to_node->position.x);
@@ -1297,12 +1788,12 @@ void editor_project_soft_areas_sync(EditorProject *project, EditorSoftBody *body
                 direction = next_direction;
             }
             if(closed && node_count >= 3 &&
-                    editor_soft_area_signed_twice_get(body, nodes, node_count) > 0.0001f &&
-                    body->area_count < EDITOR_SOFT_AREA_MAX) {
+                    editor_soft_area_signed_twice_get(body, nodes, node_count) > 0.0001f) {
                 EditorSoftArea area = {0};
                 for(size_t i = 0; i < previous_count; i += 1) {
                     if(editor_soft_area_boundary_equal(&previous[i], nodes, node_count)) {
                         area = previous[i];
+                        previous[i] = (EditorSoftArea){0};
                         break;
                     }
                 }
@@ -1312,15 +1803,24 @@ void editor_project_soft_areas_sync(EditorProject *project, EditorSoftBody *body
                     area.visible = true;
                     snprintf(area.name, sizeof(area.name), "area_%u", area.id);
                 }
-                memcpy(area.nodes, nodes, node_count * sizeof(nodes[0]));
+                if(!EDITOR_ARRAY_RESERVE(area.nodes, area.node_capacity,
+                        node_count) || !EDITOR_ARRAY_RESERVE(body->areas,
+                            body->area_capacity, body->area_count + 1)) {
+                    editor_project_soft_area_destroy(&area);
+                    goto finish;
+                }
+                memcpy(area.nodes, nodes, node_count * sizeof(*nodes));
                 area.node_count = node_count;
                 body->areas[body->area_count++] = area;
             }
         }
     }
-    for(size_t i = body->area_count; i < EDITOR_SOFT_AREA_MAX; i += 1) {
-        body->areas[i] = (EditorSoftArea){0};
-    }
+finish:
+    for(size_t i = 0; i < previous_count; i += 1)
+        editor_project_soft_area_destroy(&previous[i]);
+    free(previous);
+    free(visited);
+    free(nodes);
     editor_project_soft_body_hierarchy_sync(body);
 }
 
@@ -1338,11 +1838,13 @@ static bool editor_soft_point_in_triangle(Position point, Position a, Position b
 
 size_t editor_project_soft_area_triangulate(const EditorSoftBody *body,
         const EditorSoftArea *area, uint32_t triangles[][3], size_t capacity) {
-    uint32_t remaining[EDITOR_SOFT_AREA_NODE_MAX];
+    uint32_t *remaining;
     size_t count;
     size_t triangle_count = 0;
     if(body == NULL || area == NULL || triangles == NULL || area->node_count < 3) return 0;
     count = area->node_count;
+    remaining = malloc(count * sizeof(*remaining));
+    if(remaining == NULL) return 0;
     for(size_t i = 0; i < count; i += 1) remaining[i] = (uint32_t)i;
     while(count > 3 && triangle_count < capacity) {
         bool clipped = false;
@@ -1375,7 +1877,10 @@ size_t editor_project_soft_area_triangulate(const EditorSoftBody *body,
             clipped = true;
             break;
         }
-        if(!clipped) return 0;
+        if(!clipped) {
+            free(remaining);
+            return 0;
+        }
     }
     if(count == 3 && triangle_count < capacity) {
         triangles[triangle_count][0] = remaining[0];
@@ -1383,5 +1888,6 @@ size_t editor_project_soft_area_triangulate(const EditorSoftBody *body,
         triangles[triangle_count][2] = remaining[2];
         triangle_count += 1;
     }
+    free(remaining);
     return triangle_count;
 }

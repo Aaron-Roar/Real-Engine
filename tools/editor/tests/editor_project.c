@@ -852,6 +852,29 @@ int main(void) {
         workspace_fixture_remove(fixture);
     }
 
+    {
+        EditorProject dynamic_project;
+        EditorObject *dynamic_object;
+        editor_project_init(&dynamic_project);
+        dynamic_object = editor_project_object_add(&dynamic_project, (Position){0});
+        if(dynamic_object == NULL) return 1;
+        for(size_t i = 0; i < EDITOR_RIGID_BODY_MAX + 1; i += 1)
+            if(editor_project_rigid_body_add(&dynamic_project,
+                    dynamic_object) == NULL) return 1;
+        for(size_t i = 0; i < EDITOR_SOFT_BODY_MAX + 1; i += 1)
+            if(editor_project_soft_body_add(&dynamic_project,
+                    dynamic_object) == NULL) return 1;
+        for(size_t i = 0; i < EDITOR_SOFT_NODE_MAX + 1; i += 1)
+            if(editor_project_soft_node_add(&dynamic_project,
+                    &dynamic_object->soft_body_items[0],
+                    (Position){(float)i, 0.0f}) == NULL) return 1;
+        if(dynamic_object->rigid_body_count != EDITOR_RIGID_BODY_MAX + 1 ||
+                dynamic_object->soft_body_count != EDITOR_SOFT_BODY_MAX + 1 ||
+                dynamic_object->soft_body_items[0].node_count !=
+                    EDITOR_SOFT_NODE_MAX + 1) return 1;
+        editor_project_destroy(&dynamic_project);
+    }
+
     editor_project_selection_clear(&project);
     if(editor_project_selected_get(&project) != NULL ||
             !editor_project_object_select(&project, object->id) ||

@@ -16,6 +16,8 @@ static bool position_near(Position position, float x, float y) {
 static int auto_shape_test(void) {
     EditorHitbox hitbox = {0};
     EditorSoftBody soft_body = {0};
+    EditorVertex vertices[5] = {0};
+    EditorSoftNode nodes[6] = {0};
     EditorVertexId vertex_ids[5] = {11, 12, 13, 14, 15};
     EditorSoftNodeId node_ids[6] = {21, 22, 23, 24, 25, 26};
     EditorAutoShapeConfig rectangle = {
@@ -30,7 +32,9 @@ static int auto_shape_test(void) {
         .width = 6.0f, .height = 4.0f
     };
 
+    hitbox.vertices = vertices;
     hitbox.vertex_count = 5;
+    hitbox.vertex_capacity = 5;
     for(size_t i = 0; i < hitbox.vertex_count; i += 1)
         hitbox.vertices[i].id = vertex_ids[i];
     if(editor_result_check(editor_auto_shape_hitbox_apply(&hitbox, &rectangle)) ||
@@ -42,7 +46,9 @@ static int auto_shape_test(void) {
     for(size_t i = 0; i < hitbox.vertex_count; i += 1)
         if(hitbox.vertices[i].id != vertex_ids[i]) return 1;
 
+    soft_body.nodes = nodes;
     soft_body.node_count = 6;
+    soft_body.node_capacity = 6;
     for(size_t i = 0; i < soft_body.node_count; i += 1)
         soft_body.nodes[i].id = node_ids[i];
     if(editor_result_check(editor_auto_shape_soft_body_apply(&soft_body, &circle)) ||

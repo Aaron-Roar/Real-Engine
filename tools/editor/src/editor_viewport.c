@@ -256,9 +256,10 @@ static void editor_triangle_filled_draw(Position a, Position b, Position c, Colo
 
 static void editor_soft_area_filled_draw(const EditorObject *object,
         const EditorSoftBody *body, const EditorSoftArea *area, Color color) {
-    uint32_t triangles[EDITOR_SOFT_AREA_NODE_MAX - 2][3];
+    if(area == NULL || area->node_count < 3) return;
+    uint32_t triangles[area->node_count - 2][3];
     size_t count = editor_project_soft_area_triangulate(body, area, triangles,
-        EDITOR_SOFT_AREA_NODE_MAX - 2);
+        area->node_count - 2);
     for(size_t i = 0; i < count; i += 1) {
         const EditorSoftNode *a = NULL;
         const EditorSoftNode *b = NULL;
@@ -280,12 +281,12 @@ static void editor_soft_area_filled_draw(const EditorObject *object,
 
 static void editor_hitbox_filled_draw(const EditorObject *object,
         const EditorRigidBody *body, const EditorHitbox *hitbox, Color color) {
-    Position points[EDITOR_HITBOX_VERTEX_MAX];
     float minimum_y;
     float maximum_y;
 
     if(object == NULL || body == NULL || hitbox == NULL || hitbox->vertex_count < 3)
         return;
+    Position points[hitbox->vertex_count];
     for(uint32_t i = 0; i < hitbox->vertex_count; i += 1) {
         points[i] = editor_view_world_to_screen(
             editor_hitbox_vertex_world_get(object, body, hitbox, i));
@@ -301,7 +302,7 @@ static void editor_hitbox_filled_draw(const EditorObject *object,
     int last_row = (int)ceilf(fminf(maximum_y, EDITOR_WINDOW_HEIGHT - 1.0f));
     for(int row = first_row; row <= last_row; row += 1) {
         float scan_y = (float)row + 0.5f;
-        float intersections[EDITOR_HITBOX_VERTEX_MAX];
+        float intersections[hitbox->vertex_count];
         uint32_t count = 0;
         for(uint32_t edge = 0; edge < hitbox->vertex_count; edge += 1) {
             Position start = points[edge];
@@ -1574,8 +1575,6 @@ static Position editor_group_rotate_point(Position point, Position pivot,
 
 static bool editor_group_rigid_bodies_connected_check(EditorObject *object,
         EditorRigidBodyId first, EditorRigidBodyId second) {
-    EditorRigidBodyId queue[EDITOR_RIGID_BODY_MAX];
-    bool visited[EDITOR_RIGID_BODY_MAX] = {false};
     size_t queue_begin = 0;
     size_t queue_end = 0;
     EditorRigidBody *body;
@@ -1584,6 +1583,9 @@ static bool editor_group_rigid_bodies_connected_check(EditorObject *object,
     if(first == second) return true;
     body = editor_project_rigid_body_get(object, first);
     if(body == NULL) return false;
+    EditorRigidBodyId queue[object->rigid_body_count];
+    bool visited[object->rigid_body_count];
+    memset(visited, 0, sizeof(visited));
     visited[(size_t)(body - object->rigid_bodies)] = true;
     queue[queue_end++] = first;
     while(queue_begin < queue_end) {
