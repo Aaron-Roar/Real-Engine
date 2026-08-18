@@ -667,8 +667,13 @@ EditorResult editor_command_cli_named_parse(const EditorProject *project,
             RESOLVE_AND_PUSH(editor_cli_animated_sprite_resolve(object,
                 &selectors.animated_sprite, &item_id));
         if(strcmp(action, "frame-add") == 0) {
-            RESOLVE_AND_PUSH(editor_cli_sprite_resolve(object,
-                &selectors.sprite, &item_id));
+            if(rest_count != 4) return editor_result_error(
+                EDITOR_ERROR_INVALID_ARGUMENT,
+                "frame-add requires <name> <path> <width> <height>");
+            for(size_t i = 0; i < rest_count; i += 1)
+                if(!editor_cli_argument_push(normalized, &normalized_count, rest[i]))
+                    goto capacity_error;
+            rest_count = 0;
         } else if(strcmp(action, "frame-delete") == 0) {
             if(!selectors.frame.id_set) return editor_result_error(
                 EDITOR_ERROR_INVALID_ARGUMENT,

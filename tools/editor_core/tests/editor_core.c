@@ -969,14 +969,15 @@ static int sprite_commands_test(void) {
 
     command = (EditorCommand){.type = EDITOR_COMMAND_ANIMATION_FRAME_ADD,
         .data.animation_frame_add = {.object = object->id, .sprite = animated->id,
-            .frame = asset->id}};
+            .name = "wheel_frame", .path = "assets/wheel.png",
+            .size = {32.0f, 24.0f}}};
     executed = editor_command_execute(&project, &command);
     if(executed.kind != ERROR_RESULT_VALUE) return 1;
     result = editor_command_cli_standard_write(&project, &command, &executed,
         "project.rohr.json", text, sizeof(text));
     if(editor_result_check(result) || strstr(text, "--object") == NULL ||
             strstr(text, "--animated-sprite rolling") == NULL ||
-            strstr(text, "--sprite wheel") == NULL || strstr(text, "frame-add") == NULL)
+            strstr(text, "frame-add wheel_frame assets/wheel.png 32 24") == NULL)
         return 1;
     count = 0;
     for(char *token = strtok(text, " "); token != NULL && count < 32;
@@ -986,7 +987,10 @@ static int sprite_commands_test(void) {
     if(editor_result_check(result) || parsed.type != EDITOR_COMMAND_ANIMATION_FRAME_ADD ||
             parsed.data.animation_frame_add.object != object->id ||
             parsed.data.animation_frame_add.sprite != animated->id ||
-            parsed.data.animation_frame_add.frame != asset->id) return 1;
+            strcmp(parsed.data.animation_frame_add.name, "wheel_frame") != 0 ||
+            strcmp(parsed.data.animation_frame_add.path, "assets/wheel.png") != 0 ||
+            parsed.data.animation_frame_add.size.x != 32.0f ||
+            parsed.data.animation_frame_add.size.y != 24.0f) return 1;
 
     command = (EditorCommand){.type = EDITOR_COMMAND_ANIMATED_SPRITE_BODY_SET,
         .data.animated_sprite_body_set = {.object = object->id,

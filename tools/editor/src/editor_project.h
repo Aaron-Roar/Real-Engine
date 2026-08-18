@@ -223,7 +223,10 @@ typedef struct EditorSprite {
 } EditorSprite;
 
 typedef struct EditorAnimationFrame {
-    EditorSpriteId sprite;
+    EditorSpriteId id;
+    char name[EDITOR_OBJECT_NAME_MAX];
+    char path[EDITOR_ASSET_PATH_MAX];
+    Scale size;
 } EditorAnimationFrame;
 
 typedef struct EditorAnimatedSprite {
@@ -418,8 +421,9 @@ EditorAnimatedSprite *editor_project_animated_sprite_get(EditorObject *object,
     EditorAnimatedSpriteId id);
 bool editor_project_animated_sprite_remove(EditorObject *object,
     EditorAnimatedSpriteId id);
-bool editor_project_animation_frame_add(EditorAnimatedSprite *animated_sprite,
-    EditorSpriteId sprite);
+bool editor_project_animation_frame_add(EditorProject *project,
+    EditorAnimatedSprite *animated_sprite, const char *name, const char *path,
+    Scale size);
 bool editor_project_animation_frame_remove(EditorAnimatedSprite *animated_sprite,
     size_t index);
 

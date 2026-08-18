@@ -312,7 +312,8 @@ typedef struct EditorCommand {
         struct { EditorObjectId object; EditorAnimatedSpriteId sprite; bool enabled; }
             animated_sprite_boolean_set;
         struct { EditorObjectId object; EditorAnimatedSpriteId sprite;
-            EditorSpriteId frame; } animation_frame_add;
+            char name[EDITOR_OBJECT_NAME_MAX]; char path[EDITOR_ASSET_PATH_MAX];
+            Scale size; } animation_frame_add;
         struct { EditorObjectId object; EditorAnimatedSpriteId sprite; size_t index; }
             animation_frame_remove;
     } data;

@@ -43,7 +43,8 @@ typedef enum EditorWorkspaceBrowserAction {
     EDITOR_WORKSPACE_BROWSER_NONE,
     EDITOR_WORKSPACE_BROWSER_NEW,
     EDITOR_WORKSPACE_BROWSER_LOAD,
-    EDITOR_WORKSPACE_BROWSER_ADD_SPRITE
+    EDITOR_WORKSPACE_BROWSER_ADD_SPRITE,
+    EDITOR_WORKSPACE_BROWSER_ADD_ANIMATION_FRAME
 } EditorWorkspaceBrowserAction;
 
 static const char *editor_project_relative_path_get(const char *project_directory,
@@ -1966,7 +1967,6 @@ int main(void) {
     TextAsset y_field = {0};
     TextAsset length_field = {0};
     TextAsset path_field = {0};
-    size_t animation_sprite_choice = 0;
     TextAsset object_name_labels[EDITOR_OBJECT_MAX] = {0};
     char object_name_cache[EDITOR_OBJECT_MAX][EDITOR_OBJECT_NAME_MAX] = {{0}};
     ViewportId viewport = 0;
@@ -1991,6 +1991,7 @@ int main(void) {
     EditorWorkspaceBrowserAction workspace_browser_action =
         EDITOR_WORKSPACE_BROWSER_NONE;
     EditorObjectId sprite_browser_object = 0;
+    EditorAnimatedSpriteId animation_browser_sprite = 0;
     char startup_directory[EDITOR_FILE_BROWSER_PATH_MAX] = {0};
     bool running = true;
     bool field_editing = false;
@@ -2159,7 +2160,7 @@ int main(void) {
             !editor_text_create(&font, "Add Sprite", &add_sprite_label) ||
             !editor_text_create(&font, "Add Animated Sprite",
                 &add_animated_sprite_label) ||
-            !editor_text_create(&font, "Add Frame", &add_frame_label) ||
+            !editor_text_create(&font, "Add Sprite", &add_frame_label) ||
             !editor_text_create(&font, "None", &none_label) ||
             !editor_text_create(&font, "Add Hitbox", &add_hitbox_label) ||
             !editor_text_create(&font, "Hitbox", &hitbox_label) ||
@@ -2374,6 +2375,7 @@ int main(void) {
                 file_browser.active = false;
                 workspace_browser_action = EDITOR_WORKSPACE_BROWSER_NONE;
                 sprite_browser_object = 0;
+                animation_browser_sprite = 0;
             }
         } else if(close_action != EDITOR_CLOSE_NONE &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
@@ -4944,42 +4946,31 @@ int main(void) {
                 field_editing = name_result.active || position_x.active ||
                     position_y.active || sx.active || sy.active ||
                     tick_result.active || time_result.active || start_result.active;
-                if(selected->sprite_count > 0) {
-                    const TextAsset *options[64];
-                    size_t option_count = selected->sprite_count > 64 ? 64 :
-                        selected->sprite_count;
-                    for(size_t i = 0; i < option_count; i += 1) {
-                        (void)editor_named_text_sync(&font, selected->sprites[i].name,
-                            &sprite_labels[i], sprite_cache[i], EDITOR_OBJECT_NAME_MAX);
-                        options[i] = &sprite_labels[i];
-                    }
-                    UIDropdownResult frame_choice = rohr_ui_dropdown(
-                        "editor.animated_sprite.frame_choice", options, option_count,
-                        animation_sprite_choice < option_count ? animation_sprite_choice : 0,
+                if(rohr_ui_button("editor.animated_sprite.add_frame", &add_frame_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 496.0f,
-                            EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, NULL);
-                    if(frame_choice.changed) animation_sprite_choice =
-                        frame_choice.selected_index;
-                    if(rohr_ui_button("editor.animated_sprite.add_frame", &add_frame_label,
-                            (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 532.0f,
-                                EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, NULL).clicked) {
-                        EditorCommand command = {.type = EDITOR_COMMAND_ANIMATION_FRAME_ADD,
-                            .data.animation_frame_add = {.object = selected->id,
-                                .sprite = sprite->id,
-                                .frame = selected->sprites[animation_sprite_choice].id}};
-                        (void)editor_command_execute(&project, &command);
+                            EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, NULL).clicked) {
+                    sprite_browser_object = selected->id;
+                    animation_browser_sprite = sprite->id;
+                    workspace_browser_action =
+                        EDITOR_WORKSPACE_BROWSER_ADD_ANIMATION_FRAME;
+                    if(!editor_file_browser_open(&file_browser,
+                            EDITOR_FILE_BROWSER_OPEN_PNG, workspace.directory, &font)) {
+                        sprite_browser_object = 0;
+                        animation_browser_sprite = 0;
+                        workspace_browser_action = EDITOR_WORKSPACE_BROWSER_NONE;
                     }
                 }
                 for(size_t frame = 0; frame < sprite->frame_count; frame += 1) {
-                    EditorSprite *asset = editor_project_sprite_get(selected,
-                        sprite->frames[frame].sprite);
+                    EditorAnimationFrame *asset = &sprite->frames[frame];
                     char id[80];
-                    if(asset == NULL) continue;
-                    size_t asset_index = (size_t)(asset - selected->sprites);
+                    size_t asset_index = frame < 64 ? frame : 63;
+                    (void)editor_named_text_sync(&font, asset->name,
+                        &sprite_labels[asset_index], sprite_cache[asset_index],
+                        EDITOR_OBJECT_NAME_MAX);
                     snprintf(id, sizeof(id), "editor.animated_sprite.frame.%zu", frame);
                     if(rohr_ui_button(id, &sprite_labels[asset_index],
                             (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
-                                568.0f + (float)frame * 30.0f,
+                                532.0f + (float)frame * 30.0f,
                                 EDITOR_TOOLS_WIDTH - 20.0f, 26.0f}, NULL).double_clicked) {
                         EditorCommand command = {.type = EDITOR_COMMAND_ANIMATION_FRAME_REMOVE,
                             .data.animation_frame_remove = {.object = selected->id,
@@ -5535,6 +5526,8 @@ int main(void) {
                 if(top_menu_pressed) {
                     editor_file_browser_destroy(&file_browser);
                     workspace_browser_action = EDITOR_WORKSPACE_BROWSER_NONE;
+                    sprite_browser_object = 0;
+                    animation_browser_sprite = 0;
                     build_settings_panel.open = false;
                     build_settings_panel.build_requested = false;
                     visual_settings_panel.open = false;
@@ -5828,7 +5821,45 @@ int main(void) {
                 EditorResult load_result = editor_result_value(true);
                 bool opened;
                 EditorWorkspaceCommand command = {0};
-                if(workspace_browser_action == EDITOR_WORKSPACE_BROWSER_ADD_SPRITE) {
+                if(workspace_browser_action ==
+                        EDITOR_WORKSPACE_BROWSER_ADD_ANIMATION_FRAME) {
+                    const char *sprite_path = editor_project_relative_path_get(
+                        workspace.directory, browser_result.path);
+                    EditorCommand add_command = {.type = EDITOR_COMMAND_ANIMATION_FRAME_ADD,
+                        .data.animation_frame_add = {.object = sprite_browser_object,
+                            .sprite = animation_browser_sprite,
+                            .size = {64.0f, 64.0f}}};
+                    EditorCommandResult added;
+
+                    opened = sprite_browser_object != EDITOR_OBJECT_INVALID &&
+                        animation_browser_sprite != 0;
+                    if(opened && strlen(sprite_path) >=
+                            sizeof(add_command.data.animation_frame_add.path)) {
+                        load_result = editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                            "Animation sprite path is too long: %s", browser_result.path);
+                        opened = false;
+                    } else if(opened) {
+                        EditorObject *frame_object = editor_project_selected_get(&project);
+                        EditorAnimatedSprite *animation = frame_object == NULL ||
+                            frame_object->id != sprite_browser_object ? NULL :
+                            editor_project_animated_sprite_get(frame_object,
+                                animation_browser_sprite);
+                        snprintf(add_command.data.animation_frame_add.name,
+                            sizeof(add_command.data.animation_frame_add.name), "sprite_%zu",
+                            animation == NULL ? 1 : animation->frame_count + 1);
+                        snprintf(add_command.data.animation_frame_add.path,
+                            sizeof(add_command.data.animation_frame_add.path), "%s",
+                            sprite_path);
+                        added = editor_command_execute(&project, &add_command);
+                        opened = added.kind == ERROR_RESULT_VALUE;
+                        if(!opened) {
+                            load_result.kind = ERROR_RESULT_ERROR;
+                            load_result.result.error = added.result.error;
+                        }
+                    }
+                    sprite_browser_object = 0;
+                    animation_browser_sprite = 0;
+                } else if(workspace_browser_action == EDITOR_WORKSPACE_BROWSER_ADD_SPRITE) {
                     const char *sprite_path = editor_project_relative_path_get(
                         workspace.directory, browser_result.path);
                     EditorCommand add_command = {.type = EDITOR_COMMAND_SPRITE_ADD,
@@ -5881,8 +5912,9 @@ int main(void) {
                     opened = !editor_result_check(load_result);
                 }
                 if(opened) {
-                    if(workspace_browser_action !=
-                            EDITOR_WORKSPACE_BROWSER_ADD_SPRITE) {
+                    if(workspace_browser_action != EDITOR_WORKSPACE_BROWSER_ADD_SPRITE &&
+                            workspace_browser_action !=
+                                EDITOR_WORKSPACE_BROWSER_ADD_ANIMATION_FRAME) {
                         editor_history_reset(&history);
                         saved_project_hash = editor_project_hash_get(&project);
                         editor_viewport_state_init(&viewport_state);
@@ -5908,6 +5940,7 @@ int main(void) {
             } else if(browser_result.cancelled) {
                 workspace_browser_action = EDITOR_WORKSPACE_BROWSER_NONE;
                 sprite_browser_object = 0;
+                animation_browser_sprite = 0;
             }
         }
         rohr_graphics_layer_set(EDITOR_GRAPHICS_LAYER_TOP_MENU);

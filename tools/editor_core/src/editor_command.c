@@ -1118,16 +1118,15 @@ property_invalid:
             else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET)
                 sprite->visible = command->data.animated_sprite_boolean_set.enabled;
             else if(command->type == EDITOR_COMMAND_ANIMATION_FRAME_ADD) {
-                if(editor_project_sprite_get(object,
-                        command->data.animation_frame_add.frame) == NULL)
-                    return editor_command_not_found("sprite",
-                        command->data.animation_frame_add.frame);
                 if(sprite->frame_count >= MAX_ANIMATIONS_FRAMES ||
-                        !editor_project_animation_frame_add(sprite,
-                            command->data.animation_frame_add.frame))
+                        !editor_project_animation_frame_add(project, sprite,
+                            command->data.animation_frame_add.name,
+                            command->data.animation_frame_add.path,
+                            command->data.animation_frame_add.size))
                     return editor_command_error(editor_result_error(
                         EDITOR_ERROR_CAPACITY,
-                        "animation reached the runtime frame limit").result.error);
+                        "animation frame is invalid or reached the runtime frame limit")
+                            .result.error);
             } else {
                 if(!editor_project_animation_frame_remove(sprite,
                         command->data.animation_frame_remove.index))
@@ -1503,12 +1502,23 @@ EditorResult editor_command_cli_parse(int count, char **arguments,
                 sizeof(command->data.animated_sprite_rename.name), "%s", arguments[6]);
             return editor_result_value(true);
         }
-        if(strcmp(action, "frame-add") == 0 && count == 7 &&
-                editor_command_uint_parse(arguments[6], &value)) {
+        if(strcmp(action, "frame-add") == 0 && count == 10) {
+            char *end_x;
+            char *end_y;
+            double width = strtod(arguments[8], &end_x);
+            double height = strtod(arguments[9], &end_y);
+            if(end_x == arguments[8] || *end_x != '\0' || end_y == arguments[9] ||
+                    *end_y != '\0' || width <= 0.0 || height <= 0.0)
+                return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                    "animation frame size must be positive numbers");
             command->type = EDITOR_COMMAND_ANIMATION_FRAME_ADD;
             command->data.animation_frame_add.object = object;
             command->data.animation_frame_add.sprite = id;
-            command->data.animation_frame_add.frame = value;
+            snprintf(command->data.animation_frame_add.name,
+                sizeof(command->data.animation_frame_add.name), "%s", arguments[6]);
+            snprintf(command->data.animation_frame_add.path,
+                sizeof(command->data.animation_frame_add.path), "%s", arguments[7]);
+            command->data.animation_frame_add.size = (Scale){(float)width, (float)height};
             return editor_result_value(true);
         }
         if(strcmp(action, "frame-delete") == 0 && count == 7 &&
@@ -2307,9 +2317,17 @@ EditorResult editor_command_cli_write(const EditorCommand *command,
                     command->data.animated_sprite_boolean_set.enabled ? "true" : "false");
                 if(!editor_command_text_append(output, output_capacity, &used, values)) goto capacity_error;
             } else if(command->type == EDITOR_COMMAND_ANIMATION_FRAME_ADD) {
-                snprintf(values, sizeof(values), " %u",
-                    command->data.animation_frame_add.frame);
-                if(!editor_command_text_append(output, output_capacity, &used, values)) goto capacity_error;
+                if(!editor_command_text_append(output, output_capacity, &used, " ") ||
+                        !editor_command_shell_text_append(output, output_capacity, &used,
+                            command->data.animation_frame_add.name) ||
+                        !editor_command_text_append(output, output_capacity, &used, " ") ||
+                        !editor_command_shell_text_append(output, output_capacity, &used,
+                            command->data.animation_frame_add.path)) goto capacity_error;
+                snprintf(values, sizeof(values), " %.9g %.9g",
+                    command->data.animation_frame_add.size.x,
+                    command->data.animation_frame_add.size.y);
+                if(!editor_command_text_append(output, output_capacity, &used, values))
+                    goto capacity_error;
             } else if(command->type == EDITOR_COMMAND_ANIMATION_FRAME_REMOVE) {
                 snprintf(values, sizeof(values), " %zu",
                     command->data.animation_frame_remove.index);

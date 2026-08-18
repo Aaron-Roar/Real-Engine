@@ -589,9 +589,7 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 sprite->frame_count, (unsigned long long)sprite->ticks_per_frame,
                 sprite->time_per_frame);
             for(size_t frame = 0; frame < sprite->frame_count; frame += 1) {
-                const EditorSprite *asset = editor_workspace_sprite_get(object,
-                    sprite->frames[frame].sprite);
-                if(asset == NULL) continue;
+                const EditorAnimationFrame *asset = &sprite->frames[frame];
                 fprintf(source, "%s{.file = ", frame == 0 ? "" : ", ");
                 editor_workspace_c_string_write(source, asset->path);
                 fprintf(source, ", .size = {%#.9gf, %#.9gf}}",

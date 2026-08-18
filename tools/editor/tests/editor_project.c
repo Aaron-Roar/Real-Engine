@@ -213,8 +213,9 @@ int main(void) {
                 generated_animation->scale = (Scale){2.0f, 3.0f};
                 generated_animation->time_per_frame = 0.125;
                 generated_animation->follow_body_rotation = false;
-                (void)editor_project_animation_frame_add(generated_animation,
-                    generated_sprite->id);
+                (void)editor_project_animation_frame_add(&loaded_project,
+                    generated_animation, "first_frame", "assets/box.png",
+                    generated_sprite->size);
             }
             if(generated_beam != NULL) generated_beam->damping = 0.3f;
             if(generated_node_a != NULL) {

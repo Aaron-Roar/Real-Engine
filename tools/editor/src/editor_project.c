@@ -2043,18 +2043,6 @@ EditorSprite *editor_project_sprite_get(EditorObject *object, EditorSpriteId id)
 bool editor_project_sprite_remove(EditorObject *object, EditorSpriteId id) {
     size_t index;
     if(object == NULL || id == 0) return false;
-    for(size_t sprite_index = 0; sprite_index < object->animated_sprite_count;
-            sprite_index += 1) {
-        EditorAnimatedSprite *animation =
-            &object->animated_sprite_items[sprite_index];
-        for(size_t frame = animation->frame_count; frame > 0; frame -= 1) {
-            if(animation->frames[frame - 1].sprite != id) continue;
-            (void)editor_project_animation_frame_remove(animation, frame - 1);
-        }
-        if(animation->frame_count == 0) animation->starting_frame = 0;
-        else if(animation->starting_frame >= animation->frame_count)
-            animation->starting_frame = (uint32_t)(animation->frame_count - 1);
-    }
     for(index = 0; index < object->sprite_count; index += 1)
         if(object->sprites[index].id == id) break;
     if(index == object->sprite_count) return false;
@@ -2115,14 +2103,19 @@ bool editor_project_animated_sprite_remove(EditorObject *object,
     return false;
 }
 
-bool editor_project_animation_frame_add(EditorAnimatedSprite *animated_sprite,
-        EditorSpriteId sprite) {
-    if(animated_sprite == NULL || sprite == 0 ||
+bool editor_project_animation_frame_add(EditorProject *project,
+        EditorAnimatedSprite *animated_sprite, const char *name, const char *path,
+        Scale size) {
+    EditorAnimationFrame *frame;
+    if(project == NULL || animated_sprite == NULL || name == NULL || path == NULL ||
+            name[0] == '\0' || path[0] == '\0' || size.x <= 0.0f || size.y <= 0.0f ||
             !EDITOR_ARRAY_RESERVE(animated_sprite->frames,
                 animated_sprite->frame_capacity,
                 animated_sprite->frame_count + 1)) return false;
-    animated_sprite->frames[animated_sprite->frame_count++] =
-        (EditorAnimationFrame){sprite};
+    frame = &animated_sprite->frames[animated_sprite->frame_count++];
+    *frame = (EditorAnimationFrame){.id = project->next_sprite_id++, .size = size};
+    editor_project_property_name_format(frame->name, sizeof(frame->name), name);
+    snprintf(frame->path, sizeof(frame->path), "%s", path);
     return true;
 }
 

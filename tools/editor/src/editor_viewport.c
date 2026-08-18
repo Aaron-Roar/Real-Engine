@@ -961,9 +961,8 @@ static void editor_marquee_body_children_add(EditorViewportState *state,
     }
     for(size_t i = 0; i < object->animated_sprite_count; i += 1) {
         const EditorAnimatedSprite *animation = &object->animated_sprite_items[i];
-        const EditorSprite *frame = animation->frame_count == 0 ? NULL :
-            editor_project_sprite_get((EditorObject *)object,
-                animation->frames[0].sprite);
+        const EditorAnimationFrame *frame = animation->frame_count == 0 ? NULL :
+            &animation->frames[0];
         Position world;
         EditorMarqueeBounds bounds;
         if(!animation->visible || frame == NULL) continue;
@@ -1724,8 +1723,8 @@ static bool editor_group_point_hit(EditorProject *project,
         } else if(ref.kind == EDITOR_SELECTION_ANIMATED_SPRITE) {
             EditorAnimatedSprite *animation = editor_project_animated_sprite_get(
                 object, ref.item);
-            EditorSprite *frame = animation == NULL || animation->frame_count == 0 ?
-                NULL : editor_project_sprite_get(object, animation->frames[0].sprite);
+            EditorAnimationFrame *frame = animation == NULL ||
+                animation->frame_count == 0 ? NULL : &animation->frames[0];
             if(frame != NULL && editor_group_point_get(project, ref, &point) &&
                     fabsf(pointer.x - point.x) <=
                         frame->size.x * animation->scale.x * 0.5f &&
@@ -2406,8 +2405,8 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
     if(object->visible) {
         for(size_t i = object->animated_sprite_count; i > 0; i -= 1) {
             EditorAnimatedSprite *animation = &object->animated_sprite_items[i - 1];
-            EditorSprite *frame = animation->frame_count == 0 ? NULL :
-                editor_project_sprite_get(object, animation->frames[0].sprite);
+            EditorAnimationFrame *frame = animation->frame_count == 0 ? NULL :
+                &animation->frames[0];
             Position world;
             Scale size;
             EditorSelectionRef selection;
@@ -2868,7 +2867,7 @@ static void editor_viewport_sprites_draw(const EditorObject *object,
     }
     for(size_t i = 0; i < object->animated_sprite_count; i += 1) {
         const EditorAnimatedSprite *animation = &object->animated_sprite_items[i];
-        const EditorSprite *frame;
+        const EditorAnimationFrame *frame;
         TextureAsset *texture;
         Position world;
         Scale size;
@@ -2876,9 +2875,7 @@ static void editor_viewport_sprites_draw(const EditorObject *object,
         float rotation;
         bool selected;
         if(!animation->visible || animation->frame_count == 0) continue;
-        frame = editor_project_sprite_get((EditorObject *)object,
-            animation->frames[0].sprite);
-        if(frame == NULL) continue;
+        frame = &animation->frames[0];
         texture = editor_preview_texture_get(frame->path);
         world = editor_animated_sprite_world_get(object, animation, &rotation);
         size = (Scale){frame->size.x * animation->scale.x,

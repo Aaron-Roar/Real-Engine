@@ -218,9 +218,13 @@ static EditorResult cli_sprite_command_write(const EditorProject *project,
     else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_RENAME) {
         ADD("rename"); ADD(command->data.animated_sprite_rename.name);
     } else if(command->type == EDITOR_COMMAND_ANIMATION_FRAME_ADD) {
-        if(!cli_sprite_selector_add(object, command->data.animation_frame_add.frame,
-                output, capacity, &used)) goto full;
         ADD("frame-add");
+        ADD(command->data.animation_frame_add.name);
+        ADD(command->data.animation_frame_add.path);
+        snprintf(number, sizeof(number), "%.9g", command->data.animation_frame_add.size.x);
+        ADD(number);
+        snprintf(number, sizeof(number), "%.9g", command->data.animation_frame_add.size.y);
+        ADD(number);
     } else if(command->type == EDITOR_COMMAND_ANIMATION_FRAME_REMOVE) {
         ADD("--frame-index");
         snprintf(number, sizeof(number), "%zu", command->data.animation_frame_remove.index); ADD(number);
