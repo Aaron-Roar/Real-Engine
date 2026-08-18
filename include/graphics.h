@@ -230,6 +230,10 @@ typedef struct {
     Direction direction;
     /** Draw scale. */
     Scale scale;
+    /** Whether drawing inherits the attached entity's orientation. */
+    bool follow_entity_rotation;
+    /** Whether bulk sprite drawing includes this sprite. */
+    bool visible;
 } AnimatedSprite;
 
 /** Fixed set of animated sprites. */
@@ -318,6 +322,10 @@ void graphics_hit_boxes_draw(void);
 
 /** Load a texture from a descriptor. */
 TextureAssetResult graphics_texture_load(TextureDescriptor text_desc);
+void graphics_texture_draw(TextureAsset texture, Position position,
+    Orientation orientation);
+void graphics_screen_texture_draw(TextureAsset texture, Position center,
+    Scale size, Orientation orientation);
 
 /** Load a font. The caller must destroy successful assets. */
 FontAssetResult graphics_font_load(FontDescriptor descriptor);

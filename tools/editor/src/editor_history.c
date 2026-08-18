@@ -11,6 +11,7 @@ typedef enum EditorHistoryActionKind {
     EDITOR_HISTORY_ACTION_OBJECT,
     EDITOR_HISTORY_ACTION_AGGREGATE,
     EDITOR_HISTORY_ACTION_COLLISION,
+    EDITOR_HISTORY_ACTION_SPRITES,
     EDITOR_HISTORY_ACTION_OBJECT_ORDER
 } EditorHistoryActionKind;
 
@@ -32,6 +33,13 @@ struct EditorHistoryAggregateChange {
 struct EditorHistoryCollisionChange {
     EditorCollisionMask *masks;
     size_t count;
+};
+
+struct EditorHistorySpriteChange {
+    EditorObjectId object;
+    EditorSprite *sprites;
+    size_t count;
+    EditorSpriteId next_id;
 };
 
 typedef struct EditorHistoryObjectOrderChange {
@@ -82,6 +90,7 @@ typedef struct EditorHistoryAction {
         EditorHistoryObjectChange *object;
         EditorHistoryAggregateChange *aggregate;
         EditorHistoryCollisionChange *collision;
+        EditorHistorySpriteChange *sprites;
         EditorHistoryObjectOrderChange *order;
     } data;
 } EditorHistoryAction;
@@ -101,6 +110,7 @@ static EditorSoftBody *editor_history_soft_body_get(EditorObject *object,
     EditorSoftBodyId id);
 static void editor_history_entry_destroy(EditorHistoryEntry *entry);
 static void editor_history_collision_destroy(EditorHistoryCollisionChange *change);
+static void editor_history_sprites_destroy(EditorHistorySpriteChange *change);
 
 static void editor_history_aggregate_destroy(EditorHistoryAggregateChange *change) {
     if(change == NULL) return;
@@ -241,6 +251,64 @@ static EditorHistoryAggregateChange *editor_history_command_aggregate_capture(
         case EDITOR_COMMAND_SOFT_BODY_ORIGIN:
             return editor_history_aggregate_capture(project, EDITOR_ITEM_SOFT_NODE,
                 command->data.origin.object, command->data.origin.body);
+        case EDITOR_COMMAND_SPRITE_ADD:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.sprite_add.object, 0);
+        case EDITOR_COMMAND_SPRITE_REMOVE:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.sprite_remove.object, 0);
+        case EDITOR_COMMAND_SPRITE_RENAME:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.sprite_rename.object, 0);
+        case EDITOR_COMMAND_SPRITE_PATH_SET:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.sprite_path_set.object, 0);
+        case EDITOR_COMMAND_SPRITE_SIZE_SET:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.sprite_size_set.object, 0);
+        case EDITOR_COMMAND_ANIMATED_SPRITE_ADD:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.animated_sprite_add.object, 0);
+        case EDITOR_COMMAND_ANIMATED_SPRITE_REMOVE:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.animated_sprite_remove.object, 0);
+        case EDITOR_COMMAND_ANIMATED_SPRITE_RENAME:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.animated_sprite_rename.object, 0);
+        case EDITOR_COMMAND_ANIMATED_SPRITE_BODY_SET:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.animated_sprite_body_set.object, 0);
+        case EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.animated_sprite_position_set.object, 0);
+        case EDITOR_COMMAND_ANIMATED_SPRITE_SCALE_SET:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.animated_sprite_scale_set.object, 0);
+        case EDITOR_COMMAND_ANIMATED_SPRITE_TIMING_SET:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.animated_sprite_timing_set.object, 0);
+        case EDITOR_COMMAND_ANIMATED_SPRITE_STARTING_FRAME_SET:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.animated_sprite_starting_frame_set.object, 0);
+        case EDITOR_COMMAND_ANIMATED_SPRITE_DIRECTION_SET:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.animated_sprite_direction_set.object, 0);
+        case EDITOR_COMMAND_ANIMATED_SPRITE_FOLLOW_ROTATION_SET:
+        case EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.animated_sprite_boolean_set.object, 0);
+        case EDITOR_COMMAND_ANIMATION_FRAME_ADD:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.animation_frame_add.object, 0);
+        case EDITOR_COMMAND_ANIMATION_FRAME_REMOVE:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.animation_frame_remove.object, 0);
+        case EDITOR_COMMAND_SPRITE_POSITION_SET:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.sprite_position_set.object, 0);
+        case EDITOR_COMMAND_SPRITE_VISIBILITY_SET:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.sprite_visibility_set.object, 0);
         default: return NULL;
     }
     if(kind == EDITOR_ITEM_OBJECT) return NULL;
@@ -331,6 +399,12 @@ static void editor_history_entry_destroy(EditorHistoryEntry *entry) {
                 free(entry->commands[i].inverse.data.collision->masks);
                 free(entry->commands[i].inverse.data.collision);
             }
+            if(entry->commands[i].forward.kind == EDITOR_HISTORY_ACTION_SPRITES)
+                editor_history_sprites_destroy(
+                    entry->commands[i].forward.data.sprites);
+            if(entry->commands[i].inverse.kind == EDITOR_HISTORY_ACTION_SPRITES)
+                editor_history_sprites_destroy(
+                    entry->commands[i].inverse.data.sprites);
             if(entry->commands[i].forward.kind == EDITOR_HISTORY_ACTION_OBJECT_ORDER) {
                 free(entry->commands[i].forward.data.order->ids);
                 free(entry->commands[i].forward.data.order);
@@ -401,6 +475,18 @@ static void editor_history_action_apply(EditorProject *project,
         memcpy(project->collision_masks, change->masks,
             change->count * sizeof(*change->masks));
         project->collision_mask_count = change->count;
+        return;
+    }
+    if(action->kind == EDITOR_HISTORY_ACTION_SPRITES) {
+        EditorHistorySpriteChange *change = action->data.sprites;
+        EditorObject *object = change == NULL ? NULL :
+            editor_object_query_get(project, change->object);
+        if(object == NULL || !EDITOR_ARRAY_RESERVE(object->sprites,
+                object->sprite_capacity, change->count)) return;
+        if(change->count > 0) memcpy(object->sprites, change->sprites,
+            change->count * sizeof(*change->sprites));
+        object->sprite_count = change->count;
+        project->next_sprite_id = change->next_id;
         return;
     }
     if(action->kind == EDITOR_HISTORY_ACTION_OBJECT_ORDER) {
@@ -582,6 +668,61 @@ static EditorHistoryEntry *editor_history_collision_entry_create(
     entry->command_count = 1;
     entry->memory = sizeof(*entry) + sizeof(*entry->commands) +
         sizeof(*forward) + sizeof(*inverse);
+    return entry;
+}
+
+static EditorHistorySpriteChange *editor_history_sprites_capture(
+        const EditorProject *project, EditorObjectId object_id) {
+    EditorHistorySpriteChange *change;
+    EditorObject *object = editor_object_query_get((EditorProject *)project, object_id);
+    if(project == NULL || object == NULL) return NULL;
+    change = calloc(1, sizeof(*change));
+    if(change == NULL) return NULL;
+    change->object = object_id;
+    change->count = object->sprite_count;
+    change->next_id = project->next_sprite_id;
+    if(change->count > 0) {
+        change->sprites = malloc(change->count * sizeof(*change->sprites));
+        if(change->sprites == NULL) { free(change); return NULL; }
+        memcpy(change->sprites, object->sprites,
+            change->count * sizeof(*change->sprites));
+    }
+    return change;
+}
+
+static void editor_history_sprites_destroy(EditorHistorySpriteChange *change) {
+    if(change == NULL) return;
+    free(change->sprites);
+    free(change);
+}
+
+static bool editor_history_sprites_entry_append(EditorHistoryEntry *entry,
+        EditorHistorySpriteChange *forward, EditorHistorySpriteChange *inverse) {
+    EditorHistoryCommandPair *commands;
+    if(entry == NULL || forward == NULL || inverse == NULL) return false;
+    commands = realloc(entry->commands,
+        (entry->command_count + 1) * sizeof(*commands));
+    if(commands == NULL) return false;
+    entry->commands = commands;
+    entry->commands[entry->command_count++] = (EditorHistoryCommandPair){
+        .forward = {.kind = EDITOR_HISTORY_ACTION_SPRITES,
+            .data.sprites = forward},
+        .inverse = {.kind = EDITOR_HISTORY_ACTION_SPRITES,
+            .data.sprites = inverse}};
+    entry->memory += sizeof(*commands) + sizeof(*forward) + sizeof(*inverse) +
+        (forward->count + inverse->count) * sizeof(EditorSprite);
+    return true;
+}
+
+static EditorHistoryEntry *editor_history_sprites_entry_create(
+        EditorHistorySpriteChange *forward, EditorHistorySpriteChange *inverse) {
+    EditorHistoryEntry *entry = calloc(1, sizeof(*entry));
+    if(entry == NULL) return NULL;
+    if(!editor_history_sprites_entry_append(entry, forward, inverse)) {
+        free(entry);
+        return NULL;
+    }
+    entry->memory += sizeof(*entry);
     return entry;
 }
 
@@ -793,6 +934,7 @@ void editor_history_destroy(EditorHistory *history) {
     editor_history_object_change_destroy(history->pending_object);
     editor_history_aggregate_destroy(history->pending_aggregate);
     editor_history_collision_destroy(history->pending_collision);
+    editor_history_sprites_destroy(history->pending_sprites);
     editor_history_entry_destroy(history->transaction_commands);
     memset(history, 0, sizeof(*history));
 }
@@ -807,6 +949,8 @@ void editor_history_reset(EditorHistory *history) {
     history->pending_aggregate = NULL;
     editor_history_collision_destroy(history->pending_collision);
     history->pending_collision = NULL;
+    editor_history_sprites_destroy(history->pending_sprites);
+    history->pending_sprites = NULL;
     history->pending_command_valid = false;
     editor_history_entry_destroy(history->transaction_commands);
     history->transaction_commands = NULL;
@@ -826,10 +970,22 @@ void editor_history_command_begin(EditorHistory *history,
     history->pending_aggregate = NULL;
     editor_history_collision_destroy(history->pending_collision);
     history->pending_collision = NULL;
+    editor_history_sprites_destroy(history->pending_sprites);
+    history->pending_sprites = NULL;
     history->pending_command_valid = false;
     if(project == NULL || !editor_history_command_record_check(command)) return;
     if(command->type == EDITOR_COMMAND_COLLISION_MASK_ADD) {
         history->pending_collision = editor_history_collision_capture(project);
+        return;
+    }
+    if(command->type >= EDITOR_COMMAND_SPRITE_ADD &&
+            command->type <= EDITOR_COMMAND_SPRITE_SIZE_SET) {
+        EditorObjectId object = command->type == EDITOR_COMMAND_SPRITE_ADD ?
+            command->data.sprite_add.object : command->type == EDITOR_COMMAND_SPRITE_REMOVE ?
+            command->data.sprite_remove.object : command->type == EDITOR_COMMAND_SPRITE_RENAME ?
+            command->data.sprite_rename.object : command->type == EDITOR_COMMAND_SPRITE_PATH_SET ?
+            command->data.sprite_path_set.object : command->data.sprite_size_set.object;
+        history->pending_sprites = editor_history_sprites_capture(project, object);
         return;
     }
     if(command->type == EDITOR_COMMAND_OBJECT_ADD ||
@@ -906,6 +1062,16 @@ void editor_history_command_finish(EditorHistory *history,
             }
             (void)editor_history_object_entry_append(
                 history->transaction_commands, forward, inverse);
+        } else if(history->pending_sprites != NULL && command != NULL && result != NULL &&
+                result->kind == ERROR_RESULT_VALUE) {
+            EditorHistorySpriteChange *after =
+                editor_history_sprites_capture(history->project,
+                    history->pending_sprites->object);
+            if(after == NULL || !editor_history_sprites_entry_append(
+                    history->transaction_commands, after,
+                    history->pending_sprites))
+                editor_history_sprites_destroy(after);
+            else history->pending_sprites = NULL;
         } else if(history->pending_aggregate != NULL && command != NULL && result != NULL &&
                 result->kind == ERROR_RESULT_VALUE) {
             EditorHistoryAggregateChange *after = editor_history_aggregate_recapture(
@@ -927,6 +1093,8 @@ void editor_history_command_finish(EditorHistory *history,
         history->pending_aggregate = NULL;
         editor_history_collision_destroy(history->pending_collision);
         history->pending_collision = NULL;
+        editor_history_sprites_destroy(history->pending_sprites);
+        history->pending_sprites = NULL;
         history->pending_command_valid = false;
         return;
     }
@@ -953,6 +1121,21 @@ void editor_history_command_finish(EditorHistory *history,
             inverse.present = true;
         }
         entry = editor_history_object_entry_create(forward, inverse);
+        if(entry != NULL && editor_history_stack_push(history->undo,
+                &history->undo_count, entry))
+            editor_history_stack_clear(history->redo, &history->redo_count);
+        else editor_history_entry_destroy(entry);
+        goto finish;
+    }
+    if(history->pending_sprites != NULL && command != NULL && result != NULL &&
+            result->kind == ERROR_RESULT_VALUE) {
+        EditorHistorySpriteChange *after =
+            editor_history_sprites_capture(history->project,
+                history->pending_sprites->object);
+        entry = editor_history_sprites_entry_create(after,
+            history->pending_sprites);
+        if(entry != NULL) history->pending_sprites = NULL;
+        else editor_history_sprites_destroy(after);
         if(entry != NULL && editor_history_stack_push(history->undo,
                 &history->undo_count, entry))
             editor_history_stack_clear(history->redo, &history->redo_count);
@@ -1014,6 +1197,8 @@ finish:
     history->pending_aggregate = NULL;
     editor_history_collision_destroy(history->pending_collision);
     history->pending_collision = NULL;
+    editor_history_sprites_destroy(history->pending_sprites);
+    history->pending_sprites = NULL;
     history->pending_command_valid = false;
 }
 

@@ -243,6 +243,31 @@ names match their current responsibilities and the public API conventions.
 Perform this as focused mechanical changes, preserve subsystem boundaries, and
 avoid combining naming-only changes with simulation or ownership changes.
 
+## 18. Rendering, Mass, Camera, and Audio Authoring
+
+- Keep sprites and animated sprites owned by an object; they are not top-level
+  project assets.
+- Add position and angle offsets for object-owned sprites and animated sprites
+  attached to a parent rigid body.
+- Support object-owned, free-placed sprites and animated sprites with no parent
+  body. Their transforms remain relative to the owning object.
+- Add configurable rigid-body center-of-mass offsets. When unspecified, the
+  center of mass defaults to the shape centroid. Decide whether authored
+  offsets are relative to the centroid or the body's local origin before
+  defining the public API.
+- Allow a soft body to specify one total mass and distribute it evenly across
+  its nodes by default.
+- Investigate center-of-mass-aware soft-body mass distribution. The proposed
+  behavior weights each node's share of the total mass according to its
+  distance from the requested center of mass; define and test the exact
+  weighting rule before implementation.
+- Make cameras authorable as either free-placed objects or attachments to a
+  parent. Expose position, orientation, zoom, and the remaining camera
+  properties through the editor, CLI, JSON, generated C, and direct C API.
+- Add sound authoring and runtime support. Build a small Rohr audio API over
+  SDL's audio facilities after deciding asset ownership, loading, playback,
+  looping, mixing, volume, and destruction behavior.
+
 ## Later Features
 
 These features are useful after the foundations above are reliable:

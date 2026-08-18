@@ -294,6 +294,12 @@ EngineResult rohr_graphics_soft_body_node_color_set(Entity soft_body, Entity nod
 EngineResult rohr_graphics_soft_body_beam_color_set(Entity soft_body, Entity node_a, Entity node_b, Color color) { return graphics_soft_body_beam_color_set(soft_body, node_a, node_b, color); }
 EngineResult rohr_graphics_soft_body_area_color_set(Entity soft_body, Entity node_a, Entity node_b, Entity node_c, Color color) { return graphics_soft_body_area_color_set(soft_body, node_a, node_b, node_c, color); }
 TextureAssetResult rohr_graphics_texture_load(TextureDescriptor text_desc) { return graphics_texture_load(text_desc); }
+void rohr_graphics_texture_draw(TextureAsset texture, Position position,
+    Orientation orientation) { graphics_texture_draw(texture, position, orientation); }
+void rohr_graphics_screen_texture_draw(TextureAsset texture, Position center,
+    Scale size, Orientation orientation) {
+    graphics_screen_texture_draw(texture, center, size, orientation);
+}
 FontAssetResult rohr_graphics_font_load(FontDescriptor descriptor) { return graphics_font_load(descriptor); }
 void rohr_graphics_font_destroy(FontAsset *font) { graphics_font_destroy(font); }
 TextAssetResult rohr_graphics_text_create(const FontAsset *font, const char *value, Color color) { return graphics_text_create(font, value, color); }

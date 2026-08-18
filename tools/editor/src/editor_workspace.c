@@ -8,6 +8,27 @@
 #include <stdio.h>
 #include <string.h>
 
+static const EditorSprite *editor_workspace_sprite_get(const EditorObject *object,
+        EditorSpriteId id) {
+    if(object == NULL || id == 0) return NULL;
+    for(size_t i = 0; i < object->sprite_count; i += 1)
+        if(object->sprites[i].id == id) return &object->sprites[i];
+    return NULL;
+}
+
+static void editor_workspace_c_string_write(FILE *file, const char *value) {
+    fputc('"', file);
+    for(const unsigned char *at = (const unsigned char *)value;
+            at != NULL && *at != '\0'; at += 1) {
+        if(*at == '\\' || *at == '"') fputc('\\', file);
+        if(*at == '\n') fputs("\\n", file);
+        else if(*at == '\r') fputs("\\r", file);
+        else if(*at == '\t') fputs("\\t", file);
+        else fputc(*at, file);
+    }
+    fputc('"', file);
+}
+
 static bool editor_workspace_path_join(char *output, size_t capacity,
     const char *directory, const char *relative) {
     size_t length;
@@ -402,6 +423,35 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
         "    return result;\n"
         "}\n\n");
     fprintf(source,
+        "static EngineResult generated_sprite_create(Entity *output, Position position,\n"
+        "    const char *path, Scale size, bool visible) {\n"
+        "    EntityResult added = rohr_entity_add();\n"
+        "    AnimationAssetResult loaded;\n"
+        "    AnimatedSprite sprite;\n"
+        "    EngineResult result;\n"
+        "    if(rohr_error_check(added)) return rohr_error_result_error(added.result.error);\n"
+        "    *output = added.result.value;\n"
+        "    result = rohr_physics_position_set(*output, position);\n"
+        "    if(rohr_error_check(result)) goto fail;\n"
+        "    loaded = rohr_graphics_animation_load((AnimationDescriptor){\n"
+        "        .amount_of_descriptors = 1,\n"
+        "        .texture_descriptors = {{.file = path, .size = size}}});\n"
+        "    if(rohr_error_check(loaded)) {\n"
+        "        result = rohr_error_result_error(loaded.result.error);\n"
+        "        goto fail;\n"
+        "    }\n"
+        "    sprite = rohr_graphics_animated_sprite_create(loaded.result.value,\n"
+        "        (Scale){1.0f, 1.0f});\n"
+        "    sprite.visible = visible;\n"
+        "    result = rohr_graphics_animated_sprite_add(*output, sprite);\n"
+        "    if(rohr_error_check(result)) goto fail;\n"
+        "    return rohr_error_result_value(true);\n"
+        "fail:\n"
+        "    (void)rohr_entity_delete(*output);\n"
+        "    *output = ENTITY_INVALID;\n"
+        "    return result;\n"
+        "}\n\n");
+    fprintf(source,
         "static EngineResult generated_world_anchor_create(Entity *owner,\n"
         "    JointAnchorId *anchor, Position position) {\n"
         "    EntityResult added = rohr_entity_add();\n"
@@ -456,6 +506,10 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
             for(size_t area_index = 0; area_index < body->area_count; area_index += 1)
                 fprintf(header, "    Entity %s;\n", body->areas[area_index].name);
         }
+        for(size_t sprite_index = 0; sprite_index < object->sprite_count;
+                sprite_index += 1)
+            fprintf(header, "    Entity sprite_%s;\n",
+                object->sprites[sprite_index].name);
         fprintf(header,
             "} %s;\n\n"
             "EngineResult %s_create(%s *object, Position position);\n"
@@ -507,6 +561,61 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 body->particle ? "true" : "false",
                 (unsigned long long)body->collision_category,
                 (unsigned long long)body->collision_with);
+        }
+        for(size_t sprite_index = 0; sprite_index < object->sprite_count;
+                sprite_index += 1) {
+            const EditorSprite *sprite = &object->sprites[sprite_index];
+            fprintf(source,
+                "    result = generated_sprite_create(&object->sprite_%s, "
+                "(Position){position.x + %#.9gf, position.y + %#.9gf}, ",
+                sprite->name, sprite->position.x, sprite->position.y);
+            editor_workspace_c_string_write(source, sprite->path);
+            fprintf(source, ", (Scale){%#.9gf, %#.9gf}, %s);\n"
+                "    if(rohr_error_check(result)) goto fail;\n",
+                sprite->size.x, sprite->size.y,
+                sprite->visible ? "true" : "false");
+        }
+        for(size_t sprite_index = 0; sprite_index < object->animated_sprite_count;
+                sprite_index += 1) {
+            const EditorAnimatedSprite *sprite = &object->animated_sprite_items[sprite_index];
+            const EditorRigidBody *body = editor_workspace_body_get(object,
+                sprite->rigid_body);
+            if(body == NULL || sprite->frame_count == 0 ||
+                    sprite->frame_count > MAX_ANIMATIONS_FRAMES) continue;
+            fprintf(source,
+                "    { AnimationDescriptor descriptor = {.amount_of_descriptors = %zu, "
+                ".ticks_per_frame = UINT64_C(%llu), .time_per_frame = %.17g, "
+                ".texture_descriptors = {",
+                sprite->frame_count, (unsigned long long)sprite->ticks_per_frame,
+                sprite->time_per_frame);
+            for(size_t frame = 0; frame < sprite->frame_count; frame += 1) {
+                const EditorSprite *asset = editor_workspace_sprite_get(object,
+                    sprite->frames[frame].sprite);
+                if(asset == NULL) continue;
+                fprintf(source, "%s{.file = ", frame == 0 ? "" : ", ");
+                editor_workspace_c_string_write(source, asset->path);
+                fprintf(source, ", .size = {%#.9gf, %#.9gf}}",
+                    asset->size.x, asset->size.y);
+            }
+            fprintf(source,
+                "}};\n"
+                "      AnimationAssetResult loaded = rohr_graphics_animation_load(descriptor);\n"
+                "      AnimatedSprite animated;\n"
+                "      if(rohr_error_check(loaded)) { result = rohr_error_result_error("
+                "loaded.result.error); goto fail; }\n"
+                "      animated = rohr_graphics_animated_sprite_create(loaded.result.value, "
+                "(Scale){%#.9gf, %#.9gf});\n"
+                "      animated.animation_frame = %u;\n"
+                "      animated.direction = %s;\n"
+                "      animated.follow_entity_rotation = %s;\n"
+                "      animated.visible = %s;\n"
+                "      result = rohr_graphics_animated_sprite_add(object->%s, animated);\n"
+                "      if(rohr_error_check(result)) goto fail; }\n",
+                sprite->scale.x, sprite->scale.y, sprite->starting_frame,
+                sprite->direction == DIRECTION_LEFT ? "DIRECTION_LEFT" :
+                    "DIRECTION_RIGHT",
+                sprite->follow_body_rotation ? "true" : "false",
+                sprite->visible ? "true" : "false", body->name);
         }
         for(size_t anchor_index = 0; anchor_index < object->anchor_count; anchor_index += 1) {
             const EditorAnchor *anchor = &object->anchors[anchor_index];
@@ -724,6 +833,14 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 "(void)rohr_entity_delete(object->%s);\n",
                 body->name, body->name);
         }
+        for(size_t sprite_index = 0; sprite_index < object->sprite_count;
+                sprite_index += 1) {
+            const EditorSprite *sprite = &object->sprites[sprite_index];
+            fprintf(source,
+                "    if(object->sprite_%s != ENTITY_INVALID) "
+                "(void)rohr_entity_delete(object->sprite_%s);\n",
+                sprite->name, sprite->name);
+        }
         for(size_t anchor_index = 0; anchor_index < object->anchor_count; anchor_index += 1) {
             const EditorAnchor *anchor = &object->anchors[anchor_index];
             if(editor_workspace_body_get(object, anchor->rigid_body) == NULL ||
@@ -800,6 +917,8 @@ static bool editor_workspace_main_write(const EditorWorkspace *workspace,
         "        }\n"
         "        if(rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) break;\n"
         "        rohr_physics_update(rohr_system_tick_update());\n"
+        "        rohr_graphics_sprite_frames_update(rohr_engine_tick_get(), "
+        "rohr_engine_time_get());\n"
         "        rohr_graphics_layer_set(-100);\n"
         "        rohr_graphics_background_draw((Color){18, 22, 30, 255});\n"
         "        rohr_graphics_layer_set(0);\n");
@@ -809,6 +928,7 @@ static bool editor_workspace_main_write(const EditorWorkspace *workspace,
         editor_project_property_name_format(variable, sizeof(variable), object->name);
         fprintf(file, "        %s_draw(&%s);\n", variable, variable);
     }
+    fprintf(file, "        rohr_graphics_animated_sprites_draw();\n");
     fprintf(file,
         "        rohr_graphics_show();\n"
         "    }\n"

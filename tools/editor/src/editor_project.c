@@ -156,7 +156,9 @@ void editor_project_init(EditorProject *project) {
         .next_soft_body_id = 1,
         .next_soft_node_id = 1,
         .next_soft_beam_id = 1,
-        .next_soft_area_id = 1
+        .next_soft_area_id = 1,
+        .next_sprite_id = 1,
+        .next_animated_sprite_id = 1
     };
     if(EDITOR_ARRAY_RESERVE(project->collision_masks,
             project->collision_mask_capacity, EDITOR_COLLISION_MASK_MAX)) {
@@ -167,6 +169,42 @@ void editor_project_init(EditorProject *project) {
     }
     (void)EDITOR_ARRAY_RESERVE(project->objects, project->object_capacity,
         EDITOR_OBJECT_MAX);
+}
+
+void editor_project_animated_sprite_destroy(EditorAnimatedSprite *sprite) {
+    if(sprite == NULL) return;
+    free(sprite->frames);
+    *sprite = (EditorAnimatedSprite){0};
+}
+
+static bool editor_project_animated_sprite_clone(EditorAnimatedSprite *destination,
+        const EditorAnimatedSprite *source) {
+    if(destination == NULL || source == NULL) return false;
+    *destination = *source;
+    destination->frames = NULL;
+    destination->frame_capacity = 0;
+    if(!EDITOR_ARRAY_RESERVE(destination->frames, destination->frame_capacity,
+            source->frame_count)) return false;
+    if(source->frame_count > 0) memcpy(destination->frames, source->frames,
+        source->frame_count * sizeof(*source->frames));
+    return true;
+}
+
+static bool editor_project_animated_sprite_copy_set(
+        EditorAnimatedSprite *destination, const EditorAnimatedSprite *source) {
+    EditorAnimationFrame *frames;
+    size_t capacity;
+    if(destination == NULL || source == NULL ||
+            !EDITOR_ARRAY_RESERVE(destination->frames,
+                destination->frame_capacity, source->frame_count)) return false;
+    frames = destination->frames;
+    capacity = destination->frame_capacity;
+    *destination = *source;
+    destination->frames = frames;
+    destination->frame_capacity = capacity;
+    if(source->frame_count > 0) memcpy(destination->frames, source->frames,
+        source->frame_count * sizeof(*source->frames));
+    return true;
 }
 
 static void editor_project_hitbox_destroy(EditorHitbox *hitbox) {
@@ -436,10 +474,14 @@ void editor_project_object_destroy(EditorObject *object) {
         editor_project_rigid_body_destroy(&object->rigid_bodies[i]);
     for(size_t i = 0; i < object->soft_body_count; i += 1)
         editor_project_soft_body_destroy(&object->soft_body_items[i]);
+    for(size_t i = 0; i < object->animated_sprite_count; i += 1)
+        editor_project_animated_sprite_destroy(&object->animated_sprite_items[i]);
     free(object->rigid_bodies);
     free(object->joint_items);
     free(object->anchors);
     free(object->soft_body_items);
+    free(object->sprites);
+    free(object->animated_sprite_items);
     free(object->hierarchy);
     *object = (EditorObject){0};
 }
@@ -452,13 +494,19 @@ bool editor_project_object_clone(EditorObject *destination,
     destination->joint_items = NULL;
     destination->anchors = NULL;
     destination->soft_body_items = NULL;
+    destination->sprites = NULL;
+    destination->animated_sprite_items = NULL;
     destination->hierarchy = NULL;
     destination->rigid_body_count = 0;
     destination->soft_body_count = 0;
+    destination->sprite_count = 0;
+    destination->animated_sprite_count = 0;
     destination->rigid_body_capacity = 0;
     destination->joint_capacity = 0;
     destination->anchor_capacity = 0;
     destination->soft_body_capacity = 0;
+    destination->sprite_capacity = 0;
+    destination->animated_sprite_capacity = 0;
     destination->hierarchy_capacity = 0;
     if(!EDITOR_ARRAY_RESERVE(destination->rigid_bodies,
             destination->rigid_body_capacity, source->rigid_body_count) ||
@@ -468,6 +516,11 @@ bool editor_project_object_clone(EditorObject *destination,
                 destination->anchor_capacity, source->anchor_count) ||
             !EDITOR_ARRAY_RESERVE(destination->soft_body_items,
                 destination->soft_body_capacity, source->soft_body_count) ||
+            !EDITOR_ARRAY_RESERVE(destination->sprites,
+                destination->sprite_capacity, source->sprite_count) ||
+            !EDITOR_ARRAY_RESERVE(destination->animated_sprite_items,
+                destination->animated_sprite_capacity,
+                source->animated_sprite_count) ||
             !EDITOR_ARRAY_RESERVE(destination->hierarchy,
                 destination->hierarchy_capacity, source->hierarchy_count))
         goto fail;
@@ -490,6 +543,15 @@ bool editor_project_object_clone(EditorObject *destination,
                 &source->soft_body_items[i])) goto fail;
         destination->soft_body_count += 1;
     }
+    for(size_t i = 0; i < source->animated_sprite_count; i += 1) {
+        if(!editor_project_animated_sprite_clone(
+                &destination->animated_sprite_items[i],
+                &source->animated_sprite_items[i])) goto fail;
+        destination->animated_sprite_count += 1;
+    }
+    if(source->sprite_count > 0) memcpy(destination->sprites, source->sprites,
+        source->sprite_count * sizeof(*source->sprites));
+    destination->sprite_count = source->sprite_count;
     return true;
 fail:
     editor_project_object_destroy(destination);
@@ -502,13 +564,18 @@ bool editor_project_object_copy_set(EditorObject *destination,
     EditorJoint *editor_joints;
     EditorAnchor *anchors;
     EditorSoftBody *editor_soft_bodies;
+    EditorSprite *sprites;
+    EditorAnimatedSprite *sprite_items;
     EditorHierarchyItem *hierarchy;
-    size_t rigid_capacity, joint_capacity, anchor_capacity, soft_capacity;
-    size_t hierarchy_capacity, old_rigid_count, old_soft_count;
-    size_t old_rigid_capacity, old_soft_capacity;
+    size_t rigid_capacity, joint_capacity, anchor_capacity, soft_capacity,
+        animated_sprite_capacity, sprite_capacity;
+    size_t hierarchy_capacity, old_rigid_count, old_soft_count,
+        old_animated_sprite_count;
+    size_t old_rigid_capacity, old_soft_capacity, old_animated_sprite_capacity;
     if(destination == NULL || source == NULL) return false;
     old_rigid_capacity = destination->rigid_body_capacity;
     old_soft_capacity = destination->soft_body_capacity;
+    old_animated_sprite_capacity = destination->animated_sprite_capacity;
     if(
             !EDITOR_ARRAY_RESERVE(destination->rigid_bodies,
                 destination->rigid_body_capacity, source->rigid_body_count) ||
@@ -518,6 +585,11 @@ bool editor_project_object_copy_set(EditorObject *destination,
                 destination->anchor_capacity, source->anchor_count) ||
             !EDITOR_ARRAY_RESERVE(destination->soft_body_items,
                 destination->soft_body_capacity, source->soft_body_count) ||
+            !EDITOR_ARRAY_RESERVE(destination->sprites,
+                destination->sprite_capacity, source->sprite_count) ||
+            !EDITOR_ARRAY_RESERVE(destination->animated_sprite_items,
+                destination->animated_sprite_capacity,
+                source->animated_sprite_count) ||
             !EDITOR_ARRAY_RESERVE(destination->hierarchy,
                 destination->hierarchy_capacity, source->hierarchy_count)) return false;
     if(destination->rigid_body_capacity > old_rigid_capacity)
@@ -528,18 +600,27 @@ bool editor_project_object_copy_set(EditorObject *destination,
         memset(&destination->soft_body_items[old_soft_capacity], 0,
             (destination->soft_body_capacity - old_soft_capacity) *
                 sizeof(*destination->soft_body_items));
+    if(destination->animated_sprite_capacity > old_animated_sprite_capacity)
+        memset(&destination->animated_sprite_items[old_animated_sprite_capacity], 0,
+            (destination->animated_sprite_capacity - old_animated_sprite_capacity) *
+                sizeof(*destination->animated_sprite_items));
     rigid_bodies = destination->rigid_bodies;
     editor_joints = destination->joint_items;
     anchors = destination->anchors;
     editor_soft_bodies = destination->soft_body_items;
+    sprites = destination->sprites;
+    sprite_items = destination->animated_sprite_items;
     hierarchy = destination->hierarchy;
     rigid_capacity = destination->rigid_body_capacity;
     joint_capacity = destination->joint_capacity;
     anchor_capacity = destination->anchor_capacity;
     soft_capacity = destination->soft_body_capacity;
+    sprite_capacity = destination->sprite_capacity;
+    animated_sprite_capacity = destination->animated_sprite_capacity;
     hierarchy_capacity = destination->hierarchy_capacity;
     old_rigid_count = destination->rigid_body_count;
     old_soft_count = destination->soft_body_count;
+    old_animated_sprite_count = destination->animated_sprite_count;
     for(size_t i = 0; i < source->rigid_body_count; i += 1)
         if(!editor_project_rigid_body_copy_set(&rigid_bodies[i],
                 &source->rigid_bodies[i])) return false;
@@ -550,10 +631,18 @@ bool editor_project_object_copy_set(EditorObject *destination,
                 &source->soft_body_items[i])) return false;
     for(size_t i = source->soft_body_count; i < old_soft_count; i += 1)
         editor_project_soft_body_destroy(&editor_soft_bodies[i]);
+    for(size_t i = 0; i < source->animated_sprite_count; i += 1)
+        if(!editor_project_animated_sprite_copy_set(&sprite_items[i],
+                &source->animated_sprite_items[i])) return false;
+    for(size_t i = source->animated_sprite_count;
+            i < old_animated_sprite_count; i += 1)
+        editor_project_animated_sprite_destroy(&sprite_items[i]);
     if(source->joint_count > 0) memcpy(editor_joints, source->joint_items,
         source->joint_count * sizeof(*editor_joints));
     if(source->anchor_count > 0) memcpy(anchors, source->anchors,
         source->anchor_count * sizeof(*anchors));
+    if(source->sprite_count > 0) memcpy(sprites, source->sprites,
+        source->sprite_count * sizeof(*sprites));
     if(source->hierarchy_count > 0) memcpy(hierarchy, source->hierarchy,
         source->hierarchy_count * sizeof(*hierarchy));
     *destination = *source;
@@ -561,11 +650,15 @@ bool editor_project_object_copy_set(EditorObject *destination,
     destination->joint_items = editor_joints;
     destination->anchors = anchors;
     destination->soft_body_items = editor_soft_bodies;
+    destination->sprites = sprites;
+    destination->animated_sprite_items = sprite_items;
     destination->hierarchy = hierarchy;
     destination->rigid_body_capacity = rigid_capacity;
     destination->joint_capacity = joint_capacity;
     destination->anchor_capacity = anchor_capacity;
     destination->soft_body_capacity = soft_capacity;
+    destination->sprite_capacity = sprite_capacity;
+    destination->animated_sprite_capacity = animated_sprite_capacity;
     destination->hierarchy_capacity = hierarchy_capacity;
     return true;
 }
@@ -651,6 +744,9 @@ EditorObject *editor_project_object_add(EditorProject *project, Position positio
                 object->anchor_capacity, EDITOR_ANCHOR_MAX) ||
             !EDITOR_ARRAY_RESERVE(object->soft_body_items,
                 object->soft_body_capacity, EDITOR_SOFT_BODY_MAX) ||
+            !EDITOR_ARRAY_RESERVE(object->sprites, object->sprite_capacity, 8) ||
+            !EDITOR_ARRAY_RESERVE(object->animated_sprite_items,
+                object->animated_sprite_capacity, 8) ||
             !EDITOR_ARRAY_RESERVE(object->hierarchy,
                 object->hierarchy_capacity, EDITOR_OBJECT_HIERARCHY_MAX)) {
         editor_project_object_destroy(object);
@@ -665,6 +761,10 @@ EditorObject *editor_project_object_add(EditorProject *project, Position positio
         object->anchor_capacity * sizeof(*object->anchors));
     memset(object->soft_body_items, 0,
         object->soft_body_capacity * sizeof(*object->soft_body_items));
+    memset(object->sprites, 0,
+        object->sprite_capacity * sizeof(*object->sprites));
+    memset(object->animated_sprite_items, 0,
+        object->animated_sprite_capacity * sizeof(*object->animated_sprite_items));
     memset(object->hierarchy, 0,
         object->hierarchy_capacity * sizeof(*object->hierarchy));
     snprintf(object->name, sizeof(object->name), "Object%u", object->id);
@@ -749,6 +849,12 @@ static bool editor_project_hierarchy_item_exists(const EditorObject *object,
     } else if(item.kind == EDITOR_HIERARCHY_SOFT_BODY) {
         for(size_t i = 0; i < object->soft_body_count; i += 1)
             if(object->soft_body_items[i].id == item.id) return true;
+    } else if(item.kind == EDITOR_HIERARCHY_SPRITE) {
+        for(size_t i = 0; i < object->sprite_count; i += 1)
+            if(object->sprites[i].id == item.id) return true;
+    } else if(item.kind == EDITOR_HIERARCHY_ANIMATED_SPRITE) {
+        for(size_t i = 0; i < object->animated_sprite_count; i += 1)
+            if(object->animated_sprite_items[i].id == item.id) return true;
     }
     return false;
 }
@@ -794,6 +900,23 @@ void editor_project_object_hierarchy_sync(EditorObject *object) {
     for(size_t i = 0; i < object->soft_body_count; i += 1) {
         EditorHierarchyItem item = {EDITOR_HIERARCHY_SOFT_BODY,
             object->soft_body_items[i].id};
+        bool found = false;
+        for(size_t j = 0; j < object->hierarchy_count; j += 1)
+            if(object->hierarchy[j].kind == item.kind &&
+                    object->hierarchy[j].id == item.id) found = true;
+        if(!found) editor_project_hierarchy_item_add(object, item.kind, item.id);
+    }
+    for(size_t i = 0; i < object->animated_sprite_count; i += 1) {
+        EditorHierarchyItem item = {EDITOR_HIERARCHY_ANIMATED_SPRITE,
+            object->animated_sprite_items[i].id};
+        bool found = false;
+        for(size_t j = 0; j < object->hierarchy_count; j += 1)
+            if(object->hierarchy[j].kind == item.kind &&
+                    object->hierarchy[j].id == item.id) found = true;
+        if(!found) editor_project_hierarchy_item_add(object, item.kind, item.id);
+    }
+    for(size_t i = 0; i < object->sprite_count; i += 1) {
+        EditorHierarchyItem item = {EDITOR_HIERARCHY_SPRITE, object->sprites[i].id};
         bool found = false;
         for(size_t j = 0; j < object->hierarchy_count; j += 1)
             if(object->hierarchy[j].kind == item.kind &&
@@ -926,6 +1049,9 @@ bool editor_project_rigid_body_remove(EditorObject *object, EditorRigidBodyId id
             }
             anchor->rigid_body = 0;
         }
+        for(size_t j = 0; j < object->animated_sprite_count; j += 1)
+            if(object->animated_sprite_items[j].rigid_body == id)
+                object->animated_sprite_items[j].rigid_body = 0;
         editor_project_rigid_body_destroy(&object->rigid_bodies[i]);
         for(size_t j = i + 1; j < object->rigid_body_count; j += 1) {
             object->rigid_bodies[j - 1] = object->rigid_bodies[j];
@@ -1890,4 +2016,121 @@ size_t editor_project_soft_area_triangulate(const EditorSoftBody *body,
     }
     free(remaining);
     return triangle_count;
+}
+
+EditorSprite *editor_project_sprite_add(EditorProject *project, EditorObject *object,
+        const char *name, const char *path) {
+    EditorSprite *sprite;
+    if(project == NULL || object == NULL || name == NULL || path == NULL ||
+            path[0] == '\0' || !EDITOR_ARRAY_RESERVE(object->sprites,
+                object->sprite_capacity, object->sprite_count + 1)) return NULL;
+    sprite = &object->sprites[object->sprite_count++];
+    *sprite = (EditorSprite){.id = project->next_sprite_id++,
+        .size = {64.0f, 64.0f}, .visible = true};
+    editor_project_property_name_format(sprite->name, sizeof(sprite->name), name);
+    snprintf(sprite->path, sizeof(sprite->path), "%s", path);
+    editor_project_hierarchy_item_add(object, EDITOR_HIERARCHY_SPRITE, sprite->id);
+    return sprite;
+}
+
+EditorSprite *editor_project_sprite_get(EditorObject *object, EditorSpriteId id) {
+    if(object == NULL || id == 0) return NULL;
+    for(size_t i = 0; i < object->sprite_count; i += 1)
+        if(object->sprites[i].id == id) return &object->sprites[i];
+    return NULL;
+}
+
+bool editor_project_sprite_remove(EditorObject *object, EditorSpriteId id) {
+    size_t index;
+    if(object == NULL || id == 0) return false;
+    for(size_t sprite_index = 0; sprite_index < object->animated_sprite_count;
+            sprite_index += 1) {
+        EditorAnimatedSprite *animation =
+            &object->animated_sprite_items[sprite_index];
+        for(size_t frame = animation->frame_count; frame > 0; frame -= 1) {
+            if(animation->frames[frame - 1].sprite != id) continue;
+            (void)editor_project_animation_frame_remove(animation, frame - 1);
+        }
+        if(animation->frame_count == 0) animation->starting_frame = 0;
+        else if(animation->starting_frame >= animation->frame_count)
+            animation->starting_frame = (uint32_t)(animation->frame_count - 1);
+    }
+    for(index = 0; index < object->sprite_count; index += 1)
+        if(object->sprites[index].id == id) break;
+    if(index == object->sprite_count) return false;
+    for(size_t i = index + 1; i < object->sprite_count; i += 1)
+        object->sprites[i - 1] = object->sprites[i];
+    object->sprite_count -= 1;
+    editor_project_object_hierarchy_sync(object);
+    return true;
+}
+
+EditorAnimatedSprite *editor_project_animated_sprite_add(EditorProject *project,
+        EditorObject *object) {
+    EditorAnimatedSprite *sprite;
+    if(project == NULL || object == NULL ||
+            !EDITOR_ARRAY_RESERVE(object->animated_sprite_items,
+                object->animated_sprite_capacity,
+                object->animated_sprite_count + 1)) return NULL;
+    sprite = &object->animated_sprite_items[object->animated_sprite_count++];
+    *sprite = (EditorAnimatedSprite){
+        .id = project->next_animated_sprite_id++,
+        .scale = {1.0f, 1.0f},
+        .direction = DIRECTION_RIGHT,
+        .follow_body_rotation = true,
+        .visible = true
+    };
+    snprintf(sprite->name, sizeof(sprite->name), "animated_sprite_%u", sprite->id);
+    if(!EDITOR_ARRAY_RESERVE(sprite->frames, sprite->frame_capacity, 4)) {
+        object->animated_sprite_count -= 1;
+        return NULL;
+    }
+    editor_project_hierarchy_item_add(object,
+        EDITOR_HIERARCHY_ANIMATED_SPRITE, sprite->id);
+    return sprite;
+}
+
+EditorAnimatedSprite *editor_project_animated_sprite_get(EditorObject *object,
+        EditorAnimatedSpriteId id) {
+    if(object == NULL || id == 0) return NULL;
+    for(size_t i = 0; i < object->animated_sprite_count; i += 1)
+        if(object->animated_sprite_items[i].id == id) return &object->animated_sprite_items[i];
+    return NULL;
+}
+
+bool editor_project_animated_sprite_remove(EditorObject *object,
+        EditorAnimatedSpriteId id) {
+    if(object == NULL || id == 0) return false;
+    for(size_t i = 0; i < object->animated_sprite_count; i += 1) {
+        if(object->animated_sprite_items[i].id != id) continue;
+        editor_project_animated_sprite_destroy(&object->animated_sprite_items[i]);
+        for(size_t j = i + 1; j < object->animated_sprite_count; j += 1)
+            object->animated_sprite_items[j - 1] = object->animated_sprite_items[j];
+        object->animated_sprite_count -= 1;
+        object->animated_sprite_items[object->animated_sprite_count] =
+            (EditorAnimatedSprite){0};
+        editor_project_object_hierarchy_sync(object);
+        return true;
+    }
+    return false;
+}
+
+bool editor_project_animation_frame_add(EditorAnimatedSprite *animated_sprite,
+        EditorSpriteId sprite) {
+    if(animated_sprite == NULL || sprite == 0 ||
+            !EDITOR_ARRAY_RESERVE(animated_sprite->frames,
+                animated_sprite->frame_capacity,
+                animated_sprite->frame_count + 1)) return false;
+    animated_sprite->frames[animated_sprite->frame_count++] =
+        (EditorAnimationFrame){sprite};
+    return true;
+}
+
+bool editor_project_animation_frame_remove(EditorAnimatedSprite *animated_sprite,
+        size_t index) {
+    if(animated_sprite == NULL || index >= animated_sprite->frame_count) return false;
+    for(size_t i = index + 1; i < animated_sprite->frame_count; i += 1)
+        animated_sprite->frames[i - 1] = animated_sprite->frames[i];
+    animated_sprite->frame_count -= 1;
+    return true;
 }

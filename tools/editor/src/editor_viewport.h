@@ -21,7 +21,9 @@ typedef enum EditorViewportMode {
     EDITOR_VIEWPORT_ORIGIN,
     EDITOR_VIEWPORT_LINE,
     EDITOR_VIEWPORT_VERTEX,
-    EDITOR_VIEWPORT_AUTO_SHAPE
+    EDITOR_VIEWPORT_AUTO_SHAPE,
+    EDITOR_VIEWPORT_SPRITE,
+    EDITOR_VIEWPORT_ANIMATED_SPRITE
 } EditorViewportMode;
 
 typedef enum EditorHierarchySelection {
@@ -38,7 +40,9 @@ typedef enum EditorHierarchySelection {
     EDITOR_SELECTION_SOFT_AREA,
     EDITOR_SELECTION_ORIGIN,
     EDITOR_SELECTION_LINE,
-    EDITOR_SELECTION_VERTEX
+    EDITOR_SELECTION_VERTEX,
+    EDITOR_SELECTION_SPRITE,
+    EDITOR_SELECTION_ANIMATED_SPRITE
 } EditorHierarchySelection;
 
 typedef enum EditorOriginKind {
@@ -62,6 +66,8 @@ typedef struct EditorViewportState {
     bool dragged_anchor;
     bool dragged_soft_node;
     bool dragged_soft_body;
+    bool dragged_sprite;
+    bool dragged_animated_sprite;
     bool rotated_soft_body;
     bool dragged_origin;
     bool group_dragging;
@@ -94,6 +100,8 @@ typedef struct EditorViewportState {
     EditorSoftNodeId selected_soft_node;
     EditorSoftBeamId selected_soft_beam;
     EditorSoftAreaId selected_soft_area;
+    EditorSpriteId selected_sprite;
+    EditorAnimatedSpriteId selected_animated_sprite;
     EditorSoftAreaId soft_area_candidates[EDITOR_SOFT_AREA_MAX];
     size_t soft_area_candidate_count;
     EditorOriginKind selected_origin_kind;
@@ -148,6 +156,8 @@ void editor_viewport_draw(
     const EditorViewportState *state,
     bool grid_visible
 );
+void editor_viewport_asset_root_set(const char *path);
+void editor_viewport_assets_destroy(void);
 bool editor_viewport_selection_nudge(EditorViewportState *state,
     EditorProject *project, Vec2D screen_delta);
 

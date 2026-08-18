@@ -26,6 +26,9 @@ typedef struct EditorCliSelectors {
     EditorCliSelector line;
     EditorCliSelector node_a;
     EditorCliSelector node_b;
+    EditorCliSelector sprite;
+    EditorCliSelector animated_sprite;
+    EditorCliSelector frame;
 } EditorCliSelectors;
 
 static bool editor_cli_uint_parse(const char *text, uint32_t *value) {
@@ -84,6 +87,11 @@ static EditorCliSelector *editor_cli_selector_flag_get(EditorCliSelectors *selec
         {"--node-a-id", &selectors->node_a, true},
         {"--node-b", &selectors->node_b, false},
         {"--node-b-id", &selectors->node_b, true}
+        ,{"--sprite", &selectors->sprite, false}
+        ,{"--sprite-id", &selectors->sprite, true}
+        ,{"--animated-sprite", &selectors->animated_sprite, false}
+        ,{"--animated-sprite-id", &selectors->animated_sprite, true}
+        ,{"--frame-index", &selectors->frame, true}
     };
     for(size_t i = 0; i < sizeof(entries) / sizeof(entries[0]); i += 1) {
         if(strcmp(flag, entries[i].name) != 0) continue;
@@ -161,6 +169,23 @@ static EditorResult editor_cli_object_resolve(const EditorProject *project,
         found, matches, output);
 }
 
+static EditorResult editor_cli_sprite_resolve(const EditorObject *object,
+        const EditorCliSelector *selector, uint32_t *output) {
+    uint32_t found = 0;
+    size_t matches = 0;
+    if(selector->id_set) { *output = selector->id; return editor_result_value(true); }
+    if(selector->name == NULL) return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+        "Expected --sprite <name> or --sprite-id <id>");
+    for(size_t i = 0; object != NULL && i < object->sprite_count; i += 1) {
+        if(!editor_cli_name_equal(object->sprites[i].name, selector->name, false))
+            continue;
+        found = object->sprites[i].id;
+        matches += 1;
+    }
+    return editor_cli_match_result("Sprite", selector->name, "--sprite-id",
+        found, matches, output);
+}
+
 static EditorObject *editor_cli_object_get(const EditorProject *project, uint32_t id) {
     for(size_t i = 0; i < project->object_count; i += 1)
         if(project->objects[i].id == id) return (EditorObject *)&project->objects[i];
@@ -199,6 +224,9 @@ EDITOR_CLI_RESOLVE_FUNCTION(editor_cli_anchor_resolve, EditorObject,
     anchor_count, anchors, "Anchor", "--anchor-id")
 EDITOR_CLI_RESOLVE_FUNCTION(editor_cli_soft_body_resolve, EditorObject,
     soft_body_count, soft_body_items, "Soft body", "--soft-body-id")
+EDITOR_CLI_RESOLVE_FUNCTION(editor_cli_animated_sprite_resolve, EditorObject,
+    animated_sprite_count, animated_sprite_items, "Animated sprite",
+    "--animated-sprite-id")
 EDITOR_CLI_RESOLVE_FUNCTION(editor_cli_node_resolve, EditorSoftBody,
     node_count, nodes, "Soft node", "--node-id")
 EDITOR_CLI_RESOLVE_FUNCTION(editor_cli_beam_resolve, EditorSoftBody,
@@ -354,6 +382,9 @@ static bool editor_cli_object_matches(const EditorObject *object,
 } while(0)
     MATCH_OBJECT_CHILD(selectors->joint, object->joint_count, object->joint_items);
     MATCH_OBJECT_CHILD(selectors->anchor, object->anchor_count, object->anchors);
+    MATCH_OBJECT_CHILD(selectors->sprite, object->sprite_count, object->sprites);
+    MATCH_OBJECT_CHILD(selectors->animated_sprite, object->animated_sprite_count,
+        object->animated_sprite_items);
 #undef MATCH_OBJECT_CHILD
     if(editor_cli_selector_present(&selectors->soft_body) ||
             editor_cli_selector_present(&selectors->node) ||
@@ -431,7 +462,8 @@ EditorResult editor_command_cli_named_parse(const EditorProject *project,
         "Expected an editor CLI command");
     domain = arguments[1]; action = arguments[2];
     if(strcmp(domain, "viewport") == 0 || strcmp(domain, "navigation") == 0 ||
-            strcmp(domain, "collision-mask") == 0) needs_object = false;
+            strcmp(domain, "collision-mask") == 0)
+        needs_object = false;
     normalized[normalized_count++] = arguments[0];
     normalized[normalized_count++] = arguments[1];
     normalized[normalized_count++] = arguments[2];
@@ -551,7 +583,11 @@ EditorResult editor_command_cli_named_parse(const EditorProject *project,
 #define RESOLVE_AND_PUSH(call) do { result = (call); if(editor_result_check(result)) \
     return result; if(!editor_cli_id_push(normalized, &normalized_count, id_buffers, \
         &id_buffer_count, item_id)) goto capacity_error; } while(0)
-    if(strcmp(domain, "object") == 0) {
+    if(strcmp(domain, "sprite") == 0) {
+        if(strcmp(action, "add") != 0)
+            RESOLVE_AND_PUSH(editor_cli_sprite_resolve(object,
+                &selectors.sprite, &item_id));
+    } else if(strcmp(domain, "object") == 0) {
         if(strcmp(action, "add") == 0 || strcmp(action, "list") == 0)
             return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
                 "Object %s does not accept selectors", action);
@@ -626,6 +662,29 @@ EditorResult editor_command_cli_named_parse(const EditorProject *project,
         if(strcmp(action, "add") != 0)
             RESOLVE_AND_PUSH(editor_cli_soft_body_resolve(
                 object, &selectors.soft_body, &item_id));
+    } else if(strcmp(domain, "animated-sprite") == 0) {
+        if(strcmp(action, "add") != 0)
+            RESOLVE_AND_PUSH(editor_cli_animated_sprite_resolve(object,
+                &selectors.animated_sprite, &item_id));
+        if(strcmp(action, "frame-add") == 0) {
+            RESOLVE_AND_PUSH(editor_cli_sprite_resolve(object,
+                &selectors.sprite, &item_id));
+        } else if(strcmp(action, "frame-delete") == 0) {
+            if(!selectors.frame.id_set) return editor_result_error(
+                EDITOR_ERROR_INVALID_ARGUMENT,
+                "frame-delete requires --frame-index <index>");
+            if(!editor_cli_id_push(normalized, &normalized_count, id_buffers,
+                    &id_buffer_count, selectors.frame.id)) goto capacity_error;
+        } else if(strcmp(action, "connect") == 0) {
+            if(rest_count != 1 || strcmp(rest[0], "body") != 0)
+                return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                    "animated-sprite connect requires body");
+            if(!editor_cli_argument_push(normalized, &normalized_count, rest[0]))
+                goto capacity_error;
+            RESOLVE_AND_PUSH(editor_cli_body_resolve(object,
+                &selectors.body, &item_id));
+            rest_count = 0;
+        }
     } else if(strcmp(domain, "soft-node") == 0 || strcmp(domain, "soft-beam") == 0 ||
             strcmp(domain, "soft-area") == 0) {
         result = editor_cli_soft_body_resolve(object, &selectors.soft_body, &body_id);

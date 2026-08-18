@@ -612,6 +612,52 @@ int main(void) {
         callback_history = NULL;
     }
 
+    {
+        EditorSpriteId sprite_id;
+        editor_history_reset(&history);
+        callback_history = &history;
+        editor_command_executing_callback_set(history_begin, NULL);
+        editor_command_finished_callback_set(history_finish, NULL);
+        command = (EditorCommand){.type = EDITOR_COMMAND_SPRITE_ADD,
+            .data.sprite_add = {.object = project.objects[0].id,
+                .name = "wheel", .path = "assets/wheel.png",
+                .size = {32.0f, 32.0f}}};
+        result = editor_command_execute(&project, &command);
+        assert(result.kind == ERROR_RESULT_VALUE &&
+            project.objects[0].sprite_count == 1);
+        sprite_id = project.objects[0].sprites[0].id;
+        assert(editor_history_undo(&history));
+        assert(project.objects[0].sprite_count == 0);
+        assert(editor_history_redo(&history));
+        assert(project.objects[0].sprite_count == 1 &&
+            project.objects[0].sprites[0].id == sprite_id);
+
+        command = (EditorCommand){.type = EDITOR_COMMAND_SPRITE_POSITION_SET,
+            .data.sprite_position_set = {.object = project.objects[0].id,
+                .sprite = sprite_id, .position = {14.0f, 18.0f}}};
+        result = editor_command_execute(&project, &command);
+        assert(result.kind == ERROR_RESULT_VALUE &&
+            project.objects[0].sprites[0].position.x == 14.0f);
+        assert(editor_history_undo(&history));
+        assert(project.objects[0].sprites[0].position.x == 0.0f);
+        assert(editor_history_redo(&history));
+        assert(project.objects[0].sprites[0].position.x == 14.0f);
+
+        command = (EditorCommand){.type = EDITOR_COMMAND_ANIMATED_SPRITE_ADD,
+            .data.animated_sprite_add = {.object = project.objects[0].id,
+                .name = "rolling"}};
+        result = editor_command_execute(&project, &command);
+        assert(result.kind == ERROR_RESULT_VALUE &&
+            project.objects[0].animated_sprite_count == 1);
+        assert(editor_history_undo(&history));
+        assert(project.objects[0].animated_sprite_count == 0);
+        assert(editor_history_redo(&history));
+        assert(project.objects[0].animated_sprite_count == 1);
+        editor_command_executing_callback_set(NULL, NULL);
+        editor_command_finished_callback_set(NULL, NULL);
+        callback_history = NULL;
+    }
+
     editor_viewport_state_destroy(&viewport);
     editor_history_destroy(&history);
     return 0;

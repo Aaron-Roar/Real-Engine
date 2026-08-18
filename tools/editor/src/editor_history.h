@@ -9,6 +9,7 @@ typedef struct EditorHistoryEntry EditorHistoryEntry;
 typedef struct EditorHistoryObjectChange EditorHistoryObjectChange;
 typedef struct EditorHistoryAggregateChange EditorHistoryAggregateChange;
 typedef struct EditorHistoryCollisionChange EditorHistoryCollisionChange;
+typedef struct EditorHistorySpriteChange EditorHistorySpriteChange;
 
 typedef struct EditorHistory {
     EditorProject *project;
@@ -28,6 +29,7 @@ typedef struct EditorHistory {
     EditorHistoryObjectChange *pending_object;
     EditorHistoryAggregateChange *pending_aggregate;
     EditorHistoryCollisionChange *pending_collision;
+    EditorHistorySpriteChange *pending_sprites;
 } EditorHistory;
 
 bool editor_history_init(EditorHistory *history, EditorProject *project);

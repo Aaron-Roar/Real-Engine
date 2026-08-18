@@ -16,10 +16,12 @@ static bool editor_selection_sibling_check(EditorSelectionRef first,
         EditorSelectionRef second) {
     bool object_children = (first.kind == EDITOR_SELECTION_RIGID_BODY ||
             first.kind == EDITOR_SELECTION_JOINT ||
-            first.kind == EDITOR_SELECTION_SOFT_BODY) &&
+            first.kind == EDITOR_SELECTION_SOFT_BODY ||
+            first.kind == EDITOR_SELECTION_ANIMATED_SPRITE) &&
         (second.kind == EDITOR_SELECTION_RIGID_BODY ||
             second.kind == EDITOR_SELECTION_JOINT ||
-            second.kind == EDITOR_SELECTION_SOFT_BODY);
+            second.kind == EDITOR_SELECTION_SOFT_BODY ||
+            second.kind == EDITOR_SELECTION_ANIMATED_SPRITE);
     bool soft_children = (first.kind == EDITOR_SELECTION_SOFT_NODE ||
             first.kind == EDITOR_SELECTION_SOFT_BEAM ||
             first.kind == EDITOR_SELECTION_SOFT_AREA) &&
@@ -107,6 +109,9 @@ static EditorHierarchyItemKind editor_hierarchy_kind_get(
         EditorHierarchySelection kind) {
     if(kind == EDITOR_SELECTION_JOINT) return EDITOR_HIERARCHY_JOINT;
     if(kind == EDITOR_SELECTION_SOFT_BODY) return EDITOR_HIERARCHY_SOFT_BODY;
+    if(kind == EDITOR_SELECTION_SPRITE) return EDITOR_HIERARCHY_SPRITE;
+    if(kind == EDITOR_SELECTION_ANIMATED_SPRITE)
+        return EDITOR_HIERARCHY_ANIMATED_SPRITE;
     return EDITOR_HIERARCHY_RIGID_BODY;
 }
 
@@ -115,6 +120,9 @@ static EditorSelectionRef editor_hierarchy_selection_get(EditorObjectId object,
     EditorHierarchySelection kind = EDITOR_SELECTION_RIGID_BODY;
     if(item.kind == EDITOR_HIERARCHY_JOINT) kind = EDITOR_SELECTION_JOINT;
     else if(item.kind == EDITOR_HIERARCHY_SOFT_BODY) kind = EDITOR_SELECTION_SOFT_BODY;
+    else if(item.kind == EDITOR_HIERARCHY_SPRITE) kind = EDITOR_SELECTION_SPRITE;
+    else if(item.kind == EDITOR_HIERARCHY_ANIMATED_SPRITE)
+        kind = EDITOR_SELECTION_ANIMATED_SPRITE;
     return (EditorSelectionRef){kind, object, 0, 0, item.id};
 }
 
@@ -198,6 +206,12 @@ static bool editor_reorder_storage_get(EditorProject *project,
             *storage = (EditorReorderStorage){(unsigned char *)object->soft_body_items,
                 object->soft_body_count, sizeof(object->soft_body_items[0])};
             return true;
+        case EDITOR_SELECTION_ANIMATED_SPRITE:
+            *storage = (EditorReorderStorage){
+                (unsigned char *)object->animated_sprite_items,
+                object->animated_sprite_count,
+                sizeof(object->animated_sprite_items[0])};
+            return true;
         default: break;
     }
     if(selection.kind == EDITOR_SELECTION_HITBOX) {
@@ -249,10 +263,12 @@ bool editor_navigation_selection_reorder(EditorProject *project,
             !editor_selection_sibling_check(source, target)) return false;
     if((source.kind == EDITOR_SELECTION_RIGID_BODY ||
                 source.kind == EDITOR_SELECTION_JOINT ||
-                source.kind == EDITOR_SELECTION_SOFT_BODY) &&
+                source.kind == EDITOR_SELECTION_SOFT_BODY ||
+                source.kind == EDITOR_SELECTION_ANIMATED_SPRITE) &&
                 (target.kind == EDITOR_SELECTION_RIGID_BODY ||
                     target.kind == EDITOR_SELECTION_JOINT ||
-                    target.kind == EDITOR_SELECTION_SOFT_BODY) &&
+                    target.kind == EDITOR_SELECTION_SOFT_BODY ||
+                    target.kind == EDITOR_SELECTION_ANIMATED_SPRITE) &&
                 source.object == target.object && source.parent == 0)
         return editor_object_hierarchy_reorder(project, state, source,
             target, after, history);
@@ -345,6 +361,18 @@ static bool editor_selection_remove_command_get(EditorSelectionRef selection,
         EditorCommand *command) {
     EditorItemKind kind;
     if(command == NULL) return false;
+    if(selection.kind == EDITOR_SELECTION_SPRITE) {
+        *command = (EditorCommand){.type = EDITOR_COMMAND_SPRITE_REMOVE,
+            .data.sprite_remove = {.object = selection.object,
+                .sprite = selection.item}};
+        return true;
+    }
+    if(selection.kind == EDITOR_SELECTION_ANIMATED_SPRITE) {
+        *command = (EditorCommand){.type = EDITOR_COMMAND_ANIMATED_SPRITE_REMOVE,
+            .data.animated_sprite_remove = {.object = selection.object,
+                .sprite = selection.item}};
+        return true;
+    }
     switch(selection.kind) {
         case EDITOR_SELECTION_OBJECT: kind = EDITOR_ITEM_OBJECT; break;
         case EDITOR_SELECTION_RIGID_BODY:
@@ -495,6 +523,13 @@ bool editor_navigation_selected_open(EditorProject *project,
     EditorHitbox *hitbox;
 
     if(project == NULL || state == NULL) return false;
+    if(state->selection == EDITOR_SELECTION_SPRITE) {
+        if(editor_project_sprite_get(editor_project_selected_get(project),
+                state->selected_sprite) == NULL)
+            return false;
+        state->mode = EDITOR_VIEWPORT_SPRITE;
+        return true;
+    }
     selected = editor_project_selected_get(project);
     if(selected == NULL) return false;
     hitbox = editor_navigation_hitbox_get(selected, state);
@@ -526,6 +561,11 @@ bool editor_navigation_selected_open(EditorProject *project,
             return true;
         case EDITOR_SELECTION_SOFT_BEAM:
             state->mode = EDITOR_VIEWPORT_SOFT_BEAM;
+            return true;
+        case EDITOR_SELECTION_ANIMATED_SPRITE:
+            if(editor_project_animated_sprite_get(selected,
+                    state->selected_animated_sprite) == NULL) return false;
+            state->mode = EDITOR_VIEWPORT_ANIMATED_SPRITE;
             return true;
         case EDITOR_SELECTION_VERTEX:
             if(hitbox == NULL || state->selected_vertex >= hitbox->vertex_count)
@@ -574,6 +614,12 @@ bool editor_navigation_open_item_selection_set(EditorViewportState *state) {
             return true;
         case EDITOR_VIEWPORT_SOFT_BEAM:
             state->selection = EDITOR_SELECTION_SOFT_BEAM;
+            return true;
+        case EDITOR_VIEWPORT_SPRITE:
+            state->selection = EDITOR_SELECTION_SPRITE;
+            return true;
+        case EDITOR_VIEWPORT_ANIMATED_SPRITE:
+            state->selection = EDITOR_SELECTION_ANIMATED_SPRITE;
             return true;
         default:
             return false;

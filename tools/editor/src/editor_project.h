@@ -8,6 +8,7 @@
 #define EDITOR_HITBOX_VERTEX_MIN 3
 #define EDITOR_HITBOX_VERTEX_MAX 8
 #define EDITOR_OBJECT_NAME_MAX 64
+#define EDITOR_ASSET_PATH_MAX 1024
 #define EDITOR_RIGID_BODY_MAX 16
 #define EDITOR_BODY_HITBOX_MAX 8
 #define EDITOR_JOINT_MAX 32
@@ -22,6 +23,8 @@
 #define EDITOR_COLLISION_MASK_MAX 64
 /* Pre-release project schemas remain version 1 until the editor format is stable. */
 #define EDITOR_PROJECT_FORMAT_VERSION 1
+#define EDITOR_NAVIGATION_MODE_MAX 16
+#define EDITOR_NAVIGATION_SELECTION_MAX 15
 
 typedef uint32_t EditorObjectId;
 typedef uint32_t EditorVertexId;
@@ -33,11 +36,15 @@ typedef uint32_t EditorSoftBodyId;
 typedef uint32_t EditorSoftNodeId;
 typedef uint32_t EditorSoftBeamId;
 typedef uint32_t EditorSoftAreaId;
+typedef uint32_t EditorSpriteId;
+typedef uint32_t EditorAnimatedSpriteId;
 
 typedef enum EditorHierarchyItemKind {
     EDITOR_HIERARCHY_RIGID_BODY,
     EDITOR_HIERARCHY_JOINT,
-    EDITOR_HIERARCHY_SOFT_BODY
+    EDITOR_HIERARCHY_SOFT_BODY,
+    EDITOR_HIERARCHY_SPRITE,
+    EDITOR_HIERARCHY_ANIMATED_SPRITE
 } EditorHierarchyItemKind;
 
 typedef struct EditorHierarchyItem {
@@ -206,6 +213,36 @@ typedef struct EditorSoftBody {
     size_t hierarchy_capacity;
 } EditorSoftBody;
 
+typedef struct EditorSprite {
+    EditorSpriteId id;
+    char name[EDITOR_OBJECT_NAME_MAX];
+    char path[EDITOR_ASSET_PATH_MAX];
+    Position position;
+    Scale size;
+    bool visible;
+} EditorSprite;
+
+typedef struct EditorAnimationFrame {
+    EditorSpriteId sprite;
+} EditorAnimationFrame;
+
+typedef struct EditorAnimatedSprite {
+    EditorAnimatedSpriteId id;
+    char name[EDITOR_OBJECT_NAME_MAX];
+    Position editor_position;
+    EditorRigidBodyId rigid_body;
+    EditorAnimationFrame *frames;
+    size_t frame_count;
+    size_t frame_capacity;
+    Tick ticks_per_frame;
+    Time time_per_frame;
+    uint32_t starting_frame;
+    Scale scale;
+    Direction direction;
+    bool follow_body_rotation;
+    bool visible;
+} EditorAnimatedSprite;
+
 typedef struct EditorObject {
     EditorObjectId id;
     char name[EDITOR_OBJECT_NAME_MAX];
@@ -223,6 +260,12 @@ typedef struct EditorObject {
     EditorSoftBody *soft_body_items;
     size_t soft_body_count;
     size_t soft_body_capacity;
+    EditorSprite *sprites;
+    size_t sprite_count;
+    size_t sprite_capacity;
+    EditorAnimatedSprite *animated_sprite_items;
+    size_t animated_sprite_count;
+    size_t animated_sprite_capacity;
     EditorHierarchyItem *hierarchy;
     size_t hierarchy_count;
     size_t hierarchy_capacity;
@@ -241,6 +284,8 @@ typedef struct EditorNavigationState {
     EditorSoftBodyId soft_body;
     EditorSoftNodeId soft_node;
     EditorSoftBeamId soft_beam;
+    EditorSpriteId sprite;
+    EditorAnimatedSpriteId animated_sprite;
     uint32_t origin_kind;
 } EditorNavigationState;
 
@@ -265,6 +310,8 @@ typedef struct EditorProject {
     EditorSoftNodeId next_soft_node_id;
     EditorSoftBeamId next_soft_beam_id;
     EditorSoftAreaId next_soft_area_id;
+    EditorSpriteId next_sprite_id;
+    EditorAnimatedSpriteId next_animated_sprite_id;
     EditorObjectId selected;
 } EditorProject;
 
@@ -286,6 +333,7 @@ bool editor_project_soft_body_clone(EditorSoftBody *destination,
     const EditorSoftBody *source);
 bool editor_project_soft_body_copy_set(EditorSoftBody *destination,
     const EditorSoftBody *source);
+void editor_project_animated_sprite_destroy(EditorAnimatedSprite *sprite);
 void editor_project_object_name_format(char *output, size_t capacity,
     const char *input);
 void editor_project_property_name_format(char *output, size_t capacity,
@@ -360,5 +408,19 @@ bool editor_project_soft_beam_remove(EditorProject *project, EditorSoftBody *bod
 void editor_project_soft_areas_sync(EditorProject *project, EditorSoftBody *body);
 size_t editor_project_soft_area_triangulate(const EditorSoftBody *body,
     const EditorSoftArea *area, uint32_t triangles[][3], size_t capacity);
+EditorSprite *editor_project_sprite_add(EditorProject *project, EditorObject *object,
+    const char *name, const char *path);
+EditorSprite *editor_project_sprite_get(EditorObject *object, EditorSpriteId id);
+bool editor_project_sprite_remove(EditorObject *object, EditorSpriteId id);
+EditorAnimatedSprite *editor_project_animated_sprite_add(EditorProject *project,
+    EditorObject *object);
+EditorAnimatedSprite *editor_project_animated_sprite_get(EditorObject *object,
+    EditorAnimatedSpriteId id);
+bool editor_project_animated_sprite_remove(EditorObject *object,
+    EditorAnimatedSpriteId id);
+bool editor_project_animation_frame_add(EditorAnimatedSprite *animated_sprite,
+    EditorSpriteId sprite);
+bool editor_project_animation_frame_remove(EditorAnimatedSprite *animated_sprite,
+    size_t index);
 
 #endif

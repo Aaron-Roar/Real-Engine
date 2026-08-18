@@ -926,6 +926,116 @@ static int collision_filter_commands_test(void) {
     return 0;
 }
 
+static int sprite_commands_test(void) {
+    static EditorProject project;
+    EditorObject *object;
+    EditorRigidBody *body;
+    EditorSprite *asset;
+    EditorAnimatedSprite *animated;
+    EditorCommand command;
+    EditorCommand parsed;
+    EditorCommandResult executed;
+    EditorResult result;
+    const char *path;
+    char text[2048];
+    char *arguments[32];
+    int count = 0;
+
+    editor_project_init(&project);
+    object = editor_project_object_add(&project, (Position){0});
+    body = editor_project_rigid_body_add(&project, object);
+    asset = editor_project_sprite_add(&project, object, "wheel",
+        "assets/wheel image.png");
+    animated = editor_project_animated_sprite_add(&project, object);
+    if(object == NULL || body == NULL || asset == NULL || animated == NULL) return 1;
+    asset->size = (Scale){32.0f, 24.0f};
+    snprintf(animated->name, sizeof(animated->name), "%s", "rolling");
+
+    command = (EditorCommand){.type = EDITOR_COMMAND_SPRITE_ADD,
+        .data.sprite_add = {.object = object->id, .name = "second_frame",
+            .path = "assets/second.png", .size = {16.0f, 20.0f}}};
+    executed = (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+    result = editor_command_cli_standard_write(&project, &command, &executed,
+        "project.rohr.json", text, sizeof(text));
+    if(editor_result_check(result) || strstr(text, "--object") == NULL ||
+            strstr(text, "--sprite second_frame add") == NULL) return 1;
+    count = 0;
+    for(char *token = strtok(text, " "); token != NULL && count < 32;
+            token = strtok(NULL, " ")) arguments[count++] = token;
+    result = editor_command_cli_standard_parse(&project, count, arguments, &path,
+        &parsed);
+    if(editor_result_check(result) || parsed.type != EDITOR_COMMAND_SPRITE_ADD ||
+            parsed.data.sprite_add.object != object->id) return 1;
+
+    command = (EditorCommand){.type = EDITOR_COMMAND_ANIMATION_FRAME_ADD,
+        .data.animation_frame_add = {.object = object->id, .sprite = animated->id,
+            .frame = asset->id}};
+    executed = editor_command_execute(&project, &command);
+    if(executed.kind != ERROR_RESULT_VALUE) return 1;
+    result = editor_command_cli_standard_write(&project, &command, &executed,
+        "project.rohr.json", text, sizeof(text));
+    if(editor_result_check(result) || strstr(text, "--object") == NULL ||
+            strstr(text, "--animated-sprite rolling") == NULL ||
+            strstr(text, "--sprite wheel") == NULL || strstr(text, "frame-add") == NULL)
+        return 1;
+    count = 0;
+    for(char *token = strtok(text, " "); token != NULL && count < 32;
+            token = strtok(NULL, " ")) arguments[count++] = token;
+    result = editor_command_cli_standard_parse(&project, count, arguments, &path,
+        &parsed);
+    if(editor_result_check(result) || parsed.type != EDITOR_COMMAND_ANIMATION_FRAME_ADD ||
+            parsed.data.animation_frame_add.object != object->id ||
+            parsed.data.animation_frame_add.sprite != animated->id ||
+            parsed.data.animation_frame_add.frame != asset->id) return 1;
+
+    command = (EditorCommand){.type = EDITOR_COMMAND_ANIMATED_SPRITE_BODY_SET,
+        .data.animated_sprite_body_set = {.object = object->id,
+            .sprite = animated->id, .body = body->id}};
+    if(editor_command_execute(&project, &command).kind != ERROR_RESULT_VALUE) return 1;
+    if(editor_project_animated_sprite_get(object, animated->id)->rigid_body != body->id)
+        return 1;
+
+    command = (EditorCommand){.type = EDITOR_COMMAND_SPRITE_POSITION_SET,
+        .data.sprite_position_set = {.object = object->id, .sprite = asset->id,
+            .position = {12.0f, -7.0f}}};
+    executed = editor_command_execute(&project, &command);
+    if(executed.kind != ERROR_RESULT_VALUE || asset->position.x != 12.0f ||
+            asset->position.y != -7.0f) return 1;
+    result = editor_command_cli_standard_write(&project, &command, &executed,
+        "project.rohr.json", text, sizeof(text));
+    if(editor_result_check(result) || strstr(text, "--property position 12 -7") == NULL)
+        return 1;
+    count = 0;
+    for(char *token = strtok(text, " "); token != NULL && count < 32;
+            token = strtok(NULL, " ")) arguments[count++] = token;
+    result = editor_command_cli_standard_parse(&project, count, arguments, &path,
+        &parsed);
+    if(editor_result_check(result) ||
+            parsed.type != EDITOR_COMMAND_SPRITE_POSITION_SET ||
+            parsed.data.sprite_position_set.sprite != asset->id) return 1;
+
+    command = (EditorCommand){.type = EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET,
+        .data.animated_sprite_position_set = {.object = object->id,
+            .sprite = animated->id, .position = {30.0f, 40.0f}}};
+    executed = editor_command_execute(&project, &command);
+    if(executed.kind != ERROR_RESULT_VALUE || animated->editor_position.x != 30.0f ||
+            animated->editor_position.y != 40.0f) return 1;
+    result = editor_command_cli_standard_write(&project, &command, &executed,
+        "project.rohr.json", text, sizeof(text));
+    if(editor_result_check(result) ||
+            strstr(text, "--property position 30 40") == NULL) return 1;
+    count = 0;
+    for(char *token = strtok(text, " "); token != NULL && count < 32;
+            token = strtok(NULL, " ")) arguments[count++] = token;
+    result = editor_command_cli_standard_parse(&project, count, arguments, &path,
+        &parsed);
+    if(editor_result_check(result) ||
+            parsed.type != EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET ||
+            parsed.data.animated_sprite_position_set.sprite != animated->id) return 1;
+    editor_project_destroy(&project);
+    return 0;
+}
+
 int main(void) {
     const char *path = "/tmp/rohr-editor-core-test.json";
     EditorDocument document;
@@ -1004,16 +1114,20 @@ int main(void) {
     if(editor_result_check(result) ||
             strstr(cli_text, "'a project'\\''s/state.json'") == NULL ||
             strstr(cli_text, "object add") == NULL) return 1;
-    if(creation_result_test() != 0) return 1;
-    if(standard_cli_commands_test() != 0) return 1;
-    if(transform_commands_test() != 0) return 1;
-    if(item_commands_test() != 0) return 1;
-    if(property_commands_test() != 0) return 1;
-    if(relationship_commands_test() != 0) return 1;
-    if(collision_filter_commands_test() != 0) return 1;
-    if(named_selector_commands_test() != 0) return 1;
-    if(auto_shape_test() != 0) return 1;
-    if(auto_shape_command_test() != 0) return 1;
+#define RUN_TEST(name) do { if((name)() != 0) { \
+    fprintf(stderr, "%s failed\n", #name); return 1; } } while(0)
+    RUN_TEST(creation_result_test);
+    RUN_TEST(standard_cli_commands_test);
+    RUN_TEST(transform_commands_test);
+    RUN_TEST(item_commands_test);
+    RUN_TEST(property_commands_test);
+    RUN_TEST(relationship_commands_test);
+    RUN_TEST(collision_filter_commands_test);
+    RUN_TEST(named_selector_commands_test);
+    RUN_TEST(auto_shape_test);
+    RUN_TEST(auto_shape_command_test);
+    RUN_TEST(sprite_commands_test);
+#undef RUN_TEST
 
     editor_document_destroy(&loaded);
     editor_document_destroy(&document);

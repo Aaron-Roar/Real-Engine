@@ -13,7 +13,8 @@ static bool cli_selector_flag(const char *value) {
         "--anchor-id", "--soft-body", "--soft-body-id", "--node", "--node-id",
         "--beam", "--beam-id", "--area", "--area-id", "--vertex", "--vertex-id", "--line",
         "--line-index", "--node-a", "--node-a-id", "--node-b", "--node-b-id",
-        "--collision-mask"};
+        "--collision-mask", "--sprite", "--sprite-id", "--animated-sprite",
+        "--animated-sprite-id", "--frame-index"};
     for(size_t i = 0; i < sizeof(flags) / sizeof(flags[0]); i += 1)
         if(strcmp(value, flags[i]) == 0) return true;
     return false;
@@ -83,12 +84,198 @@ static const char *cli_property(const char *domain, const char *action) {
     return NULL;
 }
 
+static const EditorObject *cli_object_get(const EditorProject *project,
+        EditorObjectId id) {
+    if(project != NULL) for(size_t i = 0; i < project->object_count; i += 1)
+        if(project->objects[i].id == id) return &project->objects[i];
+    return NULL;
+}
+
+static bool cli_named_selector_add(char *output, size_t capacity, size_t *used,
+        const char *name_flag, const char *id_flag, const char *name, uint32_t id,
+        size_t matches) {
+    char number[16];
+    if(name != NULL && name[0] != '\0' && matches == 1)
+        return cli_token_add(output, capacity, used, name_flag) &&
+            cli_token_add(output, capacity, used, name);
+    snprintf(number, sizeof(number), "%u", id);
+    return cli_token_add(output, capacity, used, id_flag) &&
+        cli_token_add(output, capacity, used, number);
+}
+
+static bool cli_sprite_selector_add(const EditorObject *object, EditorSpriteId id,
+        char *output, size_t capacity, size_t *used) {
+    const char *name = NULL; size_t matches = 0;
+    for(size_t i = 0; object != NULL && i < object->sprite_count; i += 1)
+        if(object->sprites[i].id == id) name = object->sprites[i].name;
+    if(name != NULL) for(size_t i = 0; i < object->sprite_count; i += 1)
+        if(strcmp(object->sprites[i].name, name) == 0) matches += 1;
+    return cli_named_selector_add(output, capacity, used, "--sprite", "--sprite-id",
+        name, id, matches);
+}
+
+static bool cli_object_selector_add(const EditorProject *project, EditorObjectId id,
+        char *output, size_t capacity, size_t *used) {
+    const char *name = NULL; size_t matches = 0;
+    for(size_t i = 0; i < project->object_count; i += 1)
+        if(project->objects[i].id == id) name = project->objects[i].name;
+    if(name != NULL) for(size_t i = 0; i < project->object_count; i += 1)
+        if(strcmp(project->objects[i].name, name) == 0) matches += 1;
+    return cli_named_selector_add(output, capacity, used, "--object", "--object-id",
+        name, id, matches);
+}
+
+static bool cli_animated_selector_add(const EditorObject *object,
+        EditorAnimatedSpriteId id, char *output, size_t capacity, size_t *used) {
+    const char *name = NULL; size_t matches = 0;
+    if(object != NULL) for(size_t i = 0; i < object->animated_sprite_count; i += 1)
+        if(object->animated_sprite_items[i].id == id)
+            name = object->animated_sprite_items[i].name;
+    if(name != NULL) for(size_t i = 0; i < object->animated_sprite_count; i += 1)
+        if(strcmp(object->animated_sprite_items[i].name, name) == 0) matches += 1;
+    return cli_named_selector_add(output, capacity, used, "--animated-sprite",
+        "--animated-sprite-id", name, id, matches);
+}
+
+static EditorResult cli_sprite_command_write(const EditorProject *project,
+        const EditorCommand *command, const char *path, char *output, size_t capacity,
+        bool *handled) {
+    size_t used = 0; char number[64]; EditorObjectId object_id = 0;
+    EditorAnimatedSpriteId animated_id = 0; const EditorObject *object;
+    *handled = command->type >= EDITOR_COMMAND_SPRITE_ADD &&
+        command->type <= EDITOR_COMMAND_ANIMATION_FRAME_REMOVE;
+    if(!*handled) return editor_result_value(true);
+    output[0] = '\0';
+#define ADD(value) do { if(!cli_token_add(output, capacity, &used, (value))) goto full; } while(0)
+    ADD("editor-cli"); ADD("--project"); ADD(path);
+    if(command->type >= EDITOR_COMMAND_SPRITE_ADD &&
+            command->type <= EDITOR_COMMAND_SPRITE_VISIBILITY_SET) {
+        object_id = command->type == EDITOR_COMMAND_SPRITE_ADD ?
+            command->data.sprite_add.object : command->type == EDITOR_COMMAND_SPRITE_REMOVE ?
+            command->data.sprite_remove.object : command->type == EDITOR_COMMAND_SPRITE_RENAME ?
+            command->data.sprite_rename.object : command->type == EDITOR_COMMAND_SPRITE_PATH_SET ?
+            command->data.sprite_path_set.object :
+            command->type == EDITOR_COMMAND_SPRITE_POSITION_SET ?
+                command->data.sprite_position_set.object :
+            command->type == EDITOR_COMMAND_SPRITE_SIZE_SET ?
+                command->data.sprite_size_set.object :
+                command->data.sprite_visibility_set.object;
+        object = cli_object_get(project, object_id);
+        if(!cli_object_selector_add(project, object_id, output, capacity, &used)) goto full;
+        EditorSpriteId id = command->type == EDITOR_COMMAND_SPRITE_REMOVE ?
+            command->data.sprite_remove.sprite : command->type == EDITOR_COMMAND_SPRITE_RENAME ?
+            command->data.sprite_rename.sprite : command->type == EDITOR_COMMAND_SPRITE_PATH_SET ?
+            command->data.sprite_path_set.sprite :
+            command->type == EDITOR_COMMAND_SPRITE_POSITION_SET ?
+                command->data.sprite_position_set.sprite :
+            command->type == EDITOR_COMMAND_SPRITE_SIZE_SET ?
+                command->data.sprite_size_set.sprite :
+                command->data.sprite_visibility_set.sprite;
+        if(command->type == EDITOR_COMMAND_SPRITE_ADD) {
+            ADD("--sprite"); ADD(command->data.sprite_add.name); ADD("add");
+            ADD(command->data.sprite_add.path);
+            snprintf(number, sizeof(number), "%.9g", command->data.sprite_add.size.x); ADD(number);
+            snprintf(number, sizeof(number), "%.9g", command->data.sprite_add.size.y); ADD(number);
+        } else {
+            if(!cli_sprite_selector_add(object, id, output, capacity, &used)) goto full;
+            if(command->type == EDITOR_COMMAND_SPRITE_REMOVE) ADD("delete");
+            else if(command->type == EDITOR_COMMAND_SPRITE_RENAME) {
+                ADD("rename"); ADD(command->data.sprite_rename.name);
+            } else {
+                ADD("--property");
+                if(command->type == EDITOR_COMMAND_SPRITE_PATH_SET) {
+                    ADD("path"); ADD(command->data.sprite_path_set.path);
+                } else if(command->type == EDITOR_COMMAND_SPRITE_POSITION_SET) {
+                    ADD("position");
+                    snprintf(number, sizeof(number), "%.9g",
+                        command->data.sprite_position_set.position.x); ADD(number);
+                    snprintf(number, sizeof(number), "%.9g",
+                        command->data.sprite_position_set.position.y); ADD(number);
+                } else if(command->type == EDITOR_COMMAND_SPRITE_SIZE_SET) {
+                    ADD("size");
+                    snprintf(number, sizeof(number), "%.9g", command->data.sprite_size_set.size.x); ADD(number);
+                    snprintf(number, sizeof(number), "%.9g", command->data.sprite_size_set.size.y); ADD(number);
+                } else {
+                    ADD("visibility");
+                    ADD(command->data.sprite_visibility_set.visible ? "true" : "false");
+                }
+            }
+        }
+        return editor_result_value(true);
+    }
+    object_id = command->data.animated_sprite_remove.object;
+    animated_id = command->data.animated_sprite_remove.sprite;
+    if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_ADD)
+        object_id = command->data.animated_sprite_add.object;
+    object = cli_object_get(project, object_id);
+    if(!cli_object_selector_add(project, object_id, output, capacity, &used)) goto full;
+    if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_ADD) {
+        ADD("--animated-sprite"); ADD(command->data.animated_sprite_add.name); ADD("add");
+        return editor_result_value(true);
+    }
+    if(!cli_animated_selector_add(object, animated_id, output, capacity, &used)) goto full;
+    if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_REMOVE) ADD("delete");
+    else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_RENAME) {
+        ADD("rename"); ADD(command->data.animated_sprite_rename.name);
+    } else if(command->type == EDITOR_COMMAND_ANIMATION_FRAME_ADD) {
+        if(!cli_sprite_selector_add(object, command->data.animation_frame_add.frame,
+                output, capacity, &used)) goto full;
+        ADD("frame-add");
+    } else if(command->type == EDITOR_COMMAND_ANIMATION_FRAME_REMOVE) {
+        ADD("--frame-index");
+        snprintf(number, sizeof(number), "%zu", command->data.animation_frame_remove.index); ADD(number);
+        ADD("frame-delete");
+    } else {
+        ADD("--property");
+        if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_BODY_SET) {
+            ADD("body");
+            if(command->data.animated_sprite_body_set.body == 0) ADD("none");
+            else {
+                const EditorRigidBody *body = editor_project_rigid_body_get(
+                    (EditorObject *)object, command->data.animated_sprite_body_set.body);
+                ADD(body != NULL ? body->name : "none");
+            }
+        } else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET) {
+            ADD("position");
+            snprintf(number, sizeof(number), "%.9g",
+                command->data.animated_sprite_position_set.position.x); ADD(number);
+            snprintf(number, sizeof(number), "%.9g",
+                command->data.animated_sprite_position_set.position.y); ADD(number);
+        } else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_SCALE_SET) {
+            ADD("scale");
+            snprintf(number, sizeof(number), "%.9g", command->data.animated_sprite_scale_set.scale.x); ADD(number);
+            snprintf(number, sizeof(number), "%.9g", command->data.animated_sprite_scale_set.scale.y); ADD(number);
+        } else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_TIMING_SET) {
+            ADD("timing");
+            snprintf(number, sizeof(number), "%llu", (unsigned long long)command->data.animated_sprite_timing_set.ticks); ADD(number);
+            snprintf(number, sizeof(number), "%.17g", (double)command->data.animated_sprite_timing_set.time); ADD(number);
+        } else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_STARTING_FRAME_SET) {
+            ADD("starting-frame"); snprintf(number, sizeof(number), "%u", command->data.animated_sprite_starting_frame_set.frame); ADD(number);
+        } else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_DIRECTION_SET) {
+            ADD("direction"); ADD(command->data.animated_sprite_direction_set.direction == DIRECTION_LEFT ? "left" : "right");
+        } else {
+            ADD(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET ?
+                "visibility" : "follow-body-rotation");
+            ADD(command->data.animated_sprite_boolean_set.enabled ? "true" : "false");
+        }
+    }
+    return editor_result_value(true);
+full:
+    return editor_result_error(EDITOR_ERROR_CAPACITY,
+        "Selector-first sprite command exceeds output capacity");
+#undef ADD
+}
+
 EditorResult editor_command_cli_standard_write(const EditorProject *project,
         const EditorCommand *command, const EditorCommandResult *result,
         const char *path, char *output, size_t capacity) {
     char legacy[4096], token[CLI_MAX][CLI_TEXT];
     size_t count, at = 4, used = 0;
     const char *property;
+    bool handled = false;
+    EditorResult special = cli_sprite_command_write(project, command, path,
+        output, capacity, &handled);
+    if(handled) return special;
     EditorResult serialized = editor_command_cli_named_write(project, command,
         path, legacy, sizeof(legacy));
     if(editor_result_check(serialized)) return serialized;
@@ -155,7 +342,10 @@ typedef struct CliInput {
 
 static void cli_target_consider(CliInput *input, const char *flag, const char *name) {
     int rank; const char *domain;
-    if(strstr(flag, "vertex")) { rank = 3; domain = "vertex"; }
+    if(strstr(flag, "frame-index")) return;
+    if(strstr(flag, "animated-sprite")) { rank = 2; domain = "animated-sprite"; }
+    else if(strstr(flag, "sprite")) { rank = 1; domain = "sprite"; }
+    else if(strstr(flag, "vertex")) { rank = 3; domain = "vertex"; }
     else if(strstr(flag, "line")) { rank = 3; domain = "line"; }
     else if(strstr(flag, "hitbox")) { rank = 2; domain = "hitbox"; }
     else if(strstr(flag, "collision-mask")) { rank = 1; domain = "collision-mask"; }
@@ -225,6 +415,7 @@ EditorResult editor_command_cli_standard_parse(const EditorProject *project,
         else if(strcmp(property, "anchor-a") == 0 || strcmp(property, "anchor-b") == 0)
             domain = "joint";
         else if(strcmp(property, "rigid-body") == 0) domain = "anchor";
+        else if(strcmp(property, "body") == 0) domain = "animated-sprite";
         else if(strcmp(property, "node-a") == 0 || strcmp(property, "node-b") == 0)
             domain = "soft-beam";
     }
@@ -246,6 +437,9 @@ EditorResult editor_command_cli_standard_parse(const EditorProject *project,
          strcmp(property, "position") == 0 &&
             (strcmp(domain, "rigid-body") == 0 || strcmp(domain, "soft-body") == 0 ||
              strcmp(domain, "anchor") == 0) ? "transform" :
+         strcmp(property, "position") == 0 &&
+            (strcmp(domain, "sprite") == 0 ||
+             strcmp(domain, "animated-sprite") == 0) ? "set" :
          strcmp(property, "position") == 0 ? "position" :
          strcmp(property, "rotation") == 0 ? "transform" :
          strcmp(property, "transform") == 0 ? "transform" :
@@ -258,12 +452,17 @@ EditorResult editor_command_cli_standard_parse(const EditorProject *project,
             "filter" :
          strcmp(property, "anchor-a") == 0 || strcmp(property, "anchor-b") == 0 ||
          strcmp(property, "rigid-body") == 0 || strcmp(property, "node-a") == 0 ||
-         strcmp(property, "node-b") == 0 ? "connect" : "set") : operation);
+         strcmp(property, "node-b") == 0 || strcmp(property, "body") == 0 ?
+            "connect" : "set") : operation);
     normalized[n++] = (char *)input.path;
     for(size_t i = 0; i < input.selector_count; i += 2) {
         if(strcmp(operation, "add") == 0 && cli_selector_target_check(&input, i)) continue;
         normalized[n++] = input.selectors[i]; normalized[n++] = input.selectors[i + 1];
     }
+    if(strcmp(operation, "add") == 0 &&
+            (strcmp(domain, "animated-sprite") == 0 ||
+                strcmp(domain, "sprite") == 0))
+        normalized[n++] = (char *)input.target_name;
     if(strcmp(operation, "--property") == 0) {
         const char *action = normalized[2];
         if(strcmp(action, "set") == 0 || strcmp(action, "filter") == 0)

@@ -21,6 +21,19 @@ static bool editor_file_browser_directory_name_valid(const char *name) {
     return strchr(name, '/') == NULL && strchr(name, '\\') == NULL;
 }
 
+static bool editor_file_browser_extension_check(const char *filename,
+    const char *extension) {
+    size_t filename_length;
+    size_t extension_length;
+
+    if(filename == NULL || extension == NULL) return false;
+    filename_length = strlen(filename);
+    extension_length = strlen(extension);
+    return filename_length >= extension_length &&
+        SDL_strcasecmp(filename + filename_length - extension_length,
+            extension) == 0;
+}
+
 static SDL_EnumerationResult SDLCALL editor_file_browser_entry_add(void *userdata,
     const char *dirname, const char *filename) {
     EditorFileBrowser *browser = userdata;
@@ -37,10 +50,16 @@ static SDL_EnumerationResult SDLCALL editor_file_browser_entry_add(void *userdat
     if((browser->mode == EDITOR_FILE_BROWSER_DIRECTORY ||
             browser->mode == EDITOR_FILE_BROWSER_CREATE_DIRECTORY) &&
             info.type != SDL_PATHTYPE_DIRECTORY) return SDL_ENUM_CONTINUE;
-    if(browser->mode != EDITOR_FILE_BROWSER_DIRECTORY &&
+    if(info.type != SDL_PATHTYPE_DIRECTORY &&
+            browser->mode == EDITOR_FILE_BROWSER_OPEN_PNG &&
+            !editor_file_browser_extension_check(filename, ".png"))
+        return SDL_ENUM_CONTINUE;
+    if(info.type != SDL_PATHTYPE_DIRECTORY &&
+            browser->mode != EDITOR_FILE_BROWSER_DIRECTORY &&
             browser->mode != EDITOR_FILE_BROWSER_CREATE_DIRECTORY &&
-            info.type != SDL_PATHTYPE_DIRECTORY && (length < 5 ||
-            strcmp(filename + length - 5, ".json") != 0)) return SDL_ENUM_CONTINUE;
+            browser->mode != EDITOR_FILE_BROWSER_OPEN_PNG &&
+            !editor_file_browser_extension_check(filename, ".json"))
+        return SDL_ENUM_CONTINUE;
     if(length == 0 || length >= EDITOR_FILE_BROWSER_NAME_MAX) return SDL_ENUM_CONTINUE;
     entry = &browser->entries[browser->entry_count++];
     memcpy(entry->name, filename, length + 1);
@@ -214,6 +233,7 @@ static void editor_file_browser_parent(EditorFileBrowser *browser) {
 
     if(!editor_file_browser_parent_path_get(browser, path, sizeof(path))) return;
     snprintf(browser->directory, sizeof(browser->directory), "%s", path);
+    browser->filename[0] = '\0';
     editor_file_browser_preview_clear(browser);
     browser->refresh_pending = true;
 }
@@ -343,6 +363,7 @@ EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
                 } else {
                     editor_file_browser_preview_clear(browser);
                     snprintf(browser->directory, sizeof(browser->directory), "%s", path);
+                    browser->filename[0] = '\0';
                     browser->refresh_pending = true;
                     break;
                 }
@@ -452,7 +473,8 @@ EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
                 .string_capacity = sizeof(browser->filename)}, field_display,
             (UIRect){dialog.x + 174.0f, field_y,
                 dialog.width - 188.0f, 34.0f}, NULL);
-    } else if(browser->mode == EDITOR_FILE_BROWSER_OPEN) {
+    } else if(browser->mode == EDITOR_FILE_BROWSER_OPEN ||
+            browser->mode == EDITOR_FILE_BROWSER_OPEN_PNG) {
         (void)rohr_graphics_text_value_set(field_display, browser->filename);
         rohr_ui_button_disabled((UIRect){dialog.x + 14.0f, field_y,
             dialog.width - 28.0f, 30.0f}, NULL);

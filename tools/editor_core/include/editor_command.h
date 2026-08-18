@@ -27,7 +27,27 @@ typedef enum EditorCommandType {
     EDITOR_COMMAND_PROPERTY_SET,
     EDITOR_COMMAND_RELATIONSHIP_SET,
     EDITOR_COMMAND_COLLISION_MASK_ADD,
-    EDITOR_COMMAND_COLLISION_FILTER_SET
+    EDITOR_COMMAND_COLLISION_FILTER_SET,
+    EDITOR_COMMAND_SPRITE_ADD,
+    EDITOR_COMMAND_SPRITE_REMOVE,
+    EDITOR_COMMAND_SPRITE_RENAME,
+    EDITOR_COMMAND_SPRITE_PATH_SET,
+    EDITOR_COMMAND_SPRITE_POSITION_SET,
+    EDITOR_COMMAND_SPRITE_SIZE_SET,
+    EDITOR_COMMAND_SPRITE_VISIBILITY_SET,
+    EDITOR_COMMAND_ANIMATED_SPRITE_ADD,
+    EDITOR_COMMAND_ANIMATED_SPRITE_REMOVE,
+    EDITOR_COMMAND_ANIMATED_SPRITE_RENAME,
+    EDITOR_COMMAND_ANIMATED_SPRITE_BODY_SET,
+    EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET,
+    EDITOR_COMMAND_ANIMATED_SPRITE_SCALE_SET,
+    EDITOR_COMMAND_ANIMATED_SPRITE_TIMING_SET,
+    EDITOR_COMMAND_ANIMATED_SPRITE_STARTING_FRAME_SET,
+    EDITOR_COMMAND_ANIMATED_SPRITE_DIRECTION_SET,
+    EDITOR_COMMAND_ANIMATED_SPRITE_FOLLOW_ROTATION_SET,
+    EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET,
+    EDITOR_COMMAND_ANIMATION_FRAME_ADD,
+    EDITOR_COMMAND_ANIMATION_FRAME_REMOVE
 } EditorCommandType;
 
 typedef enum EditorItemKind {
@@ -254,6 +274,47 @@ typedef struct EditorCommand {
             char name[EDITOR_OBJECT_NAME_MAX];
         } collision_mask_add;
         EditorCollisionFilterSetCommand collision_filter_set;
+        struct {
+            EditorObjectId object;
+            char name[EDITOR_OBJECT_NAME_MAX];
+            char path[EDITOR_ASSET_PATH_MAX];
+            Scale size;
+        } sprite_add;
+        struct { EditorObjectId object; EditorSpriteId sprite; } sprite_remove;
+        struct { EditorObjectId object; EditorSpriteId sprite;
+            char name[EDITOR_OBJECT_NAME_MAX]; } sprite_rename;
+        struct { EditorObjectId object; EditorSpriteId sprite;
+            char path[EDITOR_ASSET_PATH_MAX]; } sprite_path_set;
+        struct { EditorObjectId object; EditorSpriteId sprite; Position position; }
+            sprite_position_set;
+        struct { EditorObjectId object; EditorSpriteId sprite; Scale size; }
+            sprite_size_set;
+        struct { EditorObjectId object; EditorSpriteId sprite; bool visible; }
+            sprite_visibility_set;
+        struct { EditorObjectId object; char name[EDITOR_OBJECT_NAME_MAX]; }
+            animated_sprite_add;
+        struct { EditorObjectId object; EditorAnimatedSpriteId sprite; }
+            animated_sprite_remove;
+        struct { EditorObjectId object; EditorAnimatedSpriteId sprite;
+            char name[EDITOR_OBJECT_NAME_MAX]; } animated_sprite_rename;
+        struct { EditorObjectId object; EditorAnimatedSpriteId sprite;
+            EditorRigidBodyId body; } animated_sprite_body_set;
+        struct { EditorObjectId object; EditorAnimatedSpriteId sprite;
+            Position position; } animated_sprite_position_set;
+        struct { EditorObjectId object; EditorAnimatedSpriteId sprite; Scale scale; }
+            animated_sprite_scale_set;
+        struct { EditorObjectId object; EditorAnimatedSpriteId sprite;
+            Tick ticks; Time time; } animated_sprite_timing_set;
+        struct { EditorObjectId object; EditorAnimatedSpriteId sprite; uint32_t frame; }
+            animated_sprite_starting_frame_set;
+        struct { EditorObjectId object; EditorAnimatedSpriteId sprite;
+            Direction direction; } animated_sprite_direction_set;
+        struct { EditorObjectId object; EditorAnimatedSpriteId sprite; bool enabled; }
+            animated_sprite_boolean_set;
+        struct { EditorObjectId object; EditorAnimatedSpriteId sprite;
+            EditorSpriteId frame; } animation_frame_add;
+        struct { EditorObjectId object; EditorAnimatedSpriteId sprite; size_t index; }
+            animation_frame_remove;
     } data;
 } EditorCommand;
 

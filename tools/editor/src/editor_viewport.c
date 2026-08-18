@@ -3,11 +3,85 @@
 #include "editor_layout.h"
 
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 static Position editor_view_origin;
 static float editor_view_scale = 1.0f;
+static char editor_asset_root[EDITOR_ASSET_PATH_MAX];
+
+typedef struct EditorPreviewTexture {
+    char path[EDITOR_ASSET_PATH_MAX * 2];
+    TextureAsset texture;
+    bool failed;
+} EditorPreviewTexture;
+
+static EditorPreviewTexture *editor_preview_textures;
+static size_t editor_preview_texture_count;
+static size_t editor_preview_texture_capacity;
+
+static Position editor_sprite_world_get(const EditorObject *object,
+    const EditorSprite *sprite);
+static Position editor_animated_sprite_world_get(const EditorObject *object,
+    const EditorAnimatedSprite *sprite, float *rotation);
+
+void editor_viewport_asset_root_set(const char *path) {
+    if(path == NULL) editor_asset_root[0] = '\0';
+    else snprintf(editor_asset_root, sizeof(editor_asset_root), "%s", path);
+}
+
+void editor_viewport_assets_destroy(void) {
+    free(editor_preview_textures);
+    editor_preview_textures = NULL;
+    editor_preview_texture_count = 0;
+    editor_preview_texture_capacity = 0;
+    editor_asset_root[0] = '\0';
+}
+
+static TextureAsset *editor_preview_texture_get(const char *path) {
+    char resolved[EDITOR_ASSET_PATH_MAX * 2];
+    SDL_PathInfo info;
+    bool absolute;
+
+    if(path == NULL || path[0] == '\0') return NULL;
+    absolute = path[0] == '/' || path[0] == '\\' ||
+        (path[0] != '\0' && path[1] == ':');
+    if(absolute || editor_asset_root[0] == '\0')
+        snprintf(resolved, sizeof(resolved), "%s", path);
+    else snprintf(resolved, sizeof(resolved), "%s%s%s", editor_asset_root,
+        editor_asset_root[strlen(editor_asset_root) - 1] == '/' ||
+            editor_asset_root[strlen(editor_asset_root) - 1] == '\\' ? "" : "/",
+        path);
+    for(size_t i = 0; i < editor_preview_texture_count; i += 1) {
+        if(strcmp(editor_preview_textures[i].path, resolved) == 0)
+            return editor_preview_textures[i].failed ? NULL :
+                &editor_preview_textures[i].texture;
+    }
+    if(!SDL_GetPathInfo(resolved, &info) || info.type != SDL_PATHTYPE_FILE) return NULL;
+    if(editor_preview_texture_count == editor_preview_texture_capacity) {
+        size_t capacity = editor_preview_texture_capacity == 0 ? 16 :
+            editor_preview_texture_capacity * 2;
+        EditorPreviewTexture *textures = realloc(editor_preview_textures,
+            capacity * sizeof(*textures));
+        if(textures == NULL) return NULL;
+        editor_preview_textures = textures;
+        editor_preview_texture_capacity = capacity;
+    }
+    {
+        EditorPreviewTexture *entry =
+            &editor_preview_textures[editor_preview_texture_count++];
+        TextureAssetResult result;
+        snprintf(entry->path, sizeof(entry->path), "%s", resolved);
+        result = rohr_graphics_texture_load((TextureDescriptor){resolved, {1.0f, 1.0f}});
+        if(rohr_error_check(result)) {
+            entry->failed = true;
+            return NULL;
+        }
+        entry->texture = result.result.value;
+        return &entry->texture;
+    }
+}
 
 static void editor_view_transform_set(const EditorProject *project,
     const EditorViewportState *state, const EditorObject *object) {
@@ -574,6 +648,12 @@ bool editor_viewport_selection_ref_get(const EditorProject *project,
             selection->parent = state->selected_soft_body;
             selection->item = state->selected_soft_area;
             return selection->item != 0;
+        case EDITOR_SELECTION_SPRITE:
+            selection->item = state->selected_sprite;
+            return selection->item != 0;
+        case EDITOR_SELECTION_ANIMATED_SPRITE:
+            selection->item = state->selected_animated_sprite;
+            return selection->item != 0;
         case EDITOR_SELECTION_ORIGIN:
             selection->parent = state->selected_origin_kind;
             selection->item = state->selected_origin_kind == EDITOR_ORIGIN_RIGID_BODY ?
@@ -587,7 +667,8 @@ bool editor_viewport_selection_ref_get(const EditorProject *project,
 static bool editor_viewport_selection_primary_apply(EditorProject *project,
         EditorViewportState *state, EditorSelectionRef selection) {
     EditorObject *object;
-    if(project == NULL || state == NULL || selection.object == 0 ||
+    if(project == NULL || state == NULL) return false;
+    if(selection.object == 0 ||
             !editor_project_object_select(project, selection.object)) return false;
     object = editor_project_selected_get(project);
     state->selection = selection.kind;
@@ -637,6 +718,12 @@ static bool editor_viewport_selection_primary_apply(EditorProject *project,
         case EDITOR_SELECTION_SOFT_AREA:
             state->selected_soft_body = selection.parent;
             state->selected_soft_area = selection.item;
+            break;
+        case EDITOR_SELECTION_SPRITE:
+            state->selected_sprite = selection.item;
+            break;
+        case EDITOR_SELECTION_ANIMATED_SPRITE:
+            state->selected_animated_sprite = selection.item;
             break;
         case EDITOR_SELECTION_ORIGIN:
             state->selected_origin_kind = (EditorOriginKind)selection.parent;
@@ -785,6 +872,18 @@ static EditorMarqueeBounds editor_marquee_object_bounds_get(
     for(size_t i = 0; i < object->anchor_count; i += 1)
         if(object->anchors[i].visible) editor_marquee_bounds_point_add(&bounds,
             editor_anchor_world_get(object, &object->anchors[i]));
+    for(size_t i = 0; i < object->sprite_count; i += 1) {
+        const EditorSprite *sprite = &object->sprites[i];
+        Position world;
+        if(!sprite->visible) continue;
+        world = editor_sprite_world_get(object, sprite);
+        editor_marquee_bounds_point_add(&bounds, (Position){
+            world.x - sprite->size.x * 0.5f,
+            world.y - sprite->size.y * 0.5f});
+        editor_marquee_bounds_point_add(&bounds, (Position){
+            world.x + sprite->size.x * 0.5f,
+            world.y + sprite->size.y * 0.5f});
+    }
     return bounds;
 }
 
@@ -847,6 +946,37 @@ static void editor_marquee_body_children_add(EditorViewportState *state,
             (void)editor_marquee_selection_add(state,
                 (EditorSelectionRef){EDITOR_SELECTION_JOINT,
                     object->id, 0, 0, joint->id});
+    }
+    for(size_t i = 0; i < object->sprite_count; i += 1) {
+        const EditorSprite *sprite = &object->sprites[i];
+        Position world = editor_sprite_world_get(object, sprite);
+        EditorMarqueeBounds bounds = {world.x - sprite->size.x * 0.5f,
+            world.x + sprite->size.x * 0.5f,
+            world.y - sprite->size.y * 0.5f,
+            world.y + sprite->size.y * 0.5f, true};
+        if(sprite->visible && editor_marquee_bounds_overlap(marquee, bounds))
+            (void)editor_marquee_selection_add(state,
+                (EditorSelectionRef){EDITOR_SELECTION_SPRITE,
+                    object->id, 0, 0, sprite->id});
+    }
+    for(size_t i = 0; i < object->animated_sprite_count; i += 1) {
+        const EditorAnimatedSprite *animation = &object->animated_sprite_items[i];
+        const EditorSprite *frame = animation->frame_count == 0 ? NULL :
+            editor_project_sprite_get((EditorObject *)object,
+                animation->frames[0].sprite);
+        Position world;
+        EditorMarqueeBounds bounds;
+        if(!animation->visible || frame == NULL) continue;
+        world = editor_animated_sprite_world_get(object, animation, NULL);
+        bounds = (EditorMarqueeBounds){
+            world.x - frame->size.x * animation->scale.x * 0.5f,
+            world.x + frame->size.x * animation->scale.x * 0.5f,
+            world.y - frame->size.y * animation->scale.y * 0.5f,
+            world.y + frame->size.y * animation->scale.y * 0.5f, true};
+        if(editor_marquee_bounds_overlap(marquee, bounds))
+            (void)editor_marquee_selection_add(state,
+                (EditorSelectionRef){EDITOR_SELECTION_ANIMATED_SPRITE,
+                    object->id, 0, 0, animation->id});
     }
 }
 
@@ -1028,6 +1158,12 @@ bool editor_viewport_marquee_finish(EditorViewportState *state,
                 case EDITOR_SELECTION_SOFT_BODY:
                     state->mode = EDITOR_VIEWPORT_SOFT_BODY;
                     break;
+                case EDITOR_SELECTION_SPRITE:
+                    state->mode = EDITOR_VIEWPORT_SPRITE;
+                    break;
+                case EDITOR_SELECTION_ANIMATED_SPRITE:
+                    state->mode = EDITOR_VIEWPORT_ANIMATED_SPRITE;
+                    break;
                 default: break;
             }
         }
@@ -1114,7 +1250,9 @@ void editor_viewport_back(EditorViewportState *state) {
         state->selected_anchor = 0;
     } else if(state->mode == EDITOR_VIEWPORT_RIGID_BODY ||
             state->mode == EDITOR_VIEWPORT_JOINT ||
-            state->mode == EDITOR_VIEWPORT_SOFT_BODY) {
+            state->mode == EDITOR_VIEWPORT_SOFT_BODY ||
+            state->mode == EDITOR_VIEWPORT_SPRITE ||
+            state->mode == EDITOR_VIEWPORT_ANIMATED_SPRITE) {
         state->mode = EDITOR_VIEWPORT_OBJECT;
         state->selection = EDITOR_SELECTION_OBJECT;
     } else if(state->mode == EDITOR_VIEWPORT_SOFT_NODE ||
@@ -1462,6 +1600,15 @@ static bool editor_group_parent_selected(EditorProject *project,
                     EDITOR_SELECTION_PARTICLE, ref.object, 0, 0,
                     anchor->rigid_body}))) return true;
     }
+    if(ref.kind == EDITOR_SELECTION_ANIMATED_SPRITE) {
+        EditorObject *object = editor_group_object_get(project, ref.object);
+        EditorAnimatedSprite *sprite = editor_project_animated_sprite_get(object,
+            ref.item);
+        if(sprite != NULL && sprite->rigid_body != 0 &&
+                editor_viewport_selection_contains(state, (EditorSelectionRef){
+                    EDITOR_SELECTION_RIGID_BODY, ref.object, 0, 0,
+                    sprite->rigid_body})) return true;
+    }
     return false;
 }
 
@@ -1486,6 +1633,19 @@ static bool editor_group_point_get(EditorProject *project,
         if(body == NULL) return false;
         *point = (Position){object->position.x + body->position.x,
             object->position.y + body->position.y};
+        return true;
+    }
+    if(ref.kind == EDITOR_SELECTION_SPRITE) {
+        EditorSprite *sprite = editor_project_sprite_get(object, ref.item);
+        if(sprite == NULL) return false;
+        *point = editor_sprite_world_get(object, sprite);
+        return true;
+    }
+    if(ref.kind == EDITOR_SELECTION_ANIMATED_SPRITE) {
+        EditorAnimatedSprite *sprite = editor_project_animated_sprite_get(object,
+            ref.item);
+        if(sprite == NULL) return false;
+        *point = editor_animated_sprite_world_get(object, sprite, NULL);
         return true;
     }
     if(ref.kind == EDITOR_SELECTION_ANCHOR) {
@@ -1556,6 +1716,21 @@ static bool editor_group_point_hit(EditorProject *project,
                 editor_marquee_soft_body_bounds_get(object, body);
             if(bounds.valid && pointer.x >= bounds.left && pointer.x <= bounds.right &&
                     pointer.y >= bounds.bottom && pointer.y <= bounds.top) return true;
+        } else if(ref.kind == EDITOR_SELECTION_SPRITE) {
+            EditorSprite *sprite = editor_project_sprite_get(object, ref.item);
+            if(sprite != NULL && editor_group_point_get(project, ref, &point) &&
+                    fabsf(pointer.x - point.x) <= sprite->size.x * 0.5f &&
+                    fabsf(pointer.y - point.y) <= sprite->size.y * 0.5f) return true;
+        } else if(ref.kind == EDITOR_SELECTION_ANIMATED_SPRITE) {
+            EditorAnimatedSprite *animation = editor_project_animated_sprite_get(
+                object, ref.item);
+            EditorSprite *frame = animation == NULL || animation->frame_count == 0 ?
+                NULL : editor_project_sprite_get(object, animation->frames[0].sprite);
+            if(frame != NULL && editor_group_point_get(project, ref, &point) &&
+                    fabsf(pointer.x - point.x) <=
+                        frame->size.x * animation->scale.x * 0.5f &&
+                    fabsf(pointer.y - point.y) <=
+                        frame->size.y * animation->scale.y * 0.5f) return true;
         } else if(editor_group_point_get(project, ref, &point) &&
                 hypotf(pointer.x - point.x, pointer.y - point.y) <= tolerance) {
             return true;
@@ -1669,6 +1844,36 @@ static bool editor_group_transform_apply(EditorProject *project,
                 .data.soft_body_transform = {object->id, body->id,
                     {desired.x - object->position.x, desired.y - object->position.y},
                     body->rotation + angle}};
+        } else if(ref.kind == EDITOR_SELECTION_SPRITE) {
+            EditorSprite *sprite = editor_project_sprite_get(object, ref.item);
+            if(sprite == NULL) continue;
+            command = (EditorCommand){.type = EDITOR_COMMAND_SPRITE_POSITION_SET,
+                .data.sprite_position_set = {object->id, sprite->id,
+                    {desired.x - object->position.x,
+                        desired.y - object->position.y}}};
+        } else if(ref.kind == EDITOR_SELECTION_ANIMATED_SPRITE) {
+            EditorAnimatedSprite *sprite = editor_project_animated_sprite_get(object,
+                ref.item);
+            EditorRigidBody *attached = sprite == NULL ? NULL :
+                editor_project_rigid_body_get(object, sprite->rigid_body);
+            if(sprite == NULL) continue;
+            if(attached != NULL) {
+                EditorSelectionRef body_ref = {EDITOR_SELECTION_RIGID_BODY,
+                    object->id, 0, 0, attached->id};
+                if(editor_group_rigid_body_already_driven(project, state, i,
+                        body_ref)) continue;
+                command = (EditorCommand){.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
+                    .data.rigid_body_transform = {object->id, attached->id,
+                        {desired.x - object->position.x,
+                            desired.y - object->position.y},
+                        attached->rotation + angle}};
+            } else {
+                command = (EditorCommand){
+                    .type = EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET,
+                    .data.animated_sprite_position_set = {object->id, sprite->id,
+                        {desired.x - object->position.x,
+                            desired.y - object->position.y}}};
+            }
         } else if(ref.kind == EDITOR_SELECTION_ANCHOR) {
             EditorAnchor *anchor = editor_project_anchor_get(object, ref.item);
             EditorRigidBody *body = anchor == NULL ? NULL :
@@ -1878,12 +2083,52 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
         state->dragged_anchor = false;
         state->dragged_soft_node = false;
         state->dragged_soft_body = false;
+        state->dragged_sprite = false;
+        state->dragged_animated_sprite = false;
         state->rotated_soft_body = false;
         state->dragged_origin = false;
         return false;
     }
     body = editor_selected_body_get(object, state);
     hitbox = editor_selected_hitbox_get(object, state);
+    if(state->dragged_sprite && (primary_button == MOUSE_BUTTON_STATE_DOWN ||
+            primary_button == MOUSE_BUTTON_STATE_PRESSED)) {
+        EditorSprite *sprite = editor_project_sprite_get(object,
+            state->selected_sprite);
+        if(sprite != NULL) {
+            EditorCommand command = {.type = EDITOR_COMMAND_SPRITE_POSITION_SET,
+                .data.sprite_position_set = {object->id, sprite->id,
+                    {pointer.x - object->position.x - state->drag_offset.x,
+                        pointer.y - object->position.y - state->drag_offset.y}}};
+            (void)editor_command_execute(project, &command);
+        }
+        return true;
+    }
+    if(state->dragged_animated_sprite &&
+            (primary_button == MOUSE_BUTTON_STATE_DOWN ||
+                primary_button == MOUSE_BUTTON_STATE_PRESSED)) {
+        EditorAnimatedSprite *sprite = editor_project_animated_sprite_get(object,
+            state->selected_animated_sprite);
+        EditorRigidBody *attached = sprite == NULL ? NULL :
+            editor_project_rigid_body_get(object, sprite->rigid_body);
+        Position desired = {pointer.x - state->drag_offset.x,
+            pointer.y - state->drag_offset.y};
+        if(attached != NULL) {
+            EditorCommand command = {.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
+                .data.rigid_body_transform = {object->id, attached->id,
+                    {desired.x - object->position.x,
+                        desired.y - object->position.y}, attached->rotation}};
+            (void)editor_command_execute(project, &command);
+        } else if(sprite != NULL) {
+            EditorCommand command = {
+                .type = EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET,
+                .data.animated_sprite_position_set = {object->id, sprite->id,
+                    {desired.x - object->position.x,
+                        desired.y - object->position.y}}};
+            (void)editor_command_execute(project, &command);
+        }
+        return true;
+    }
     if(state->dragged_anchor && (primary_button == MOUSE_BUTTON_STATE_DOWN ||
             primary_button == MOUSE_BUTTON_STATE_PRESSED)) {
         EditorAnchor *anchor = editor_project_anchor_get(object, state->selected_anchor);
@@ -2154,6 +2399,54 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
             state->rotated_soft_body = true;
             state->rotation_pointer_offset = soft_body->rotation -
                 atan2f(pointer.y - center.y, pointer.x - center.x);
+            return true;
+        }
+    }
+
+    if(object->visible) {
+        for(size_t i = object->animated_sprite_count; i > 0; i -= 1) {
+            EditorAnimatedSprite *animation = &object->animated_sprite_items[i - 1];
+            EditorSprite *frame = animation->frame_count == 0 ? NULL :
+                editor_project_sprite_get(object, animation->frames[0].sprite);
+            Position world;
+            Scale size;
+            EditorSelectionRef selection;
+            if(!animation->visible || frame == NULL) continue;
+            world = editor_animated_sprite_world_get(object, animation, NULL);
+            size = (Scale){frame->size.x * animation->scale.x,
+                frame->size.y * animation->scale.y};
+            if(fabsf(pointer.x - world.x) > size.x * 0.5f ||
+                    fabsf(pointer.y - world.y) > size.y * 0.5f) continue;
+            selection = (EditorSelectionRef){EDITOR_SELECTION_ANIMATED_SPRITE,
+                object->id, 0, 0, animation->id};
+            (void)editor_viewport_selection_set(project, state, selection,
+                state->selection_modifier);
+            state->mode = EDITOR_VIEWPORT_ANIMATED_SPRITE;
+            state->selection = EDITOR_SELECTION_ANIMATED_SPRITE;
+            state->selected_animated_sprite = animation->id;
+            state->dragged_animated_sprite = true;
+            state->drag_offset = (Vec2D){pointer.x - world.x,
+                pointer.y - world.y};
+            return true;
+        }
+        for(size_t i = object->sprite_count; i > 0; i -= 1) {
+            EditorSprite *sprite = &object->sprites[i - 1];
+            Position world;
+            EditorSelectionRef selection;
+            if(!sprite->visible) continue;
+            world = editor_sprite_world_get(object, sprite);
+            if(fabsf(pointer.x - world.x) > sprite->size.x * 0.5f ||
+                    fabsf(pointer.y - world.y) > sprite->size.y * 0.5f) continue;
+            selection = (EditorSelectionRef){EDITOR_SELECTION_SPRITE,
+                object->id, 0, 0, sprite->id};
+            (void)editor_viewport_selection_set(project, state, selection,
+                state->selection_modifier);
+            state->mode = EDITOR_VIEWPORT_SPRITE;
+            state->selection = EDITOR_SELECTION_SPRITE;
+            state->selected_sprite = sprite->id;
+            state->dragged_sprite = true;
+            state->drag_offset = (Vec2D){pointer.x - world.x,
+                pointer.y - world.y};
             return true;
         }
     }
@@ -2516,6 +2809,94 @@ static bool editor_viewport_path_selected(const EditorViewportState *state,
         (EditorSelectionRef){kind, object, parent, container, item});
 }
 
+static Position editor_sprite_world_get(const EditorObject *object,
+        const EditorSprite *sprite) {
+    return (Position){object->position.x + sprite->position.x,
+        object->position.y + sprite->position.y};
+}
+
+static Position editor_animated_sprite_world_get(const EditorObject *object,
+        const EditorAnimatedSprite *sprite, float *rotation) {
+    const EditorRigidBody *body = NULL;
+    if(rotation != NULL) *rotation = 0.0f;
+    for(size_t i = 0; i < object->rigid_body_count; i += 1)
+        if(object->rigid_bodies[i].id == sprite->rigid_body)
+            body = &object->rigid_bodies[i];
+    if(body != NULL) {
+        if(rotation != NULL && sprite->follow_body_rotation) *rotation = body->rotation;
+        return (Position){object->position.x + body->position.x,
+            object->position.y + body->position.y};
+    }
+    return (Position){object->position.x + sprite->editor_position.x,
+        object->position.y + sprite->editor_position.y};
+}
+
+static void editor_sprite_outline_draw(Position center, Scale size, Color color) {
+    Position half = {size.x * 0.5f, size.y * 0.5f};
+    Position a = {center.x - half.x, center.y - half.y};
+    Position b = {center.x + half.x, center.y - half.y};
+    Position c = {center.x + half.x, center.y + half.y};
+    Position d = {center.x - half.x, center.y + half.y};
+    editor_line_draw(a, b, color);
+    editor_line_draw(b, c, color);
+    editor_line_draw(c, d, color);
+    editor_line_draw(d, a, color);
+}
+
+static void editor_viewport_sprites_draw(const EditorObject *object,
+        const EditorViewportState *state, bool object_highlighted) {
+    for(size_t i = 0; i < object->sprite_count; i += 1) {
+        const EditorSprite *sprite = &object->sprites[i];
+        TextureAsset *texture;
+        Position world;
+        Scale screen_size;
+        bool selected;
+        if(!sprite->visible) continue;
+        texture = editor_preview_texture_get(sprite->path);
+        world = editor_sprite_world_get(object, sprite);
+        screen_size = (Scale){sprite->size.x * editor_view_scale,
+            sprite->size.y * editor_view_scale};
+        if(texture != NULL) rohr_graphics_screen_texture_draw(*texture,
+            editor_view_world_to_screen(world), screen_size, 0.0f);
+        selected = object_highlighted ||
+            (state->selection == EDITOR_SELECTION_SPRITE &&
+                state->selected_sprite == sprite->id) ||
+            editor_viewport_path_selected(state, EDITOR_SELECTION_SPRITE,
+                object->id, 0, 0, sprite->id);
+        if(selected) editor_sprite_outline_draw(world, sprite->size,
+            (Color){255, 215, 70, 255});
+    }
+    for(size_t i = 0; i < object->animated_sprite_count; i += 1) {
+        const EditorAnimatedSprite *animation = &object->animated_sprite_items[i];
+        const EditorSprite *frame;
+        TextureAsset *texture;
+        Position world;
+        Scale size;
+        Scale screen_size;
+        float rotation;
+        bool selected;
+        if(!animation->visible || animation->frame_count == 0) continue;
+        frame = editor_project_sprite_get((EditorObject *)object,
+            animation->frames[0].sprite);
+        if(frame == NULL) continue;
+        texture = editor_preview_texture_get(frame->path);
+        world = editor_animated_sprite_world_get(object, animation, &rotation);
+        size = (Scale){frame->size.x * animation->scale.x,
+            frame->size.y * animation->scale.y};
+        screen_size = (Scale){size.x * editor_view_scale,
+            size.y * editor_view_scale};
+        if(texture != NULL) rohr_graphics_screen_texture_draw(*texture,
+            editor_view_world_to_screen(world), screen_size, rotation);
+        selected = object_highlighted ||
+            (state->selection == EDITOR_SELECTION_ANIMATED_SPRITE &&
+                state->selected_animated_sprite == animation->id) ||
+            editor_viewport_path_selected(state, EDITOR_SELECTION_ANIMATED_SPRITE,
+                object->id, 0, 0, animation->id);
+        if(selected) editor_sprite_outline_draw(world, size,
+            (Color){255, 215, 70, 255});
+    }
+}
+
 static void editor_viewport_object_draw(const EditorObject *object,
     const EditorViewportState *state, bool object_selected) {
     bool object_highlighted;
@@ -2524,6 +2905,8 @@ static void editor_viewport_object_draw(const EditorObject *object,
         state->selection == EDITOR_SELECTION_OBJECT && object_selected) ||
         editor_viewport_path_selected(state, EDITOR_SELECTION_OBJECT,
             object->id, 0, 0, object->id);
+
+    editor_viewport_sprites_draw(object, state, object_highlighted);
 
     for(size_t body_index = 0; body_index < object->rigid_body_count; body_index += 1) {
         const EditorRigidBody *body = &object->rigid_bodies[body_index];

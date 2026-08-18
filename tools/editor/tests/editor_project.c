@@ -177,6 +177,10 @@ int main(void) {
                 generated_object, (Position){80.0f, 20.0f}, 0);
             EditorJoint *generated_joint = editor_project_joint_add(&loaded_project,
                 generated_object, EDITOR_JOINT_SPRING);
+            EditorSprite *generated_sprite = editor_project_sprite_add(&loaded_project,
+                generated_object, "fly_frame", "assets/fly frame.png");
+            EditorAnimatedSprite *generated_animation =
+                editor_project_animated_sprite_add(&loaded_project, generated_object);
             EditorSoftBody *generated_soft_body = editor_project_soft_body_add(
                 &loaded_project, generated_object);
             if(generated_soft_body != NULL) generated_soft_body->rotation = 0.5f;
@@ -203,6 +207,15 @@ int main(void) {
                 generated_node_a->friction = 0.6f;
                 generated_node_a->restitution = 0.4f;
             }
+            if(generated_sprite != NULL) generated_sprite->size = (Scale){32.0f, 24.0f};
+            if(generated_animation != NULL && generated_sprite != NULL) {
+                generated_animation->rigid_body = generated_body->id;
+                generated_animation->scale = (Scale){2.0f, 3.0f};
+                generated_animation->time_per_frame = 0.125;
+                generated_animation->follow_body_rotation = false;
+                (void)editor_project_animation_frame_add(generated_animation,
+                    generated_sprite->id);
+            }
             if(generated_beam != NULL) generated_beam->damping = 0.3f;
             if(generated_node_a != NULL) {
                 generated_node_a->color = UINT32_C(0xff0000ff);
@@ -217,6 +230,8 @@ int main(void) {
                     generated_node_b == NULL || generated_node_c == NULL ||
                     generated_beam == NULL || generated_beam_b == NULL ||
                     generated_beam_c == NULL || generated_soft_body->area_count != 1 ||
+                    generated_sprite == NULL || generated_animation == NULL ||
+                    generated_animation->frame_count != 1 ||
                     !editor_project_joint_anchor_set(generated_object,
                         generated_joint, 0, body_anchor->id) ||
                     !editor_project_joint_anchor_set(generated_object,
@@ -258,6 +273,10 @@ int main(void) {
                 !file_contains(path, "rohr_physics_soft_body_triangle_create") ||
                 !file_contains(path, "rohr_graphics_soft_body_node_color_set") ||
                 !file_contains(path, "rohr_graphics_soft_body_area_color_set") ||
+                !file_contains(path, "rohr_graphics_animation_load") ||
+                !file_contains(path, "assets/fly frame.png") ||
+                !file_contains(path, "animated.follow_entity_rotation = false") ||
+                !file_contains(path, "(Scale){2.00000000f, 3.00000000f}") ||
                 !file_contains(path, "void starter_draw")) {
             workspace_fixture_remove(fixture);
             return 1;

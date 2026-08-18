@@ -64,6 +64,7 @@ typedef struct GraphicsCommand {
             SDL_FRect destination;
             SDL_FPoint center;
             double degrees;
+            SDL_FlipMode flip;
         } texture;
     } data;
 } GraphicsCommand;
@@ -2054,7 +2055,7 @@ static void graphics_commands_execute(void) {
                         sdl_renderer, command->data.texture.texture, NULL,
                         &command->data.texture.destination,
                         command->data.texture.degrees, &command->data.texture.center,
-                        SDL_FLIP_NONE);
+                        command->data.texture.flip);
                     break;
             }
         }
@@ -2374,6 +2375,8 @@ AnimatedSprite graphics_animated_sprite_create(AnimationAsset asset_ptr, Scale s
     sprite.animation_frame = 0;
     sprite.direction = DIRECTION_RIGHT;
     sprite.scale = scale;
+    sprite.follow_entity_rotation = true;
+    sprite.visible = true;
     sprite.last_update_tick = 0;
     sprite.last_update_time = 0;
 
@@ -2391,7 +2394,8 @@ void graphics_sprite_frame_update(AnimatedSprite *sprite, Tick current_tick, Tim
     }
 }
 
-void graphics_texture_draw(TextureAsset texture_asset, Position pos, Orientation ort) {
+static void graphics_texture_draw_flipped(TextureAsset texture_asset, Position pos,
+        Orientation ort, SDL_FlipMode flip) {
     SDL_FRect dst_rect = {0};
     float output_width = WINDOW_WIDTH;
     float output_height = WINDOW_HEIGHT;
@@ -2420,6 +2424,28 @@ void graphics_texture_draw(TextureAsset texture_asset, Position pos, Orientation
     command->data.texture.destination = dst_rect;
     command->data.texture.center = center;
     command->data.texture.degrees = degrees;
+    command->data.texture.flip = flip;
+}
+
+void graphics_texture_draw(TextureAsset texture_asset, Position pos, Orientation ort) {
+    graphics_texture_draw_flipped(texture_asset, pos, ort, SDL_FLIP_NONE);
+}
+
+void graphics_screen_texture_draw(TextureAsset texture_asset, Position center,
+        Scale size, Orientation orientation) {
+    GraphicsCommand *command;
+    SDL_FRect destination = {center.x - size.x * 0.5f,
+        center.y - size.y * 0.5f, size.x, size.y};
+    SDL_FPoint rotation_center = {size.x * 0.5f, size.y * 0.5f};
+
+    if(texture_asset.texture == NULL || size.x <= 0.0f || size.y <= 0.0f) return;
+    command = graphics_command_append(GRAPHICS_COMMAND_TEXTURE);
+    if(command == NULL) return;
+    command->data.texture.texture = texture_asset.texture;
+    command->data.texture.destination = destination;
+    command->data.texture.center = rotation_center;
+    command->data.texture.degrees = -(double)orientation * 180.0 / (double)PI_F;
+    command->data.texture.flip = SDL_FLIP_NONE;
 }
 
 void graphics_sprite_draw(AnimatedSprite sprite, Position pos, Orientation ort) {
@@ -2428,7 +2454,8 @@ void graphics_sprite_draw(AnimatedSprite sprite, Position pos, Orientation ort) 
     asset.size.x = asset.size.x * sprite.scale.x;
     asset.size.y = asset.size.y * sprite.scale.y;
 
-    graphics_texture_draw(asset, pos, ort);
+    graphics_texture_draw_flipped(asset, pos, ort,
+        sprite.direction == DIRECTION_LEFT ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
 }
 
 EngineResult graphics_animated_sprite_add(Entity entity, AnimatedSprite sprite) {
@@ -2449,8 +2476,10 @@ EngineResult graphics_animated_sprite_add(Entity entity, AnimatedSprite sprite) 
 void graphics_animated_sprites_draw(void) {
     RohrComponentMask filter = ROHR_ANIMATED_SPRITE;
     for(int i = 0; i < MAX_ENTITIES; i += 1) {
-        if(entity_index_alive_check(i) && entity_index_components_check(i, filter)) {
-            graphics_sprite_draw(animated_sprites[i], positions[i], orientations[i]);
+        if(entity_index_alive_check(i) && entity_index_components_check(i, filter) &&
+                animated_sprites[i].visible) {
+            graphics_sprite_draw(animated_sprites[i], positions[i],
+                animated_sprites[i].follow_entity_rotation ? orientations[i] : 0.0f);
         }
     }
 }

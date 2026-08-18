@@ -143,6 +143,11 @@ static const EditorBulkProperty origin_properties[] = {
     {"X", EDITOR_BULK_POSITION_X, EDITOR_BULK_FLOAT, 0},
     {"Y", EDITOR_BULK_POSITION_Y, EDITOR_BULK_FLOAT, 0}
 };
+static const EditorBulkProperty sprite_properties[] = {
+    {"Visible", EDITOR_BULK_VISIBILITY, EDITOR_BULK_CHECKBOX, 0},
+    {"X", EDITOR_BULK_POSITION_X, EDITOR_BULK_FLOAT, 0},
+    {"Y", EDITOR_BULK_POSITION_Y, EDITOR_BULK_FLOAT, 0}
+};
 static const EditorBulkProperty mixed_position_properties[] = {
     {"X", EDITOR_BULK_POSITION_X, EDITOR_BULK_FLOAT, 0},
     {"Y", EDITOR_BULK_POSITION_Y, EDITOR_BULK_FLOAT, 0}
@@ -180,6 +185,8 @@ static const EditorBulkProperty *editor_bulk_properties_get(
         case EDITOR_SELECTION_VERTEX: EDITOR_BULK_LIST(vertex_properties);
         case EDITOR_SELECTION_LINE: EDITOR_BULK_LIST(line_properties);
         case EDITOR_SELECTION_ORIGIN: EDITOR_BULK_LIST(origin_properties);
+        case EDITOR_SELECTION_SPRITE:
+        case EDITOR_SELECTION_ANIMATED_SPRITE: EDITOR_BULK_LIST(sprite_properties);
         default: *count = 0; return NULL;
     }
 #undef EDITOR_BULK_LIST
@@ -200,6 +207,8 @@ static const EditorBulkProperty *editor_bulk_mixed_properties_get(
             case EDITOR_SELECTION_SOFT_NODE:
             case EDITOR_SELECTION_VERTEX:
             case EDITOR_SELECTION_ORIGIN:
+            case EDITOR_SELECTION_SPRITE:
+            case EDITOR_SELECTION_ANIMATED_SPRITE:
                 rotation = false;
                 break;
             default:
@@ -383,6 +392,41 @@ static bool editor_bulk_transform_command_get(EditorProject *project,
             .data.soft_node_position = {ref.object, ref.parent, ref.item, position}};
         return true;
     }
+    if(ref.kind == EDITOR_SELECTION_SPRITE) {
+        EditorSprite *sprite = editor_project_sprite_get(object, ref.item);
+        Position position;
+        if(sprite == NULL) return false;
+        position = sprite->position;
+        if(target == EDITOR_BULK_POSITION_X) position.x = value;
+        else if(target == EDITOR_BULK_POSITION_Y) position.y = value;
+        else return false;
+        *command = (EditorCommand){.type = EDITOR_COMMAND_SPRITE_POSITION_SET,
+            .data.sprite_position_set = {ref.object, ref.item, position}};
+        return true;
+    }
+    if(ref.kind == EDITOR_SELECTION_ANIMATED_SPRITE) {
+        EditorAnimatedSprite *sprite = editor_project_animated_sprite_get(object,
+            ref.item);
+        EditorRigidBody *body = sprite == NULL ? NULL :
+            editor_project_rigid_body_get(object, sprite->rigid_body);
+        Position position;
+        if(sprite == NULL) return false;
+        position = body == NULL ? sprite->editor_position : body->position;
+        if(target == EDITOR_BULK_POSITION_X) position.x = value;
+        else if(target == EDITOR_BULK_POSITION_Y) position.y = value;
+        else return false;
+        if(body != NULL) {
+            *command = (EditorCommand){.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
+                .data.rigid_body_transform = {ref.object, body->id,
+                    position, body->rotation}};
+        } else {
+            *command = (EditorCommand){
+                .type = EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET,
+                .data.animated_sprite_position_set = {ref.object, ref.item,
+                    position}};
+        }
+        return true;
+    }
     if(ref.kind == EDITOR_SELECTION_VERTEX) {
         EditorRigidBody *body = editor_project_rigid_body_get(object, ref.parent);
         EditorHitbox *hitbox = editor_project_hitbox_get(body, ref.container);
@@ -433,6 +477,17 @@ static bool editor_bulk_transform_command_get(EditorProject *project,
 static bool editor_bulk_visibility_command_get(EditorSelectionRef ref,
         bool visible, EditorCommand *command) {
     EditorVisibilityKind kind;
+    if(ref.kind == EDITOR_SELECTION_SPRITE) {
+        *command = (EditorCommand){.type = EDITOR_COMMAND_SPRITE_VISIBILITY_SET,
+            .data.sprite_visibility_set = {ref.object, ref.item, visible}};
+        return true;
+    }
+    if(ref.kind == EDITOR_SELECTION_ANIMATED_SPRITE) {
+        *command = (EditorCommand){
+            .type = EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET,
+            .data.animated_sprite_boolean_set = {ref.object, ref.item, visible}};
+        return true;
+    }
     switch(ref.kind) {
         case EDITOR_SELECTION_OBJECT: kind = EDITOR_VISIBILITY_OBJECT; break;
         case EDITOR_SELECTION_RIGID_BODY:

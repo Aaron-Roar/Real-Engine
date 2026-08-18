@@ -242,6 +242,33 @@ static yyjson_mut_val *editor_json_soft_body_write(yyjson_mut_doc *document,
     return value;
 }
 
+static yyjson_mut_val *editor_json_animated_sprite_write(yyjson_mut_doc *document,
+        const EditorAnimatedSprite *sprite) {
+    yyjson_mut_val *value = yyjson_mut_obj(document);
+    yyjson_mut_val *frames = yyjson_mut_arr(document);
+    yyjson_mut_obj_add_uint(document, value, "id", sprite->id);
+    yyjson_mut_obj_add_strcpy(document, value, "name", sprite->name);
+    yyjson_mut_obj_add_uint(document, value, "rigid_body", sprite->rigid_body);
+    yyjson_mut_obj_add_val(document, value, "editor_position",
+        editor_json_position_write(document, sprite->editor_position));
+    for(size_t i = 0; i < sprite->frame_count; i += 1)
+        yyjson_mut_arr_add_uint(document, frames, sprite->frames[i].sprite);
+    yyjson_mut_obj_add_val(document, value, "frames", frames);
+    yyjson_mut_obj_add_uint(document, value, "ticks_per_frame",
+        sprite->ticks_per_frame);
+    yyjson_mut_obj_add_real(document, value, "time_per_frame",
+        sprite->time_per_frame);
+    yyjson_mut_obj_add_uint(document, value, "starting_frame",
+        sprite->starting_frame);
+    yyjson_mut_obj_add_real(document, value, "scale_x", sprite->scale.x);
+    yyjson_mut_obj_add_real(document, value, "scale_y", sprite->scale.y);
+    yyjson_mut_obj_add_uint(document, value, "direction", sprite->direction);
+    yyjson_mut_obj_add_bool(document, value, "follow_body_rotation",
+        sprite->follow_body_rotation);
+    yyjson_mut_obj_add_bool(document, value, "visible", sprite->visible);
+    return value;
+}
+
 bool editor_project_save(const EditorProject *project, const char *path) {
     yyjson_mut_doc *document;
     yyjson_mut_val *root;
@@ -279,6 +306,9 @@ bool editor_project_save(const EditorProject *project, const char *path) {
         yyjson_mut_obj_add_uint(document, value, "soft_body", navigation->soft_body);
         yyjson_mut_obj_add_uint(document, value, "soft_node", navigation->soft_node);
         yyjson_mut_obj_add_uint(document, value, "soft_beam", navigation->soft_beam);
+        yyjson_mut_obj_add_uint(document, value, "sprite", navigation->sprite);
+        yyjson_mut_obj_add_uint(document, value, "animated_sprite",
+            navigation->animated_sprite);
         yyjson_mut_obj_add_uint(document, value, "origin_kind", navigation->origin_kind);
         yyjson_mut_obj_add_val(document, root, "navigation", value);
     }
@@ -293,6 +323,9 @@ bool editor_project_save(const EditorProject *project, const char *path) {
     yyjson_mut_obj_add_uint(document, root, "next_soft_node_id", project->next_soft_node_id);
     yyjson_mut_obj_add_uint(document, root, "next_soft_beam_id", project->next_soft_beam_id);
     yyjson_mut_obj_add_uint(document, root, "next_soft_area_id", project->next_soft_area_id);
+    yyjson_mut_obj_add_uint(document, root, "next_sprite_id", project->next_sprite_id);
+    yyjson_mut_obj_add_uint(document, root, "next_animated_sprite_id",
+        project->next_animated_sprite_id);
     for(size_t i = 0; i < project->collision_mask_count; i += 1) {
         yyjson_mut_arr_add_strcpy(document, collision_masks,
             project->collision_masks[i].name);
@@ -305,6 +338,8 @@ bool editor_project_save(const EditorProject *project, const char *path) {
         yyjson_mut_val *anchors = yyjson_mut_arr(document);
         yyjson_mut_val *joint_values = yyjson_mut_arr(document);
         yyjson_mut_val *soft_body_values = yyjson_mut_arr(document);
+        yyjson_mut_val *sprites = yyjson_mut_arr(document);
+        yyjson_mut_val *animated_sprite_values = yyjson_mut_arr(document);
         yyjson_mut_val *hierarchy = yyjson_mut_arr(document);
         yyjson_mut_obj_add_uint(document, value, "id", object->id);
         yyjson_mut_obj_add_strcpy(document, value, "name", object->name);
@@ -323,6 +358,23 @@ bool editor_project_save(const EditorProject *project, const char *path) {
         for(size_t j = 0; j < object->soft_body_count; j += 1)
             yyjson_mut_arr_add_val(soft_body_values, editor_json_soft_body_write(document,
                 &object->soft_body_items[j]));
+        for(size_t j = 0; j < object->sprite_count; j += 1) {
+            yyjson_mut_val *sprite = yyjson_mut_obj(document);
+            yyjson_mut_obj_add_uint(document, sprite, "id", object->sprites[j].id);
+            yyjson_mut_obj_add_strcpy(document, sprite, "name", object->sprites[j].name);
+            yyjson_mut_obj_add_strcpy(document, sprite, "path", object->sprites[j].path);
+            yyjson_mut_obj_add_val(document, sprite, "position",
+                editor_json_position_write(document, object->sprites[j].position));
+            yyjson_mut_obj_add_real(document, sprite, "width", object->sprites[j].size.x);
+            yyjson_mut_obj_add_real(document, sprite, "height", object->sprites[j].size.y);
+            yyjson_mut_obj_add_bool(document, sprite, "visible",
+                object->sprites[j].visible);
+            yyjson_mut_arr_add_val(sprites, sprite);
+        }
+        for(size_t j = 0; j < object->animated_sprite_count; j += 1)
+            yyjson_mut_arr_add_val(animated_sprite_values,
+                editor_json_animated_sprite_write(document,
+                    &object->animated_sprite_items[j]));
         for(size_t j = 0; j < object->hierarchy_count; j += 1) {
             yyjson_mut_val *item = yyjson_mut_obj(document);
             yyjson_mut_obj_add_uint(document, item, "kind", object->hierarchy[j].kind);
@@ -333,6 +385,9 @@ bool editor_project_save(const EditorProject *project, const char *path) {
         yyjson_mut_obj_add_val(document, value, "anchors", anchors);
         yyjson_mut_obj_add_val(document, value, "joints", joint_values);
         yyjson_mut_obj_add_val(document, value, "soft_bodies", soft_body_values);
+        yyjson_mut_obj_add_val(document, value, "sprites", sprites);
+        yyjson_mut_obj_add_val(document, value, "animated_sprites",
+            animated_sprite_values);
         yyjson_mut_obj_add_val(document, value, "hierarchy", hierarchy);
         yyjson_mut_arr_add_val(objects, value);
     }
@@ -650,6 +705,51 @@ static bool editor_json_soft_body_read(yyjson_val *value, EditorSoftBody *body,
     return true;
 }
 
+static bool editor_json_animated_sprite_read(yyjson_val *value,
+        EditorAnimatedSprite *sprite, EditorProject *project) {
+    yyjson_val *frames;
+    yyjson_val *time;
+    uint32_t direction;
+    uint64_t ticks;
+    if(!yyjson_is_obj(value) || sprite == NULL || project == NULL ||
+            !editor_json_uint(value, "id", &sprite->id) || sprite->id == 0 ||
+            !editor_json_name(value, sprite->name) ||
+            !editor_json_uint(value, "rigid_body", &sprite->rigid_body) ||
+            !editor_json_position_read(yyjson_obj_get(value, "editor_position"),
+                &sprite->editor_position) ||
+            !editor_json_uint64(value, "ticks_per_frame", &ticks) ||
+            !editor_json_uint(value, "starting_frame", &sprite->starting_frame) ||
+            !editor_json_real(value, "scale_x", &sprite->scale.x) ||
+            !editor_json_real(value, "scale_y", &sprite->scale.y) ||
+            !editor_json_uint(value, "direction", &direction) ||
+            direction > DIRECTION_RIGHT ||
+            !editor_json_bool(value, "follow_body_rotation",
+                &sprite->follow_body_rotation) ||
+            !editor_json_bool(value, "visible", &sprite->visible)) return false;
+    time = yyjson_obj_get(value, "time_per_frame");
+    frames = yyjson_obj_get(value, "frames");
+    if(!yyjson_is_num(time) || yyjson_get_real(time) < 0.0 ||
+            !yyjson_is_arr(frames) || yyjson_arr_size(frames) > MAX_ANIMATIONS_FRAMES ||
+            sprite->scale.x <= 0.0f || sprite->scale.y <= 0.0f) return false;
+    editor_project_property_name_format(sprite->name, sizeof(sprite->name),
+        sprite->name);
+    sprite->ticks_per_frame = (Tick)ticks;
+    sprite->time_per_frame = (Time)yyjson_get_real(time);
+    sprite->direction = (Direction)direction;
+    sprite->frame_count = yyjson_arr_size(frames);
+    if(!EDITOR_ARRAY_RESERVE(sprite->frames, sprite->frame_capacity,
+            sprite->frame_count)) return false;
+    for(size_t i = 0; i < sprite->frame_count; i += 1) {
+        yyjson_val *frame = yyjson_arr_get(frames, i);
+        if(!yyjson_is_uint(frame) || yyjson_get_uint(frame) == 0 ||
+                yyjson_get_uint(frame) > UINT32_MAX) return false;
+        sprite->frames[i].sprite = (EditorSpriteId)yyjson_get_uint(frame);
+    }
+    if(project->next_animated_sprite_id <= sprite->id)
+        project->next_animated_sprite_id = sprite->id + 1;
+    return true;
+}
+
 static bool editor_json_references_valid(EditorProject *project) {
     uint64_t valid_masks = project->collision_mask_count == 64 ? UINT64_MAX :
         (UINT64_C(1) << project->collision_mask_count) - 1;
@@ -685,6 +785,23 @@ static bool editor_json_references_valid(EditorProject *project) {
                 }
                 if(!found_a || !found_b) return false;
             }
+        }
+        for(size_t j = 0; j < object->animated_sprite_count; j += 1) {
+            EditorAnimatedSprite *sprite = &object->animated_sprite_items[j];
+            if(sprite->rigid_body != 0 &&
+                    editor_project_rigid_body_get(object, sprite->rigid_body) == NULL)
+                return false;
+            if(sprite->frame_count > MAX_ANIMATIONS_FRAMES ||
+                    (sprite->frame_count > 0 &&
+                        sprite->starting_frame >= sprite->frame_count))
+                return false;
+            for(size_t other = 0; other < j; other += 1)
+                if(sprite->rigid_body != 0 &&
+                        object->animated_sprite_items[other].rigid_body ==
+                            sprite->rigid_body) return false;
+            for(size_t frame = 0; frame < sprite->frame_count; frame += 1)
+                if(editor_project_sprite_get(object,
+                        sprite->frames[frame].sprite) == NULL) return false;
         }
     }
     return project->selected == 0 || editor_project_selected_get(project) != NULL;
@@ -766,8 +883,22 @@ EditorResult editor_project_load(EditorProject *project, const char *path) {
                 !editor_json_uint(navigation, "soft_node", &loaded.navigation.soft_node) ||
                 !editor_json_uint(navigation, "soft_beam", &loaded.navigation.soft_beam) ||
                 !editor_json_uint(navigation, "origin_kind", &loaded.navigation.origin_kind) ||
-                loaded.navigation.mode > 11 || loaded.navigation.selection > 11 ||
+                loaded.navigation.mode > EDITOR_NAVIGATION_MODE_MAX ||
+                loaded.navigation.selection > EDITOR_NAVIGATION_SELECTION_MAX ||
                 loaded.navigation.origin_kind > 2)) goto done;
+        if(navigation != NULL) {
+            yyjson_val *sprite = yyjson_obj_get(navigation, "sprite");
+            yyjson_val *animated = yyjson_obj_get(navigation, "animated_sprite");
+            if((sprite != NULL && (!yyjson_is_uint(sprite) ||
+                        yyjson_get_uint(sprite) > UINT32_MAX)) ||
+                    (animated != NULL && (!yyjson_is_uint(animated) ||
+                        yyjson_get_uint(animated) > UINT32_MAX))) goto done;
+            if(sprite != NULL)
+                loaded.navigation.sprite = (uint32_t)yyjson_get_uint(sprite);
+            if(animated != NULL)
+                loaded.navigation.animated_sprite =
+                    (uint32_t)yyjson_get_uint(animated);
+        }
     }
     if(!editor_json_uint(root, "selected", &loaded.selected) || !yyjson_is_arr(objects) ||
             !editor_json_uint(root, "next_object_id", &loaded.next_id) ||
@@ -788,6 +919,15 @@ EditorResult editor_project_load(EditorProject *project, const char *path) {
             !yyjson_is_arr(collision_masks) || yyjson_arr_size(collision_masks) == 0 ||
             yyjson_arr_size(collision_masks) > EDITOR_COLLISION_MASK_MAX)
         goto done;
+    {
+        yyjson_val *next_sprite = yyjson_obj_get(root, "next_sprite_id");
+        yyjson_val *next_animated = yyjson_obj_get(root, "next_animated_sprite_id");
+        if((next_sprite != NULL && !editor_json_uint(root, "next_sprite_id",
+                    &loaded.next_sprite_id)) ||
+                (next_animated != NULL && !editor_json_uint(root,
+                    "next_animated_sprite_id", &loaded.next_animated_sprite_id)) ||
+                loaded.next_sprite_id == 0 || loaded.next_animated_sprite_id == 0) goto done;
+    }
     loaded.collision_mask_count = yyjson_arr_size(collision_masks);
     if(!EDITOR_ARRAY_RESERVE(loaded.collision_masks,
             loaded.collision_mask_capacity, loaded.collision_mask_count)) goto done;
@@ -812,6 +952,9 @@ EditorResult editor_project_load(EditorProject *project, const char *path) {
         yyjson_val *anchors = yyjson_obj_get(value, "anchors");
         yyjson_val *joint_values = yyjson_obj_get(value, "joints");
         yyjson_val *soft_body_values = yyjson_obj_get(value, "soft_bodies");
+        yyjson_val *sprites = yyjson_obj_get(value, "sprites");
+        yyjson_val *animated_sprite_values = yyjson_obj_get(value,
+            "animated_sprites");
         yyjson_val *hierarchy = yyjson_obj_get(value, "hierarchy");
         if(!yyjson_is_obj(value) || !editor_json_uint(value, "id", &object->id) ||
                 object->id == 0 || !editor_json_name(value, object->name) ||
@@ -819,12 +962,18 @@ EditorResult editor_project_load(EditorProject *project, const char *path) {
                 !editor_json_bool(value, "visible", &object->visible) ||
                 !yyjson_is_arr(bodies) || !yyjson_is_arr(anchors) ||
                 !yyjson_is_arr(joint_values) || !yyjson_is_arr(soft_body_values) ||
+                (sprites != NULL && !yyjson_is_arr(sprites)) ||
+                (animated_sprite_values != NULL &&
+                    !yyjson_is_arr(animated_sprite_values)) ||
                 (hierarchy != NULL && !yyjson_is_arr(hierarchy))) goto done;
         editor_project_object_name_format(object->name, sizeof(object->name), object->name);
         object->rigid_body_count = yyjson_arr_size(bodies);
         object->anchor_count = yyjson_arr_size(anchors);
         object->joint_count = yyjson_arr_size(joint_values);
         object->soft_body_count = yyjson_arr_size(soft_body_values);
+        object->sprite_count = sprites == NULL ? 0 : yyjson_arr_size(sprites);
+        object->animated_sprite_count = animated_sprite_values == NULL ? 0 :
+            yyjson_arr_size(animated_sprite_values);
         if(!EDITOR_ARRAY_RESERVE(object->rigid_bodies,
                 object->rigid_body_capacity, object->rigid_body_count) ||
                 !EDITOR_ARRAY_RESERVE(object->anchors, object->anchor_capacity,
@@ -832,7 +981,12 @@ EditorResult editor_project_load(EditorProject *project, const char *path) {
                 !EDITOR_ARRAY_RESERVE(object->joint_items, object->joint_capacity,
                     object->joint_count) ||
                 !EDITOR_ARRAY_RESERVE(object->soft_body_items,
-                    object->soft_body_capacity, object->soft_body_count)) goto done;
+                    object->soft_body_capacity, object->soft_body_count) ||
+                !EDITOR_ARRAY_RESERVE(object->sprites, object->sprite_capacity,
+                    object->sprite_count) ||
+                !EDITOR_ARRAY_RESERVE(object->animated_sprite_items,
+                    object->animated_sprite_capacity,
+                    object->animated_sprite_count)) goto done;
         if(object->rigid_body_count > 0) memset(object->rigid_bodies, 0,
             object->rigid_body_count * sizeof(*object->rigid_bodies));
         if(object->anchor_count > 0) memset(object->anchors, 0,
@@ -841,6 +995,30 @@ EditorResult editor_project_load(EditorProject *project, const char *path) {
             object->joint_count * sizeof(*object->joint_items));
         if(object->soft_body_count > 0) memset(object->soft_body_items, 0,
             object->soft_body_count * sizeof(*object->soft_body_items));
+        for(size_t j = 0; j < object->sprite_count; j += 1) {
+            yyjson_val *sprite_value = yyjson_arr_get(sprites, j);
+            yyjson_val *path_value = yyjson_obj_get(sprite_value, "path");
+            EditorSprite *sprite = &object->sprites[j];
+            if(!yyjson_is_obj(sprite_value) ||
+                    !editor_json_uint(sprite_value, "id", &sprite->id) ||
+                    sprite->id == 0 || !editor_json_name(sprite_value, sprite->name) ||
+                    !yyjson_is_str(path_value) || yyjson_get_len(path_value) == 0 ||
+                    yyjson_get_len(path_value) >= EDITOR_ASSET_PATH_MAX ||
+                    !editor_json_position_read(yyjson_obj_get(sprite_value, "position"),
+                        &sprite->position) ||
+                    !editor_json_real(sprite_value, "width", &sprite->size.x) ||
+                    !editor_json_real(sprite_value, "height", &sprite->size.y) ||
+                    !editor_json_bool(sprite_value, "visible", &sprite->visible) ||
+                    sprite->size.x <= 0.0f || sprite->size.y <= 0.0f) goto done;
+            editor_project_property_name_format(sprite->name, sizeof(sprite->name),
+                sprite->name);
+            memcpy(sprite->path, yyjson_get_str(path_value),
+                yyjson_get_len(path_value) + 1);
+            if(loaded.next_sprite_id <= sprite->id)
+                loaded.next_sprite_id = sprite->id + 1;
+        }
+        if(object->animated_sprite_count > 0) memset(object->animated_sprite_items, 0,
+            object->animated_sprite_count * sizeof(*object->animated_sprite_items));
         for(size_t j = 0; j < object->rigid_body_count; j += 1)
             if(!editor_json_body_read(yyjson_arr_get(bodies, j),
                     &object->rigid_bodies[j], &loaded)) goto done;
@@ -853,6 +1031,10 @@ EditorResult editor_project_load(EditorProject *project, const char *path) {
         for(size_t j = 0; j < object->soft_body_count; j += 1)
             if(!editor_json_soft_body_read(yyjson_arr_get(soft_body_values, j),
                     &object->soft_body_items[j], &loaded)) goto done;
+        for(size_t j = 0; j < object->animated_sprite_count; j += 1)
+            if(!editor_json_animated_sprite_read(
+                    yyjson_arr_get(animated_sprite_values, j),
+                    &object->animated_sprite_items[j], &loaded)) goto done;
         if(hierarchy != NULL) {
             object->hierarchy_count = yyjson_arr_size(hierarchy);
             if(!EDITOR_ARRAY_RESERVE(object->hierarchy,
@@ -861,7 +1043,7 @@ EditorResult editor_project_load(EditorProject *project, const char *path) {
                 yyjson_val *item = yyjson_arr_get(hierarchy, j);
                 uint32_t kind;
                 if(!yyjson_is_obj(item) || !editor_json_uint(item, "kind", &kind) ||
-                        kind > EDITOR_HIERARCHY_SOFT_BODY ||
+                        kind > EDITOR_HIERARCHY_ANIMATED_SPRITE ||
                         !editor_json_uint(item, "id", &object->hierarchy[j].id) ||
                         object->hierarchy[j].id == 0) goto done;
                 object->hierarchy[j].kind = (EditorHierarchyItemKind)kind;
@@ -870,7 +1052,8 @@ EditorResult editor_project_load(EditorProject *project, const char *path) {
         {
             size_t serialized_count = object->hierarchy_count;
             size_t expected_count = object->rigid_body_count + object->joint_count +
-                object->soft_body_count;
+                object->soft_body_count + object->sprite_count +
+                object->animated_sprite_count;
             editor_project_object_hierarchy_sync(object);
             if(hierarchy != NULL && (object->hierarchy_count != serialized_count ||
                     object->hierarchy_count != expected_count)) goto done;

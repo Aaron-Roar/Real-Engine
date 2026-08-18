@@ -1308,6 +1308,12 @@ EngineResult rohr_graphics_soft_body_area_color_set(
  */
 TextureAssetResult rohr_graphics_texture_load(TextureDescriptor text_desc);
 
+/** Draws a loaded texture centered at a world position. */
+void rohr_graphics_texture_draw(TextureAsset texture, Position position,
+    Orientation orientation);
+void rohr_graphics_screen_texture_draw(TextureAsset texture, Position center,
+    Scale size, Orientation orientation);
+
 /** @brief Loads a caller-owned font asset. */
 FontAssetResult rohr_graphics_font_load(FontDescriptor descriptor);
 

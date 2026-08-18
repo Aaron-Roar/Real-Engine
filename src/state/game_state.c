@@ -54,6 +54,9 @@ typedef struct StateSpriteReference {
     Time time_per_frame;
     Tick ticks_per_frame;
     int start_frame;
+    Direction direction;
+    bool follow_entity_rotation;
+    bool visible;
 } StateSpriteReference;
 
 typedef struct StateUIButton {
@@ -1377,6 +1380,9 @@ static EngineResult state_components_load(
         double generated_value;
         Tick ticks_per_frame;
         int start_frame;
+        bool follow_entity_rotation = true;
+        bool visible = true;
+        uint32_t direction = DIRECTION_RIGHT;
         if(!yyjson_is_obj(value)
                 || !yyjson_is_str(animation_name)
                 || yyjson_get_len(animation_name) == 0
@@ -1419,6 +1425,19 @@ static EngineResult state_components_load(
         } else {
             start_frame = 0;
         }
+        base_value = yyjson_obj_get(value, "direction");
+        if(base_value != NULL && (!yyjson_is_uint(base_value) ||
+                yyjson_get_uint(base_value) > DIRECTION_RIGHT))
+            return error_result_error(ERROR_ENGINE_STATE_INVALID);
+        if(base_value != NULL) direction = (uint32_t)yyjson_get_uint(base_value);
+        base_value = yyjson_obj_get(value, "follow_entity_rotation");
+        if(base_value != NULL && !yyjson_is_bool(base_value))
+            return error_result_error(ERROR_ENGINE_STATE_INVALID);
+        if(base_value != NULL) follow_entity_rotation = yyjson_get_bool(base_value);
+        base_value = yyjson_obj_get(value, "visible");
+        if(base_value != NULL && !yyjson_is_bool(base_value))
+            return error_result_error(ERROR_ENGINE_STATE_INVALID);
+        if(base_value != NULL) visible = yyjson_get_bool(base_value);
         if(variation != NULL) {
             field = yyjson_obj_get(variation, "scale");
             if(field != NULL && !state_variation_vec2(
@@ -1492,6 +1511,9 @@ static EngineResult state_components_load(
         sprite.animation.time_per_frame = time_per_frame;
         sprite.animation.ticks_per_frame = ticks_per_frame;
         sprite.animation_frame = start_frame;
+        sprite.direction = (Direction)direction;
+        sprite.follow_entity_rotation = follow_entity_rotation;
+        sprite.visible = visible;
         result = graphics_animated_sprite_add(entity, sprite);
         if(result.kind == ERROR_RESULT_ERROR) return result;
         state_sprite_references[index] = (StateSpriteReference){
@@ -1499,7 +1521,10 @@ static EngineResult state_components_load(
             .scale = scale,
             .time_per_frame = time_per_frame,
             .ticks_per_frame = ticks_per_frame,
-            .start_frame = start_frame
+            .start_frame = start_frame,
+            .direction = (Direction)direction,
+            .follow_entity_rotation = follow_entity_rotation,
+            .visible = visible
         };
         memcpy(
             state_sprite_references[index].animation,
@@ -2374,6 +2399,12 @@ EngineResult game_state_file_save(const char *path) {
                 "start_frame",
                 reference->start_frame
             );
+            yyjson_mut_obj_add_uint(document, sprite, "direction",
+                reference->direction);
+            yyjson_mut_obj_add_bool(document, sprite, "follow_entity_rotation",
+                reference->follow_entity_rotation);
+            yyjson_mut_obj_add_bool(document, sprite, "visible",
+                reference->visible);
             yyjson_mut_obj_add_val(
                 document,
                 components,

@@ -106,6 +106,11 @@ static EditorSoftBeam *editor_command_soft_beam_get(EditorSoftBody *body,
     return NULL;
 }
 
+static EditorAnimatedSprite *editor_command_animated_sprite_get(EditorObject *object,
+        EditorAnimatedSpriteId id) {
+    return editor_project_animated_sprite_get(object, id);
+}
+
 static bool editor_command_collision_mask_find(const EditorProject *project,
         const char *name, size_t *index) {
     char formatted[EDITOR_OBJECT_NAME_MAX];
@@ -423,8 +428,9 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
             return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
         }
         case EDITOR_COMMAND_NAVIGATION_SET:
-            if(command->data.navigation.mode > 11 ||
-                    command->data.navigation.selection > 11 ||
+            if(command->data.navigation.mode > EDITOR_NAVIGATION_MODE_MAX ||
+                    command->data.navigation.selection >
+                        EDITOR_NAVIGATION_SELECTION_MAX ||
                     command->data.navigation.origin_kind > 2)
                 return editor_command_error(editor_result_error(
                     EDITOR_ERROR_INVALID_ARGUMENT,
@@ -939,6 +945,201 @@ property_invalid:
             else *filter &= ~bit;
             return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
         }
+        case EDITOR_COMMAND_SPRITE_ADD: {
+            EditorObject *object = editor_object_query_get(project,
+                command->data.sprite_add.object);
+            EditorSprite *sprite = editor_project_sprite_add(project, object,
+                command->data.sprite_add.name, command->data.sprite_add.path);
+            if(sprite == NULL) return editor_command_error(editor_result_error(
+                EDITOR_ERROR_CAPACITY, "could not add sprite").result.error);
+            sprite->size = command->data.sprite_add.size;
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE,
+                .result.object = sprite->id};
+        }
+        case EDITOR_COMMAND_SPRITE_REMOVE:
+            if(!editor_project_sprite_remove(editor_object_query_get(project,
+                    command->data.sprite_remove.object),
+                    command->data.sprite_remove.sprite))
+                return editor_command_error(editor_result_error(
+                    EDITOR_ERROR_REFERENCE_INVALID,
+                    "sprite was not found").result.error);
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+        case EDITOR_COMMAND_SPRITE_RENAME:
+        case EDITOR_COMMAND_SPRITE_PATH_SET:
+        case EDITOR_COMMAND_SPRITE_POSITION_SET:
+        case EDITOR_COMMAND_SPRITE_SIZE_SET:
+        case EDITOR_COMMAND_SPRITE_VISIBILITY_SET: {
+            EditorSpriteId id = command->type == EDITOR_COMMAND_SPRITE_RENAME ?
+                command->data.sprite_rename.sprite :
+                command->type == EDITOR_COMMAND_SPRITE_PATH_SET ?
+                    command->data.sprite_path_set.sprite :
+                command->type == EDITOR_COMMAND_SPRITE_POSITION_SET ?
+                    command->data.sprite_position_set.sprite :
+                command->type == EDITOR_COMMAND_SPRITE_SIZE_SET ?
+                    command->data.sprite_size_set.sprite :
+                    command->data.sprite_visibility_set.sprite;
+            EditorObjectId object_id = command->type == EDITOR_COMMAND_SPRITE_RENAME ?
+                command->data.sprite_rename.object :
+                command->type == EDITOR_COMMAND_SPRITE_PATH_SET ?
+                    command->data.sprite_path_set.object :
+                command->type == EDITOR_COMMAND_SPRITE_POSITION_SET ?
+                    command->data.sprite_position_set.object :
+                command->type == EDITOR_COMMAND_SPRITE_SIZE_SET ?
+                    command->data.sprite_size_set.object :
+                    command->data.sprite_visibility_set.object;
+            EditorSprite *sprite = editor_project_sprite_get(
+                editor_object_query_get(project, object_id), id);
+            if(sprite == NULL) return editor_command_not_found("sprite", id);
+            if(command->type == EDITOR_COMMAND_SPRITE_RENAME)
+                editor_project_property_name_format(sprite->name, sizeof(sprite->name),
+                    command->data.sprite_rename.name);
+            else if(command->type == EDITOR_COMMAND_SPRITE_PATH_SET) {
+                if(command->data.sprite_path_set.path[0] == '\0')
+                    return editor_command_error(editor_result_error(
+                        EDITOR_ERROR_INVALID_ARGUMENT,
+                        "sprite path cannot be empty").result.error);
+                snprintf(sprite->path, sizeof(sprite->path), "%s",
+                    command->data.sprite_path_set.path);
+            } else if(command->type == EDITOR_COMMAND_SPRITE_POSITION_SET) {
+                sprite->position = command->data.sprite_position_set.position;
+            } else if(command->type == EDITOR_COMMAND_SPRITE_SIZE_SET) {
+                if(command->data.sprite_size_set.size.x <= 0.0f ||
+                        command->data.sprite_size_set.size.y <= 0.0f)
+                    return editor_command_error(editor_result_error(
+                        EDITOR_ERROR_INVALID_ARGUMENT,
+                        "sprite size must be positive").result.error);
+                sprite->size = command->data.sprite_size_set.size;
+            } else sprite->visible = command->data.sprite_visibility_set.visible;
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+        }
+        case EDITOR_COMMAND_ANIMATED_SPRITE_ADD: {
+            EditorObject *object = editor_object_query_get(project,
+                command->data.animated_sprite_add.object);
+            EditorAnimatedSprite *sprite;
+            if(object == NULL) return editor_command_not_found("object",
+                command->data.animated_sprite_add.object);
+            sprite = editor_project_animated_sprite_add(project, object);
+            if(sprite == NULL) return editor_command_error(editor_result_error(
+                EDITOR_ERROR_CAPACITY, "could not add animated sprite").result.error);
+            if(command->data.animated_sprite_add.name[0] != '\0')
+                editor_project_property_name_format(sprite->name, sizeof(sprite->name),
+                    command->data.animated_sprite_add.name);
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE,
+                .result.object = sprite->id};
+        }
+        case EDITOR_COMMAND_ANIMATED_SPRITE_REMOVE: {
+            EditorObject *object = editor_object_query_get(project,
+                command->data.animated_sprite_remove.object);
+            if(object == NULL || !editor_project_animated_sprite_remove(object,
+                    command->data.animated_sprite_remove.sprite))
+                return editor_command_not_found("animated sprite",
+                    command->data.animated_sprite_remove.sprite);
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+        }
+        case EDITOR_COMMAND_ANIMATED_SPRITE_RENAME:
+        case EDITOR_COMMAND_ANIMATED_SPRITE_BODY_SET:
+        case EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET:
+        case EDITOR_COMMAND_ANIMATED_SPRITE_SCALE_SET:
+        case EDITOR_COMMAND_ANIMATED_SPRITE_TIMING_SET:
+        case EDITOR_COMMAND_ANIMATED_SPRITE_STARTING_FRAME_SET:
+        case EDITOR_COMMAND_ANIMATED_SPRITE_DIRECTION_SET:
+        case EDITOR_COMMAND_ANIMATED_SPRITE_FOLLOW_ROTATION_SET:
+        case EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET:
+        case EDITOR_COMMAND_ANIMATION_FRAME_ADD:
+        case EDITOR_COMMAND_ANIMATION_FRAME_REMOVE: {
+            EditorObjectId object_id;
+            EditorAnimatedSpriteId sprite_id;
+            EditorObject *object;
+            EditorAnimatedSprite *sprite;
+#define ANIMATED_IDS(member) do { object_id = command->data.member.object; \
+    sprite_id = command->data.member.sprite; } while(0)
+            if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_RENAME)
+                ANIMATED_IDS(animated_sprite_rename);
+            else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_BODY_SET)
+                ANIMATED_IDS(animated_sprite_body_set);
+            else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET)
+                ANIMATED_IDS(animated_sprite_position_set);
+            else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_SCALE_SET)
+                ANIMATED_IDS(animated_sprite_scale_set);
+            else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_TIMING_SET)
+                ANIMATED_IDS(animated_sprite_timing_set);
+            else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_STARTING_FRAME_SET)
+                ANIMATED_IDS(animated_sprite_starting_frame_set);
+            else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_DIRECTION_SET)
+                ANIMATED_IDS(animated_sprite_direction_set);
+            else if(command->type == EDITOR_COMMAND_ANIMATION_FRAME_ADD)
+                ANIMATED_IDS(animation_frame_add);
+            else if(command->type == EDITOR_COMMAND_ANIMATION_FRAME_REMOVE)
+                ANIMATED_IDS(animation_frame_remove);
+            else ANIMATED_IDS(animated_sprite_boolean_set);
+#undef ANIMATED_IDS
+            object = editor_object_query_get(project, object_id);
+            sprite = editor_command_animated_sprite_get(object, sprite_id);
+            if(sprite == NULL) return editor_command_not_found("animated sprite", sprite_id);
+            if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_RENAME)
+                editor_project_property_name_format(sprite->name, sizeof(sprite->name),
+                    command->data.animated_sprite_rename.name);
+            else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_BODY_SET) {
+                EditorRigidBodyId body = command->data.animated_sprite_body_set.body;
+                if(body != 0 && editor_project_rigid_body_get(object, body) == NULL)
+                    return editor_command_not_found("rigid body", body);
+                for(size_t i = 0; body != 0 && i < object->animated_sprite_count; i += 1)
+                    if(object->animated_sprite_items[i].id != sprite->id &&
+                            object->animated_sprite_items[i].rigid_body == body)
+                        return editor_command_error(editor_result_error(
+                            EDITOR_ERROR_REFERENCE_INVALID,
+                            "rigid body already has an animated sprite").result.error);
+                sprite->rigid_body = body;
+            } else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET) {
+                sprite->editor_position =
+                    command->data.animated_sprite_position_set.position;
+            } else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_SCALE_SET) {
+                Scale scale = command->data.animated_sprite_scale_set.scale;
+                if(scale.x <= 0.0f || scale.y <= 0.0f)
+                    return editor_command_error(editor_result_error(
+                        EDITOR_ERROR_INVALID_ARGUMENT,
+                        "animated sprite scale must be positive").result.error);
+                sprite->scale = scale;
+            } else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_TIMING_SET) {
+                sprite->ticks_per_frame = command->data.animated_sprite_timing_set.ticks;
+                sprite->time_per_frame = command->data.animated_sprite_timing_set.time;
+            } else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_STARTING_FRAME_SET) {
+                uint32_t frame = command->data.animated_sprite_starting_frame_set.frame;
+                if(frame >= sprite->frame_count)
+                    return editor_command_error(editor_result_error(
+                        EDITOR_ERROR_INVALID_ARGUMENT,
+                        "starting frame is outside the animation").result.error);
+                sprite->starting_frame = frame;
+            } else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_DIRECTION_SET)
+                sprite->direction = command->data.animated_sprite_direction_set.direction;
+            else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_FOLLOW_ROTATION_SET)
+                sprite->follow_body_rotation =
+                    command->data.animated_sprite_boolean_set.enabled;
+            else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET)
+                sprite->visible = command->data.animated_sprite_boolean_set.enabled;
+            else if(command->type == EDITOR_COMMAND_ANIMATION_FRAME_ADD) {
+                if(editor_project_sprite_get(object,
+                        command->data.animation_frame_add.frame) == NULL)
+                    return editor_command_not_found("sprite",
+                        command->data.animation_frame_add.frame);
+                if(sprite->frame_count >= MAX_ANIMATIONS_FRAMES ||
+                        !editor_project_animation_frame_add(sprite,
+                            command->data.animation_frame_add.frame))
+                    return editor_command_error(editor_result_error(
+                        EDITOR_ERROR_CAPACITY,
+                        "animation reached the runtime frame limit").result.error);
+            } else {
+                if(!editor_project_animation_frame_remove(sprite,
+                        command->data.animation_frame_remove.index))
+                    return editor_command_error(editor_result_error(
+                        EDITOR_ERROR_NOT_FOUND,
+                        "animation frame index was not found").result.error);
+                if(sprite->frame_count == 0) sprite->starting_frame = 0;
+                else if(sprite->starting_frame >= sprite->frame_count)
+                    sprite->starting_frame = (uint32_t)sprite->frame_count - 1;
+            }
+            return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
+        }
     }
     return editor_command_error((EditorError){EDITOR_ERROR_INVALID_ARGUMENT,
         "unknown editor command"});
@@ -1194,6 +1395,220 @@ EditorResult editor_command_cli_parse(int count, char **arguments,
             "expected an editor mutation command");
     domain = arguments[1];
     action = arguments[2];
+    if(strcmp(domain, "sprite") == 0) {
+        uint32_t object, id;
+        *document_path = arguments[3];
+        if(count < 6 || !editor_command_uint_parse(arguments[4], &object))
+            return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                "sprite command requires an object");
+        if(strcmp(action, "add") == 0 && count == 9 &&
+                editor_command_float_parse(arguments[7],
+                    &command->data.sprite_add.size.x) &&
+                editor_command_float_parse(arguments[8],
+                    &command->data.sprite_add.size.y)) {
+            command->type = EDITOR_COMMAND_SPRITE_ADD;
+            command->data.sprite_add.object = object;
+            snprintf(command->data.sprite_add.name,
+                sizeof(command->data.sprite_add.name), "%s", arguments[5]);
+            snprintf(command->data.sprite_add.path,
+                sizeof(command->data.sprite_add.path), "%s", arguments[6]);
+            return editor_result_value(true);
+        }
+        if(count >= 6 && editor_command_uint_parse(arguments[5], &id)) {
+            if(strcmp(action, "delete") == 0 && count == 6) {
+                command->type = EDITOR_COMMAND_SPRITE_REMOVE;
+                command->data.sprite_remove.object = object;
+                command->data.sprite_remove.sprite = id;
+                return editor_result_value(true);
+            }
+            if(strcmp(action, "rename") == 0 && count == 7) {
+                command->type = EDITOR_COMMAND_SPRITE_RENAME;
+                command->data.sprite_rename.object = object;
+                command->data.sprite_rename.sprite = id;
+                snprintf(command->data.sprite_rename.name,
+                    sizeof(command->data.sprite_rename.name), "%s", arguments[6]);
+                return editor_result_value(true);
+            }
+            if(strcmp(action, "set") == 0 && count == 8 &&
+                    strcmp(arguments[6], "path") == 0) {
+                command->type = EDITOR_COMMAND_SPRITE_PATH_SET;
+                command->data.sprite_path_set.object = object;
+                command->data.sprite_path_set.sprite = id;
+                snprintf(command->data.sprite_path_set.path,
+                    sizeof(command->data.sprite_path_set.path), "%s", arguments[7]);
+                return editor_result_value(true);
+            }
+            if(strcmp(action, "set") == 0 && count == 9 &&
+                    strcmp(arguments[6], "position") == 0 &&
+                    editor_command_float_parse(arguments[7],
+                        &command->data.sprite_position_set.position.x) &&
+                    editor_command_float_parse(arguments[8],
+                        &command->data.sprite_position_set.position.y)) {
+                command->type = EDITOR_COMMAND_SPRITE_POSITION_SET;
+                command->data.sprite_position_set.object = object;
+                command->data.sprite_position_set.sprite = id;
+                return editor_result_value(true);
+            }
+            if(strcmp(action, "set") == 0 && count == 9 &&
+                    strcmp(arguments[6], "size") == 0 &&
+                    editor_command_float_parse(arguments[7],
+                        &command->data.sprite_size_set.size.x) &&
+                    editor_command_float_parse(arguments[8],
+                        &command->data.sprite_size_set.size.y)) {
+                command->type = EDITOR_COMMAND_SPRITE_SIZE_SET;
+                command->data.sprite_size_set.object = object;
+                command->data.sprite_size_set.sprite = id;
+                return editor_result_value(true);
+            }
+            if(strcmp(action, "set") == 0 && count == 8 &&
+                    strcmp(arguments[6], "visibility") == 0 &&
+                    editor_command_bool_parse(arguments[7],
+                        &command->data.sprite_visibility_set.visible)) {
+                command->type = EDITOR_COMMAND_SPRITE_VISIBILITY_SET;
+                command->data.sprite_visibility_set.object = object;
+                command->data.sprite_visibility_set.sprite = id;
+                return editor_result_value(true);
+            }
+        }
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "invalid sprite command");
+    }
+    if(strcmp(domain, "animated-sprite") == 0) {
+        uint32_t object, id, value;
+        *document_path = arguments[3];
+        if(count < 6 || !editor_command_uint_parse(arguments[4], &object))
+            return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                "animated-sprite command requires an object");
+        if(strcmp(action, "add") == 0 && count == 6) {
+            command->type = EDITOR_COMMAND_ANIMATED_SPRITE_ADD;
+            command->data.animated_sprite_add.object = object;
+            snprintf(command->data.animated_sprite_add.name,
+                sizeof(command->data.animated_sprite_add.name), "%s", arguments[5]);
+            return editor_result_value(true);
+        }
+        if(!editor_command_uint_parse(arguments[5], &id))
+            return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                "animated-sprite ID must be an integer");
+        if(strcmp(action, "delete") == 0 && count == 6) {
+            command->type = EDITOR_COMMAND_ANIMATED_SPRITE_REMOVE;
+            command->data.animated_sprite_remove.object = object;
+            command->data.animated_sprite_remove.sprite = id;
+            return editor_result_value(true);
+        }
+        if(strcmp(action, "rename") == 0 && count == 7) {
+            command->type = EDITOR_COMMAND_ANIMATED_SPRITE_RENAME;
+            command->data.animated_sprite_rename.object = object;
+            command->data.animated_sprite_rename.sprite = id;
+            snprintf(command->data.animated_sprite_rename.name,
+                sizeof(command->data.animated_sprite_rename.name), "%s", arguments[6]);
+            return editor_result_value(true);
+        }
+        if(strcmp(action, "frame-add") == 0 && count == 7 &&
+                editor_command_uint_parse(arguments[6], &value)) {
+            command->type = EDITOR_COMMAND_ANIMATION_FRAME_ADD;
+            command->data.animation_frame_add.object = object;
+            command->data.animation_frame_add.sprite = id;
+            command->data.animation_frame_add.frame = value;
+            return editor_result_value(true);
+        }
+        if(strcmp(action, "frame-delete") == 0 && count == 7 &&
+                editor_command_uint_parse(arguments[6], &value)) {
+            command->type = EDITOR_COMMAND_ANIMATION_FRAME_REMOVE;
+            command->data.animation_frame_remove.object = object;
+            command->data.animation_frame_remove.sprite = id;
+            command->data.animation_frame_remove.index = value;
+            return editor_result_value(true);
+        }
+        if(strcmp(action, "connect") == 0 && count == 8 &&
+                strcmp(arguments[6], "body") == 0 &&
+                editor_command_optional_id_parse(arguments[7], &value)) {
+            command->type = EDITOR_COMMAND_ANIMATED_SPRITE_BODY_SET;
+            command->data.animated_sprite_body_set.object = object;
+            command->data.animated_sprite_body_set.sprite = id;
+            command->data.animated_sprite_body_set.body = value;
+            return editor_result_value(true);
+        }
+        if(strcmp(action, "set") == 0 && count >= 8) {
+            const char *property = arguments[6];
+            if(strcmp(property, "body") == 0 && count == 8 &&
+                    editor_command_optional_id_parse(arguments[7], &value)) {
+                command->type = EDITOR_COMMAND_ANIMATED_SPRITE_BODY_SET;
+                command->data.animated_sprite_body_set.object = object;
+                command->data.animated_sprite_body_set.sprite = id;
+                command->data.animated_sprite_body_set.body = value;
+                return editor_result_value(true);
+            }
+            if(strcmp(property, "scale") == 0 && count == 9 &&
+                    editor_command_float_parse(arguments[7],
+                        &command->data.animated_sprite_scale_set.scale.x) &&
+                    editor_command_float_parse(arguments[8],
+                        &command->data.animated_sprite_scale_set.scale.y)) {
+                command->type = EDITOR_COMMAND_ANIMATED_SPRITE_SCALE_SET;
+                command->data.animated_sprite_scale_set.object = object;
+                command->data.animated_sprite_scale_set.sprite = id;
+                return editor_result_value(true);
+            }
+            if(strcmp(property, "position") == 0 && count == 9 &&
+                    editor_command_float_parse(arguments[7],
+                        &command->data.animated_sprite_position_set.position.x) &&
+                    editor_command_float_parse(arguments[8],
+                        &command->data.animated_sprite_position_set.position.y)) {
+                command->type = EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET;
+                command->data.animated_sprite_position_set.object = object;
+                command->data.animated_sprite_position_set.sprite = id;
+                return editor_result_value(true);
+            }
+            if(strcmp(property, "timing") == 0 && count == 9) {
+                char *tick_end, *time_end;
+                unsigned long long ticks = strtoull(arguments[7], &tick_end, 10);
+                double time = strtod(arguments[8], &time_end);
+                if(*tick_end != '\0' || *time_end != '\0' || time < 0.0)
+                    return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                        "timing requires non-negative ticks and seconds");
+                command->type = EDITOR_COMMAND_ANIMATED_SPRITE_TIMING_SET;
+                command->data.animated_sprite_timing_set.object = object;
+                command->data.animated_sprite_timing_set.sprite = id;
+                command->data.animated_sprite_timing_set.ticks = (Tick)ticks;
+                command->data.animated_sprite_timing_set.time = (Time)time;
+                return editor_result_value(true);
+            }
+            if(strcmp(property, "starting-frame") == 0 && count == 8 &&
+                    editor_command_uint_parse(arguments[7], &value)) {
+                command->type = EDITOR_COMMAND_ANIMATED_SPRITE_STARTING_FRAME_SET;
+                command->data.animated_sprite_starting_frame_set.object = object;
+                command->data.animated_sprite_starting_frame_set.sprite = id;
+                command->data.animated_sprite_starting_frame_set.frame = value;
+                return editor_result_value(true);
+            }
+            if(strcmp(property, "direction") == 0 && count == 8 &&
+                    (strcmp(arguments[7], "left") == 0 ||
+                        strcmp(arguments[7], "right") == 0)) {
+                command->type = EDITOR_COMMAND_ANIMATED_SPRITE_DIRECTION_SET;
+                command->data.animated_sprite_direction_set.object = object;
+                command->data.animated_sprite_direction_set.sprite = id;
+                command->data.animated_sprite_direction_set.direction =
+                    strcmp(arguments[7], "left") == 0 ? DIRECTION_LEFT :
+                        DIRECTION_RIGHT;
+                return editor_result_value(true);
+            }
+            if((strcmp(property, "follow-body-rotation") == 0 ||
+                    strcmp(property, "visibility") == 0) && count == 8) {
+                bool enabled;
+                if(!editor_command_bool_parse(arguments[7], &enabled))
+                    return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                        "%s requires true or false", property);
+                command->type = strcmp(property, "visibility") == 0 ?
+                    EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET :
+                    EDITOR_COMMAND_ANIMATED_SPRITE_FOLLOW_ROTATION_SET;
+                command->data.animated_sprite_boolean_set.object = object;
+                command->data.animated_sprite_boolean_set.sprite = id;
+                command->data.animated_sprite_boolean_set.enabled = enabled;
+                return editor_result_value(true);
+            }
+        }
+        return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+            "invalid animated-sprite command");
+    }
     *document_path = arguments[3];
     memset(command, 0, sizeof(*command));
     if(strcmp(domain, "navigation") == 0 && strcmp(action, "set") == 0) {
@@ -1459,6 +1874,26 @@ item_invalid:
     if(strcmp(action, "visibility") == 0) {
         EditorVisibilityKind kind;
         bool has_parent = false;
+        if(strcmp(domain, "sprite") == 0 && count == 7 &&
+                editor_command_uint_parse(arguments[4],
+                    &command->data.sprite_visibility_set.object) &&
+                editor_command_uint_parse(arguments[5],
+                    &command->data.sprite_visibility_set.sprite) &&
+                editor_command_bool_parse(arguments[6],
+                    &command->data.sprite_visibility_set.visible)) {
+            command->type = EDITOR_COMMAND_SPRITE_VISIBILITY_SET;
+            return editor_result_value(true);
+        }
+        if(strcmp(domain, "animated-sprite") == 0 && count == 7 &&
+                editor_command_uint_parse(arguments[4],
+                    &command->data.animated_sprite_boolean_set.object) &&
+                editor_command_uint_parse(arguments[5],
+                    &command->data.animated_sprite_boolean_set.sprite) &&
+                editor_command_bool_parse(arguments[6],
+                    &command->data.animated_sprite_boolean_set.enabled)) {
+            command->type = EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET;
+            return editor_result_value(true);
+        }
         if(strcmp(domain, "object") == 0) kind = EDITOR_VISIBILITY_OBJECT;
         else if(strcmp(domain, "rigid-body") == 0) kind = EDITOR_VISIBILITY_RIGID_BODY;
         else if(strcmp(domain, "hitbox") == 0) {
@@ -1730,7 +2165,158 @@ EditorResult editor_command_cli_write(const EditorCommand *command,
         return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
             "command serialization requires a command, path, and output buffer");
     output[0] = '\0';
+    if(command->type >= EDITOR_COMMAND_SPRITE_ADD &&
+            command->type <= EDITOR_COMMAND_SPRITE_SIZE_SET) {
+        if(!editor_command_text_append(output, output_capacity, &used,
+                "editor-cli sprite ")) goto capacity_error;
+    } else if(command->type >= EDITOR_COMMAND_ANIMATED_SPRITE_ADD &&
+            command->type <= EDITOR_COMMAND_ANIMATION_FRAME_REMOVE) {
+        if(!editor_command_text_append(output, output_capacity, &used,
+                "editor-cli animated-sprite ")) goto capacity_error;
+    }
     switch(command->type) {
+        case EDITOR_COMMAND_SPRITE_ADD:
+            if(!editor_command_text_append(output, output_capacity, &used, "add ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            snprintf(values, sizeof(values), " %u ", command->data.sprite_add.object);
+            if(!editor_command_text_append(output, output_capacity, &used, values) ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        command->data.sprite_add.name) ||
+                    !editor_command_text_append(output, output_capacity, &used, " ") ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        command->data.sprite_add.path)) goto capacity_error;
+            snprintf(values, sizeof(values), " %.9g %.9g",
+                command->data.sprite_add.size.x, command->data.sprite_add.size.y);
+            if(!editor_command_text_append(output, output_capacity, &used, values))
+                goto capacity_error;
+            return editor_result_value(true);
+        case EDITOR_COMMAND_SPRITE_REMOVE:
+        case EDITOR_COMMAND_SPRITE_RENAME:
+        case EDITOR_COMMAND_SPRITE_PATH_SET:
+        case EDITOR_COMMAND_SPRITE_SIZE_SET: {
+            EditorSpriteId id = command->type == EDITOR_COMMAND_SPRITE_REMOVE ?
+                command->data.sprite_remove.sprite :
+                command->type == EDITOR_COMMAND_SPRITE_RENAME ?
+                    command->data.sprite_rename.sprite :
+                command->type == EDITOR_COMMAND_SPRITE_PATH_SET ?
+                    command->data.sprite_path_set.sprite :
+                    command->data.sprite_size_set.sprite;
+            const char *action = command->type == EDITOR_COMMAND_SPRITE_REMOVE ?
+                "delete" : command->type == EDITOR_COMMAND_SPRITE_RENAME ? "rename" : "set";
+            EditorObjectId object = command->type == EDITOR_COMMAND_SPRITE_REMOVE ?
+                command->data.sprite_remove.object :
+                command->type == EDITOR_COMMAND_SPRITE_RENAME ?
+                    command->data.sprite_rename.object :
+                command->type == EDITOR_COMMAND_SPRITE_PATH_SET ?
+                    command->data.sprite_path_set.object :
+                    command->data.sprite_size_set.object;
+            snprintf(values, sizeof(values), "%s ", action);
+            if(!editor_command_text_append(output, output_capacity, &used, values) ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            snprintf(values, sizeof(values), " %u %u", object, id);
+            if(!editor_command_text_append(output, output_capacity, &used, values))
+                goto capacity_error;
+            if(command->type == EDITOR_COMMAND_SPRITE_RENAME) {
+                if(!editor_command_text_append(output, output_capacity, &used, " ") ||
+                        !editor_command_shell_text_append(output, output_capacity, &used,
+                            command->data.sprite_rename.name)) goto capacity_error;
+            } else if(command->type == EDITOR_COMMAND_SPRITE_PATH_SET) {
+                if(!editor_command_text_append(output, output_capacity, &used, " path ") ||
+                        !editor_command_shell_text_append(output, output_capacity, &used,
+                            command->data.sprite_path_set.path)) goto capacity_error;
+            } else if(command->type == EDITOR_COMMAND_SPRITE_SIZE_SET) {
+                snprintf(values, sizeof(values), " size %.9g %.9g",
+                    command->data.sprite_size_set.size.x,
+                    command->data.sprite_size_set.size.y);
+                if(!editor_command_text_append(output, output_capacity, &used, values))
+                    goto capacity_error;
+            }
+            return editor_result_value(true);
+        }
+        case EDITOR_COMMAND_ANIMATED_SPRITE_ADD:
+            snprintf(values, sizeof(values), "add ");
+            if(!editor_command_text_append(output, output_capacity, &used, values) ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            snprintf(values, sizeof(values), " %u ",
+                command->data.animated_sprite_add.object);
+            if(!editor_command_text_append(output, output_capacity, &used, values) ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        command->data.animated_sprite_add.name)) goto capacity_error;
+            return editor_result_value(true);
+        case EDITOR_COMMAND_ANIMATED_SPRITE_REMOVE:
+        case EDITOR_COMMAND_ANIMATED_SPRITE_RENAME:
+        case EDITOR_COMMAND_ANIMATED_SPRITE_BODY_SET:
+        case EDITOR_COMMAND_ANIMATED_SPRITE_SCALE_SET:
+        case EDITOR_COMMAND_ANIMATED_SPRITE_TIMING_SET:
+        case EDITOR_COMMAND_ANIMATED_SPRITE_STARTING_FRAME_SET:
+        case EDITOR_COMMAND_ANIMATED_SPRITE_DIRECTION_SET:
+        case EDITOR_COMMAND_ANIMATED_SPRITE_FOLLOW_ROTATION_SET:
+        case EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET:
+        case EDITOR_COMMAND_ANIMATION_FRAME_ADD:
+        case EDITOR_COMMAND_ANIMATION_FRAME_REMOVE: {
+            EditorObjectId object = command->data.animated_sprite_remove.object;
+            EditorAnimatedSpriteId id = command->data.animated_sprite_remove.sprite;
+            const char *action = command->type == EDITOR_COMMAND_ANIMATED_SPRITE_REMOVE ?
+                "delete" : command->type == EDITOR_COMMAND_ANIMATED_SPRITE_RENAME ?
+                "rename" : command->type == EDITOR_COMMAND_ANIMATION_FRAME_ADD ?
+                "frame-add" : command->type == EDITOR_COMMAND_ANIMATION_FRAME_REMOVE ?
+                "frame-delete" : command->type == EDITOR_COMMAND_ANIMATED_SPRITE_BODY_SET ?
+                "connect" : "set";
+            snprintf(values, sizeof(values), "%s ", action);
+            if(!editor_command_text_append(output, output_capacity, &used, values) ||
+                    !editor_command_shell_text_append(output, output_capacity, &used,
+                        document_path)) goto capacity_error;
+            snprintf(values, sizeof(values), " %u %u", object, id);
+            if(!editor_command_text_append(output, output_capacity, &used, values))
+                goto capacity_error;
+            if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_RENAME) {
+                if(!editor_command_text_append(output, output_capacity, &used, " ") ||
+                        !editor_command_shell_text_append(output, output_capacity, &used,
+                            command->data.animated_sprite_rename.name)) goto capacity_error;
+            } else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_BODY_SET) {
+                snprintf(values, sizeof(values), " body %u",
+                    command->data.animated_sprite_body_set.body);
+                if(!editor_command_text_append(output, output_capacity, &used, values)) goto capacity_error;
+            } else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_SCALE_SET) {
+                snprintf(values, sizeof(values), " scale %.9g %.9g",
+                    command->data.animated_sprite_scale_set.scale.x,
+                    command->data.animated_sprite_scale_set.scale.y);
+                if(!editor_command_text_append(output, output_capacity, &used, values)) goto capacity_error;
+            } else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_TIMING_SET) {
+                snprintf(values, sizeof(values), " timing %llu %.17g",
+                    (unsigned long long)command->data.animated_sprite_timing_set.ticks,
+                    (double)command->data.animated_sprite_timing_set.time);
+                if(!editor_command_text_append(output, output_capacity, &used, values)) goto capacity_error;
+            } else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_STARTING_FRAME_SET) {
+                snprintf(values, sizeof(values), " starting-frame %u",
+                    command->data.animated_sprite_starting_frame_set.frame);
+                if(!editor_command_text_append(output, output_capacity, &used, values)) goto capacity_error;
+            } else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_DIRECTION_SET) {
+                snprintf(values, sizeof(values), " direction %s",
+                    command->data.animated_sprite_direction_set.direction == DIRECTION_LEFT ?
+                        "left" : "right");
+                if(!editor_command_text_append(output, output_capacity, &used, values)) goto capacity_error;
+            } else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_FOLLOW_ROTATION_SET ||
+                    command->type == EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET) {
+                snprintf(values, sizeof(values), " %s %s",
+                    command->type == EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET ?
+                        "visibility" : "follow-body-rotation",
+                    command->data.animated_sprite_boolean_set.enabled ? "true" : "false");
+                if(!editor_command_text_append(output, output_capacity, &used, values)) goto capacity_error;
+            } else if(command->type == EDITOR_COMMAND_ANIMATION_FRAME_ADD) {
+                snprintf(values, sizeof(values), " %u",
+                    command->data.animation_frame_add.frame);
+                if(!editor_command_text_append(output, output_capacity, &used, values)) goto capacity_error;
+            } else if(command->type == EDITOR_COMMAND_ANIMATION_FRAME_REMOVE) {
+                snprintf(values, sizeof(values), " %zu",
+                    command->data.animation_frame_remove.index);
+                if(!editor_command_text_append(output, output_capacity, &used, values)) goto capacity_error;
+            }
+            return editor_result_value(true);
+        }
         case EDITOR_COMMAND_OBJECT_ADD:
         case EDITOR_COMMAND_OBJECT_RENAME:
         case EDITOR_COMMAND_OBJECT_REMOVE:
