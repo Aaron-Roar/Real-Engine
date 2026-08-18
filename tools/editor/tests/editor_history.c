@@ -137,6 +137,7 @@ int main(void) {
             MOUSE_BUTTON_STATE_DOWN, MOUSE_BUTTON_STATE_UP, false, 0.0f, false));
         editor_history_continuous_set(&history, false);
         assert(history.undo_count == 1);
+        assert(editor_history_memory_get(&history) < 4096);
         shortcut_apply(&history, SDLK_Z);
         assert(hitbox->vertices[0].position.x == original_vertex.x);
         shortcut_apply(&history, SDLK_Y);

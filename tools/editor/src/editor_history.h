@@ -19,6 +19,10 @@ typedef struct EditorHistory {
     bool continuous_recorded;
     bool recorded_since_continuous_update;
     bool transaction_active;
+    bool pending_command_valid;
+    bool restoring;
+    EditorCommand pending_forward;
+    EditorCommand pending_inverse;
 } EditorHistory;
 
 bool editor_history_init(EditorHistory *history, EditorProject *project);
