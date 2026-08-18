@@ -72,6 +72,36 @@ int main(void) {
     assert(project.object_count == 1);
     assert(strcmp(project.objects[0].name, "Car") == 0);
 
+    editor_history_reset(&history);
+    command = (EditorCommand){.type = EDITOR_COMMAND_ITEM_ADD,
+        .data.item_add = {.kind = EDITOR_ITEM_RIGID_BODY,
+            .object = project.objects[0].id}};
+    editor_history_command_begin(&history, &project, &command);
+    result = editor_command_execute(&project, &command);
+    editor_history_command_finish(&history, &command, &result);
+    assert(result.kind == ERROR_RESULT_VALUE);
+    {
+        EditorRigidBodyId added_body = result.result.object;
+        assert(project.objects[0].rigid_body_count == 1);
+        assert(editor_history_undo(&history));
+        assert(project.objects[0].rigid_body_count == 0);
+        assert(editor_history_redo(&history));
+        assert(project.objects[0].rigid_body_count == 1);
+        assert(project.objects[0].rigid_bodies[0].id == added_body);
+        command = (EditorCommand){.type = EDITOR_COMMAND_ITEM_REMOVE,
+            .data.item_remove = {.kind = EDITOR_ITEM_RIGID_BODY,
+                .object = project.objects[0].id, .item = added_body}};
+        editor_history_command_begin(&history, &project, &command);
+        result = editor_command_execute(&project, &command);
+        editor_history_command_finish(&history, &command, &result);
+        assert(result.kind == ERROR_RESULT_VALUE);
+        assert(project.objects[0].rigid_body_count == 0);
+        assert(editor_history_undo(&history));
+        assert(project.objects[0].rigid_body_count == 1);
+        assert(editor_history_redo(&history));
+        assert(project.objects[0].rigid_body_count == 0);
+    }
+
     body = editor_project_rigid_body_add(&project, &project.objects[0]);
     assert(body != NULL);
     hitbox = editor_project_hitbox_add(&project, body);

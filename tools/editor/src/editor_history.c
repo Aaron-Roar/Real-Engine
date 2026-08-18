@@ -18,8 +18,23 @@ typedef enum EditorHistoryEntryKind {
 
 typedef enum EditorHistoryActionKind {
     EDITOR_HISTORY_ACTION_COMMAND,
-    EDITOR_HISTORY_ACTION_OBJECT
+    EDITOR_HISTORY_ACTION_OBJECT,
+    EDITOR_HISTORY_ACTION_AGGREGATE
 } EditorHistoryActionKind;
+
+typedef enum EditorHistoryAggregateKind {
+    EDITOR_HISTORY_AGGREGATE_OBJECT,
+    EDITOR_HISTORY_AGGREGATE_RIGID_BODY,
+    EDITOR_HISTORY_AGGREGATE_SOFT_BODY
+} EditorHistoryAggregateKind;
+
+struct EditorHistoryAggregateChange {
+    EditorHistoryAggregateKind kind;
+    EditorObjectId object;
+    uint32_t item;
+    void *value;
+    size_t size;
+};
 
 struct EditorHistoryObjectChange {
     bool present;
@@ -33,6 +48,7 @@ typedef struct EditorHistoryAction {
     union {
         EditorCommand command;
         EditorHistoryObjectChange *object;
+        EditorHistoryAggregateChange *aggregate;
     } data;
 } EditorHistoryAction;
 
@@ -50,12 +66,90 @@ struct EditorHistoryEntry {
     size_t command_count;
 };
 
+static EditorSoftBody *editor_history_soft_body_get(EditorObject *object,
+    EditorSoftBodyId id);
+
 #define EDITOR_HISTORY_BLOCK_SIZE 64
 
 static size_t editor_history_block_size_get(size_t offset) {
     size_t remaining = sizeof(EditorProject) - offset;
     return remaining < EDITOR_HISTORY_BLOCK_SIZE ? remaining :
         EDITOR_HISTORY_BLOCK_SIZE;
+}
+
+static void editor_history_aggregate_destroy(EditorHistoryAggregateChange *change) {
+    if(change == NULL) return;
+    free(change->value);
+    free(change);
+}
+
+static EditorHistoryAggregateChange *editor_history_aggregate_capture(
+        EditorProject *project, EditorItemKind kind, EditorObjectId object_id,
+        uint32_t parent) {
+    EditorHistoryAggregateChange *change;
+    EditorObject *object = editor_object_query_get(project, object_id);
+    const void *value = NULL;
+    size_t size = 0;
+    EditorHistoryAggregateKind aggregate_kind = EDITOR_HISTORY_AGGREGATE_OBJECT;
+    uint32_t item = 0;
+    if(object == NULL) return NULL;
+    if(kind == EDITOR_ITEM_HITBOX || kind == EDITOR_ITEM_VERTEX ||
+            kind == EDITOR_ITEM_LINE) {
+        EditorRigidBody *body = editor_project_rigid_body_get(object, parent);
+        if(body == NULL) return NULL;
+        aggregate_kind = EDITOR_HISTORY_AGGREGATE_RIGID_BODY;
+        item = parent;
+        value = body;
+        size = sizeof(*body);
+    } else if(kind == EDITOR_ITEM_SOFT_NODE || kind == EDITOR_ITEM_SOFT_BEAM ||
+            kind == EDITOR_ITEM_SOFT_AREA) {
+        EditorSoftBody *body = editor_history_soft_body_get(object, parent);
+        if(body == NULL) return NULL;
+        aggregate_kind = EDITOR_HISTORY_AGGREGATE_SOFT_BODY;
+        item = parent;
+        value = body;
+        size = sizeof(*body);
+    } else {
+        value = object;
+        size = sizeof(*object);
+    }
+    change = calloc(1, sizeof(*change));
+    if(change == NULL) return NULL;
+    change->value = malloc(size);
+    if(change->value == NULL) {
+        free(change);
+        return NULL;
+    }
+    memcpy(change->value, value, size);
+    change->kind = aggregate_kind;
+    change->object = object_id;
+    change->item = item;
+    change->size = size;
+    return change;
+}
+
+static EditorHistoryEntry *editor_history_aggregate_entry_create(
+        EditorHistoryAggregateChange *forward,
+        EditorHistoryAggregateChange *inverse) {
+    EditorHistoryEntry *entry;
+    if(forward == NULL || inverse == NULL) return NULL;
+    entry = calloc(1, sizeof(*entry));
+    if(entry == NULL) return NULL;
+    entry->commands = malloc(sizeof(*entry->commands));
+    if(entry->commands == NULL) {
+        free(entry);
+        return NULL;
+    }
+    entry->kind = EDITOR_HISTORY_ENTRY_COMMANDS;
+    entry->commands[0] = (EditorHistoryCommandPair){
+        .forward = {.kind = EDITOR_HISTORY_ACTION_AGGREGATE,
+            .data.aggregate = forward},
+        .inverse = {.kind = EDITOR_HISTORY_ACTION_AGGREGATE,
+            .data.aggregate = inverse}};
+    entry->command_count = 1;
+    entry->memory = sizeof(*entry) + sizeof(*entry->commands) +
+        sizeof(*forward) + sizeof(*inverse) + forward->size + inverse->size;
+    return entry;
 }
 
 static bool editor_history_block_changed(const unsigned char *before,
@@ -78,6 +172,16 @@ static void editor_history_entry_destroy(EditorHistoryEntry *entry) {
                 free(entry->commands[i].forward.data.object);
             if(entry->commands[i].inverse.kind == EDITOR_HISTORY_ACTION_OBJECT)
                 free(entry->commands[i].inverse.data.object);
+            if(entry->commands[i].forward.kind == EDITOR_HISTORY_ACTION_AGGREGATE) {
+                if(entry->commands[i].forward.data.aggregate != NULL)
+                    free(entry->commands[i].forward.data.aggregate->value);
+                free(entry->commands[i].forward.data.aggregate);
+            }
+            if(entry->commands[i].inverse.kind == EDITOR_HISTORY_ACTION_AGGREGATE) {
+                if(entry->commands[i].inverse.data.aggregate != NULL)
+                    free(entry->commands[i].inverse.data.aggregate->value);
+                free(entry->commands[i].inverse.data.aggregate);
+            }
         }
         free(entry->commands);
     }
@@ -171,6 +275,25 @@ static void editor_history_action_apply(EditorProject *project,
     if(project == NULL || action == NULL) return;
     if(action->kind == EDITOR_HISTORY_ACTION_COMMAND) {
         (void)editor_command_execute(project, &action->data.command);
+        return;
+    }
+    if(action->kind == EDITOR_HISTORY_ACTION_AGGREGATE) {
+        EditorHistoryAggregateChange *change = action->data.aggregate;
+        EditorObject *object;
+        if(change == NULL || change->value == NULL) return;
+        object = editor_object_query_get(project, change->object);
+        if(change->kind == EDITOR_HISTORY_AGGREGATE_OBJECT) {
+            if(object != NULL && change->size == sizeof(*object))
+                memcpy(object, change->value, change->size);
+        } else if(change->kind == EDITOR_HISTORY_AGGREGATE_RIGID_BODY) {
+            EditorRigidBody *body = editor_project_rigid_body_get(object, change->item);
+            if(body != NULL && change->size == sizeof(*body))
+                memcpy(body, change->value, change->size);
+        } else {
+            EditorSoftBody *body = editor_history_soft_body_get(object, change->item);
+            if(body != NULL && change->size == sizeof(*body))
+                memcpy(body, change->value, change->size);
+        }
         return;
     }
     if(action->data.object == NULL) return;
@@ -452,6 +575,7 @@ void editor_history_destroy(EditorHistory *history) {
     editor_history_stack_clear(history->redo, &history->redo_count);
     free(history->pending);
     free(history->pending_object);
+    editor_history_aggregate_destroy(history->pending_aggregate);
     free(history->transaction_before);
     editor_history_entry_destroy(history->transaction_commands);
     memset(history, 0, sizeof(*history));
@@ -465,6 +589,8 @@ void editor_history_reset(EditorHistory *history) {
     history->pending = NULL;
     free(history->pending_object);
     history->pending_object = NULL;
+    editor_history_aggregate_destroy(history->pending_aggregate);
+    history->pending_aggregate = NULL;
     history->pending_command_valid = false;
     free(history->transaction_before);
     history->transaction_before = NULL;
@@ -484,6 +610,8 @@ void editor_history_command_begin(EditorHistory *history,
     history->pending = NULL;
     free(history->pending_object);
     history->pending_object = NULL;
+    editor_history_aggregate_destroy(history->pending_aggregate);
+    history->pending_aggregate = NULL;
     history->pending_command_valid = false;
     if(project == NULL || !editor_history_command_record_check(command)) return;
     if(command->type == EDITOR_COMMAND_OBJECT_ADD ||
@@ -508,6 +636,20 @@ void editor_history_command_begin(EditorHistory *history,
                     .selected = project->selected};
             return;
         }
+    }
+    if(command->type == EDITOR_COMMAND_ITEM_ADD &&
+            command->data.item_add.kind != EDITOR_ITEM_OBJECT) {
+        history->pending_aggregate = editor_history_aggregate_capture(
+            history->project, command->data.item_add.kind,
+            command->data.item_add.object, command->data.item_add.parent);
+        return;
+    }
+    if(command->type == EDITOR_COMMAND_ITEM_REMOVE &&
+            command->data.item_remove.kind != EDITOR_ITEM_OBJECT) {
+        history->pending_aggregate = editor_history_aggregate_capture(
+            history->project, command->data.item_remove.kind,
+            command->data.item_remove.object, command->data.item_remove.parent);
+        return;
     }
     if(editor_history_inverse_get(history->project, command,
             &history->pending_inverse)) {
@@ -535,6 +677,8 @@ void editor_history_command_finish(EditorHistory *history,
         history->pending = NULL;
         free(history->pending_object);
         history->pending_object = NULL;
+        editor_history_aggregate_destroy(history->pending_aggregate);
+        history->pending_aggregate = NULL;
         history->pending_command_valid = false;
         return;
     }
@@ -561,6 +705,26 @@ void editor_history_command_finish(EditorHistory *history,
             inverse.present = true;
         }
         entry = editor_history_object_entry_create(forward, inverse);
+        if(entry != NULL && editor_history_stack_push(history->undo,
+                &history->undo_count, entry))
+            editor_history_stack_clear(history->redo, &history->redo_count);
+        else editor_history_entry_destroy(entry);
+        goto finish;
+    }
+    if(history->pending_aggregate != NULL && command != NULL && result != NULL &&
+            result->kind == ERROR_RESULT_VALUE) {
+        EditorItemKind kind = command->type == EDITOR_COMMAND_ITEM_ADD ?
+            command->data.item_add.kind : command->data.item_remove.kind;
+        EditorObjectId object = command->type == EDITOR_COMMAND_ITEM_ADD ?
+            command->data.item_add.object : command->data.item_remove.object;
+        uint32_t parent = command->type == EDITOR_COMMAND_ITEM_ADD ?
+            command->data.item_add.parent : command->data.item_remove.parent;
+        EditorHistoryAggregateChange *after = editor_history_aggregate_capture(
+            history->project, kind, object, parent);
+        entry = editor_history_aggregate_entry_create(after,
+            history->pending_aggregate);
+        if(entry != NULL) history->pending_aggregate = NULL;
+        else editor_history_aggregate_destroy(after);
         if(entry != NULL && editor_history_stack_push(history->undo,
                 &history->undo_count, entry))
             editor_history_stack_clear(history->redo, &history->redo_count);
@@ -616,6 +780,8 @@ finish:
     history->pending = NULL;
     free(history->pending_object);
     history->pending_object = NULL;
+    editor_history_aggregate_destroy(history->pending_aggregate);
+    history->pending_aggregate = NULL;
     history->pending_command_valid = false;
 }
 
