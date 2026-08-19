@@ -3,64 +3,54 @@
 
 #include <float.h>
 
-OverlapInfo physics_sat_overlap_on_axes_get(Shape shape_1, Shape shape_2, Vec2DList axes, OverlapInfo overlap_info) {
-    for (int i = 0; i < axes.amount_of_vectors; i += 1) {
-        Axis axis = axes.vectors[i];
+static bool physics_sat_piece_axes_apply(
+    Shape first,
+    Shape second,
+    const Shape *source,
+    uint8_t piece_index,
+    OverlapInfo *overlap
+) {
+    Vec2DList axes = math_vectors_normalize(math_normals_create(first));
 
-        Projection p1 = math_project_shape_on_axis(shape_1, axis);
-        Projection p2 = math_project_shape_on_axis(shape_2, axis);
-
-        float overlap = math_projection_overlap(p1, p2);
-
-        if (overlap <= 0.0f) {
-            return (OverlapInfo){ .detected = false };
-        }
-
-        if (overlap < overlap_info.depth) {
-            overlap_info.depth = overlap;
-            overlap_info.normal = axis;
+    for(uint8_t edge = 0; edge < axes.amount_of_vectors; edge += 1) {
+        Axis axis = axes.vectors[edge];
+        Projection first_projection = math_project_shape_on_axis(first, axis);
+        Projection second_projection = math_project_shape_on_axis(second, axis);
+        float depth = math_projection_overlap(first_projection, second_projection);
+        if(depth <= 0.0f) return false;
+        if(physics_shape_collision_piece_edge_boundary_check(
+                source, piece_index, edge) && depth < overlap->depth) {
+            overlap->depth = depth;
+            overlap->normal = axis;
         }
     }
-
-    return overlap_info;
+    return true;
 }
-static OverlapInfo physics_sat_convex_overlap_get(Shape shape_1, Shape shape_2)
-{
-    OverlapInfo collision = {
-        .detected = true,
-        .normal = {0},
-        .depth = FLT_MAX
-    };
 
-    Vec2DList shape1_axes = math_vectors_normalize(math_normals_create(shape_1));
-    Vec2DList shape2_axes = math_vectors_normalize(math_normals_create(shape_2));
+static OverlapInfo physics_sat_piece_overlap_get(
+    const Shape *first_source,
+    uint8_t first_index,
+    const Shape *second_source,
+    uint8_t second_index
+) {
+    Shape first = physics_shape_collision_piece_get(first_source, first_index);
+    Shape second = physics_shape_collision_piece_get(second_source, second_index);
+    OverlapInfo overlap = {.detected = true, .depth = FLT_MAX};
+    Vec2D center_delta;
 
-    collision = physics_sat_overlap_on_axes_get(shape_1, shape_2, shape1_axes, collision);
-
-    if (!collision.detected) {
-        return collision;
+    if(!physics_sat_piece_axes_apply(first, second, first_source, first_index,
+            &overlap) ||
+            !physics_sat_piece_axes_apply(second, first, second_source,
+                second_index, &overlap) || overlap.depth == FLT_MAX)
+        return (OverlapInfo){0};
+    center_delta = math_vector_subtract(
+        math_polygon_centroid(*second_source),
+        math_polygon_centroid(*first_source));
+    if(math_dot_product(center_delta, overlap.normal) < 0.0f) {
+        overlap.normal.x *= -1.0f;
+        overlap.normal.y *= -1.0f;
     }
-
-    collision = physics_sat_overlap_on_axes_get(shape_1, shape_2, shape2_axes, collision);
-
-    if (!collision.detected) {
-        return collision;
-    }
-
-    Position c1 = math_polygon_centroid(shape_1);
-    Position c2 = math_polygon_centroid(shape_2);
-
-    Vec2D center_delta = {
-        .x = c2.x - c1.x,
-        .y = c2.y - c1.y
-    };
-
-    if (math_dot_product(center_delta, collision.normal) < 0.0f) {
-        collision.normal.x *= -1.0f;
-        collision.normal.y *= -1.0f;
-    }
-
-    return collision;
+    return overlap;
 }
 
 OverlapInfo physics_sat_overlap_get(Shape shape_1, Shape shape_2) {
@@ -75,13 +65,11 @@ OverlapInfo physics_sat_overlap_get(Shape shape_1, Shape shape_2) {
     first_count = physics_shape_collision_piece_count_get(&shape_1);
     second_count = physics_shape_collision_piece_count_get(&shape_2);
     for(uint8_t first = 0; first < first_count; first += 1) {
-        Shape first_piece = physics_shape_collision_piece_get(&shape_1, first);
         for(uint8_t second = 0; second < second_count; second += 1) {
-            Shape second_piece = physics_shape_collision_piece_get(&shape_2, second);
-            OverlapInfo overlap = physics_sat_convex_overlap_get(
-                first_piece, second_piece);
+            OverlapInfo overlap = physics_sat_piece_overlap_get(
+                &shape_1, first, &shape_2, second);
             if(!overlap.detected) continue;
-            if(!best.detected || overlap.depth < best.depth) best = overlap;
+            if(!best.detected || overlap.depth > best.depth) best = overlap;
         }
     }
     return best;

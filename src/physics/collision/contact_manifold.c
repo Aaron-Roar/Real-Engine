@@ -160,7 +160,7 @@ ContactManifold contact_manifold_polygon_get(
     Axis normal
 ) {
     ContactManifold best = {0};
-    float best_depth = FLT_MAX;
+    float best_depth = -FLT_MAX;
     uint8_t first_count;
     uint8_t second_count;
 
@@ -177,10 +177,9 @@ ContactManifold contact_manifold_polygon_get(
                 &second, second_index);
             OverlapInfo overlap = physics_sat_overlap_get(first_piece, second_piece);
             ContactManifold candidate;
-            if(!overlap.detected || overlap.depth >= best_depth ||
-                    math_dot_product(overlap.normal, normal) < 0.99f) continue;
+            if(!overlap.detected || overlap.depth <= best_depth) continue;
             candidate = contact_manifold_convex_get(
-                first_piece, second_piece, overlap.normal);
+                first_piece, second_piece, normal);
             if(candidate.count == 0) continue;
             best = candidate;
             best_depth = overlap.depth;

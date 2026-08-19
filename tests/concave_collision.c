@@ -2,6 +2,8 @@
 #include "physics/collision/contact_manifold.h"
 #include "physics/collision/shape_decomposition.h"
 
+#include <math.h>
+
 static Shape l_shape_get(void) {
     return (Shape){
         .amount_of_vertices = 6,
@@ -18,6 +20,16 @@ static Shape square_get(float min_x, float min_y, float max_x, float max_y) {
         .vertices = {
             {min_x, min_y}, {max_x, min_y},
             {max_x, max_y}, {min_x, max_y}
+        }
+    };
+}
+
+static Shape notched_shape_get(void) {
+    return (Shape){
+        .amount_of_vertices = 5,
+        .vertices = {
+            {25.0f, 24.0f}, {25.0f, -25.0f}, {-1.0f, 3.0f},
+            {-25.0f, -25.0f}, {-25.0f, 25.0f}
         }
     };
 }
@@ -59,6 +71,10 @@ int main(void) {
         return 10;
     if(!physics_sat_overlap_get(l_shape_get(),
             square_get(0.5f, 0.5f, 1.5f, 1.5f)).detected) return 11;
+    overlap = physics_sat_overlap_get(notched_shape_get(),
+        square_get(24.0f, 8.0f, 27.0f, 12.0f));
+    if(!overlap.detected || overlap.normal.x < 0.9f ||
+            fabsf(overlap.normal.y) > 0.1f) return 12;
 
     return 0;
 }

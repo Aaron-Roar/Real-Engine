@@ -157,3 +157,23 @@ Shape physics_shape_collision_piece_get(const Shape *shape, uint8_t index) {
             shape->concave_pieces[index].vertex_indices[i]];
     return piece;
 }
+
+bool physics_shape_collision_piece_edge_boundary_check(
+    const Shape *shape,
+    uint8_t piece_index,
+    uint8_t edge_index
+) {
+    uint8_t first;
+    uint8_t second;
+    uint16_t count;
+
+    if(shape == NULL) return false;
+    if(shape->concave_piece_count == 0)
+        return piece_index == 0 && edge_index < shape->amount_of_vertices;
+    if(piece_index >= shape->concave_piece_count || edge_index >= 3) return false;
+    count = shape->amount_of_vertices;
+    first = shape->concave_pieces[piece_index].vertex_indices[edge_index];
+    second = shape->concave_pieces[piece_index].vertex_indices[(edge_index + 1) % 3];
+    return (uint16_t)((first + 1) % count) == second ||
+        (uint16_t)((second + 1) % count) == first;
+}

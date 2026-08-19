@@ -106,8 +106,8 @@ semantics are stable.
   boundaries through the existing contact pipeline.
 - Profile concave contacts, then cache the selected convex-piece pair between
   overlap detection and manifold generation if it materially reduces work.
-- Improve concave boundary response by merging contacts across adjacent convex
-  pieces and suppressing internal decomposition edges.
+- Improve concave stacking by merging compatible contacts across adjacent
+  convex pieces without exposing decomposition through the public API.
 - Add compound contours and holes only after their ownership and authoring
   representation are explicit.
 - Profile before adding a sparse broad-phase interaction candidate index.
