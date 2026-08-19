@@ -613,6 +613,35 @@ int main(void) {
     }
 
     {
+        EditorObjectId object_id = project.objects[0].id;
+        editor_history_reset(&history);
+        project.objects[0].position = (Position){0};
+        callback_history = &history;
+        editor_command_executing_callback_set(history_begin, NULL);
+        editor_command_finished_callback_set(history_finish, NULL);
+        assert(editor_history_transaction_begin(&history));
+        assert(editor_history_transaction_object_track(&history, object_id));
+        editor_history_transaction_commands_suppress_set(&history, true);
+        for(int step = 1; step <= 3; step += 1) {
+            command = (EditorCommand){.type = EDITOR_COMMAND_OBJECT_POSITION,
+                .data.object_position = {.object = object_id,
+                    .position = {(float)step * 10.0f, (float)step * 5.0f}}};
+            result = editor_command_execute(&project, &command);
+            assert(result.kind == ERROR_RESULT_VALUE);
+        }
+        assert(editor_history_transaction_end(&history));
+        assert(history.undo_count == 1);
+        assert(project.objects[0].position.x == 30.0f);
+        assert(editor_history_undo(&history));
+        assert(project.objects[0].position.x == 0.0f);
+        assert(editor_history_redo(&history));
+        assert(project.objects[0].position.x == 30.0f);
+        editor_command_executing_callback_set(NULL, NULL);
+        editor_command_finished_callback_set(NULL, NULL);
+        callback_history = NULL;
+    }
+
+    {
         EditorSpriteId sprite_id;
         editor_history_reset(&history);
         callback_history = &history;

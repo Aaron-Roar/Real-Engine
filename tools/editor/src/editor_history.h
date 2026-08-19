@@ -22,6 +22,7 @@ typedef struct EditorHistory {
     bool continuous_recorded;
     bool recorded_since_continuous_update;
     bool transaction_active;
+    bool transaction_commands_suppressed;
     bool pending_command_valid;
     bool restoring;
     EditorCommand pending_forward;
@@ -44,6 +45,8 @@ bool editor_history_transaction_begin(EditorHistory *history);
 bool editor_history_transaction_object_track(EditorHistory *history,
     EditorObjectId object);
 bool editor_history_transaction_object_order_track(EditorHistory *history);
+void editor_history_transaction_commands_suppress_set(EditorHistory *history,
+    bool suppressed);
 bool editor_history_transaction_end(EditorHistory *history);
 void editor_history_transaction_cancel(EditorHistory *history);
 bool editor_history_undo(EditorHistory *history);

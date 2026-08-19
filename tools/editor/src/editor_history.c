@@ -977,6 +977,7 @@ void editor_history_reset(EditorHistory *history) {
     editor_history_entry_destroy(history->transaction_commands);
     history->transaction_commands = NULL;
     history->transaction_active = false;
+    history->transaction_commands_suppressed = false;
     history->continuous = false;
     history->continuous_recorded = false;
     history->recorded_since_continuous_update = false;
@@ -995,6 +996,8 @@ void editor_history_command_begin(EditorHistory *history,
     editor_history_sprites_destroy(history->pending_sprites);
     history->pending_sprites = NULL;
     history->pending_command_valid = false;
+    if(history->transaction_active &&
+            history->transaction_commands_suppressed) return;
     if(project == NULL || !editor_history_command_record_check(command)) return;
     if(command->type == EDITOR_COMMAND_COLLISION_MASK_ADD) {
         history->pending_collision = editor_history_collision_capture(project);
@@ -1252,6 +1255,7 @@ bool editor_history_transaction_begin(EditorHistory *history) {
     history->transaction_commands->memory =
         sizeof(*history->transaction_commands);
     history->transaction_active = true;
+    history->transaction_commands_suppressed = false;
     return true;
 }
 
@@ -1340,6 +1344,12 @@ fail:
     return false;
 }
 
+void editor_history_transaction_commands_suppress_set(EditorHistory *history,
+        bool suppressed) {
+    if(history == NULL || !history->transaction_active) return;
+    history->transaction_commands_suppressed = suppressed;
+}
+
 static bool editor_history_transaction_tracks_finalize(EditorHistory *history) {
     EditorHistoryEntry *entry;
     size_t output = 0;
@@ -1390,6 +1400,7 @@ bool editor_history_transaction_end(EditorHistory *history) {
     entry = history->transaction_commands;
     history->transaction_commands = NULL;
     history->transaction_active = false;
+    history->transaction_commands_suppressed = false;
     if(entry->command_count == 0) {
         editor_history_entry_destroy(entry);
         return true;
@@ -1413,6 +1424,7 @@ void editor_history_transaction_cancel(EditorHistory *history) {
     editor_history_entry_destroy(history->transaction_commands);
     history->transaction_commands = NULL;
     history->transaction_active = false;
+    history->transaction_commands_suppressed = false;
 }
 
 static bool editor_history_restore(EditorHistory *history,

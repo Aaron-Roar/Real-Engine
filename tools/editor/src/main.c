@@ -2096,9 +2096,7 @@ int main(void) {
                 }
             }
         }
-        editor_history_continuous_set(&history, field_editing ||
-            mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_PRESSED ||
-            mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_DOWN);
+        editor_history_continuous_set(&history, field_editing);
         if(notification_panel.report_open &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             notification_panel.report_open = false;
@@ -3233,11 +3231,8 @@ int main(void) {
                 pointer.y < EDITOR_MENU_HEIGHT ||
                 pointer.y >= EDITOR_VIEWPORT_BOTTOM;
             bool viewport_consumed;
-            bool group_transform_before = viewport_state.group_dragging ||
-                viewport_state.group_rotating ||
-                (viewport_state.selected_item_count >= 2 &&
-                    (viewport_state.rotated_body ||
-                        viewport_state.rotated_soft_body));
+            bool transform_before =
+                editor_viewport_transform_active_check(&viewport_state);
             bool pan_modifier =
                 rohr_controller_key_down_get(&keyboard, SDLK_LCTRL) ||
                 rohr_controller_key_down_get(&keyboard, SDLK_RCTRL);
@@ -3275,29 +3270,34 @@ int main(void) {
                 viewport_state.selection_modifier = false;
             }
             {
-                bool group_transform_after = viewport_state.group_dragging ||
-                    viewport_state.group_rotating ||
-                    (viewport_state.selected_item_count >= 2 &&
-                        (viewport_state.rotated_body ||
-                            viewport_state.rotated_soft_body));
-                if(!group_transform_before && group_transform_after) {
+                bool transform_after =
+                    editor_viewport_transform_active_check(&viewport_state);
+                if(!transform_before && transform_after) {
+                    bool tracked = false;
                     if(!editor_history_transaction_begin(&history)) {
-                        viewport_state.group_dragging = false;
-                        viewport_state.group_rotating = false;
-                        viewport_state.rotated_body = false;
-                        viewport_state.rotated_soft_body = false;
-                    } else for(size_t i = 0;
-                            i < viewport_state.selected_item_count; i += 1)
-                        if(!editor_history_transaction_object_track(&history,
-                                viewport_state.selected_items[i].object)) {
-                            editor_history_transaction_cancel(&history);
-                            viewport_state.group_dragging = false;
-                            viewport_state.group_rotating = false;
-                            viewport_state.rotated_body = false;
-                            viewport_state.rotated_soft_body = false;
-                            break;
+                        editor_viewport_transform_cancel(&viewport_state);
+                    } else {
+                        for(size_t i = 0;
+                                i < viewport_state.selected_item_count; i += 1) {
+                            if(!editor_history_transaction_object_track(&history,
+                                    viewport_state.selected_items[i].object)) {
+                                tracked = false;
+                                break;
+                            }
+                            tracked = true;
                         }
-                } else if(group_transform_before && !group_transform_after) {
+                        if(!tracked && project.selected != 0)
+                            tracked = editor_history_transaction_object_track(
+                                &history, project.selected);
+                        if(!tracked) {
+                            editor_history_transaction_cancel(&history);
+                            editor_viewport_transform_cancel(&viewport_state);
+                        } else {
+                            editor_history_transaction_commands_suppress_set(
+                                &history, true);
+                        }
+                    }
+                } else if(transform_before && !transform_after) {
                     (void)editor_history_transaction_end(&history);
                 }
             }
@@ -3382,9 +3382,7 @@ int main(void) {
                 (void)editor_command_execute(&project, &command);
             }
         }
-        editor_history_continuous_set(&history, field_editing ||
-            mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_PRESSED ||
-            mouse.button_states[MOUSE_BUTTON_LEFT] == MOUSE_BUTTON_STATE_DOWN);
+        editor_history_continuous_set(&history, field_editing);
         rohr_ui_frame_end();
         if(!file_browser.active) {
             (void)rohr_graphics_screen_rect_draw(

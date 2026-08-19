@@ -2118,6 +2118,35 @@ static bool editor_group_transform_apply(EditorProject *project,
     return changed;
 }
 
+bool editor_viewport_transform_active_check(const EditorViewportState *state) {
+    if(state == NULL) return false;
+    return state->dragged_vertex >= 0 || state->dragged_body ||
+        state->rotated_body || state->dragged_anchor ||
+        state->dragged_soft_node || state->dragged_soft_body ||
+        state->dragged_sprite || state->dragged_animated_sprite ||
+        state->rotated_sprite || state->rotated_animated_sprite ||
+        state->rotated_soft_body || state->dragged_origin ||
+        state->group_dragging || state->group_rotating;
+}
+
+void editor_viewport_transform_cancel(EditorViewportState *state) {
+    if(state == NULL) return;
+    state->dragged_vertex = -1;
+    state->dragged_body = false;
+    state->rotated_body = false;
+    state->dragged_anchor = false;
+    state->dragged_soft_node = false;
+    state->dragged_soft_body = false;
+    state->dragged_sprite = false;
+    state->dragged_animated_sprite = false;
+    state->rotated_sprite = false;
+    state->rotated_animated_sprite = false;
+    state->rotated_soft_body = false;
+    state->dragged_origin = false;
+    state->group_dragging = false;
+    state->group_rotating = false;
+}
+
 bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
     Position pointer, MouseButtonState primary_button,
     MouseButtonState pan_button, bool pan_modifier, float wheel_y,
@@ -2296,18 +2325,7 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
     }
     if(object == NULL) return false;
     if(primary_button == MOUSE_BUTTON_STATE_RELEASED) {
-        state->dragged_vertex = -1;
-        state->dragged_body = false;
-        state->rotated_body = false;
-        state->dragged_anchor = false;
-        state->dragged_soft_node = false;
-        state->dragged_soft_body = false;
-        state->dragged_sprite = false;
-        state->dragged_animated_sprite = false;
-        state->rotated_sprite = false;
-        state->rotated_animated_sprite = false;
-        state->rotated_soft_body = false;
-        state->dragged_origin = false;
+        editor_viewport_transform_cancel(state);
         return false;
     }
     body = editor_selected_body_get(object, state);

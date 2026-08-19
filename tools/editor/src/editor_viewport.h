@@ -157,6 +157,8 @@ bool editor_viewport_update(
     float wheel_y,
     bool pointer_consumed
 );
+bool editor_viewport_transform_active_check(const EditorViewportState *state);
+void editor_viewport_transform_cancel(EditorViewportState *state);
 bool editor_viewport_auto_shape_update(EditorViewportState *state,
     EditorProject *project, EditorAutoShapeConfig *config, Position pointer,
     MouseButtonState primary_button, MouseButtonState pan_button,
