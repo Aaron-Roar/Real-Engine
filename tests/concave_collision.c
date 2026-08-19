@@ -35,6 +35,7 @@ static Shape notched_shape_get(void) {
 }
 
 int main(void) {
+    ContactManifold manifold;
     OverlapInfo overlap;
     Shape concave;
     Shape reversed = l_shape_get();
@@ -75,6 +76,15 @@ int main(void) {
         square_get(24.0f, 8.0f, 27.0f, 12.0f));
     if(!overlap.detected || overlap.normal.x < 0.9f ||
             fabsf(overlap.normal.y) > 0.1f) return 12;
+    overlap = physics_sat_overlap_get(l_shape_get(),
+        square_get(-1.0f, -0.5f, 5.0f, 0.5f));
+    if(!overlap.detected) return 13;
+    manifold = contact_manifold_polygon_get(l_shape_get(),
+        square_get(-1.0f, -0.5f, 5.0f, 0.5f), overlap.normal);
+    if(manifold.count != 2 ||
+            fabsf(math_dot_product(
+                math_vector_subtract(manifold.points[1], manifold.points[0]),
+                (Axis){-overlap.normal.y, overlap.normal.x})) < 1.0f) return 14;
 
     return 0;
 }

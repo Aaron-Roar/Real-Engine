@@ -1,4 +1,5 @@
 #include "physics.h"
+#include "overlap_geometry.h"
 #include "shape_decomposition.h"
 
 #include <float.h>
@@ -27,7 +28,7 @@ static bool physics_sat_piece_axes_apply(
     return true;
 }
 
-static OverlapInfo physics_sat_piece_overlap_get(
+OverlapInfo physics_sat_collision_piece_overlap_get(
     const Shape *first_source,
     uint8_t first_index,
     const Shape *second_source,
@@ -66,7 +67,7 @@ OverlapInfo physics_sat_overlap_get(Shape shape_1, Shape shape_2) {
     second_count = physics_shape_collision_piece_count_get(&shape_2);
     for(uint8_t first = 0; first < first_count; first += 1) {
         for(uint8_t second = 0; second < second_count; second += 1) {
-            OverlapInfo overlap = physics_sat_piece_overlap_get(
+            OverlapInfo overlap = physics_sat_collision_piece_overlap_get(
                 &shape_1, first, &shape_2, second);
             if(!overlap.detected) continue;
             if(!best.detected || overlap.depth > best.depth) best = overlap;

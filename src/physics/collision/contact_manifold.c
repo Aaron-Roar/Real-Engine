@@ -1,4 +1,5 @@
 #include "contact_manifold.h"
+#include "overlap_geometry.h"
 #include "physics.h"
 #include "shape_decomposition.h"
 
@@ -159,15 +160,19 @@ ContactManifold contact_manifold_polygon_get(
     Shape second,
     Axis normal
 ) {
-    ContactManifold best = {0};
-    float best_depth = -FLT_MAX;
+    ContactManifold merged = {0};
+    Position minimum_point = {0};
+    Position maximum_point = {0};
+    Axis tangent = {-normal.y, normal.x};
+    float minimum_projection = FLT_MAX;
+    float maximum_projection = -FLT_MAX;
     uint8_t first_count;
     uint8_t second_count;
 
     if(!first.collision_geometry_prepared &&
-            !physics_shape_collision_prepare(first, &first)) return best;
+            !physics_shape_collision_prepare(first, &first)) return merged;
     if(!second.collision_geometry_prepared &&
-            !physics_shape_collision_prepare(second, &second)) return best;
+            !physics_shape_collision_prepare(second, &second)) return merged;
     first_count = physics_shape_collision_piece_count_get(&first);
     second_count = physics_shape_collision_piece_count_get(&second);
     for(uint8_t first_index = 0; first_index < first_count; first_index += 1) {
@@ -175,15 +180,29 @@ ContactManifold contact_manifold_polygon_get(
         for(uint8_t second_index = 0; second_index < second_count; second_index += 1) {
             Shape second_piece = physics_shape_collision_piece_get(
                 &second, second_index);
-            OverlapInfo overlap = physics_sat_overlap_get(first_piece, second_piece);
+            OverlapInfo overlap = physics_sat_collision_piece_overlap_get(
+                &first, first_index, &second, second_index);
             ContactManifold candidate;
-            if(!overlap.detected || overlap.depth <= best_depth) continue;
+            if(!overlap.detected ||
+                    math_dot_product(overlap.normal, normal) < 0.98f) continue;
             candidate = contact_manifold_convex_get(
                 first_piece, second_piece, normal);
-            if(candidate.count == 0) continue;
-            best = candidate;
-            best_depth = overlap.depth;
+            for(uint8_t point = 0; point < candidate.count; point += 1) {
+                float projection = math_dot_product(candidate.points[point], tangent);
+                if(projection < minimum_projection) {
+                    minimum_projection = projection;
+                    minimum_point = candidate.points[point];
+                }
+                if(projection > maximum_projection) {
+                    maximum_projection = projection;
+                    maximum_point = candidate.points[point];
+                }
+            }
         }
     }
-    return best;
+    if(minimum_projection == FLT_MAX) return merged;
+    merged.points[merged.count++] = minimum_point;
+    if(maximum_projection - minimum_projection > 0.0001f)
+        merged.points[merged.count++] = maximum_point;
+    return merged;
 }
