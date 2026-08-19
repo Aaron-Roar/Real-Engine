@@ -184,19 +184,25 @@ set(ROHR_ENGINE_SOURCES
     src/physics/collision/collision_material.c
     src/physics/collision/interaction_query.c
     src/physics/collision/interaction_set.c
+    src/physics/collision/interaction_state.c
     src/physics/collision/overlap_query.c
+    src/physics/collision/overlap_geometry.c
     src/physics/constraints/constraint_solver.c
     src/physics/constraints/transform_lock.c
     src/physics/joints/joint_constraint.c
+    src/physics/joints/joint.c
     src/physics/joints/joint_solver.c
     src/physics/particles/particle.c
     src/physics/physics.c
+    src/physics/physics_entity.c
     src/physics/physics_step.c
     src/physics/pipeline/physics_pipeline.c
+    src/physics/pipeline/physics_config.c
     src/physics/pipeline/physics_stages.c
     src/physics/rigid_body/rigid_body.c
     src/physics/rigid_body/rigid_body_step.c
     src/physics/soft_body/soft_body.c
+    src/physics/soft_body/soft_body_state.c
     src/physics/soft_body/soft_body_solver.c
     src/state/game_state.c
     src/tools/tools.c

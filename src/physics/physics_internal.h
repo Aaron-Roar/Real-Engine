@@ -3,6 +3,7 @@
 
 #include "physics.h"
 
+void physics_tables_destroy(void);
 EngineResult physics_live_index_get(Entity entity, EntityIndex *index);
 typedef EngineResult (*PhysicsGroupEntityFn)(Entity entity);
 typedef EngineResult (*PhysicsGroupEntityTargetFn)(
@@ -22,5 +23,11 @@ void physics_body_state_table_init(void);
 void physics_body_state_entity_clear(EntityIndex index);
 void physics_body_state_sync(EntityIndex index);
 void physics_force_state_init(void);
+void physics_joint_state_init(void);
+void physics_joint_entity_clear(Entity entity, EntityIndex index);
+void physics_soft_body_entity_clear(Entity entity, EntityIndex index);
+EngineResult physics_interaction_state_init(void);
+void physics_interaction_state_destroy(void);
+void physics_config_init(void);
 
 #endif
