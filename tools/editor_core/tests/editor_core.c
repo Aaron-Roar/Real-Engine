@@ -284,7 +284,7 @@ static int standard_cli_commands_test(void) {
             strcmp(added.created.name, "new_frame") != 0) return 1;
     result = editor_command_cli_standard_write(&project, &add, &added,
         "project.rohr.json", output, sizeof(output));
-    if(editor_result_check(result) || strstr(output, "editor-cli --project") != output ||
+    if(editor_result_check(result) || strstr(output, "rohr-cli --project") != output ||
             strstr(output, "--object FastCar") == NULL ||
             strstr(output, "--body new_frame add") == NULL) return 1;
     return 0;
@@ -482,7 +482,7 @@ static int transform_commands_test(void) {
         if(editor_command_execute(&project, &commands[i]).kind != ERROR_RESULT_VALUE ||
                 editor_result_check(editor_command_cli_write(&commands[i],
                     "project.rohr.json", cli_text, sizeof(cli_text))) ||
-                strstr(cli_text, "editor-cli ") != cli_text) return 1;
+                strstr(cli_text, "rohr-cli ") != cli_text) return 1;
     }
     if(object->position.x != 1.0f || rigid_body->rotation != 0.5f ||
             anchor->rotation != 0.75f || node->position.x == 0.0f ||

@@ -2410,11 +2410,11 @@ EditorResult editor_command_cli_write(const EditorCommand *command,
     if(command->type >= EDITOR_COMMAND_SPRITE_ADD &&
             command->type <= EDITOR_COMMAND_SPRITE_SIZE_SET) {
         if(!editor_command_text_append(output, output_capacity, &used,
-                "editor-cli sprite ")) goto capacity_error;
+                "rohr-cli sprite ")) goto capacity_error;
     } else if(command->type >= EDITOR_COMMAND_ANIMATED_SPRITE_ADD &&
             command->type <= EDITOR_COMMAND_ANIMATION_FRAME_SIZE_SET) {
         if(!editor_command_text_append(output, output_capacity, &used,
-                "editor-cli animated-sprite ")) goto capacity_error;
+                "rohr-cli animated-sprite ")) goto capacity_error;
     }
     switch(command->type) {
         case EDITOR_COMMAND_SPRITE_ADD:
@@ -2661,7 +2661,7 @@ EditorResult editor_command_cli_write(const EditorCommand *command,
     }
     if(domain == NULL) return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
         "unknown editor item target");
-    if(!editor_command_text_append(output, output_capacity, &used, "editor-cli ") ||
+    if(!editor_command_text_append(output, output_capacity, &used, "rohr-cli ") ||
             !editor_command_text_append(output, output_capacity, &used, domain) ||
             !editor_command_text_append(output, output_capacity, &used, " "))
         goto capacity_error;

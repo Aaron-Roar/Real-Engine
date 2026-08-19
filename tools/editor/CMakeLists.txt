@@ -23,8 +23,8 @@ target_compile_definitions(rohr_editor_gui PRIVATE
 target_link_libraries(rohr_editor_gui PRIVATE rohr_engine rohr_terminal rohr_editor_core)
 
 set_target_properties(rohr_editor_gui PROPERTIES
-    OUTPUT_NAME editor-gui
-    RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tools/editor-gui
+    OUTPUT_NAME rohr-gui
+    RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tools/rohr-gui
 )
 
 add_custom_command(TARGET rohr_editor_gui POST_BUILD

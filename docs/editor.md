@@ -56,7 +56,7 @@ Saving and generating are separate operations:
 Configure and build a generated game from its project directory:
 
 ```sh
-editor-cli --project . build
+rohr-cli --project . build
 ./build/MyGame
 ```
 

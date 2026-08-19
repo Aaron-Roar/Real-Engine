@@ -147,7 +147,7 @@ static EditorResult cli_sprite_command_write(const EditorProject *project,
     if(!*handled) return editor_result_value(true);
     output[0] = '\0';
 #define ADD(value) do { if(!cli_token_add(output, capacity, &used, (value))) goto full; } while(0)
-    ADD("editor-cli"); ADD("--project"); ADD(path);
+    ADD("rohr-cli"); ADD("--project"); ADD(path);
     if(command->type >= EDITOR_COMMAND_SPRITE_ADD &&
             command->type <= EDITOR_COMMAND_SPRITE_VISIBILITY_SET) {
         object_id = command->type == EDITOR_COMMAND_SPRITE_ADD ?
@@ -342,7 +342,7 @@ EditorResult editor_command_cli_standard_write(const EditorProject *project,
         "Could not serialize selector-first command");
     output[0] = '\0';
 #define ADD(value) do { if(!cli_token_add(output, capacity, &used, (value))) goto full; } while(0)
-    ADD("editor-cli"); ADD("--project"); ADD(token[3]);
+    ADD("rohr-cli"); ADD("--project"); ADD(token[3]);
     if(command->type == EDITOR_COMMAND_NAVIGATION_SET) {
         if(count != 17) goto invalid;
         for(size_t i = 7; i + 1 < count; i += 2) { ADD(token[i]); ADD(token[i + 1]); }

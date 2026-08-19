@@ -126,10 +126,10 @@ static void cli_help_print(int count, char **arguments) {
     const char *property = cli_help_property_get(count, arguments);
     cli_usage_print();
     puts("\nGeneral examples:\n"
-        "  editor-cli --project ./objects/project.rohr.json --object car "
+        "  rohr-cli --project ./objects/project.rohr.json --object car "
             "--body chassis --property mass 5\n"
-        "  editor-cli --project ./game validate\n"
-        "  editor-cli --project ./game build");
+        "  rohr-cli --project ./game validate\n"
+        "  rohr-cli --project ./game build");
     if(domain == NULL) {
         puts("\nSelectors:\n"
             "  --object, --body, --hitbox, --joint, --anchor, --soft-body,\n"
@@ -140,7 +140,7 @@ static void cli_help_print(int count, char **arguments) {
     }
     printf("\nSelected depth: %s\n", domain->name);
     if(property != NULL) printf("Value required:\n  --property %s\n", property);
-    printf("What can be set:\n  %s\n\nExample:\n  editor-cli %s\n",
+    printf("What can be set:\n  %s\n\nExample:\n  rohr-cli %s\n",
         domain->properties, domain->example);
     puts("Operations at this depth:\n  rename <new-name>, delete");
 }
@@ -170,17 +170,17 @@ static bool cli_help_request_check(int count, char **arguments) {
 
 static void cli_usage_print(void) {
     puts("usage:\n"
-        "  editor-cli [--project <project.rohr.json>] <selectors> <operation>\n"
+        "  rohr-cli [--project <project.rohr.json>] <selectors> <operation>\n"
         "  Selectors are order-independent and precede the operation.\n"
         "  Properties: --property <name> <values...>\n"
         "  Structure: add, delete, or rename [new-name]\n"
-        "  Project: editor-cli [--project <project-directory>] "
+        "  Project: rohr-cli [--project <project-directory>] "
             "<operation>\n"
         "  Project operations: create, validate, generate-c, compile, build\n"
-        "  Example: editor-cli --object car --body chassis --property mass 5\n"
-        "  Example: editor-cli --body chassis --property position 10 20\n"
-        "  Example: editor-cli --project ./game validate\n"
-        "  Example: editor-cli --project ./game create");
+        "  Example: rohr-cli --object car --body chassis --property mass 5\n"
+        "  Example: rohr-cli --body chassis --property position 10 20\n"
+        "  Example: rohr-cli --project ./game validate\n"
+        "  Example: rohr-cli --project ./game create");
 }
 
 static bool cli_absolute_path_get(char *output, size_t capacity,

@@ -1448,7 +1448,7 @@ EditorResult editor_workspace_command_cli_write(const EditorWorkspaceCommand *co
         "Unknown workspace command");
     output[0] = '\0';
     if(!editor_workspace_command_text_append(output, output_capacity, &used,
-            "editor-cli --project ") ||
+            "rohr-cli --project ") ||
             !editor_workspace_command_shell_append(output, output_capacity, &used,
                 command->directory)) goto capacity_error;
     if(!editor_workspace_command_text_append(output, output_capacity, &used, " ") ||

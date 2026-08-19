@@ -132,7 +132,7 @@ SDK releases use three independently tested distribution paths:
 ```text
 dist/
 ├── linux/             # Generic Linux SDK built against the release baseline
-│   ├── bin/          # editor-cli and editor-gui
+│   ├── bin/          # rohr-cli and rohr-gui
 │   ├── include/      # Rohr and SDL public headers
 │   ├── lib or lib64/ # Static libraries and CMake packages
 │   └── share/        # Editor Lua defaults, project template, and licenses

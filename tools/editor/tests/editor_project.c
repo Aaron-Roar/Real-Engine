@@ -126,7 +126,7 @@ int main(void) {
                     &workspace, &workspace_project, &workspace_command)) ||
                 editor_result_check(editor_workspace_command_cli_write(
                     &workspace_command, cli_command, sizeof(cli_command))) ||
-                strstr(cli_command, "editor-cli --project ") != cli_command ||
+                strstr(cli_command, "rohr-cli --project ") != cli_command ||
                 strstr(cli_command, " create") == NULL) {
             workspace_fixture_remove(fixture);
             return 1;
@@ -288,7 +288,7 @@ int main(void) {
         EditorResult cli_result = editor_workspace_command_cli_write(
             &workspace_command, cli_command, sizeof(cli_command));
         if(editor_result_check(generation_result) || editor_result_check(cli_result) ||
-                strstr(cli_command, "editor-cli --project ") != cli_command ||
+                strstr(cli_command, "rohr-cli --project ") != cli_command ||
                 strstr(cli_command, " generate-c") == NULL ||
                 !file_contains(path, "7.00000000f") ||
                 !file_contains(path, "ROHR_PARTICLE") ||

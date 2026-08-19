@@ -62,7 +62,7 @@
           ];
 
           postFixup = ''
-            wrapProgram "$out/bin/editor-gui" \
+            wrapProgram "$out/bin/rohr-gui" \
               --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath (runtimeLibraries pkgs)}"
           '';
 
