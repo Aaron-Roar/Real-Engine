@@ -173,6 +173,7 @@ set(ROHR_ENGINE_SOURCES
     src/input/controller.c
     src/math/math2d.c
     src/physics/broadphase/aabb_tree.c
+    src/physics/body/body_state.c
     src/physics/collision/contact_constraint.c
     src/physics/collision/contact_manifold.c
     src/physics/collision/contact_query.c
