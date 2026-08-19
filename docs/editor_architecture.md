@@ -13,10 +13,13 @@ EditorWorkspace
         │   └── EditorHitbox[] -> EditorVertex[]
         ├── EditorAnchor[]
         ├── EditorJoint[]
-        └── EditorSoftBody[]
-            ├── EditorSoftNode[]
-            ├── EditorSoftBeam[]
-            └── EditorSoftArea[]
+        ├── EditorSoftBody[]
+        │   ├── EditorSoftNode[]
+        │   ├── EditorSoftBeam[]
+        │   └── EditorSoftArea[]
+        ├── EditorSprite[]
+        └── EditorAnimatedSprite[]
+            └── EditorAnimationFrame[]
 ```
 
 Editor ids are stable references inside editor data. They are not engine
@@ -27,8 +30,8 @@ fields hold the resulting handles.
 ## Modules
 
 `tools/editor/src/main.c`
-: Owns application lifetime, top-level menus, UI composition, keyboard routing,
-  color picking, scroll layout, dirty-state checks, and editor panels.
+: Owns application lifetime and coordinates extracted states, item editors,
+  viewport controls, menus, browser code, and panels.
 
 `editor_project.h` and `editor_project.c`
 : Define and mutate the in-memory authoring model. This layer owns stable editor
@@ -51,7 +54,7 @@ fields hold the resulting handles.
   transitions, and keyboard nudging. World-to-screen conversion also performs
   the engine/editor Y-axis inversion.
 
-`editor_file_browser.h` and `editor_file_browser.c`
+`browser/editor_file_browser.h` and `browser/editor_file_browser.c`
 : Implement the modal directory browser and its two-pane directory preview.
 
 `editor_layout.h`
@@ -120,13 +123,14 @@ Generated creation is transactional: if a component or entity operation fails,
 already-created runtime entities are destroyed. Generated destruction tolerates
 partially created objects and clears handles afterward.
 
-Particle auto-fit is derived from the first rigid-body hitbox using its polygon
-centroid and farthest vertex. The derived value is refreshed in editor state,
-written to JSON, and recomputed during generation to prevent stale output.
+Particle geometry is stored independently from the first rigid-body hitbox.
+Its origin is local to the rigid-body origin; auto-fit derives radius from that
+origin and the farthest hitbox vertex. JSON and generated C preserve polygon,
+particle origin, and particle radius separately.
 
 ## Ownership rules
 
-- `EditorProject` owns all fixed-capacity editor arrays and names.
+- `EditorProject` owns dynamically growing editor collections and their names.
 - Parent removal owns removal of its children.
 - Anchors are independent object children and are referenced by joints.
 - Joints do not own anchors and therefore do not implicitly delete them.

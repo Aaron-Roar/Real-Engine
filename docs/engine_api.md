@@ -195,13 +195,13 @@ Returns the static message associated with an engine error code.
 
 ```c
 #define rohr_error_message_get(ResultValue) \
-    error_result_message_get((ResultValue).kind, (ResultValue).result.error)
 ```
 
-Returns the error message for any generated Rohr result type, followed by
-copied low-level diagnostic detail when the failing boundary supplied it. For
-example, SDL failures append the `SDL_GetError()` text captured at the point of
-failure. Pass a result variable because the macro evaluates it twice.
+Returns a result's error message with captured low-level detail.
+
+ResultValue should be a result variable because this macro evaluates it
+
+twice. Every generated Rohr result type supports this shared field layout.
 
 | Parameter | Description |
 | --- | --- |
@@ -1415,9 +1415,11 @@ Applies torque to an entity for one physics tick.
 EngineResult rohr_physics_hitbox_set(Entity entity, Shape hitbox);
 ```
 
-Sets a simple polygon hitbox and prepares hidden convex decomposition when
-needed. Degenerate and self-intersecting outlines are rejected. This does not
-enable physical collision response.
+Sets a simple polygon hitbox and prepares hidden convex decomposition when needed.
+
+Degenerate and self-intersecting outlines are rejected. This does not enable
+
+physical collision response.
 
 | Parameter | Description |
 | --- | --- |
@@ -2147,6 +2149,38 @@ Gets overlap information for two particle shapes.
 
 **Returns:** Geometric overlap information.
 
+### `rohr_physics_particle_origin_set`
+
+```c
+EngineResult rohr_physics_particle_origin_set(Entity entity, Position local_origin);
+```
+
+ Set a particle circle's origin relative to its rigid-body origin.
+
+### `rohr_physics_particle_origin_get`
+
+```c
+PositionResult rohr_physics_particle_origin_get(Entity entity);
+```
+
+ Get a particle circle's origin relative to its rigid-body origin.
+
+### `rohr_physics_particle_radius_set`
+
+```c
+EngineResult rohr_physics_particle_radius_set(Entity entity, float radius);
+```
+
+ Set a particle circle's radius independently of its polygon hitbox.
+
+### `rohr_physics_particle_radius_get`
+
+```c
+ParticleRadiusResult rohr_physics_particle_radius_get(Entity entity);
+```
+
+ Get a particle circle's effective radius.
+
 ### `rohr_physics_overlap_check`
 
 ```c
@@ -2327,18 +2361,13 @@ Draws the frame background.
 | --- | --- |
 | `color` | Background color. |
 
-Drawing is deferred until `rohr_graphics_show()`. Commands are ordered by their
-layer and retain submission order within the same layer.
-
 ### `rohr_graphics_layer_set`
 
 ```c
 void rohr_graphics_layer_set(int layer);
 ```
 
-Sets the signed ordering layer captured by subsequent draw calls. Lower layers
-render first. The active layer resets to `0` after each
-`rohr_graphics_show()`.
+ Sets the ordering layer captured by subsequent draw commands.
 
 ### `rohr_graphics_layer_get`
 
@@ -2346,7 +2375,7 @@ render first. The active layer resets to `0` after each
 int rohr_graphics_layer_get(void);
 ```
 
-Returns the layer that subsequent draw calls will capture.
+ Returns the ordering layer used by subsequent draw commands.
 
 ### `rohr_graphics_screen_rect_draw`
 
@@ -2373,8 +2402,6 @@ bool rohr_graphics_logical_size_set(int width, int height);
 ```
 
  Changes the logical screen size while preserving aspect-correct presentation.
-Calling this disables automatic aspect-ratio matching. If an application does
-not configure either setting, Rohr uses the fixed 1280x720 default.
 
 ### `rohr_graphics_aspect_ratio_set`
 
@@ -2382,9 +2409,7 @@ not configure either setting, Rohr uses the fixed 1280x720 default.
 bool rohr_graphics_aspect_ratio_set(int width, int height);
 ```
 
-Changes the logical aspect ratio while preserving the current logical height.
-For example, `(16, 10)` produces a 16:10 logical canvas. This disables automatic
-aspect-ratio matching.
+ Changes the logical aspect ratio while preserving the logical height.
 
 ### `rohr_graphics_aspect_ratio_auto_set`
 
@@ -2392,25 +2417,7 @@ aspect-ratio matching.
 bool rohr_graphics_aspect_ratio_auto_set(bool enabled);
 ```
 
-When enabled, matches the logical width to the current renderer output while
-preserving logical height. This avoids letterboxing as a resizable window or
-fullscreen output changes shape.
-
-### `rohr_graphics_window_presentation_default_get`
-
-Returns a 1280x720 windowed presentation configuration.
-
-### `rohr_graphics_window_presentation_set`
-
-```c
-EngineResult rohr_graphics_window_presentation_set(
-    GraphicsWindowPresentationConfig config);
-```
-
-Applies window mode, physical resolution, logical resolution, and automatic
-aspect matching as one transaction. Modes are windowed, borderless fullscreen,
-and display-mode fullscreen. Fullscreen selects the closest display mode to the
-requested physical resolution.
+ Matches the logical aspect ratio to the render output when enabled.
 
 ### `rohr_graphics_window_presentation_get`
 
@@ -2418,8 +2425,7 @@ requested physical resolution.
 GraphicsWindowPresentationConfig rohr_graphics_window_presentation_get(void);
 ```
 
-Returns the active mode, actual window size in physical pixels, current logical
-size, and automatic-aspect state.
+ Returns the active window mode and actual physical/logical dimensions.
 
 ### `rohr_graphics_screen_clip_set`
 
@@ -2586,6 +2592,14 @@ Loads a texture asset.
 
 **Returns:** TextureAssetResult containing the asset, or an error.
 
+### `rohr_graphics_texture_draw`
+
+```c
+void rohr_graphics_texture_draw(TextureAsset texture, Position position, Orientation orientation);
+```
+
+ Draws a loaded texture centered at a world position.
+
 ### `rohr_graphics_font_load`
 
 ```c
@@ -2655,6 +2669,14 @@ Creates an animated sprite from an animation asset.
 
 **Returns:** Animated sprite value.
 
+### `rohr_graphics_animated_sprite_update`
+
+```c
+void rohr_graphics_animated_sprite_update(AnimatedSprite *sprite, Tick current_tick, Time current_time);
+```
+
+ Advance one animated sprite's frame state without attaching it to an entity.
+
 ### `rohr_graphics_animated_sprite_add`
 
 ```c
@@ -2669,6 +2691,14 @@ Adds an animated sprite to an entity.
 | `sprite` | Animated sprite component value. |
 
 **Returns:** EngineResult describing success or failure.
+
+### `rohr_graphics_animated_sprite_draw`
+
+```c
+bool rohr_graphics_animated_sprite_draw(Entity entity);
+```
+
+ Draw the animated sprite attached to one entity.
 
 ### `rohr_graphics_animated_sprites_draw`
 
@@ -2864,6 +2894,30 @@ void rohr_graphics_aabb_tree_draw(void);
 
  Draw the current physics AABB-tree bounds when debug drawing is enabled.
 
+### `rohr_graphics_contacts_debug_set`
+
+```c
+void rohr_graphics_contacts_debug_set(bool enabled);
+```
+
+ Enable or disable current-contact manifold debug drawing.
+
+### `rohr_graphics_contacts_debug_check`
+
+```c
+bool rohr_graphics_contacts_debug_check(void);
+```
+
+ Return whether current-contact manifold debug drawing is enabled.
+
+### `rohr_graphics_contacts_draw`
+
+```c
+void rohr_graphics_contacts_draw(void);
+```
+
+ Draw current contact manifold points and first-to-second normals when enabled.
+
 ### `rohr_graphics_recording_start`
 
 ```c
@@ -2878,6 +2932,19 @@ Starts recording rendered frames to a video file.
 | `fps` | Recording frame rate. |
 
 **Returns:** true when recording starts successfully, false otherwise.
+
+### `rohr_graphics_particle_draw`
+
+```c
+void rohr_graphics_particle_draw(Entity entity, Fill fill_type);
+```
+
+Draws one particle entity using its collision circle.
+
+| Parameter | Description |
+| --- | --- |
+| `entity` | Particle entity to draw. |
+| `fill_type` | Whether to draw the circle filled or outlined. |
 
 ### `rohr_graphics_particles_draw`
 
@@ -3846,6 +3913,14 @@ void rohr_ui_field_event_add(const SDL_Event *event);
 ```
 
  Queues a keyboard event for focused UI fields.
+
+### `rohr_ui_field_focus_clear`
+
+```c
+void rohr_ui_field_focus_clear(void);
+```
+
+ Clears the currently focused UI text or number field.
 
 ### `rohr_ui_field`
 

@@ -284,14 +284,17 @@ shows a dotted particle ring with its fill behind rigid bodies. Single-clicking
 the ring selects it, double-clicking opens the particle editor, and dragging the
 ring translates its rigid body.
 
-The particle editor provides radius, ring color, fill color, and **Auto Fit**.
-Auto-fit is enabled by default. It places the particle at the hitbox polygon
-centroid and sets its radius to the largest centroid-to-vertex distance. Moving
-a vertex updates the fitted particle. Disabling auto-fit preserves its last
-calculated radius, after which the radius field can be edited manually.
+The particle editor provides local origin X/Y, radius, ring color, fill color,
+and **Auto Fit**. The origin is relative to the rigid-body origin and follows
+its rotation. Auto-fit is enabled by default and sets the radius to the largest
+particle-origin-to-vertex distance. Moving a vertex updates the fitted radius.
+Disabling auto-fit preserves its last value, after which radius can be edited
+manually.
 
-The same centroid and radius are saved and used by generated C, so the preview
-and generated physics agree.
+Particle geometry is independent from the polygon hitbox. Generated C retains
+the authored polygon and separately calls the particle-origin and
+particle-radius APIs. Particle/particle pairs use circles; particle/ordinary
+rigid-body pairs use their polygon hitboxes.
 
 ## Anchors and joints
 

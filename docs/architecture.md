@@ -1,71 +1,106 @@
 # Architecture {#architecture}
 
-Rohr Engine keeps systems separate and explicit. Public engine APIs live in
-`include/`, implementation files are grouped by domain under `src/`, and
-private engine contracts that should not be application-facing live in
-`src/core/engine_internal.h`.
+Rohr Engine is a C and SDL3 engine built around explicit systems and visible
+data ownership. The public facade is `include/rohr.h`; applications should not
+depend on headers under `src/`.
 
-The engine initializes entity, physics, graphics, and grid tables during
-`engine_init()`. Entity-indexed tables start with zero capacity and grow as
-entities are added. `entity_add()` returns a stable entity id, while systems
-resolve that id to the current component table index when table access is
-needed.
+## Runtime organization
 
-The standard physics update is composed from public pipeline stages, while
-`system_physics_update()` remains the systems-layer entry point.
+```text
+include/                 public engine and tools APIs
+src/
+├── core/                lifecycle, facade, errors, systems, timing
+├── entity/              stable entity handles and component metadata
+├── graphics/            renderer, deferred draw layers, UI, presentation
+├── input/               keyboard, mouse, and controller input
+├── math/                vectors, polygons, projections, and AABBs
+├── physics/
+│   ├── body/            body state, forces, and motion properties
+│   ├── broadphase/      dynamic AABB tree
+│   ├── collision/       filtering, decomposition, overlap, manifolds
+│   ├── constraints/     iterative constraint orchestration
+│   ├── joints/          anchors and joint constraints
+│   ├── particles/       particle-circle geometry and response helpers
+│   ├── pipeline/        standard and individually callable stages
+│   ├── rigid_body/      integration and rigid contact response
+│   └── soft_body/       nodes, beams, areas, and boundary contacts
+└── state/               JSON runtime state and authored definitions
+tools/
+├── editor_core/         editor document commands and CLI grammar
+├── cli/                 rohr-cli frontend
+├── editor/              rohr-gui frontend
+└── terminal/            reusable terminal emulator
+```
 
-## Generated game components
+Domain modules own their state and cleanup. Cross-domain private contracts are
+declared in narrowly scoped internal headers such as
+`src/core/engine_internal.h` and `src/physics/physics_internal.h`.
 
-The component-generation tools keep game tags and data components separate from
-engine-owned components. Engine APIs use `RohrComponentMask`; generated games own a distinct
-`GameComponentMask` and never pass it to engine component functions.
+## Entities and components
 
-Tags consume one generated mask bit and have no value storage. Data components
-generate a typed sparse-set pool containing a dense entity list, dense values,
-and a small `EntityIndex`-to-dense-index lookup table. This keeps lookup and
-swap-removal constant-time while allocating large values only for entities that
-actually have the component.
+`Entity` is a stable, generation-checked handle. `EntityIndex` is an internal
+index into component pools. Systems resolve handles before direct table access;
+applications should retain `Entity`, not `EntityIndex`.
 
-Generated games explicitly initialize and shut down their component storage.
-They must call `game_components_clear(entity)` before deleting an engine entity.
-Optional generated destruction hooks handle values that own resources. Addresses
-returned by generated `get_addr` functions become invalid when that component's
-pool grows or removes an entry.
-## Physics pipeline
+Engine component pools grow with entity capacity. A pool owns a value array and
+occupancy information, so optional data does not need a valid sentinel value.
+Entity deletion clears owned component state before its index can be reused.
 
-Physics implementation is divided by domain under `src/physics`. Pipeline
-orchestration lives in `src/physics/pipeline`:
+Engine component masks use `ROHR_` prefixes. Generated game components use a
+separate `GameComponentMask` and typed sparse-set pools. Generated component
+addresses are invalidated when their pool grows or swap-removes an item.
 
-- `physics_stages.c` exposes individual operations over the engine component
-  pools and reusable constraint buffers.
-- `physics_pipeline.c` composes those operations into the standard substep and
-  complete update used by most games.
-- Rigid-body, joint, soft-body, collision, constraint, and broadphase modules
-  implement the work invoked by those stages.
+## Error flow
 
-The standard pipeline remains the behavioral reference. Custom pipelines may
-omit stages, but their caller owns the resulting behavior and must preserve
-required ordering such as clearing transient constraints before gathering.
+Fallible APIs return small generated result types. Errors are propagated to the
+application boundary; the application decides whether to log, notify, recover,
+or terminate. `rohr_error_message_get(result)` combines the stable Rohr error
+message with a captured lower-level cause such as `SDL_GetError()`.
 
-## Graphics command layers
+See [Error handling](errors.md).
 
-Graphics drawing is deferred until `graphics_show()`. Only layers used during
-the current frame are represented. Each active signed layer owns a dense,
-insertion-ordered command buffer; the small sparse layer array is sorted before
-execution. Command buffers retain their allocations between frames, while the
-active layer set and command counts reset after presentation.
+## Physics
 
-This avoids allocating gaps between layer numbers and avoids sorting every draw
-command. Commands submitted to the same layer always execute in submission
-order.
+The standard physics update is assembled from public stages under
+`src/physics/pipeline`. The default pipeline remains the behavioral reference,
+while advanced applications may call stages directly.
 
-## Editor
+Rigid contact constraints and active joints are gathered once per substep and
+iterated together. Polygon collision uses an AABB-tree broadphase, SAT over
+cached convex pieces, contact manifolds, accumulated impulses, positional
+correction, friction, and restitution. Concave decomposition is internal.
 
-The editor under `tools/editor` is a separate application that links the engine
-but owns a non-runtime authoring model. Editor object ids are not ECS entity
-handles. JSON persists the authoring model, and explicit generation materializes
-it as C functions that create runtime entities.
+See [Physics](physics.md) for ordering, collision modes, and limitations.
 
-This separation lets editor data retain names, hierarchy, visibility, and
-editing metadata without adding editor-only components to the engine. See the
-[editor architecture](editor_architecture.md) and [editor guide](editor.md).
+## Graphics
+
+Drawing is deferred until presentation. Each active signed layer owns an
+insertion-ordered command buffer. Only layers used during the frame exist in
+the sparse active-layer list; layers are ordered before execution, while calls
+within one layer retain submission order. Buffers retain capacity between
+frames.
+
+The UI is composed from primitive interactions, surfaces, clipping, text,
+fields, sliders, dropdowns, and scroll regions. Higher-level tools use the same
+public primitives available to applications.
+
+## Editor and generated projects
+
+The editor owns an authoring model separate from runtime ECS state. Editor ids
+are stable references inside `EditorProject`, not live engine entities. JSON
+stores editable objects and metadata; generated C creates runtime entities and
+returns their handles through typed generated structs.
+
+Saving JSON and generating C are separate operations. Generation replaces only
+files under `src/generated/`; developer-owned `src/main.c` is created with a
+new project and is not overwritten afterward.
+
+See [Editor guide](editor.md) and [Editor architecture](editor_architecture.md).
+
+## Build and distribution
+
+CMake is authoritative. `dev.sh` and `dev.bat` are convenience frontends. SDK
+installs export a `Rohr` CMake package, headers, static libraries, `rohr-cli`,
+`rohr-gui`, configuration defaults, project templates, and licenses.
+
+See [Building and SDK usage](building.md).

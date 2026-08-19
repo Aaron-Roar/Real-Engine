@@ -54,6 +54,8 @@ are generated from the Doxygen comments in the public headers under `include/`.
 - [Engine API reference](engine_api.md)
 - [Tools API reference](tools_api.md)
 - [Architecture](architecture.md)
+- [Physics](physics.md)
+- [Building and SDK usage](building.md)
 - [Using the editor](editor.md)
 - [Editor architecture](editor_architecture.md)
 - [Entity ids](entity_ids.md)
