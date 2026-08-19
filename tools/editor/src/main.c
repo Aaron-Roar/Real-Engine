@@ -563,7 +563,8 @@ static float editor_panel_content_height_get(const EditorProject *project,
     if(object == NULL) return height;
     if(state->mode == EDITOR_VIEWPORT_OBJECT) {
         return fmaxf(height, 350.0f + (float)(object->rigid_body_count +
-            object->joint_count + object->soft_body_count) * 30.0f);
+            object->joint_count + object->soft_body_count + object->sprite_count +
+            object->animated_sprite_count) * 30.0f);
     }
     if(state->mode == EDITOR_VIEWPORT_RIGID_BODY) {
         for(size_t i = 0; i < object->rigid_body_count; i += 1) {
@@ -587,7 +588,7 @@ static float editor_panel_content_height_get(const EditorProject *project,
     if(state->mode == EDITOR_VIEWPORT_ANIMATED_SPRITE) {
         for(size_t i = 0; i < object->animated_sprite_count; i += 1)
             if(object->animated_sprite_items[i].id == state->selected_animated_sprite)
-                return fmaxf(height, 576.0f +
+                return fmaxf(height, 614.0f +
                     (float)object->animated_sprite_items[i].frame_count * 30.0f);
     }
     if(state->mode == EDITOR_VIEWPORT_HITBOX) {
@@ -2475,8 +2476,7 @@ int main(void) {
                 !editor_terminal_panel_focused_check(&terminal_panel) &&
                 rohr_controller_key_pressed_get(&keyboard, SDLK_ESCAPE)) {
             if(viewport_state.selected_item_count > 1) {
-                editor_viewport_selection_clear(&viewport_state);
-                viewport_state.selection = EDITOR_SELECTION_NONE;
+                editor_viewport_multi_selection_dismiss(&project, &viewport_state);
             } else if(editor_viewport_hitbox_editor_active_get(&viewport_state)) {
                 editor_viewport_back(&viewport_state);
             } else if(viewport_state.mode == EDITOR_VIEWPORT_HIERARCHY &&
@@ -4737,10 +4737,8 @@ int main(void) {
                 size_t sprite_index = (size_t)(sprite - selected->sprites);
                 char edited_name[EDITOR_OBJECT_NAME_MAX];
                 char edited_path[EDITOR_ASSET_PATH_MAX];
-                EditorRigidBody *attached_body = editor_project_rigid_body_get(
-                    selected, sprite->rigid_body);
-                Position edited_position = attached_body != NULL ?
-                    attached_body->position : sprite->position;
+                Position edited_position = sprite->position;
+                float edited_rotation = sprite->rotation;
                 float width = sprite->size.x;
                 float height = sprite->size.y;
                 const TextAsset *body_options[EDITOR_RIGID_BODY_MAX + 1];
@@ -4799,24 +4797,31 @@ int main(void) {
                         .number = &edited_position.y}, &y_field,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 82.0f, 194.0f,
                         EDITOR_TOOLS_WIDTH - 92.0f, 28.0f}, NULL);
-                rohr_ui_label(&width_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                rohr_ui_label(&rotation_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     232.0f, 70.0f, 28.0f});
-                UIFieldResult width_result = rohr_ui_field("editor.sprite.width",
-                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &width}, &x_field,
+                UIFieldResult rotation_result = rohr_ui_field("editor.sprite.rotation",
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                        .number = &edited_rotation}, &x_field,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 82.0f, 232.0f,
                         EDITOR_TOOLS_WIDTH - 92.0f, 28.0f}, NULL);
-                rohr_ui_label(&height_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                rohr_ui_label(&width_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     270.0f, 70.0f, 28.0f});
+                UIFieldResult width_result = rohr_ui_field("editor.sprite.width",
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &width}, &x_field,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 82.0f, 270.0f,
+                        EDITOR_TOOLS_WIDTH - 92.0f, 28.0f}, NULL);
+                rohr_ui_label(&height_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    308.0f, 70.0f, 28.0f});
                 UIFieldResult height_result = rohr_ui_field("editor.sprite.height",
                     (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &height}, &y_field,
-                    (UIRect){EDITOR_VIEWPORT_WIDTH + 82.0f, 270.0f,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 82.0f, 308.0f,
                         EDITOR_TOOLS_WIDTH - 92.0f, 28.0f}, NULL);
                 bool visible_changed = editor_checkbox("editor.sprite.visible",
                     &terminal_visible_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
-                        346.0f, EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, &visible);
+                        384.0f, EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, &visible);
                 bool follow_changed = editor_checkbox("editor.sprite.follow",
                     &follow_rotation_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
-                        308.0f, EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, &follow);
+                        346.0f, EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, &follow);
                 if(name_result.changed) {
                     EditorCommand command = {.type = EDITOR_COMMAND_SPRITE_RENAME,
                         .data.sprite_rename = {.object = selected->id,
@@ -4842,14 +4847,15 @@ int main(void) {
                     (void)editor_command_execute(&project, &command);
                 }
                 if(x_result.changed || y_result.changed) {
-                    EditorCommand command = attached_body != NULL ?
-                        (EditorCommand){.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
-                            .data.rigid_body_transform = {selected->id,
-                                attached_body->id, edited_position,
-                                attached_body->rotation}} :
-                        (EditorCommand){.type = EDITOR_COMMAND_SPRITE_POSITION_SET,
-                            .data.sprite_position_set = {.object = selected->id,
-                                .sprite = sprite->id, .position = edited_position}};
+                    EditorCommand command = {.type = EDITOR_COMMAND_SPRITE_POSITION_SET,
+                        .data.sprite_position_set = {.object = selected->id,
+                            .sprite = sprite->id, .position = edited_position}};
+                    (void)editor_command_execute(&project, &command);
+                }
+                if(rotation_result.changed) {
+                    EditorCommand command = {.type = EDITOR_COMMAND_SPRITE_ROTATION_SET,
+                        .data.sprite_rotation_set = {.object = selected->id,
+                            .sprite = sprite->id, .rotation = edited_rotation}};
                     (void)editor_command_execute(&project, &command);
                 }
                 if(width_result.changed || height_result.changed) {
@@ -4874,7 +4880,7 @@ int main(void) {
                 }
                 field_editing = name_result.active || path_result.active ||
                     x_result.active || y_result.active || width_result.active ||
-                    height_result.active;
+                    height_result.active || rotation_result.active;
                 if(rohr_ui_button("editor.sprite.delete", &delete_sprite_label,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
                             editor_panel_delete_y_get(&project, &viewport_state),
@@ -4983,10 +4989,8 @@ int main(void) {
                 size_t animated_index = (size_t)(sprite -
                     selected->animated_sprite_items);
                 char edited_name[EDITOR_OBJECT_NAME_MAX];
-                EditorRigidBody *attached_body = editor_project_rigid_body_get(
-                    selected, sprite->rigid_body);
-                Position edited_position = attached_body != NULL ?
-                    attached_body->position : sprite->editor_position;
+                Position edited_position = sprite->editor_position;
+                float edited_rotation = sprite->editor_rotation;
                 float scale_x = sprite->scale.x, scale_y = sprite->scale.y;
                 float ticks = (float)sprite->ticks_per_frame;
                 float seconds = (float)sprite->time_per_frame;
@@ -5050,59 +5054,67 @@ int main(void) {
                         .number = &edited_position.y}, &animated_position_y_field,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 156.0f,
                         EDITOR_TOOLS_WIDTH - 110.0f, 28.0f}, NULL);
-                rohr_ui_label(&scale_x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                rohr_ui_label(&rotation_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     194.0f, 90.0f, 28.0f});
+                UIFieldResult rotation_result = rohr_ui_field(
+                    "editor.animated_sprite.rotation",
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT,
+                        .number = &edited_rotation}, &animated_position_x_field,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 194.0f,
+                        EDITOR_TOOLS_WIDTH - 110.0f, 28.0f}, NULL);
+                rohr_ui_label(&scale_x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    232.0f, 90.0f, 28.0f});
                 UIFieldResult sx = rohr_ui_field("editor.animated_sprite.scale_x",
                     (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &scale_x},
                     &animated_scale_x_field,
-                    (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 194.0f,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 232.0f,
                         EDITOR_TOOLS_WIDTH - 110.0f, 28.0f}, NULL);
                 rohr_ui_label(&scale_y_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
-                    232.0f, 90.0f, 28.0f});
+                    270.0f, 90.0f, 28.0f});
                 UIFieldResult sy = rohr_ui_field("editor.animated_sprite.scale_y",
                     (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &scale_y},
                     &animated_scale_y_field,
-                    (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 232.0f,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 270.0f,
                         EDITOR_TOOLS_WIDTH - 110.0f, 28.0f}, NULL);
                 rohr_ui_label(&ticks_per_frame_label,
-                    (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 270.0f, 110.0f, 28.0f});
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 308.0f, 110.0f, 28.0f});
                 UIFieldResult tick_result = rohr_ui_field(
                     "editor.animated_sprite.ticks",
                     (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &ticks},
                     &animated_ticks_field,
-                    (UIRect){EDITOR_VIEWPORT_WIDTH + 120.0f, 270.0f,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 120.0f, 308.0f,
                         EDITOR_TOOLS_WIDTH - 130.0f, 28.0f}, NULL);
                 rohr_ui_label(&time_per_frame_label,
-                    (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 308.0f, 110.0f, 28.0f});
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 346.0f, 110.0f, 28.0f});
                 UIFieldResult time_result = rohr_ui_field(
                     "editor.animated_sprite.seconds",
                     (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &seconds},
                     &animated_time_field,
-                    (UIRect){EDITOR_VIEWPORT_WIDTH + 120.0f, 308.0f,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 120.0f, 346.0f,
                         EDITOR_TOOLS_WIDTH - 130.0f, 28.0f}, NULL);
                 rohr_ui_label(&starting_frame_label,
-                    (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 346.0f, 110.0f, 28.0f});
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f, 384.0f, 110.0f, 28.0f});
                 UIFieldResult start_result = rohr_ui_field(
                     "editor.animated_sprite.start",
                     (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &starting},
                     &animated_starting_frame_field,
-                    (UIRect){EDITOR_VIEWPORT_WIDTH + 120.0f, 346.0f,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 120.0f, 384.0f,
                         EDITOR_TOOLS_WIDTH - 130.0f, 28.0f}, NULL);
                 rohr_ui_label(&direction_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
-                    384.0f, 90.0f, 28.0f});
+                    422.0f, 90.0f, 28.0f});
                 UIDropdownResult direction_result = rohr_ui_dropdown(
                     "editor.animated_sprite.direction", direction_options, 2,
                     sprite->direction == DIRECTION_LEFT ? 0 : 1,
-                    (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 384.0f,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 422.0f,
                         EDITOR_TOOLS_WIDTH - 110.0f, 28.0f}, NULL);
                 bool follow = sprite->follow_body_rotation;
                 bool playing = sprite->playing;
                 bool follow_changed = editor_checkbox("editor.animated_sprite.follow",
                     &follow_rotation_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
-                        422.0f, EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, &follow);
+                        460.0f, EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, &follow);
                 bool playing_changed = editor_checkbox("editor.animated_sprite.playing",
                     &playing_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
-                        458.0f, EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, &playing);
+                        496.0f, EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, &playing);
                 if(name_result.changed) {
                     EditorCommand command = {.type = EDITOR_COMMAND_ANIMATED_SPRITE_RENAME,
                         .data.animated_sprite_rename = {.object = selected->id,
@@ -5119,20 +5131,18 @@ int main(void) {
                     (void)editor_command_execute(&project, &command);
                 }
                 if(position_x.changed || position_y.changed) {
-                    if(attached_body != NULL) {
-                        EditorCommand command = {
-                            .type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
-                            .data.rigid_body_transform = {selected->id,
-                                attached_body->id, edited_position,
-                                attached_body->rotation}};
-                        (void)editor_command_execute(&project, &command);
-                    } else {
-                        EditorCommand command = {
-                            .type = EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET,
-                            .data.animated_sprite_position_set = {selected->id,
-                                sprite->id, edited_position}};
-                        (void)editor_command_execute(&project, &command);
-                    }
+                    EditorCommand command = {
+                        .type = EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET,
+                        .data.animated_sprite_position_set = {selected->id,
+                            sprite->id, edited_position}};
+                    (void)editor_command_execute(&project, &command);
+                }
+                if(rotation_result.changed) {
+                    EditorCommand command = {
+                        .type = EDITOR_COMMAND_ANIMATED_SPRITE_ROTATION_SET,
+                        .data.animated_sprite_rotation_set = {selected->id,
+                            sprite->id, edited_rotation}};
+                    (void)editor_command_execute(&project, &command);
                 }
                 if(sx.changed || sy.changed) {
                     EditorCommand command = {.type = EDITOR_COMMAND_ANIMATED_SPRITE_SCALE_SET,
@@ -5176,9 +5186,10 @@ int main(void) {
                 }
                 field_editing = name_result.active || position_x.active ||
                     position_y.active || sx.active || sy.active ||
-                    tick_result.active || time_result.active || start_result.active;
+                    tick_result.active || time_result.active || start_result.active ||
+                    rotation_result.active;
                 if(rohr_ui_button("editor.animated_sprite.add_frame", &add_frame_label,
-                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 494.0f,
+                        (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, 532.0f,
                             EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, NULL).clicked) {
                     sprite_browser_object = selected->id;
                     animation_browser_sprite = sprite->id;
@@ -5200,7 +5211,7 @@ int main(void) {
                         selected->id, sprite->id, 0, asset->id};
                     UIButtonStyle selected_style = editor_selected_button_style_get();
                     UIRect frame_bounds = {EDITOR_VIEWPORT_WIDTH + 10.0f,
-                        530.0f + (float)frame * 30.0f,
+                        568.0f + (float)frame * 30.0f,
                         EDITOR_TOOLS_WIDTH - 20.0f, 26.0f};
                     UIButtonResult frame_result;
                     (void)editor_named_text_sync(&font, asset->name,

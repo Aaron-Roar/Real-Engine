@@ -27,6 +27,14 @@ static bool editor_command_position_equal(Position first, Position second) {
         editor_command_float_equal(first.y, second.y);
 }
 
+static Position editor_command_position_rotate(Position position,
+        Orientation rotation) {
+    float cosine = cosf(rotation);
+    float sine = sinf(rotation);
+    return (Position){position.x * cosine - position.y * sine,
+        position.x * sine + position.y * cosine};
+}
+
 static const char *editor_auto_shape_kind_name_get(EditorAutoShapeKind kind) {
     switch(kind) {
         case EDITOR_AUTO_SHAPE_TRIANGLE: return "triangle";
@@ -967,6 +975,7 @@ property_invalid:
         case EDITOR_COMMAND_SPRITE_RENAME:
         case EDITOR_COMMAND_SPRITE_PATH_SET:
         case EDITOR_COMMAND_SPRITE_POSITION_SET:
+        case EDITOR_COMMAND_SPRITE_ROTATION_SET:
         case EDITOR_COMMAND_SPRITE_SIZE_SET:
         case EDITOR_COMMAND_SPRITE_BODY_SET:
         case EDITOR_COMMAND_SPRITE_FOLLOW_ROTATION_SET:
@@ -977,6 +986,8 @@ property_invalid:
                     command->data.sprite_path_set.sprite :
                 command->type == EDITOR_COMMAND_SPRITE_POSITION_SET ?
                     command->data.sprite_position_set.sprite :
+                command->type == EDITOR_COMMAND_SPRITE_ROTATION_SET ?
+                    command->data.sprite_rotation_set.sprite :
                 command->type == EDITOR_COMMAND_SPRITE_SIZE_SET ?
                     command->data.sprite_size_set.sprite :
                 command->type == EDITOR_COMMAND_SPRITE_BODY_SET ?
@@ -990,6 +1001,8 @@ property_invalid:
                     command->data.sprite_path_set.object :
                 command->type == EDITOR_COMMAND_SPRITE_POSITION_SET ?
                     command->data.sprite_position_set.object :
+                command->type == EDITOR_COMMAND_SPRITE_ROTATION_SET ?
+                    command->data.sprite_rotation_set.object :
                 command->type == EDITOR_COMMAND_SPRITE_SIZE_SET ?
                     command->data.sprite_size_set.object :
                 command->type == EDITOR_COMMAND_SPRITE_BODY_SET ?
@@ -1012,6 +1025,8 @@ property_invalid:
                     command->data.sprite_path_set.path);
             } else if(command->type == EDITOR_COMMAND_SPRITE_POSITION_SET) {
                 sprite->position = command->data.sprite_position_set.position;
+            } else if(command->type == EDITOR_COMMAND_SPRITE_ROTATION_SET) {
+                sprite->rotation = command->data.sprite_rotation_set.rotation;
             } else if(command->type == EDITOR_COMMAND_SPRITE_SIZE_SET) {
                 if(command->data.sprite_size_set.size.x <= 0.0f ||
                         command->data.sprite_size_set.size.y <= 0.0f)
@@ -1021,6 +1036,10 @@ property_invalid:
                 sprite->size = command->data.sprite_size_set.size;
             } else if(command->type == EDITOR_COMMAND_SPRITE_BODY_SET) {
                 EditorObject *object = editor_object_query_get(project, object_id);
+                EditorRigidBody *old_body;
+                EditorRigidBody *new_body;
+                Position object_local;
+                Orientation world_rotation;
                 if(command->data.sprite_body_set.body != 0 &&
                         editor_project_rigid_body_get(
                             object,
@@ -1036,9 +1055,37 @@ property_invalid:
                         return editor_command_error(editor_result_error(
                             EDITOR_ERROR_REFERENCE_INVALID,
                             "rigid body already has a static sprite").result.error);
+                old_body = editor_project_rigid_body_get(object, sprite->rigid_body);
+                new_body = editor_project_rigid_body_get(object,
+                    command->data.sprite_body_set.body);
+                object_local = sprite->position;
+                world_rotation = sprite->rotation;
+                if(old_body != NULL) {
+                    object_local = editor_command_position_rotate(object_local,
+                        old_body->rotation);
+                    if(sprite->follow_body_rotation) world_rotation += old_body->rotation;
+                    object_local.x += old_body->position.x;
+                    object_local.y += old_body->position.y;
+                }
+                if(new_body != NULL) {
+                    object_local.x -= new_body->position.x;
+                    object_local.y -= new_body->position.y;
+                    object_local = editor_command_position_rotate(object_local,
+                        -new_body->rotation);
+                    if(sprite->follow_body_rotation) world_rotation -= new_body->rotation;
+                }
+                sprite->position = object_local;
+                sprite->rotation = world_rotation;
                 sprite->rigid_body = command->data.sprite_body_set.body;
-            } else if(command->type == EDITOR_COMMAND_SPRITE_FOLLOW_ROTATION_SET)
-                sprite->follow_body_rotation = command->data.sprite_boolean_set.enabled;
+            } else if(command->type == EDITOR_COMMAND_SPRITE_FOLLOW_ROTATION_SET) {
+                bool enabled = command->data.sprite_boolean_set.enabled;
+                EditorRigidBody *body = editor_project_rigid_body_get(
+                    editor_object_query_get(project, object_id), sprite->rigid_body);
+                if(body != NULL && enabled != sprite->follow_body_rotation) {
+                    sprite->rotation += enabled ? -body->rotation : body->rotation;
+                }
+                sprite->follow_body_rotation = enabled;
+            }
             else sprite->visible = command->data.sprite_visibility_set.visible;
             return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
         }
@@ -1069,6 +1116,7 @@ property_invalid:
         case EDITOR_COMMAND_ANIMATED_SPRITE_RENAME:
         case EDITOR_COMMAND_ANIMATED_SPRITE_BODY_SET:
         case EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET:
+        case EDITOR_COMMAND_ANIMATED_SPRITE_ROTATION_SET:
         case EDITOR_COMMAND_ANIMATED_SPRITE_SCALE_SET:
         case EDITOR_COMMAND_ANIMATED_SPRITE_TIMING_SET:
         case EDITOR_COMMAND_ANIMATED_SPRITE_STARTING_FRAME_SET:
@@ -1093,6 +1141,8 @@ property_invalid:
                 ANIMATED_IDS(animated_sprite_body_set);
             else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET)
                 ANIMATED_IDS(animated_sprite_position_set);
+            else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_ROTATION_SET)
+                ANIMATED_IDS(animated_sprite_rotation_set);
             else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_SCALE_SET)
                 ANIMATED_IDS(animated_sprite_scale_set);
             else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_TIMING_SET)
@@ -1121,6 +1171,10 @@ property_invalid:
                     command->data.animated_sprite_rename.name);
             else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_BODY_SET) {
                 EditorRigidBodyId body = command->data.animated_sprite_body_set.body;
+                EditorRigidBody *old_body;
+                EditorRigidBody *new_body;
+                Position object_local;
+                Orientation world_rotation;
                 if(body != 0 && editor_project_rigid_body_get(object, body) == NULL)
                     return editor_command_not_found("rigid body", body);
                 for(size_t i = 0; body != 0 && i < object->animated_sprite_count; i += 1)
@@ -1129,10 +1183,33 @@ property_invalid:
                         return editor_command_error(editor_result_error(
                             EDITOR_ERROR_REFERENCE_INVALID,
                             "rigid body already has an animated sprite").result.error);
+                old_body = editor_project_rigid_body_get(object, sprite->rigid_body);
+                new_body = editor_project_rigid_body_get(object, body);
+                object_local = sprite->editor_position;
+                world_rotation = sprite->editor_rotation;
+                if(old_body != NULL) {
+                    object_local = editor_command_position_rotate(object_local,
+                        old_body->rotation);
+                    if(sprite->follow_body_rotation) world_rotation += old_body->rotation;
+                    object_local.x += old_body->position.x;
+                    object_local.y += old_body->position.y;
+                }
+                if(new_body != NULL) {
+                    object_local.x -= new_body->position.x;
+                    object_local.y -= new_body->position.y;
+                    object_local = editor_command_position_rotate(object_local,
+                        -new_body->rotation);
+                    if(sprite->follow_body_rotation) world_rotation -= new_body->rotation;
+                }
+                sprite->editor_position = object_local;
+                sprite->editor_rotation = world_rotation;
                 sprite->rigid_body = body;
             } else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET) {
                 sprite->editor_position =
                     command->data.animated_sprite_position_set.position;
+            } else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_ROTATION_SET) {
+                sprite->editor_rotation =
+                    command->data.animated_sprite_rotation_set.rotation;
             } else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_SCALE_SET) {
                 Scale scale = command->data.animated_sprite_scale_set.scale;
                 if(scale.x <= 0.0f || scale.y <= 0.0f)
@@ -1152,9 +1229,16 @@ property_invalid:
                 sprite->starting_frame = frame;
             } else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_DIRECTION_SET)
                 sprite->direction = command->data.animated_sprite_direction_set.direction;
-            else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_FOLLOW_ROTATION_SET)
-                sprite->follow_body_rotation =
-                    command->data.animated_sprite_boolean_set.enabled;
+            else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_FOLLOW_ROTATION_SET) {
+                bool enabled = command->data.animated_sprite_boolean_set.enabled;
+                EditorRigidBody *body = editor_project_rigid_body_get(object,
+                    sprite->rigid_body);
+                if(body != NULL && enabled != sprite->follow_body_rotation) {
+                    sprite->editor_rotation += enabled ?
+                        -body->rotation : body->rotation;
+                }
+                sprite->follow_body_rotation = enabled;
+            }
             else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_VISIBILITY_SET)
                 sprite->visible = command->data.animated_sprite_boolean_set.enabled;
             else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_PLAYING_SET)
@@ -1520,6 +1604,15 @@ EditorResult editor_command_cli_parse(int count, char **arguments,
                 command->data.sprite_position_set.sprite = id;
                 return editor_result_value(true);
             }
+            if(strcmp(action, "set") == 0 && count == 8 &&
+                    strcmp(arguments[6], "rotation") == 0 &&
+                    editor_command_float_parse(arguments[7],
+                        &command->data.sprite_rotation_set.rotation)) {
+                command->type = EDITOR_COMMAND_SPRITE_ROTATION_SET;
+                command->data.sprite_rotation_set.object = object;
+                command->data.sprite_rotation_set.sprite = id;
+                return editor_result_value(true);
+            }
             if(strcmp(action, "set") == 0 && count == 9 &&
                     strcmp(arguments[6], "size") == 0 &&
                     editor_command_float_parse(arguments[7],
@@ -1694,6 +1787,14 @@ EditorResult editor_command_cli_parse(int count, char **arguments,
                 command->type = EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET;
                 command->data.animated_sprite_position_set.object = object;
                 command->data.animated_sprite_position_set.sprite = id;
+                return editor_result_value(true);
+            }
+            if(strcmp(property, "rotation") == 0 && count == 8 &&
+                    editor_command_float_parse(arguments[7],
+                        &command->data.animated_sprite_rotation_set.rotation)) {
+                command->type = EDITOR_COMMAND_ANIMATED_SPRITE_ROTATION_SET;
+                command->data.animated_sprite_rotation_set.object = object;
+                command->data.animated_sprite_rotation_set.sprite = id;
                 return editor_result_value(true);
             }
             if(strcmp(property, "timing") == 0 && count == 9) {

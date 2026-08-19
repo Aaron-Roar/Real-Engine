@@ -2486,6 +2486,63 @@ EngineResult graphics_sprite_add(Entity entity, Sprite sprite) {
     return result.kind == ERROR_RESULT_ERROR ? result : error_result_value(true);
 }
 
+EngineResult graphics_sprite_body_offset_set(Entity entity, Position offset) {
+    EntityIndex index;
+    if(!entity_index_get(entity, &index) || !entity_index_alive_check(index))
+        return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
+    if(!entity_index_components_check(index, ROHR_SPRITE) ||
+            index >= sprites_pool.capacity || !sprites_pool.used[index])
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    sprite_components[index].body_offset = offset;
+    return error_result_value(true);
+}
+
+PositionResult graphics_sprite_body_offset_get(Entity entity) {
+    EntityIndex index;
+    if(!entity_index_get(entity, &index) || !entity_index_alive_check(index))
+        return ERROR_RESULT_MAKE_ERROR(PositionResult, ERROR_ENGINE_INVALID_ENTITY);
+    if(!entity_index_components_check(index, ROHR_SPRITE) ||
+            index >= sprites_pool.capacity || !sprites_pool.used[index])
+        return ERROR_RESULT_MAKE_ERROR(PositionResult, ERROR_ENGINE_COMPONENT_MISSING);
+    return ERROR_RESULT_MAKE_VALUE(PositionResult,
+        sprite_components[index].body_offset);
+}
+
+EngineResult graphics_sprite_orientation_offset_set(Entity entity,
+        Orientation offset) {
+    EntityIndex index;
+    if(!entity_index_get(entity, &index) || !entity_index_alive_check(index))
+        return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
+    if(!entity_index_components_check(index, ROHR_SPRITE) ||
+            index >= sprites_pool.capacity || !sprites_pool.used[index])
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    sprite_components[index].orientation_offset = offset;
+    return error_result_value(true);
+}
+
+SpriteOrientationResult graphics_sprite_orientation_offset_get(Entity entity) {
+    EntityIndex index;
+    if(!entity_index_get(entity, &index) || !entity_index_alive_check(index))
+        return ERROR_RESULT_MAKE_ERROR(SpriteOrientationResult,
+            ERROR_ENGINE_INVALID_ENTITY);
+    if(!entity_index_components_check(index, ROHR_SPRITE) ||
+            index >= sprites_pool.capacity || !sprites_pool.used[index])
+        return ERROR_RESULT_MAKE_ERROR(SpriteOrientationResult,
+            ERROR_ENGINE_COMPONENT_MISSING);
+    return ERROR_RESULT_MAKE_VALUE(SpriteOrientationResult,
+        sprite_components[index].orientation_offset);
+}
+
+static Position graphics_sprite_world_position_get(Position entity_position,
+        Orientation entity_orientation, Position offset) {
+    float cosine = cosf(entity_orientation);
+    float sine = sinf(entity_orientation);
+    offset = (Position){offset.x * cosine - offset.y * sine,
+        offset.x * sine + offset.y * cosine};
+    return (Position){entity_position.x + offset.x,
+        entity_position.y + offset.y};
+}
+
 bool graphics_sprite_draw(Entity entity) {
     EntityIndex index;
     TextureAsset asset;
@@ -2497,8 +2554,10 @@ bool graphics_sprite_draw(Entity entity) {
     asset = sprite_components[index].texture;
     asset.size.x *= sprite_components[index].scale.x;
     asset.size.y *= sprite_components[index].scale.y;
-    graphics_texture_draw_flipped(asset, positions[index],
-        sprite_components[index].follow_entity_rotation ? orientations[index] : 0.0f,
+    graphics_texture_draw_flipped(asset, graphics_sprite_world_position_get(
+            positions[index], orientations[index], sprite_components[index].body_offset),
+        sprite_components[index].orientation_offset +
+            (sprite_components[index].follow_entity_rotation ? orientations[index] : 0.0f),
         sprite_components[index].direction == DIRECTION_LEFT ?
             SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
     return true;
@@ -2530,6 +2589,59 @@ EngineResult graphics_animated_sprite_add(Entity entity, AnimatedSprite sprite) 
     return error_result_value(true);
 }
 
+EngineResult graphics_animated_sprite_body_offset_set(Entity entity,
+        Position offset) {
+    EntityIndex index;
+    if(!entity_index_get(entity, &index) || !entity_index_alive_check(index))
+        return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
+    if(!entity_index_components_check(index, ROHR_ANIMATED_SPRITE) ||
+            index >= animated_sprites_pool.capacity ||
+            !animated_sprites_pool.used[index])
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    animated_sprites[index].body_offset = offset;
+    return error_result_value(true);
+}
+
+PositionResult graphics_animated_sprite_body_offset_get(Entity entity) {
+    EntityIndex index;
+    if(!entity_index_get(entity, &index) || !entity_index_alive_check(index))
+        return ERROR_RESULT_MAKE_ERROR(PositionResult, ERROR_ENGINE_INVALID_ENTITY);
+    if(!entity_index_components_check(index, ROHR_ANIMATED_SPRITE) ||
+            index >= animated_sprites_pool.capacity ||
+            !animated_sprites_pool.used[index])
+        return ERROR_RESULT_MAKE_ERROR(PositionResult, ERROR_ENGINE_COMPONENT_MISSING);
+    return ERROR_RESULT_MAKE_VALUE(PositionResult,
+        animated_sprites[index].body_offset);
+}
+
+EngineResult graphics_animated_sprite_orientation_offset_set(Entity entity,
+        Orientation offset) {
+    EntityIndex index;
+    if(!entity_index_get(entity, &index) || !entity_index_alive_check(index))
+        return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
+    if(!entity_index_components_check(index, ROHR_ANIMATED_SPRITE) ||
+            index >= animated_sprites_pool.capacity ||
+            !animated_sprites_pool.used[index])
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    animated_sprites[index].orientation_offset = offset;
+    return error_result_value(true);
+}
+
+SpriteOrientationResult graphics_animated_sprite_orientation_offset_get(
+        Entity entity) {
+    EntityIndex index;
+    if(!entity_index_get(entity, &index) || !entity_index_alive_check(index))
+        return ERROR_RESULT_MAKE_ERROR(SpriteOrientationResult,
+            ERROR_ENGINE_INVALID_ENTITY);
+    if(!entity_index_components_check(index, ROHR_ANIMATED_SPRITE) ||
+            index >= animated_sprites_pool.capacity ||
+            !animated_sprites_pool.used[index])
+        return ERROR_RESULT_MAKE_ERROR(SpriteOrientationResult,
+            ERROR_ENGINE_COMPONENT_MISSING);
+    return ERROR_RESULT_MAKE_VALUE(SpriteOrientationResult,
+        animated_sprites[index].orientation_offset);
+}
+
 bool graphics_animated_sprite_draw(Entity entity) {
     EntityIndex index;
 
@@ -2538,8 +2650,12 @@ bool graphics_animated_sprite_draw(Entity entity) {
             index >= animated_sprites_pool.capacity ||
             !animated_sprites_pool.used[index] || !animated_sprites[index].visible)
         return false;
-    graphics_animated_sprite_value_draw(animated_sprites[index], positions[index],
-        animated_sprites[index].follow_entity_rotation ? orientations[index] : 0.0f);
+    graphics_animated_sprite_value_draw(animated_sprites[index],
+        graphics_sprite_world_position_get(positions[index], orientations[index],
+            animated_sprites[index].body_offset),
+        animated_sprites[index].orientation_offset +
+            (animated_sprites[index].follow_entity_rotation ?
+                orientations[index] : 0.0f));
     return true;
 }
 

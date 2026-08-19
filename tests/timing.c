@@ -36,6 +36,47 @@ int main(void) {
         rohr_engine_shutdown();
         return 1;
     }
+    if(rohr_error_check(rohr_graphics_sprite_body_offset_set(
+                transient.result.value, (Position){3.0f, 4.0f})) ||
+            rohr_error_check(rohr_graphics_sprite_orientation_offset_set(
+                transient.result.value, 0.5f))) {
+        rohr_engine_shutdown();
+        return 1;
+    }
+    {
+        PositionResult offset = rohr_graphics_sprite_body_offset_get(
+            transient.result.value);
+        SpriteOrientationResult rotation =
+            rohr_graphics_sprite_orientation_offset_get(transient.result.value);
+        if(rohr_error_check(offset) || rohr_error_check(rotation) ||
+                offset.result.value.x != 3.0f || offset.result.value.y != 4.0f ||
+                rotation.result.value != 0.5f) {
+            rohr_engine_shutdown();
+            return 1;
+        }
+    }
+    if(rohr_error_check(rohr_graphics_animated_sprite_add(
+                transient.result.value, preview)) ||
+            rohr_error_check(rohr_graphics_animated_sprite_body_offset_set(
+                transient.result.value, (Position){-2.0f, 6.0f})) ||
+            rohr_error_check(rohr_graphics_animated_sprite_orientation_offset_set(
+                transient.result.value, -0.25f))) {
+        rohr_engine_shutdown();
+        return 1;
+    }
+    {
+        PositionResult offset = rohr_graphics_animated_sprite_body_offset_get(
+            transient.result.value);
+        SpriteOrientationResult rotation =
+            rohr_graphics_animated_sprite_orientation_offset_get(
+                transient.result.value);
+        if(rohr_error_check(offset) || rohr_error_check(rotation) ||
+                offset.result.value.x != -2.0f || offset.result.value.y != 6.0f ||
+                rotation.result.value != -0.25f) {
+            rohr_engine_shutdown();
+            return 1;
+        }
+    }
     (void)rohr_entity_delete(transient.result.value);
     if(rohr_system_tick_update() != 0) {
         rohr_engine_shutdown();

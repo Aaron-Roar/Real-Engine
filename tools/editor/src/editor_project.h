@@ -218,6 +218,7 @@ typedef struct EditorSprite {
     char name[EDITOR_OBJECT_NAME_MAX];
     char path[EDITOR_ASSET_PATH_MAX];
     Position position;
+    Orientation rotation;
     EditorRigidBodyId rigid_body;
     Scale size;
     bool follow_body_rotation;
@@ -235,6 +236,7 @@ typedef struct EditorAnimatedSprite {
     EditorAnimatedSpriteId id;
     char name[EDITOR_OBJECT_NAME_MAX];
     Position editor_position;
+    Orientation editor_rotation;
     EditorRigidBodyId rigid_body;
     EditorAnimationFrame *frames;
     size_t frame_count;

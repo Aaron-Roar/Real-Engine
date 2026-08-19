@@ -287,6 +287,9 @@ static EditorHistoryAggregateChange *editor_history_command_aggregate_capture(
         case EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET:
             return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
                 command->data.animated_sprite_position_set.object, 0);
+        case EDITOR_COMMAND_ANIMATED_SPRITE_ROTATION_SET:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.animated_sprite_rotation_set.object, 0);
         case EDITOR_COMMAND_ANIMATED_SPRITE_SCALE_SET:
             return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
                 command->data.animated_sprite_scale_set.object, 0);
@@ -322,6 +325,9 @@ static EditorHistoryAggregateChange *editor_history_command_aggregate_capture(
         case EDITOR_COMMAND_SPRITE_POSITION_SET:
             return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
                 command->data.sprite_position_set.object, 0);
+        case EDITOR_COMMAND_SPRITE_ROTATION_SET:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.sprite_rotation_set.object, 0);
         case EDITOR_COMMAND_SPRITE_VISIBILITY_SET:
             return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
                 command->data.sprite_visibility_set.object, 0);
@@ -1002,6 +1008,8 @@ void editor_history_command_begin(EditorHistory *history,
             command->data.sprite_rename.object : command->type == EDITOR_COMMAND_SPRITE_PATH_SET ?
             command->data.sprite_path_set.object : command->type ==
                 EDITOR_COMMAND_SPRITE_POSITION_SET ? command->data.sprite_position_set.object :
+                command->type == EDITOR_COMMAND_SPRITE_ROTATION_SET ?
+                    command->data.sprite_rotation_set.object :
                 command->type == EDITOR_COMMAND_SPRITE_SIZE_SET ?
                     command->data.sprite_size_set.object : command->type ==
                     EDITOR_COMMAND_SPRITE_BODY_SET ? command->data.sprite_body_set.object :

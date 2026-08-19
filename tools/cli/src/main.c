@@ -72,10 +72,13 @@ static const CliHelpDomain cli_help_domains[] = {
         "--body chassis --vertex vertex_1 --property position 4 8", 3},
     {"--line", "hitbox line", "length <number>",
         "--body chassis --line line_1 --property length 20", 3},
-    {"--sprite", "sprite", "path <file>, size <width> <height>",
+    {"--sprite", "sprite", "path <file>, position <x> <y>, rotation <radians>, "
+        "size <width> <height>, body <body|none>, "
+        "follow-body-rotation <true|false>, visibility <true|false>",
         "--object car --sprite wheel --property path assets/wheel.png", 1},
     {"--animated-sprite", "animated sprite", "body <body|none>, "
-        "scale <x> <y>, timing <ticks> <seconds>, starting-frame <index>, "
+        "position <x> <y>, rotation <radians>, scale <x> <y>, "
+        "timing <ticks> <seconds>, starting-frame <index>, "
         "direction <left|right>, follow-body-rotation <true|false>, "
         "visibility <true|false>",
         "--object car --animated-sprite wheel_animation --property scale 2 2", 2}

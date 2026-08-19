@@ -70,11 +70,29 @@ int main(void) {
         if(!editor_viewport_selection_set(&project, &state, second, true) ||
                 state.selected_item_count != 1 ||
                 state.selected_rigid_body != body->id) return 1;
+        state.mode = EDITOR_VIEWPORT_RIGID_BODY;
         if(!editor_viewport_selection_set(&project, &state, mixed, true) ||
                 state.selected_item_count != 2 ||
                 editor_viewport_selection_homogeneous_check(&state) ||
                 state.selection != EDITOR_SELECTION_SOFT_BODY) return 1;
+        editor_viewport_multi_selection_dismiss(&project, &state);
+        if(state.selected_item_count != 0 ||
+                state.mode != EDITOR_VIEWPORT_RIGID_BODY ||
+                state.selection != EDITOR_SELECTION_RIGID_BODY ||
+                state.selected_rigid_body != body->id) return 1;
+        state.selection = EDITOR_SELECTION_RIGID_BODY;
+        state.selected_rigid_body = body->id;
+        state.mode = EDITOR_VIEWPORT_RIGID_BODY;
         editor_viewport_selection_clear(&state);
+        if(!editor_viewport_selection_set(&project, &state, mixed, true) ||
+                state.selected_item_count != 2 ||
+                state.selected_items[0].kind != EDITOR_SELECTION_RIGID_BODY ||
+                state.selected_items[1].kind != EDITOR_SELECTION_SOFT_BODY)
+            return 1;
+        editor_viewport_multi_selection_dismiss(&project, &state);
+        if(state.mode != EDITOR_VIEWPORT_RIGID_BODY ||
+                state.selection != EDITOR_SELECTION_RIGID_BODY ||
+                state.selected_rigid_body != body->id) return 1;
     }
     if(!navigation_mode_open_check(&project, &state, EDITOR_SELECTION_OBJECT,
                 EDITOR_VIEWPORT_OBJECT)) return 1;

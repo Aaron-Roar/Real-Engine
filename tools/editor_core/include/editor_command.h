@@ -33,6 +33,7 @@ typedef enum EditorCommandType {
     EDITOR_COMMAND_SPRITE_RENAME,
     EDITOR_COMMAND_SPRITE_PATH_SET,
     EDITOR_COMMAND_SPRITE_POSITION_SET,
+    EDITOR_COMMAND_SPRITE_ROTATION_SET,
     EDITOR_COMMAND_SPRITE_SIZE_SET,
     EDITOR_COMMAND_SPRITE_BODY_SET,
     EDITOR_COMMAND_SPRITE_FOLLOW_ROTATION_SET,
@@ -42,6 +43,7 @@ typedef enum EditorCommandType {
     EDITOR_COMMAND_ANIMATED_SPRITE_RENAME,
     EDITOR_COMMAND_ANIMATED_SPRITE_BODY_SET,
     EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET,
+    EDITOR_COMMAND_ANIMATED_SPRITE_ROTATION_SET,
     EDITOR_COMMAND_ANIMATED_SPRITE_SCALE_SET,
     EDITOR_COMMAND_ANIMATED_SPRITE_TIMING_SET,
     EDITOR_COMMAND_ANIMATED_SPRITE_STARTING_FRAME_SET,
@@ -293,6 +295,8 @@ typedef struct EditorCommand {
             char path[EDITOR_ASSET_PATH_MAX]; } sprite_path_set;
         struct { EditorObjectId object; EditorSpriteId sprite; Position position; }
             sprite_position_set;
+        struct { EditorObjectId object; EditorSpriteId sprite; Orientation rotation; }
+            sprite_rotation_set;
         struct { EditorObjectId object; EditorSpriteId sprite; Scale size; }
             sprite_size_set;
         struct { EditorObjectId object; EditorSpriteId sprite;
@@ -311,6 +315,8 @@ typedef struct EditorCommand {
             EditorRigidBodyId body; } animated_sprite_body_set;
         struct { EditorObjectId object; EditorAnimatedSpriteId sprite;
             Position position; } animated_sprite_position_set;
+        struct { EditorObjectId object; EditorAnimatedSpriteId sprite;
+            Orientation rotation; } animated_sprite_rotation_set;
         struct { EditorObjectId object; EditorAnimatedSpriteId sprite; Scale scale; }
             animated_sprite_scale_set;
         struct { EditorObjectId object; EditorAnimatedSpriteId sprite;

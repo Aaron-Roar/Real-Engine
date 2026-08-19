@@ -1358,6 +1358,18 @@ void rohr_graphics_animated_sprite_update(AnimatedSprite *sprite, Tick current_t
 EngineResult rohr_graphics_animated_sprite_add(Entity entity, AnimatedSprite sprite);
 Sprite rohr_graphics_sprite_create(TextureAsset asset, Scale scale);
 EngineResult rohr_graphics_sprite_add(Entity entity, Sprite sprite);
+EngineResult rohr_graphics_sprite_body_offset_set(Entity entity, Position offset);
+PositionResult rohr_graphics_sprite_body_offset_get(Entity entity);
+EngineResult rohr_graphics_sprite_orientation_offset_set(Entity entity,
+    Orientation offset);
+SpriteOrientationResult rohr_graphics_sprite_orientation_offset_get(Entity entity);
+EngineResult rohr_graphics_animated_sprite_body_offset_set(Entity entity,
+    Position offset);
+PositionResult rohr_graphics_animated_sprite_body_offset_get(Entity entity);
+EngineResult rohr_graphics_animated_sprite_orientation_offset_set(Entity entity,
+    Orientation offset);
+SpriteOrientationResult rohr_graphics_animated_sprite_orientation_offset_get(
+    Entity entity);
 bool rohr_graphics_sprite_draw(Entity entity);
 void rohr_graphics_sprites_draw(void);
 

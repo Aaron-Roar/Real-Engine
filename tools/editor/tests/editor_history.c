@@ -643,6 +643,17 @@ int main(void) {
         assert(editor_history_redo(&history));
         assert(project.objects[0].sprites[0].position.x == 14.0f);
 
+        command = (EditorCommand){.type = EDITOR_COMMAND_SPRITE_ROTATION_SET,
+            .data.sprite_rotation_set = {.object = project.objects[0].id,
+                .sprite = sprite_id, .rotation = 0.75f}};
+        result = editor_command_execute(&project, &command);
+        assert(result.kind == ERROR_RESULT_VALUE &&
+            project.objects[0].sprites[0].rotation == 0.75f);
+        assert(editor_history_undo(&history));
+        assert(project.objects[0].sprites[0].rotation == 0.0f);
+        assert(editor_history_redo(&history));
+        assert(project.objects[0].sprites[0].rotation == 0.75f);
+
         command = (EditorCommand){.type = EDITOR_COMMAND_ANIMATED_SPRITE_ADD,
             .data.animated_sprite_add = {.object = project.objects[0].id,
                 .name = "rolling"}};
@@ -653,6 +664,19 @@ int main(void) {
         assert(project.objects[0].animated_sprite_count == 0);
         assert(editor_history_redo(&history));
         assert(project.objects[0].animated_sprite_count == 1);
+        command = (EditorCommand){
+            .type = EDITOR_COMMAND_ANIMATED_SPRITE_ROTATION_SET,
+            .data.animated_sprite_rotation_set = {
+                .object = project.objects[0].id,
+                .sprite = project.objects[0].animated_sprite_items[0].id,
+                .rotation = -0.5f}};
+        result = editor_command_execute(&project, &command);
+        assert(result.kind == ERROR_RESULT_VALUE &&
+            project.objects[0].animated_sprite_items[0].editor_rotation == -0.5f);
+        assert(editor_history_undo(&history));
+        assert(project.objects[0].animated_sprite_items[0].editor_rotation == 0.0f);
+        assert(editor_history_redo(&history));
+        assert(project.objects[0].animated_sprite_items[0].editor_rotation == -0.5f);
         editor_command_executing_callback_set(NULL, NULL);
         editor_command_finished_callback_set(NULL, NULL);
         callback_history = NULL;

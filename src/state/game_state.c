@@ -1382,6 +1382,8 @@ static EngineResult state_components_load(
         int start_frame;
         bool follow_entity_rotation = true;
         bool visible = true;
+        Position body_offset = {0};
+        double orientation_offset = 0.0;
         uint32_t direction = DIRECTION_RIGHT;
         if(!yyjson_is_obj(value)
                 || !yyjson_is_str(animation_name)
@@ -1397,6 +1399,13 @@ static EngineResult state_components_load(
                 ERROR_ENGINE_STATE_ASSET_REFERENCE_NOT_FOUND
             );
         }
+        base_value = yyjson_obj_get(value, "body_offset");
+        if(base_value != NULL && !state_vec2(base_value, &body_offset))
+            return error_result_error(ERROR_ENGINE_STATE_INVALID);
+        base_value = yyjson_obj_get(value, "orientation_offset");
+        if(base_value != NULL && !yyjson_is_num(base_value))
+            return error_result_error(ERROR_ENGINE_STATE_INVALID);
+        if(base_value != NULL) orientation_offset = yyjson_get_num(base_value);
         base_value = yyjson_obj_get(value, "time_per_frame");
         if(base_value != NULL) {
             if(!yyjson_is_num(base_value)) {
@@ -1501,6 +1510,9 @@ static EngineResult state_components_load(
                 || scale_value.x <= 0.0f
                 || scale_value.y <= 0.0f
                 || !isfinite(time_per_frame)
+                || !isfinite(body_offset.x)
+                || !isfinite(body_offset.y)
+                || !isfinite(orientation_offset)
                 || time_per_frame < 0.0
                 || start_frame < 0
                 || start_frame >= animation->asset.texture_list.amount) {
@@ -1512,6 +1524,8 @@ static EngineResult state_components_load(
         sprite.animation.ticks_per_frame = ticks_per_frame;
         sprite.animation_frame = start_frame;
         sprite.direction = (Direction)direction;
+        sprite.body_offset = body_offset;
+        sprite.orientation_offset = (Orientation)orientation_offset;
         sprite.follow_entity_rotation = follow_entity_rotation;
         sprite.visible = visible;
         result = graphics_animated_sprite_add(entity, sprite);
@@ -2401,6 +2415,10 @@ EngineResult game_state_file_save(const char *path) {
             );
             yyjson_mut_obj_add_uint(document, sprite, "direction",
                 reference->direction);
+            yyjson_mut_obj_add_val(document, sprite, "body_offset",
+                state_vec2_write(document, animated_sprites[index].body_offset));
+            yyjson_mut_obj_add_real(document, sprite, "orientation_offset",
+                animated_sprites[index].orientation_offset);
             yyjson_mut_obj_add_bool(document, sprite, "follow_entity_rotation",
                 reference->follow_entity_rotation);
             yyjson_mut_obj_add_bool(document, sprite, "visible",

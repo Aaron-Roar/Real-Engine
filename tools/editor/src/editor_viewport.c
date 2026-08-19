@@ -84,6 +84,27 @@ static Position editor_sprite_world_get(const EditorObject *object,
     const EditorSprite *sprite);
 static Position editor_animated_sprite_world_get(const EditorObject *object,
     const EditorAnimatedSprite *sprite, float *rotation);
+static Orientation editor_sprite_world_rotation_get(const EditorObject *object,
+    const EditorSprite *sprite);
+static bool editor_viewport_selection_primary_apply(EditorProject *project,
+    EditorViewportState *state, EditorSelectionRef selection);
+
+static Position editor_sprite_rotation_handle_get(Position center,
+        Orientation rotation) {
+    float length = EDITOR_VIEWPORT_ROTATION_ARM_LENGTH / editor_view_scale;
+    return (Position){center.x + sinf(rotation) * length,
+        center.y - cosf(rotation) * length};
+}
+
+static Orientation editor_sprite_world_rotation_get(const EditorObject *object,
+        const EditorSprite *sprite) {
+    Orientation rotation = sprite->rotation;
+    if(sprite->follow_body_rotation)
+        for(size_t i = 0; i < object->rigid_body_count; i += 1)
+            if(object->rigid_bodies[i].id == sprite->rigid_body)
+                rotation += object->rigid_bodies[i].rotation;
+    return rotation;
+}
 
 void editor_viewport_asset_root_set(const char *path) {
     if(path == NULL) editor_asset_root[0] = '\0';
@@ -625,6 +646,25 @@ void editor_viewport_state_destroy(EditorViewportState *state) {
 void editor_viewport_selection_clear(EditorViewportState *state) {
     if(state == NULL) return;
     state->selected_item_count = 0;
+    state->multi_selection_return_valid = false;
+}
+
+void editor_viewport_multi_selection_dismiss(EditorProject *project,
+        EditorViewportState *state) {
+    EditorSelectionRef restore;
+    EditorViewportMode mode;
+    bool valid;
+    if(state == NULL) return;
+    restore = state->multi_selection_return_selection;
+    mode = state->multi_selection_return_mode;
+    valid = state->multi_selection_return_valid;
+    editor_viewport_selection_clear(state);
+    if(valid && project != NULL &&
+            editor_viewport_selection_primary_apply(project, state, restore)) {
+        state->mode = mode;
+    } else {
+        state->selection = EDITOR_SELECTION_NONE;
+    }
 }
 
 static bool editor_selection_ref_equal(EditorSelectionRef first,
@@ -813,12 +853,31 @@ static bool editor_viewport_selection_primary_apply(EditorProject *project,
 bool editor_viewport_selection_set(EditorProject *project,
         EditorViewportState *state, EditorSelectionRef selection, bool additive) {
     size_t existing = SIZE_MAX;
+    EditorSelectionRef prior = {0};
+    bool prior_valid = false;
     if(project == NULL || state == NULL || selection.kind == EDITOR_SELECTION_NONE)
         return false;
+    if(additive && state->selected_item_count == 0)
+        prior_valid = editor_viewport_selection_ref_get(project, state, &prior) &&
+            !editor_selection_ref_equal(prior, selection);
+    if(prior_valid) {
+        if(state->selected_item_capacity == 0) {
+            state->selected_items = malloc(8 * sizeof(*state->selected_items));
+            if(state->selected_items == NULL) return false;
+            state->selected_item_capacity = 8;
+        }
+        state->selected_items[state->selected_item_count++] = prior;
+    }
     for(size_t i = 0; i < state->selected_item_count; i += 1)
         if(editor_selection_ref_equal(state->selected_items[i], selection)) existing = i;
+    if(additive && state->selected_item_count == 1 && existing == SIZE_MAX) {
+        state->multi_selection_return_mode = state->mode;
+        state->multi_selection_return_selection = state->selected_items[0];
+        state->multi_selection_return_valid = true;
+    }
     if(!additive) {
         state->selected_item_count = 0;
+        state->multi_selection_return_valid = false;
         existing = SIZE_MAX;
     } else if(existing != SIZE_MAX) {
         memmove(&state->selected_items[existing], &state->selected_items[existing + 1],
@@ -1113,10 +1172,14 @@ bool editor_viewport_marquee_finish(EditorViewportState *state,
     Position first;
     Position second;
     EditorMarqueeBounds marquee;
+    EditorSelectionRef return_selection = {0};
+    bool return_valid;
     if(state == NULL || project == NULL || !state->marquee_active) return false;
     state->marquee_end = pointer;
     state->marquee_active = false;
     starting_mode = state->mode;
+    return_valid = editor_viewport_selection_ref_get(
+        project, state, &return_selection);
     object = editor_project_selected_get(project);
     editor_view_transform_set(project, state, object);
     first = editor_view_screen_to_world(state->marquee_start);
@@ -1216,6 +1279,11 @@ bool editor_viewport_marquee_finish(EditorViewportState *state,
             state->selected_items[state->selected_item_count - 1];
         if(!editor_viewport_selection_primary_apply(project, state, primary))
             return false;
+        if(state->selected_item_count > 1 && return_valid) {
+            state->multi_selection_return_mode = starting_mode;
+            state->multi_selection_return_selection = return_selection;
+            state->multi_selection_return_valid = true;
+        }
         if(starting_mode == EDITOR_VIEWPORT_OBJECT) {
             switch(primary.kind) {
                 case EDITOR_SELECTION_RIGID_BODY:
@@ -1451,6 +1519,25 @@ static bool editor_object_visual_point_contains(const EditorObject *object,
                 editor_anchor_world_get(object, a),
                 editor_anchor_world_get(object, b)) <= 64.0f) return true;
     }
+    for(size_t i = 0; i < object->sprite_count; i += 1) {
+        const EditorSprite *sprite = &object->sprites[i];
+        Position center;
+        if(!sprite->visible) continue;
+        center = editor_sprite_world_get(object, sprite);
+        if(fabsf(point.x - center.x) <= sprite->size.x * 0.5f &&
+                fabsf(point.y - center.y) <= sprite->size.y * 0.5f) return true;
+    }
+    for(size_t i = 0; i < object->animated_sprite_count; i += 1) {
+        const EditorAnimatedSprite *sprite = &object->animated_sprite_items[i];
+        Position center;
+        Scale size;
+        if(!sprite->visible || sprite->frame_count == 0) continue;
+        center = editor_animated_sprite_world_get(object, sprite, NULL);
+        size = (Scale){sprite->frames[0].size.x * sprite->scale.x,
+            sprite->frames[0].size.y * sprite->scale.y};
+        if(fabsf(point.x - center.x) <= size.x * 0.5f &&
+                fabsf(point.y - center.y) <= size.y * 0.5f) return true;
+    }
     return false;
 }
 
@@ -1675,6 +1762,14 @@ static bool editor_group_parent_selected(EditorProject *project,
                  editor_viewport_selection_contains(state, (EditorSelectionRef){
                     EDITOR_SELECTION_PARTICLE, ref.object, 0, 0,
                     anchor->rigid_body}))) return true;
+    }
+    if(ref.kind == EDITOR_SELECTION_SPRITE) {
+        EditorObject *object = editor_group_object_get(project, ref.object);
+        EditorSprite *sprite = editor_project_sprite_get(object, ref.item);
+        if(sprite != NULL && sprite->rigid_body != 0 &&
+                editor_viewport_selection_contains(state, (EditorSelectionRef){
+                    EDITOR_SELECTION_RIGID_BODY, ref.object, 0, 0,
+                    sprite->rigid_body})) return true;
     }
     if(ref.kind == EDITOR_SELECTION_ANIMATED_SPRITE) {
         EditorObject *object = editor_group_object_get(project, ref.object);
@@ -1924,43 +2019,54 @@ static bool editor_group_transform_apply(EditorProject *project,
             EditorSprite *sprite = editor_project_sprite_get(object, ref.item);
             EditorRigidBody *attached = sprite == NULL ? NULL :
                 editor_project_rigid_body_get(object, sprite->rigid_body);
+            Position local;
             if(sprite == NULL) continue;
+            local = (Position){desired.x - object->position.x,
+                desired.y - object->position.y};
             if(attached != NULL) {
-                EditorSelectionRef body_ref = {EDITOR_SELECTION_RIGID_BODY,
-                    object->id, 0, 0, attached->id};
-                if(editor_group_rigid_body_already_driven(project, state, i,
-                        body_ref)) continue;
-                command = (EditorCommand){.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
-                    .data.rigid_body_transform = {object->id, attached->id,
-                        {desired.x - object->position.x,
-                            desired.y - object->position.y},
-                        attached->rotation + angle}};
-            } else command = (EditorCommand){.type = EDITOR_COMMAND_SPRITE_POSITION_SET,
-                    .data.sprite_position_set = {object->id, sprite->id,
-                        {desired.x - object->position.x,
-                            desired.y - object->position.y}}};
+                local.x -= attached->position.x;
+                local.y -= attached->position.y;
+                float cosine = cosf(-attached->rotation);
+                float sine = sinf(-attached->rotation);
+                local = (Position){local.x * cosine - local.y * sine,
+                    local.x * sine + local.y * cosine};
+            }
+            command = (EditorCommand){.type = EDITOR_COMMAND_SPRITE_POSITION_SET,
+                .data.sprite_position_set = {object->id, sprite->id, local}};
+            if(angle != 0.0f) {
+                EditorCommand rotate = {.type = EDITOR_COMMAND_SPRITE_ROTATION_SET,
+                    .data.sprite_rotation_set = {object->id, sprite->id,
+                        sprite->rotation + angle}};
+                changed = editor_command_execute(project, &rotate).kind ==
+                    ERROR_RESULT_VALUE || changed;
+            }
         } else if(ref.kind == EDITOR_SELECTION_ANIMATED_SPRITE) {
             EditorAnimatedSprite *sprite = editor_project_animated_sprite_get(object,
                 ref.item);
             EditorRigidBody *attached = sprite == NULL ? NULL :
                 editor_project_rigid_body_get(object, sprite->rigid_body);
+            Position local;
             if(sprite == NULL) continue;
+            local = (Position){desired.x - object->position.x,
+                desired.y - object->position.y};
             if(attached != NULL) {
-                EditorSelectionRef body_ref = {EDITOR_SELECTION_RIGID_BODY,
-                    object->id, 0, 0, attached->id};
-                if(editor_group_rigid_body_already_driven(project, state, i,
-                        body_ref)) continue;
-                command = (EditorCommand){.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
-                    .data.rigid_body_transform = {object->id, attached->id,
-                        {desired.x - object->position.x,
-                            desired.y - object->position.y},
-                        attached->rotation + angle}};
-            } else {
-                command = (EditorCommand){
-                    .type = EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET,
-                    .data.animated_sprite_position_set = {object->id, sprite->id,
-                        {desired.x - object->position.x,
-                            desired.y - object->position.y}}};
+                local.x -= attached->position.x;
+                local.y -= attached->position.y;
+                float cosine = cosf(-attached->rotation);
+                float sine = sinf(-attached->rotation);
+                local = (Position){local.x * cosine - local.y * sine,
+                    local.x * sine + local.y * cosine};
+            }
+            command = (EditorCommand){
+                .type = EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET,
+                .data.animated_sprite_position_set = {object->id, sprite->id, local}};
+            if(angle != 0.0f) {
+                EditorCommand rotate = {
+                    .type = EDITOR_COMMAND_ANIMATED_SPRITE_ROTATION_SET,
+                    .data.animated_sprite_rotation_set = {object->id, sprite->id,
+                        sprite->editor_rotation + angle}};
+                changed = editor_command_execute(project, &rotate).kind ==
+                    ERROR_RESULT_VALUE || changed;
             }
         } else if(ref.kind == EDITOR_SELECTION_ANCHOR) {
             EditorAnchor *anchor = editor_project_anchor_get(object, ref.item);
@@ -2113,11 +2219,27 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
             return true;
         }
         if(state->mode == EDITOR_VIEWPORT_RIGID_BODY) {
-            EditorRigidBody *selected_body = editor_selected_body_get(object, state);
-            if(selected_body != NULL) {
-                Position handle = editor_body_rotation_handle_get(object, selected_body);
-                individual_rotation_handle_hit = hypotf(pointer.x - handle.x,
-                    pointer.y - handle.y) <= 12.0f / editor_view_scale;
+            for(size_t i = 0; object != NULL &&
+                    i < state->selected_item_count; i += 1) {
+                EditorSelectionRef ref = state->selected_items[i];
+                EditorRigidBody *selected_body;
+                Position handle;
+                Position center;
+                if(ref.object != object->id ||
+                        (ref.kind != EDITOR_SELECTION_RIGID_BODY &&
+                            ref.kind != EDITOR_SELECTION_PARTICLE)) continue;
+                selected_body = editor_project_rigid_body_get(object, ref.item);
+                if(selected_body == NULL) continue;
+                handle = editor_body_rotation_handle_get(object, selected_body);
+                if(hypotf(pointer.x - handle.x, pointer.y - handle.y) >
+                        12.0f / editor_view_scale) continue;
+                (void)editor_viewport_selection_primary_apply(project, state, ref);
+                center = (Position){object->position.x + selected_body->position.x,
+                    object->position.y + selected_body->position.y};
+                state->rotated_body = true;
+                state->rotation_pointer_offset = selected_body->rotation -
+                    atan2f(pointer.y - center.y, pointer.x - center.x);
+                return true;
             }
         } else if(state->mode == EDITOR_VIEWPORT_SOFT_BODY) {
             EditorSoftBody *selected_body = editor_group_soft_body_get(
@@ -2173,6 +2295,8 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
         state->dragged_soft_body = false;
         state->dragged_sprite = false;
         state->dragged_animated_sprite = false;
+        state->rotated_sprite = false;
+        state->rotated_animated_sprite = false;
         state->rotated_soft_body = false;
         state->dragged_origin = false;
         return false;
@@ -2188,15 +2312,37 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
         if(sprite != NULL) {
             Position desired = {pointer.x - state->drag_offset.x,
                 pointer.y - state->drag_offset.y};
-            EditorCommand command = attached != NULL ?
-                (EditorCommand){.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
-                    .data.rigid_body_transform = {object->id, attached->id,
-                        {desired.x - object->position.x,
-                            desired.y - object->position.y}, attached->rotation}} :
-                (EditorCommand){.type = EDITOR_COMMAND_SPRITE_POSITION_SET,
-                    .data.sprite_position_set = {object->id, sprite->id,
-                        {desired.x - object->position.x,
-                            desired.y - object->position.y}}};
+            Position local = {desired.x - object->position.x,
+                desired.y - object->position.y};
+            if(attached != NULL) {
+                local.x -= attached->position.x;
+                local.y -= attached->position.y;
+                float cosine = cosf(-attached->rotation);
+                float sine = sinf(-attached->rotation);
+                local = (Position){local.x * cosine - local.y * sine,
+                    local.x * sine + local.y * cosine};
+            }
+            EditorCommand command = {.type = EDITOR_COMMAND_SPRITE_POSITION_SET,
+                .data.sprite_position_set = {object->id, sprite->id, local}};
+            (void)editor_command_execute(project, &command);
+        }
+        return true;
+    }
+    if(state->rotated_sprite && (primary_button == MOUSE_BUTTON_STATE_DOWN ||
+            primary_button == MOUSE_BUTTON_STATE_PRESSED)) {
+        EditorSprite *sprite = editor_project_sprite_get(object,
+            state->selected_sprite);
+        if(sprite != NULL) {
+            Position center = editor_sprite_world_get(object, sprite);
+            EditorRigidBody *attached = editor_project_rigid_body_get(object,
+                sprite->rigid_body);
+            Orientation world_rotation = atan2f(pointer.y - center.y,
+                pointer.x - center.x) + state->rotation_pointer_offset;
+            Orientation rotation = world_rotation -
+                (attached != NULL && sprite->follow_body_rotation ?
+                    attached->rotation : 0.0f);
+            EditorCommand command = {.type = EDITOR_COMMAND_SPRITE_ROTATION_SET,
+                .data.sprite_rotation_set = {object->id, sprite->id, rotation}};
             (void)editor_command_execute(project, &command);
         }
         return true;
@@ -2210,18 +2356,44 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
             editor_project_rigid_body_get(object, sprite->rigid_body);
         Position desired = {pointer.x - state->drag_offset.x,
             pointer.y - state->drag_offset.y};
-        if(attached != NULL) {
-            EditorCommand command = {.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
-                .data.rigid_body_transform = {object->id, attached->id,
-                    {desired.x - object->position.x,
-                        desired.y - object->position.y}, attached->rotation}};
-            (void)editor_command_execute(project, &command);
-        } else if(sprite != NULL) {
+        if(sprite != NULL) {
+            Position local = {desired.x - object->position.x,
+                desired.y - object->position.y};
+            if(attached != NULL) {
+                local.x -= attached->position.x;
+                local.y -= attached->position.y;
+                float cosine = cosf(-attached->rotation);
+                float sine = sinf(-attached->rotation);
+                local = (Position){local.x * cosine - local.y * sine,
+                    local.x * sine + local.y * cosine};
+            }
             EditorCommand command = {
                 .type = EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET,
                 .data.animated_sprite_position_set = {object->id, sprite->id,
-                    {desired.x - object->position.x,
-                        desired.y - object->position.y}}};
+                    local}};
+            (void)editor_command_execute(project, &command);
+        }
+        return true;
+    }
+    if(state->rotated_animated_sprite &&
+            (primary_button == MOUSE_BUTTON_STATE_DOWN ||
+                primary_button == MOUSE_BUTTON_STATE_PRESSED)) {
+        EditorAnimatedSprite *sprite = editor_project_animated_sprite_get(object,
+            state->selected_animated_sprite);
+        if(sprite != NULL) {
+            Position center = editor_animated_sprite_world_get(object, sprite,
+                NULL);
+            EditorRigidBody *attached = editor_project_rigid_body_get(object,
+                sprite->rigid_body);
+            Orientation world_rotation = atan2f(pointer.y - center.y,
+                pointer.x - center.x) + state->rotation_pointer_offset;
+            Orientation rotation = world_rotation -
+                (attached != NULL && sprite->follow_body_rotation ?
+                    attached->rotation : 0.0f);
+            EditorCommand command = {
+                .type = EDITOR_COMMAND_ANIMATED_SPRITE_ROTATION_SET,
+                .data.animated_sprite_rotation_set = {object->id, sprite->id,
+                    rotation}};
             (void)editor_command_execute(project, &command);
         }
         return true;
@@ -2417,8 +2589,9 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                 state->last_viewport_click_index == body->id &&
                 now - state->last_viewport_click_at <= 400;
             if(state->selection_modifier) {
-                state->selection = EDITOR_SELECTION_ORIGIN;
-                state->selected_origin_kind = EDITOR_ORIGIN_RIGID_BODY;
+                (void)editor_viewport_selection_set(project, state,
+                    (EditorSelectionRef){EDITOR_SELECTION_ORIGIN, object->id,
+                        EDITOR_ORIGIN_RIGID_BODY, 0, body->id}, true);
                 state->last_viewport_click_selection = EDITOR_SELECTION_NONE;
             } else if(editing || double_clicked) {
                 state->selection = EDITOR_SELECTION_ORIGIN;
@@ -2461,8 +2634,9 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                 state->last_viewport_click_index == soft_body->id &&
                 now - state->last_viewport_click_at <= 400;
             if(state->selection_modifier) {
-                state->selection = EDITOR_SELECTION_ORIGIN;
-                state->selected_origin_kind = EDITOR_ORIGIN_SOFT_BODY;
+                (void)editor_viewport_selection_set(project, state,
+                    (EditorSelectionRef){EDITOR_SELECTION_ORIGIN, object->id,
+                        EDITOR_ORIGIN_SOFT_BODY, 0, soft_body->id}, true);
                 state->last_viewport_click_selection = EDITOR_SELECTION_NONE;
             } else if(editing || double_clicked) {
                 state->selection = EDITOR_SELECTION_ORIGIN;
@@ -2497,6 +2671,39 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
             state->rotation_pointer_offset = soft_body->rotation -
                 atan2f(pointer.y - center.y, pointer.x - center.x);
             return true;
+        }
+    }
+
+    if(object->visible && state->mode == EDITOR_VIEWPORT_SPRITE) {
+        EditorSprite *sprite = editor_project_sprite_get(object, state->selected_sprite);
+        if(sprite != NULL && sprite->visible) {
+            Position center = editor_sprite_world_get(object, sprite);
+            Orientation rotation = editor_sprite_world_rotation_get(object, sprite);
+            Position handle = editor_sprite_rotation_handle_get(center, rotation);
+            if(hypotf(pointer.x - handle.x, pointer.y - handle.y) <=
+                    12.0f / editor_view_scale) {
+                state->rotated_sprite = true;
+                state->rotation_pointer_offset = rotation -
+                    atan2f(pointer.y - center.y, pointer.x - center.x);
+                return true;
+            }
+        }
+    }
+    if(object->visible && state->mode == EDITOR_VIEWPORT_ANIMATED_SPRITE) {
+        EditorAnimatedSprite *sprite = editor_project_animated_sprite_get(object,
+            state->selected_animated_sprite);
+        if(sprite != NULL && sprite->visible) {
+            Orientation rotation;
+            Position center = editor_animated_sprite_world_get(object, sprite,
+                &rotation);
+            Position handle = editor_sprite_rotation_handle_get(center, rotation);
+            if(hypotf(pointer.x - handle.x, pointer.y - handle.y) <=
+                    12.0f / editor_view_scale) {
+                state->rotated_animated_sprite = true;
+                state->rotation_pointer_offset = rotation -
+                    atan2f(pointer.y - center.y, pointer.x - center.x);
+                return true;
+            }
         }
     }
 
@@ -2554,6 +2761,13 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
             Position world = editor_anchor_world_get(object, anchor);
             if(!anchor->visible || (pointer.x - world.x) * (pointer.x - world.x) +
                     (pointer.y - world.y) * (pointer.y - world.y) > 100.0f) continue;
+            if(state->selection_modifier) {
+                (void)editor_viewport_selection_set(project, state,
+                    (EditorSelectionRef){EDITOR_SELECTION_ANCHOR,
+                        object->id, 0, 0, anchor->id}, true);
+                state->last_viewport_click_selection = EDITOR_SELECTION_NONE;
+                return true;
+            }
             state->selection = EDITOR_SELECTION_ANCHOR;
             state->selected_anchor = anchor->id;
             state->mode = EDITOR_VIEWPORT_ANCHOR;
@@ -2576,6 +2790,13 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
             if(state->mode == EDITOR_VIEWPORT_HITBOX &&
                     state->selected_rigid_body == particle_body->id) {
                 continue;
+            }
+            if(state->selection_modifier) {
+                (void)editor_viewport_selection_set(project, state,
+                    (EditorSelectionRef){EDITOR_SELECTION_PARTICLE,
+                        object->id, 0, 0, particle_body->id}, true);
+                state->last_viewport_click_selection = EDITOR_SELECTION_NONE;
+                return true;
             }
             now = SDL_GetTicks();
             double_clicked = state->last_viewport_click_selection ==
@@ -2664,8 +2885,9 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                 }
                 state->selected_soft_body = soft_body->id;
                 if(state->selection_modifier) {
-                    state->selection = EDITOR_SELECTION_SOFT_NODE;
-                    state->selected_soft_node = node->id;
+                    (void)editor_viewport_selection_set(project, state,
+                        (EditorSelectionRef){EDITOR_SELECTION_SOFT_NODE,
+                            object->id, soft_body->id, 0, node->id}, true);
                     state->last_viewport_click_selection = EDITOR_SELECTION_NONE;
                     return true;
                 }
@@ -2711,8 +2933,9 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                         editor_soft_node_world_get(object, soft_body, b)) > 36.0f) continue;
                 state->selected_soft_body = soft_body->id;
                 if(state->selection_modifier) {
-                    state->selection = EDITOR_SELECTION_SOFT_BEAM;
-                    state->selected_soft_beam = beam->id;
+                    (void)editor_viewport_selection_set(project, state,
+                        (EditorSelectionRef){EDITOR_SELECTION_SOFT_BEAM,
+                            object->id, soft_body->id, 0, beam->id}, true);
                     state->last_viewport_click_selection = EDITOR_SELECTION_NONE;
                     return true;
                 }
@@ -2764,9 +2987,9 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                 if(state->soft_area_candidate_count > 0) {
                     EditorSoftAreaId area_id = state->soft_area_candidates[0];
                     if(state->selection_modifier) {
-                        state->selection = EDITOR_SELECTION_SOFT_AREA;
-                        state->selected_soft_body = soft_body->id;
-                        state->selected_soft_area = area_id;
+                        (void)editor_viewport_selection_set(project, state,
+                            (EditorSelectionRef){EDITOR_SELECTION_SOFT_AREA,
+                                object->id, soft_body->id, 0, area_id}, true);
                         state->last_viewport_click_selection = EDITOR_SELECTION_NONE;
                         return true;
                     }
@@ -2858,6 +3081,13 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
                     !editor_hitbox_point_contains(object, candidate_body, candidate, pointer)) {
                 continue;
             }
+            if(state->selection_modifier) {
+                (void)editor_viewport_selection_set(project, state,
+                    (EditorSelectionRef){EDITOR_SELECTION_RIGID_BODY,
+                        object->id, 0, 0, candidate_body->id}, true);
+                state->last_viewport_click_selection = EDITOR_SELECTION_NONE;
+                return true;
+            }
             if(state->mode == EDITOR_VIEWPORT_HIERARCHY) {
                 state->selection = EDITOR_SELECTION_OBJECT;
                 editor_viewport_object_editor_enter(state);
@@ -2909,10 +3139,18 @@ static bool editor_viewport_path_selected(const EditorViewportState *state,
 
 static Position editor_sprite_world_get(const EditorObject *object,
         const EditorSprite *sprite) {
-    for(size_t i = 0; i < object->rigid_body_count; i += 1)
-        if(object->rigid_bodies[i].id == sprite->rigid_body)
-            return (Position){object->position.x + object->rigid_bodies[i].position.x,
-                object->position.y + object->rigid_bodies[i].position.y};
+    for(size_t i = 0; i < object->rigid_body_count; i += 1) {
+        const EditorRigidBody *body = &object->rigid_bodies[i];
+        if(body->id == sprite->rigid_body) {
+            Position offset = sprite->position;
+            float cosine = cosf(body->rotation);
+            float sine = sinf(body->rotation);
+            offset = (Position){offset.x * cosine - offset.y * sine,
+                offset.x * sine + offset.y * cosine};
+            return (Position){object->position.x + body->position.x + offset.x,
+                object->position.y + body->position.y + offset.y};
+        }
+    }
     return (Position){object->position.x + sprite->position.x,
         object->position.y + sprite->position.y};
 }
@@ -2925,24 +3163,33 @@ static Position editor_animated_sprite_world_get(const EditorObject *object,
         if(object->rigid_bodies[i].id == sprite->rigid_body)
             body = &object->rigid_bodies[i];
     if(body != NULL) {
-        if(rotation != NULL && sprite->follow_body_rotation) *rotation = body->rotation;
-        return (Position){object->position.x + body->position.x,
-            object->position.y + body->position.y};
+        Position offset = sprite->editor_position;
+        float cosine = cosf(body->rotation);
+        float sine = sinf(body->rotation);
+        offset = (Position){offset.x * cosine - offset.y * sine,
+            offset.x * sine + offset.y * cosine};
+        if(rotation != NULL) *rotation = sprite->editor_rotation +
+            (sprite->follow_body_rotation ? body->rotation : 0.0f);
+        return (Position){object->position.x + body->position.x + offset.x,
+            object->position.y + body->position.y + offset.y};
     }
+    if(rotation != NULL) *rotation = sprite->editor_rotation;
     return (Position){object->position.x + sprite->editor_position.x,
         object->position.y + sprite->editor_position.y};
 }
 
-static void editor_sprite_outline_draw(Position center, Scale size, Color color) {
-    Position half = {size.x * 0.5f, size.y * 0.5f};
-    Position a = {center.x - half.x, center.y - half.y};
-    Position b = {center.x + half.x, center.y - half.y};
-    Position c = {center.x + half.x, center.y + half.y};
-    Position d = {center.x - half.x, center.y + half.y};
-    editor_line_draw(a, b, color);
-    editor_line_draw(b, c, color);
-    editor_line_draw(c, d, color);
-    editor_line_draw(d, a, color);
+static void editor_sprite_outline_draw(Position center, Scale size,
+        Orientation rotation, Color color) {
+    Position corners[4] = {{-size.x * 0.5f, -size.y * 0.5f},
+        {size.x * 0.5f, -size.y * 0.5f}, {size.x * 0.5f, size.y * 0.5f},
+        {-size.x * 0.5f, size.y * 0.5f}};
+    float cosine = cosf(rotation);
+    float sine = sinf(rotation);
+    for(size_t i = 0; i < 4; i += 1) corners[i] = (Position){
+        center.x + corners[i].x * cosine - corners[i].y * sine,
+        center.y + corners[i].x * sine + corners[i].y * cosine};
+    for(size_t i = 0; i < 4; i += 1)
+        editor_line_draw(corners[i], corners[(i + 1) % 4], color);
 }
 
 static void editor_viewport_sprites_draw(const EditorObject *object,
@@ -2953,7 +3200,7 @@ static void editor_viewport_sprites_draw(const EditorObject *object,
         TextureAsset *texture;
         Position world;
         Scale screen_size;
-        float rotation = 0.0f;
+        float rotation = sprite->rotation;
         bool selected;
         if(!sprite->visible) continue;
         texture = editor_preview_texture_get(sprite->path);
@@ -2961,7 +3208,7 @@ static void editor_viewport_sprites_draw(const EditorObject *object,
         if(sprite->follow_body_rotation)
             for(size_t body = 0; body < object->rigid_body_count; body += 1)
                 if(object->rigid_bodies[body].id == sprite->rigid_body)
-                    rotation = object->rigid_bodies[body].rotation;
+                    rotation += object->rigid_bodies[body].rotation;
         screen_size = (Scale){sprite->size.x * editor_view_scale,
             sprite->size.y * editor_view_scale};
         if(texture != NULL) rohr_graphics_screen_texture_draw(*texture,
@@ -2971,8 +3218,15 @@ static void editor_viewport_sprites_draw(const EditorObject *object,
                 state->selected_sprite == sprite->id) ||
             editor_viewport_path_selected(state, EDITOR_SELECTION_SPRITE,
                 object->id, 0, 0, sprite->id);
-        if(selected) editor_sprite_outline_draw(world, sprite->size,
+        if(selected) editor_sprite_outline_draw(world, sprite->size, rotation,
             (Color){255, 215, 70, 255});
+        if(state->mode == EDITOR_VIEWPORT_SPRITE &&
+                state->selected_sprite == sprite->id) {
+            Position handle = editor_sprite_rotation_handle_get(world, rotation);
+            editor_line_draw(world, handle, (Color){255, 215, 70, 255});
+            editor_circle_draw(handle, 10.0f / editor_view_scale,
+                (Color){255, 215, 70, 255});
+        }
     }
     rohr_graphics_layer_set(EDITOR_GRAPHICS_LAYER_ANIMATION);
     for(size_t i = 0; i < object->animated_sprite_count; i += 1) {
@@ -3001,8 +3255,15 @@ static void editor_viewport_sprites_draw(const EditorObject *object,
                 state->selected_animated_sprite == animation->id) ||
             editor_viewport_path_selected(state, EDITOR_SELECTION_ANIMATED_SPRITE,
                 object->id, 0, 0, animation->id);
-        if(selected) editor_sprite_outline_draw(world, size,
+        if(selected) editor_sprite_outline_draw(world, size, rotation,
             (Color){255, 215, 70, 255});
+        if(state->mode == EDITOR_VIEWPORT_ANIMATED_SPRITE &&
+                state->selected_animated_sprite == animation->id) {
+            Position handle = editor_sprite_rotation_handle_get(world, rotation);
+            editor_line_draw(world, handle, (Color){255, 215, 70, 255});
+            editor_circle_draw(handle, 10.0f / editor_view_scale,
+                (Color){255, 215, 70, 255});
+        }
     }
 }
 
@@ -3109,11 +3370,31 @@ static void editor_viewport_object_draw(const EditorObject *object,
             if(state->selection == EDITOR_SELECTION_ORIGIN &&
                     state->selected_origin_kind == EDITOR_ORIGIN_RIGID_BODY)
                 editor_circle_draw(center, 7.0f, (Color){255, 215, 70, 255});
-            if(state->mode == EDITOR_VIEWPORT_RIGID_BODY) {
+            if(state->mode == EDITOR_VIEWPORT_RIGID_BODY &&
+                    state->selected_item_count <= 1) {
                 Position handle = editor_body_rotation_handle_get(object, selected);
                 editor_line_draw(center, handle, (Color){255, 215, 70, 255});
                 editor_circle_draw(handle, 10.0f, (Color){255, 215, 70, 255});
             }
+        }
+    }
+
+    if(state->selected_item_count > 1 && state->mode == EDITOR_VIEWPORT_RIGID_BODY) {
+        for(size_t i = 0; i < state->selected_item_count; i += 1) {
+            EditorSelectionRef ref = state->selected_items[i];
+            const EditorRigidBody *body;
+            Position center;
+            Position handle;
+            if(ref.object != object->id ||
+                    (ref.kind != EDITOR_SELECTION_RIGID_BODY &&
+                        ref.kind != EDITOR_SELECTION_PARTICLE)) continue;
+            body = editor_project_rigid_body_get((EditorObject *)object, ref.item);
+            if(body == NULL || !body->visible) continue;
+            center = (Position){object->position.x + body->position.x,
+                object->position.y + body->position.y};
+            handle = editor_body_rotation_handle_get(object, body);
+            editor_line_draw(center, handle, (Color){255, 215, 70, 255});
+            editor_circle_draw(handle, 10.0f, (Color){255, 215, 70, 255});
         }
     }
 

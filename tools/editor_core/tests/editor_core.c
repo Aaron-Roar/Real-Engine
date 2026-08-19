@@ -1039,6 +1039,29 @@ static int sprite_commands_test(void) {
             parsed.type != EDITOR_COMMAND_SPRITE_POSITION_SET ||
             parsed.data.sprite_position_set.sprite != asset->id) return 1;
 
+    command = (EditorCommand){.type = EDITOR_COMMAND_SPRITE_ROTATION_SET,
+        .data.sprite_rotation_set = {.object = object->id, .sprite = asset->id,
+            .rotation = 0.75f}};
+    executed = editor_command_execute(&project, &command);
+    if(executed.kind != ERROR_RESULT_VALUE || asset->rotation != 0.75f) {
+        fprintf(stderr, "static rotation execute failed\n"); return 1;
+    }
+    result = editor_command_cli_standard_write(&project, &command, &executed,
+        "project.rohr.json", text, sizeof(text));
+    if(editor_result_check(result) ||
+            strstr(text, "--property rotation 0.75") == NULL) {
+        fprintf(stderr, "static rotation write failed: %s\n", text); return 1;
+    }
+    count = 0;
+    for(char *token = strtok(text, " "); token != NULL && count < 32;
+            token = strtok(NULL, " ")) arguments[count++] = token;
+    result = editor_command_cli_standard_parse(&project, count, arguments, &path,
+        &parsed);
+    if(editor_result_check(result) || parsed.type != EDITOR_COMMAND_SPRITE_ROTATION_SET ||
+            parsed.data.sprite_rotation_set.rotation != 0.75f) {
+        fprintf(stderr, "static rotation parse failed: %s\n", text); return 1;
+    }
+
     command = (EditorCommand){.type = EDITOR_COMMAND_SPRITE_BODY_SET,
         .data.sprite_body_set = {.object = object->id, .sprite = asset->id,
             .body = body->id}};
@@ -1079,6 +1102,30 @@ static int sprite_commands_test(void) {
     if(editor_result_check(result) ||
             parsed.type != EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET ||
             parsed.data.animated_sprite_position_set.sprite != animated->id) return 1;
+    command = (EditorCommand){.type = EDITOR_COMMAND_ANIMATED_SPRITE_ROTATION_SET,
+        .data.animated_sprite_rotation_set = {.object = object->id,
+            .sprite = animated->id, .rotation = -0.5f}};
+    executed = editor_command_execute(&project, &command);
+    if(executed.kind != ERROR_RESULT_VALUE ||
+            animated->editor_rotation != -0.5f) {
+        fprintf(stderr, "animated rotation execute failed\n"); return 1;
+    }
+    result = editor_command_cli_standard_write(&project, &command, &executed,
+        "project.rohr.json", text, sizeof(text));
+    if(editor_result_check(result) ||
+            strstr(text, "--property rotation -0.5") == NULL) {
+        fprintf(stderr, "animated rotation write failed: %s\n", text); return 1;
+    }
+    count = 0;
+    for(char *token = strtok(text, " "); token != NULL && count < 32;
+            token = strtok(NULL, " ")) arguments[count++] = token;
+    result = editor_command_cli_standard_parse(&project, count, arguments, &path,
+        &parsed);
+    if(editor_result_check(result) ||
+            parsed.type != EDITOR_COMMAND_ANIMATED_SPRITE_ROTATION_SET ||
+            parsed.data.animated_sprite_rotation_set.rotation != -0.5f) {
+        fprintf(stderr, "animated rotation parse failed: %s\n", text); return 1;
+    }
     editor_project_destroy(&project);
     return 0;
 }

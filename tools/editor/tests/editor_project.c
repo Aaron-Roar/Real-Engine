@@ -204,11 +204,17 @@ int main(void) {
                 generated_node_a->friction = 0.6f;
                 generated_node_a->restitution = 0.4f;
             }
-            if(generated_sprite != NULL) generated_sprite->size = (Scale){32.0f, 24.0f};
+            if(generated_sprite != NULL) {
+                generated_sprite->size = (Scale){32.0f, 24.0f};
+                generated_sprite->position = (Position){4.0f, 5.0f};
+                generated_sprite->rotation = 0.25f;
+            }
             if(generated_animation != NULL && generated_sprite != NULL) {
                 generated_animation->rigid_body = generated_object->rigid_bodies[2].id;
                 generated_animation->scale = (Scale){2.0f, 3.0f};
                 generated_animation->time_per_frame = 0.125;
+                generated_animation->editor_position = (Position){6.0f, 7.0f};
+                generated_animation->editor_rotation = -0.5f;
                 generated_animation->follow_body_rotation = false;
                 (void)editor_project_animation_frame_add(&loaded_project,
                     generated_animation, "first_frame", "assets/box.png",
@@ -275,6 +281,10 @@ int main(void) {
                 !file_contains(path, "rohr_graphics_animation_load") ||
                 !file_contains(path, "assets/fly frame.png") ||
                 !file_contains(path, "animated.follow_entity_rotation = false") ||
+                !file_contains(path, "animated.body_offset = (Position){6.00000000f, 7.00000000f}") ||
+                !file_contains(path, "animated.orientation_offset = -0.500000000f") ||
+                !file_contains(path,
+                    "(Scale){32.0000000f, 24.0000000f}, true, 0.250000000f, true") ||
                 !file_contains(path, "(Scale){2.00000000f, 3.00000000f}") ||
                 !file_contains(path, "void starter_draw") ||
                 !file_contains(path, "EngineResult project_objects_create_all") ||

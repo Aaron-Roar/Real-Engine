@@ -312,6 +312,14 @@ void rohr_graphics_animated_sprite_update(AnimatedSprite *sprite, Tick current_t
 EngineResult rohr_graphics_animated_sprite_add(Entity entity, AnimatedSprite sprite) { return graphics_animated_sprite_add(entity, sprite); }
 Sprite rohr_graphics_sprite_create(TextureAsset asset, Scale scale) { return graphics_sprite_create(asset, scale); }
 EngineResult rohr_graphics_sprite_add(Entity entity, Sprite sprite) { return graphics_sprite_add(entity, sprite); }
+EngineResult rohr_graphics_sprite_body_offset_set(Entity entity, Position offset) { return graphics_sprite_body_offset_set(entity, offset); }
+PositionResult rohr_graphics_sprite_body_offset_get(Entity entity) { return graphics_sprite_body_offset_get(entity); }
+EngineResult rohr_graphics_sprite_orientation_offset_set(Entity entity, Orientation offset) { return graphics_sprite_orientation_offset_set(entity, offset); }
+SpriteOrientationResult rohr_graphics_sprite_orientation_offset_get(Entity entity) { return graphics_sprite_orientation_offset_get(entity); }
+EngineResult rohr_graphics_animated_sprite_body_offset_set(Entity entity, Position offset) { return graphics_animated_sprite_body_offset_set(entity, offset); }
+PositionResult rohr_graphics_animated_sprite_body_offset_get(Entity entity) { return graphics_animated_sprite_body_offset_get(entity); }
+EngineResult rohr_graphics_animated_sprite_orientation_offset_set(Entity entity, Orientation offset) { return graphics_animated_sprite_orientation_offset_set(entity, offset); }
+SpriteOrientationResult rohr_graphics_animated_sprite_orientation_offset_get(Entity entity) { return graphics_animated_sprite_orientation_offset_get(entity); }
 bool rohr_graphics_sprite_draw(Entity entity) { return graphics_sprite_draw(entity); }
 void rohr_graphics_sprites_draw(void) { graphics_sprites_draw(); }
 bool rohr_graphics_animated_sprite_draw(Entity entity) { return graphics_animated_sprite_draw(entity); }

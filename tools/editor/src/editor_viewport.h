@@ -70,6 +70,8 @@ typedef struct EditorViewportState {
     bool dragged_soft_body;
     bool dragged_sprite;
     bool dragged_animated_sprite;
+    bool rotated_sprite;
+    bool rotated_animated_sprite;
     bool rotated_soft_body;
     bool dragged_origin;
     bool group_dragging;
@@ -87,6 +89,9 @@ typedef struct EditorViewportState {
     float group_pointer_angle;
     float rotation_pointer_offset;
     EditorViewportMode mode;
+    EditorViewportMode multi_selection_return_mode;
+    EditorSelectionRef multi_selection_return_selection;
+    bool multi_selection_return_valid;
     EditorHierarchySelection selection;
     EditorHierarchySelection last_viewport_click_selection;
     EditorObjectId last_viewport_click_object;
@@ -122,6 +127,8 @@ typedef struct EditorViewportState {
 void editor_viewport_state_init(EditorViewportState *state);
 void editor_viewport_state_destroy(EditorViewportState *state);
 void editor_viewport_selection_clear(EditorViewportState *state);
+void editor_viewport_multi_selection_dismiss(EditorProject *project,
+    EditorViewportState *state);
 bool editor_viewport_selection_ref_get(const EditorProject *project,
     const EditorViewportState *state, EditorSelectionRef *selection);
 bool editor_viewport_selection_contains(const EditorViewportState *state,

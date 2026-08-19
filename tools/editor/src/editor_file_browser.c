@@ -377,9 +377,10 @@ EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
         UIButtonStyle selected_style = editor_file_browser_selected_style_get();
         bool have_entry_path = editor_file_browser_path_join(entry_path,
             sizeof(entry_path), browser->directory, browser->entries[i].name);
-        bool selected = browser->mode == EDITOR_FILE_BROWSER_OPEN_PNG_MULTI ?
-            browser->entry_selected[i] : browser->entries[i].directory &&
-                have_entry_path && strcmp(entry_path, browser->selected_directory) == 0;
+        bool selected = browser->entries[i].directory ?
+            have_entry_path && strcmp(entry_path, browser->selected_directory) == 0 :
+            browser->mode == EDITOR_FILE_BROWSER_OPEN_PNG_MULTI &&
+                browser->entry_selected[i];
         snprintf(id, sizeof(id), "editor.file_browser.entry.%zu", i);
         interaction = rohr_ui_button(id, &browser->entry_labels[i],
             (UIRect){dialog.x + 14.0f, dialog.y + 82.0f + (float)i * 32.0f,
@@ -389,7 +390,7 @@ EditorFileBrowserResult editor_file_browser_draw(EditorFileBrowser *browser,
             char path[EDITOR_FILE_BROWSER_PATH_MAX];
             if(editor_file_browser_path_join(path, sizeof(path), browser->directory,
                     browser->entries[i].name)) {
-                if(directory_mode && !interaction.double_clicked) {
+                if(!interaction.double_clicked) {
                     (void)editor_file_browser_preview_refresh(browser, path);
                 } else {
                     editor_file_browser_preview_clear(browser);

@@ -148,7 +148,8 @@ static const EditorBulkProperty origin_properties[] = {
 static const EditorBulkProperty sprite_properties[] = {
     {"Visible", EDITOR_BULK_VISIBILITY, EDITOR_BULK_CHECKBOX, 0},
     {"X", EDITOR_BULK_POSITION_X, EDITOR_BULK_FLOAT, 0},
-    {"Y", EDITOR_BULK_POSITION_Y, EDITOR_BULK_FLOAT, 0}
+    {"Y", EDITOR_BULK_POSITION_Y, EDITOR_BULK_FLOAT, 0},
+    {"Rotation", EDITOR_BULK_ROTATION, EDITOR_BULK_FLOAT, 0}
 };
 static const EditorBulkProperty animation_frame_properties[] = {
     {"Width", EDITOR_BULK_FRAME_WIDTH, EDITOR_BULK_FLOAT, 0},
@@ -215,9 +216,10 @@ static const EditorBulkProperty *editor_bulk_mixed_properties_get(
             case EDITOR_SELECTION_SOFT_NODE:
             case EDITOR_SELECTION_VERTEX:
             case EDITOR_SELECTION_ORIGIN:
+                rotation = false;
+                break;
             case EDITOR_SELECTION_SPRITE:
             case EDITOR_SELECTION_ANIMATED_SPRITE:
-                rotation = false;
                 break;
             default:
                 *count = 0;
@@ -425,7 +427,11 @@ static bool editor_bulk_transform_command_get(EditorProject *project,
         position = sprite->position;
         if(target == EDITOR_BULK_POSITION_X) position.x = value;
         else if(target == EDITOR_BULK_POSITION_Y) position.y = value;
-        else return false;
+        else if(target == EDITOR_BULK_ROTATION) {
+            *command = (EditorCommand){.type = EDITOR_COMMAND_SPRITE_ROTATION_SET,
+                .data.sprite_rotation_set = {ref.object, ref.item, value}};
+            return true;
+        } else return false;
         *command = (EditorCommand){.type = EDITOR_COMMAND_SPRITE_POSITION_SET,
             .data.sprite_position_set = {ref.object, ref.item, position}};
         return true;
@@ -433,24 +439,20 @@ static bool editor_bulk_transform_command_get(EditorProject *project,
     if(ref.kind == EDITOR_SELECTION_ANIMATED_SPRITE) {
         EditorAnimatedSprite *sprite = editor_project_animated_sprite_get(object,
             ref.item);
-        EditorRigidBody *body = sprite == NULL ? NULL :
-            editor_project_rigid_body_get(object, sprite->rigid_body);
         Position position;
         if(sprite == NULL) return false;
-        position = body == NULL ? sprite->editor_position : body->position;
+        position = sprite->editor_position;
         if(target == EDITOR_BULK_POSITION_X) position.x = value;
         else if(target == EDITOR_BULK_POSITION_Y) position.y = value;
-        else return false;
-        if(body != NULL) {
-            *command = (EditorCommand){.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
-                .data.rigid_body_transform = {ref.object, body->id,
-                    position, body->rotation}};
-        } else {
+        else if(target == EDITOR_BULK_ROTATION) {
             *command = (EditorCommand){
-                .type = EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET,
-                .data.animated_sprite_position_set = {ref.object, ref.item,
-                    position}};
-        }
+                .type = EDITOR_COMMAND_ANIMATED_SPRITE_ROTATION_SET,
+                .data.animated_sprite_rotation_set = {ref.object, ref.item, value}};
+            return true;
+        } else return false;
+        *command = (EditorCommand){
+            .type = EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET,
+            .data.animated_sprite_position_set = {ref.object, ref.item, position}};
         return true;
     }
     if(ref.kind == EDITOR_SELECTION_VERTEX) {
@@ -730,6 +732,7 @@ bool editor_bulk_panel_draw(EditorBulkPanel *panel, EditorProject *project,
         editor_bulk_properties_get(state->selected_items[0].kind,
             &property_count) : editor_bulk_mixed_properties_get(state,
                 &property_count);
+    if(property_count == 0 || properties == NULL) return false;
     if(property_count > EDITOR_BULK_PROPERTY_MAX) return false;
     if(panel->kind != (editor_viewport_selection_homogeneous_check(state) ?
             state->selected_items[0].kind : EDITOR_SELECTION_NONE) ||

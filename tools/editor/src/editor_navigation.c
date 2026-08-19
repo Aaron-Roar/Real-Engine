@@ -665,6 +665,10 @@ bool editor_navigation_open_item_selection_set(EditorViewportState *state) {
 void editor_navigation_current_selection_clear(EditorProject *project,
         EditorViewportState *state) {
     if(project == NULL || state == NULL) return;
+    if(state->selected_item_count > 1) {
+        editor_viewport_multi_selection_dismiss(project, state);
+        return;
+    }
     editor_viewport_selection_clear(state);
     if(state->mode == EDITOR_VIEWPORT_HIERARCHY) {
         editor_project_selection_clear(project);

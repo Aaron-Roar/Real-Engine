@@ -600,7 +600,7 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
     fprintf(source,
         "static EngineResult generated_sprite_create(Entity *output, Entity target,\n"
         "    Position position, const char *path, Scale size, bool follow_rotation,\n"
-        "    bool visible) {\n"
+        "    Orientation rotation, bool visible) {\n"
         "    EntityResult added = {.kind = ERROR_RESULT_VALUE};\n"
         "    TextureAssetResult loaded;\n"
         "    Sprite sprite;\n"
@@ -618,6 +618,8 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
         "        goto fail;\n"
         "    }\n"
         "    sprite = rohr_graphics_sprite_create(loaded.result.value, (Scale){1.0f, 1.0f});\n"
+        "    sprite.body_offset = owned ? (Position){0} : position;\n"
+        "    sprite.orientation_offset = rotation;\n"
         "    sprite.follow_entity_rotation = follow_rotation;\n"
         "    sprite.visible = visible;\n"
         "    result = rohr_graphics_sprite_add(*output, sprite);\n"
@@ -751,18 +753,24 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
             const EditorRigidBody *body = editor_workspace_body_get(object,
                 sprite->rigid_body);
             char target[EDITOR_OBJECT_NAME_MAX + 16];
+            char sprite_position[128];
             if(body == NULL) snprintf(target, sizeof(target), "ENTITY_INVALID");
             else snprintf(target, sizeof(target), "object->%s", body->name);
-            fprintf(source,
-                "    result = generated_sprite_create(&object->sprite_%s, %s, "
-                "(Position){position.x + %#.9gf, position.y + %#.9gf}, ",
-                sprite->name, target,
+            if(body == NULL) snprintf(sprite_position, sizeof(sprite_position),
+                "(Position){position.x + %#.9gf, position.y + %#.9gf}",
                 sprite->position.x, sprite->position.y);
+            else snprintf(sprite_position, sizeof(sprite_position),
+                "(Position){%#.9gf, %#.9gf}", sprite->position.x,
+                sprite->position.y);
+            fprintf(source,
+                "    result = generated_sprite_create(&object->sprite_%s, %s, %s, ",
+                sprite->name, target, sprite_position);
             editor_workspace_c_string_write(source, sprite->path);
-            fprintf(source, ", (Scale){%#.9gf, %#.9gf}, %s, %s);\n"
+            fprintf(source, ", (Scale){%#.9gf, %#.9gf}, %s, %#.9gf, %s);\n"
                 "    if(rohr_error_check(result)) goto fail;\n",
                 sprite->size.x, sprite->size.y,
                 sprite->follow_body_rotation ? "true" : "false",
+                sprite->rotation,
                 sprite->visible ? "true" : "false");
         }
         for(size_t sprite_index = 0; sprite_index < object->animated_sprite_count;
@@ -808,12 +816,17 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 "      animated = rohr_graphics_animated_sprite_create(loaded.result.value, "
                 "(Scale){%#.9gf, %#.9gf});\n"
                 "      animated.animation_frame = %u;\n"
+                "      animated.body_offset = (Position){%#.9gf, %#.9gf};\n"
+                "      animated.orientation_offset = %#.9gf;\n"
                 "      animated.direction = %s;\n"
                 "      animated.follow_entity_rotation = %s;\n"
                 "      animated.visible = %s;\n"
                 "      result = rohr_graphics_animated_sprite_add(object->%s, animated);\n"
                 "      if(rohr_error_check(result)) goto fail; }\n",
                 sprite->scale.x, sprite->scale.y, sprite->starting_frame,
+                body == NULL ? 0.0f : sprite->editor_position.x,
+                body == NULL ? 0.0f : sprite->editor_position.y,
+                sprite->editor_rotation,
                 sprite->direction == DIRECTION_LEFT ? "DIRECTION_LEFT" :
                     "DIRECTION_RIGHT",
                 sprite->follow_body_rotation ? "true" : "false",

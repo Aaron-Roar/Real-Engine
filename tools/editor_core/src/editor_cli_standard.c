@@ -157,6 +157,8 @@ static EditorResult cli_sprite_command_write(const EditorProject *project,
             command->data.sprite_path_set.object :
             command->type == EDITOR_COMMAND_SPRITE_POSITION_SET ?
                 command->data.sprite_position_set.object :
+            command->type == EDITOR_COMMAND_SPRITE_ROTATION_SET ?
+                command->data.sprite_rotation_set.object :
             command->type == EDITOR_COMMAND_SPRITE_SIZE_SET ?
                 command->data.sprite_size_set.object :
             command->type == EDITOR_COMMAND_SPRITE_BODY_SET ?
@@ -172,6 +174,8 @@ static EditorResult cli_sprite_command_write(const EditorProject *project,
             command->data.sprite_path_set.sprite :
             command->type == EDITOR_COMMAND_SPRITE_POSITION_SET ?
                 command->data.sprite_position_set.sprite :
+            command->type == EDITOR_COMMAND_SPRITE_ROTATION_SET ?
+                command->data.sprite_rotation_set.sprite :
             command->type == EDITOR_COMMAND_SPRITE_SIZE_SET ?
                 command->data.sprite_size_set.sprite :
             command->type == EDITOR_COMMAND_SPRITE_BODY_SET ?
@@ -199,6 +203,10 @@ static EditorResult cli_sprite_command_write(const EditorProject *project,
                         command->data.sprite_position_set.position.x); ADD(number);
                     snprintf(number, sizeof(number), "%.9g",
                         command->data.sprite_position_set.position.y); ADD(number);
+                } else if(command->type == EDITOR_COMMAND_SPRITE_ROTATION_SET) {
+                    ADD("rotation");
+                    snprintf(number, sizeof(number), "%.9g",
+                        command->data.sprite_rotation_set.rotation); ADD(number);
                 } else if(command->type == EDITOR_COMMAND_SPRITE_SIZE_SET) {
                     ADD("size");
                     snprintf(number, sizeof(number), "%.9g", command->data.sprite_size_set.size.x); ADD(number);
@@ -285,6 +293,10 @@ static EditorResult cli_sprite_command_write(const EditorProject *project,
                 command->data.animated_sprite_position_set.position.x); ADD(number);
             snprintf(number, sizeof(number), "%.9g",
                 command->data.animated_sprite_position_set.position.y); ADD(number);
+        } else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_ROTATION_SET) {
+            ADD("rotation");
+            snprintf(number, sizeof(number), "%.9g",
+                command->data.animated_sprite_rotation_set.rotation); ADD(number);
         } else if(command->type == EDITOR_COMMAND_ANIMATED_SPRITE_SCALE_SET) {
             ADD("scale");
             snprintf(number, sizeof(number), "%.9g", command->data.animated_sprite_scale_set.scale.x); ADD(number);
@@ -488,6 +500,9 @@ EditorResult editor_command_cli_standard_parse(const EditorProject *project,
             (strcmp(domain, "sprite") == 0 ||
              strcmp(domain, "animated-sprite") == 0) ? "set" :
          strcmp(property, "position") == 0 ? "position" :
+         strcmp(property, "rotation") == 0 &&
+            (strcmp(domain, "sprite") == 0 ||
+             strcmp(domain, "animated-sprite") == 0) ? "set" :
          strcmp(property, "rotation") == 0 ? "transform" :
          strcmp(property, "transform") == 0 ? "transform" :
          strcmp(property, "origin") == 0 ? "origin" :
@@ -515,7 +530,8 @@ EditorResult editor_command_cli_standard_parse(const EditorProject *project,
         if(strcmp(action, "set") == 0 || strcmp(action, "filter") == 0)
             normalized[n++] = (char *)property;
         else if(strcmp(action, "connect") == 0) normalized[n++] = (char *)property;
-        if(strcmp(property, "rotation") == 0) {
+        if(strcmp(property, "rotation") == 0 &&
+                strcmp(action, "transform") == 0) {
             if(input.terminal + 2 >= count || input.terminal + 3 != count)
                 return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
                     "rotation requires one value");

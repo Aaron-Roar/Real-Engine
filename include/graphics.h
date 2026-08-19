@@ -220,6 +220,8 @@ typedef struct Sprite {
     TextureAsset texture;
     Direction direction;
     Scale scale;
+    Position body_offset;
+    Orientation orientation_offset;
     bool follow_entity_rotation;
     bool visible;
 } Sprite;
@@ -242,11 +244,18 @@ typedef struct {
     Direction direction;
     /** Draw scale. */
     Scale scale;
+    /** Local position relative to the attached entity. */
+    Position body_offset;
+    /** Additional orientation relative to the attached entity. */
+    Orientation orientation_offset;
     /** Whether drawing inherits the attached entity's orientation. */
     bool follow_entity_rotation;
     /** Whether bulk sprite drawing includes this sprite. */
     bool visible;
 } AnimatedSprite;
+
+/** Result type for sprite orientation offsets. */
+ERROR_DECLARE_RESULT_TYPE(SpriteOrientationResult, Orientation);
 
 /** Fixed set of animated sprites. */
 typedef struct {
@@ -373,6 +382,28 @@ Sprite graphics_sprite_create(TextureAsset asset, Scale scale);
 
 /** Attach a static sprite to an entity. */
 EngineResult graphics_sprite_add(Entity entity, Sprite sprite);
+
+/** Set the local position offset of an attached static sprite. */
+EngineResult graphics_sprite_body_offset_set(Entity entity, Position offset);
+/** Get the local position offset of an attached static sprite. */
+PositionResult graphics_sprite_body_offset_get(Entity entity);
+/** Set the orientation offset of an attached static sprite. */
+EngineResult graphics_sprite_orientation_offset_set(Entity entity,
+    Orientation offset);
+/** Get the orientation offset of an attached static sprite. */
+SpriteOrientationResult graphics_sprite_orientation_offset_get(Entity entity);
+
+/** Set the local position offset of an attached animated sprite. */
+EngineResult graphics_animated_sprite_body_offset_set(Entity entity,
+    Position offset);
+/** Get the local position offset of an attached animated sprite. */
+PositionResult graphics_animated_sprite_body_offset_get(Entity entity);
+/** Set the orientation offset of an attached animated sprite. */
+EngineResult graphics_animated_sprite_orientation_offset_set(Entity entity,
+    Orientation offset);
+/** Get the orientation offset of an attached animated sprite. */
+SpriteOrientationResult graphics_animated_sprite_orientation_offset_get(
+    Entity entity);
 
 /** Draw the static sprite attached to one entity. */
 bool graphics_sprite_draw(Entity entity);
