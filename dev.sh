@@ -37,6 +37,7 @@ sdk_build() {
         -DROHR_BUILD_EXAMPLES=OFF \
         -DROHR_BUILD_TESTS=OFF \
         -DROHR_ENABLE_DOCUMENTATION=OFF \
+        -DROHR_PORTABLE_SDK=ON \
         "$@"
     cmake --build "$sdk_build_directory" --parallel
     cmake --install "$sdk_build_directory" --prefix "$sdk_directory"

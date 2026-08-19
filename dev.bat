@@ -28,7 +28,7 @@ cmake -E remove_directory "%PROJECT_ROOT%dist\rohr"
 if errorlevel 1 exit /b %errorlevel%
 cmake -E remove_directory "%SDK_DIRECTORY%"
 if errorlevel 1 exit /b %errorlevel%
-cmake -S "%PROJECT_ROOT%" -B "%SDK_BUILD_DIRECTORY%" -DCMAKE_BUILD_TYPE=Release -DROHR_BUILD_EXAMPLES=OFF -DROHR_BUILD_TESTS=OFF -DROHR_ENABLE_DOCUMENTATION=OFF
+cmake -S "%PROJECT_ROOT%" -B "%SDK_BUILD_DIRECTORY%" -DCMAKE_BUILD_TYPE=Release -DROHR_BUILD_EXAMPLES=OFF -DROHR_BUILD_TESTS=OFF -DROHR_ENABLE_DOCUMENTATION=OFF -DROHR_PORTABLE_SDK=ON
 if errorlevel 1 exit /b %errorlevel%
 cmake --build "%SDK_BUILD_DIRECTORY%" --config Release --parallel
 if errorlevel 1 exit /b %errorlevel%

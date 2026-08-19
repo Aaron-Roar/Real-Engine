@@ -16,6 +16,8 @@ option(ROHR_BUILD_EDITOR "Build Rohr Editor" ON)
 option(ROHR_BUILD_TERMINAL "Build Rohr Terminal tool" ON)
 option(ROHR_BUILD_CLI "Build Rohr project CLI" ON)
 option(ROHR_ENABLE_DOCUMENTATION "Enable documentation build targets" ON)
+option(ROHR_PORTABLE_SDK
+    "Avoid development-package dependencies in installed Rohr SDKs" OFF)
 
 set(ROHR_LUA_SOURCES
     lib/lua/lapi.c
@@ -59,16 +61,24 @@ set(CMAKE_C_EXTENSIONS OFF)
 
 set(SDL_SHARED OFF CACHE BOOL "Build SDL3 as a shared library" FORCE)
 set(SDL_STATIC ON CACHE BOOL "Build SDL3 as a static library" FORCE)
-set(SDL_DEPS_SHARED OFF CACHE BOOL "Load SDL platform dependencies dynamically" FORCE)
-set(SDL_ALSA_SHARED OFF CACHE BOOL "Load ALSA dynamically" FORCE)
-set(SDL_PIPEWIRE_SHARED OFF CACHE BOOL "Load PipeWire dynamically" FORCE)
-set(SDL_PULSEAUDIO_SHARED OFF CACHE BOOL "Load PulseAudio dynamically" FORCE)
+set(ROHR_SDL_DEPS_SHARED OFF)
+if(ROHR_PORTABLE_SDK AND UNIX AND NOT APPLE)
+    set(ROHR_SDL_DEPS_SHARED ON)
+endif()
+set(SDL_DEPS_SHARED ${ROHR_SDL_DEPS_SHARED} CACHE BOOL
+    "Load SDL platform dependencies dynamically" FORCE)
+set(SDL_ALSA_SHARED ${ROHR_SDL_DEPS_SHARED} CACHE BOOL "Load ALSA dynamically" FORCE)
+set(SDL_PIPEWIRE_SHARED ${ROHR_SDL_DEPS_SHARED} CACHE BOOL
+    "Load PipeWire dynamically" FORCE)
+set(SDL_PULSEAUDIO_SHARED ${ROHR_SDL_DEPS_SHARED} CACHE BOOL
+    "Load PulseAudio dynamically" FORCE)
 if(UNIX AND NOT APPLE)
     set(SDL_WAYLAND ON CACHE BOOL "Build the native Wayland video driver" FORCE)
-    set(SDL_WAYLAND_SHARED OFF CACHE BOOL "Load Wayland dynamically" FORCE)
+    set(SDL_WAYLAND_SHARED ${ROHR_SDL_DEPS_SHARED} CACHE BOOL
+        "Load Wayland dynamically" FORCE)
     set(SDL_X11 ON CACHE BOOL "Build the X11 fallback video driver" FORCE)
 endif()
-set(SDL_X11_SHARED OFF CACHE BOOL "Load X11 dynamically" FORCE)
+set(SDL_X11_SHARED ${ROHR_SDL_DEPS_SHARED} CACHE BOOL "Load X11 dynamically" FORCE)
 set(SDL_TEST_LIBRARY OFF CACHE BOOL "Build the SDL3 test library" FORCE)
 set(SDL_TESTS OFF CACHE BOOL "Build SDL3 tests" FORCE)
 set(SDL_EXAMPLES OFF CACHE BOOL "Build SDL3 examples" FORCE)
@@ -87,7 +97,7 @@ add_subdirectory(lib/SDL_image)
 set(SDLTTF_INSTALL ON CACHE BOOL "Install SDL3_ttf" FORCE)
 set(SDLTTF_SAMPLES OFF CACHE BOOL "Build SDL3_ttf samples" FORCE)
 set(SDLTTF_PLUTOSVG OFF CACHE BOOL "Build SDL_ttf color emoji support" FORCE)
-if(WIN32)
+if(WIN32 OR ROHR_PORTABLE_SDK)
     set(SDLTTF_VENDORED ON CACHE BOOL "Use bundled SDL_ttf dependencies" FORCE)
     set(SDLTTF_HARFBUZZ OFF CACHE BOOL "Build SDL_ttf HarfBuzz support" FORCE)
 else()
