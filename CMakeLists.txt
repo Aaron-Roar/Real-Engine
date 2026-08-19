@@ -18,6 +18,10 @@ option(ROHR_BUILD_CLI "Build Rohr project CLI" ON)
 option(ROHR_ENABLE_DOCUMENTATION "Enable documentation build targets" ON)
 option(ROHR_PORTABLE_SDK
     "Avoid development-package dependencies in installed Rohr SDKs" OFF)
+option(ROHR_BUILD_SDK_CONSUMER_TESTS
+    "Test an external consumer against the installed Rohr SDK" OFF)
+set(ROHR_SDK_INSTALL_PREFIX "" CACHE PATH
+    "Installed SDK prefix used by external consumer tests")
 
 set(ROHR_LUA_SOURCES
     lib/lua/lapi.c
@@ -230,7 +234,7 @@ install(FILES lib/lua/LICENSE
 
 include(cmake/RohrHostTools.cmake)
 
-if(ROHR_BUILD_TESTS)
+if(ROHR_BUILD_TESTS OR ROHR_BUILD_SDK_CONSUMER_TESTS)
     include(CTest)
 endif()
 
@@ -267,6 +271,34 @@ if(ROHR_BUILD_EXAMPLES)
         pong
     )
 
+endif()
+
+if(ROHR_BUILD_SDK_CONSUMER_TESTS)
+    if(NOT ROHR_SDK_INSTALL_PREFIX)
+        message(FATAL_ERROR
+            "ROHR_BUILD_SDK_CONSUMER_TESTS requires ROHR_SDK_INSTALL_PREFIX")
+    endif()
+    if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+        set(ROHR_SDK_TEST_PLATFORM windows)
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        set(ROHR_SDK_TEST_PLATFORM linux)
+    else()
+        message(FATAL_ERROR
+            "Installed SDK consumer tests do not support ${CMAKE_SYSTEM_NAME}")
+    endif()
+    add_test(
+        NAME installed_sdk_consumer_${ROHR_SDK_TEST_PLATFORM}
+        COMMAND ${CMAKE_COMMAND}
+            "-DROHR_SDK_PREFIX=${ROHR_SDK_INSTALL_PREFIX}"
+            "-DROHR_CONSUMER_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/tests/installed_sdk_consumer"
+            "-DROHR_CONSUMER_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/tests/installed_sdk_consumer_${ROHR_SDK_TEST_PLATFORM}"
+            "-DROHR_GENERATOR=${CMAKE_GENERATOR}"
+            "-DROHR_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}"
+            "-DROHR_GENERATOR_TOOLSET=${CMAKE_GENERATOR_TOOLSET}"
+            "-DROHR_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/run_installed_sdk_consumer.cmake")
+    set_tests_properties(installed_sdk_consumer_${ROHR_SDK_TEST_PLATFORM}
+        PROPERTIES LABELS "sdk;${ROHR_SDK_TEST_PLATFORM}")
 endif()
 
 if(ROHR_BUILD_TESTS)

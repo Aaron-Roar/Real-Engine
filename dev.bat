@@ -28,11 +28,13 @@ cmake -E remove_directory "%PROJECT_ROOT%dist\rohr"
 if errorlevel 1 exit /b %errorlevel%
 cmake -E remove_directory "%SDK_DIRECTORY%"
 if errorlevel 1 exit /b %errorlevel%
-cmake -S "%PROJECT_ROOT%" -B "%SDK_BUILD_DIRECTORY%" -DCMAKE_BUILD_TYPE=Release -DROHR_BUILD_EXAMPLES=OFF -DROHR_BUILD_TESTS=OFF -DROHR_ENABLE_DOCUMENTATION=OFF -DROHR_PORTABLE_SDK=ON
+cmake -S "%PROJECT_ROOT%" -B "%SDK_BUILD_DIRECTORY%" -DCMAKE_BUILD_TYPE=Release -DROHR_BUILD_EXAMPLES=OFF -DROHR_BUILD_TESTS=OFF -DROHR_BUILD_SDK_CONSUMER_TESTS=ON -DROHR_ENABLE_DOCUMENTATION=OFF -DROHR_PORTABLE_SDK=ON -DROHR_SDK_INSTALL_PREFIX="%SDK_DIRECTORY%"
 if errorlevel 1 exit /b %errorlevel%
 cmake --build "%SDK_BUILD_DIRECTORY%" --config Release --parallel
 if errorlevel 1 exit /b %errorlevel%
 cmake --install "%SDK_BUILD_DIRECTORY%" --config Release --prefix "%SDK_DIRECTORY%"
+if errorlevel 1 exit /b %errorlevel%
+ctest --test-dir "%SDK_BUILD_DIRECTORY%" --build-config Release --output-on-failure -R "^installed_sdk_consumer_windows$"
 if errorlevel 1 exit /b %errorlevel%
 echo Rohr windows SDK: %SDK_DIRECTORY%
 exit /b 0

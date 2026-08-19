@@ -36,11 +36,15 @@ sdk_build() {
         -DCMAKE_BUILD_TYPE=Release \
         -DROHR_BUILD_EXAMPLES=OFF \
         -DROHR_BUILD_TESTS=OFF \
+        -DROHR_BUILD_SDK_CONSUMER_TESTS=ON \
         -DROHR_ENABLE_DOCUMENTATION=OFF \
         -DROHR_PORTABLE_SDK=ON \
+        -DROHR_SDK_INSTALL_PREFIX="$sdk_directory" \
         "$@"
     cmake --build "$sdk_build_directory" --parallel
     cmake --install "$sdk_build_directory" --prefix "$sdk_directory"
+    ctest --test-dir "$sdk_build_directory" \
+        --output-on-failure -R "^installed_sdk_consumer_${platform}$"
     echo "Rohr $platform SDK: $sdk_directory"
 }
 
