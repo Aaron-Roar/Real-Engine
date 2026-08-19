@@ -1,293 +1,205 @@
 # Next Steps
 
-The main direction is to make Rohr Engine the runtime beneath a C authoring
-tool. Rohr Editor will let developers author entities, components, assets,
-levels, and UI, then generate ordinary C configuration that is compiled with
-the engine and handwritten game logic. The editor remains optional: every
-generated feature must also be available through the direct public C API.
+Rohr Engine is the runtime beneath an optional C authoring tool. Work is
+ordered by dependency and engine workflow value: shared runtime models first,
+physics semantics second, authoring coverage third, and platform expansion
+last.
 
-## 1. Stable Configuration and Build API
+## Requirements for Every Step
 
-Define plain-C configuration structures and generic builders for entities,
-components, assets, scenes, and UI. These structures are the shared contract
-used by handwritten games, editor previews, generated C, JSON import/export,
-and tests.
+- Keep direct C, CLI, JSON, generated C, project loading, and editor preview in
+  behavioral parity wherever the feature applies.
+- Add focused tests in the same commit as behavior.
+- Keep generated output deterministic and compile it on Linux and Windows.
+- Document physics behavior changes before implementing them.
+- Preserve explicit ownership, lifetime, and allocation-failure handling.
 
-- Direct engine APIs are the primary implementation path.
-- JSON only serializes features that the direct C API already supports.
-- Keep configuration, runtime handles, owned assets, and per-frame results
-  distinct and consistently named.
-- Prefer static configuration arrays over generating thousands of arbitrary
-  engine calls.
-- Keep ownership, destruction, component dependencies, and failure cleanup
-  explicit.
-- Ensure generated and handwritten configurations produce identical runtime
-  behavior.
+## 1. Shared Render Attachment Model
 
-## 2. Generated C Authoring Pipeline
+This is first because sprites already expose body-specific APIs, and the same
+model is required by animated sprites and cameras.
 
-Build a small deterministic command-line generator before rebuilding the
-graphical editor. It should read an editor project model, validate references,
-and emit clearly marked `.generated.c` and `.generated.h` files containing
-static engine configuration.
+- Rename sprite APIs that use `sprite_body_*`; body attachment is optional and
+  should not define the sprite API's identity.
+- Introduce one explicit attachment value containing the target rigid body,
+  position offset, orientation offset, and position/orientation lock settings.
+- Share the model between sprites, animated sprites, and later cameras.
+- Keep free-placed transforms valid when no attachment is present.
+- Migrate engine API, CLI, JSON, generated C, editor GUI, loading, and undo/redo
+  in separate reviewable commits.
+- Test attachment, detachment, offsets, rotation locks, target destruction, and
+  save/load/codegen parity.
 
-- Generated files must never overwrite handwritten game code.
-- Repeated generation without project changes must produce identical output.
-- Escape C identifiers, strings, and file paths safely.
-- Report generation errors in terms of the authored project data.
-- Compile generated sources with the existing Makefile, Rohr Engine, and
-  handwritten game behavior.
-- Keep runtime JSON loading available where useful, but do not require a JSON
-  parser in generated shipping games.
-- First convert one existing example to generated static C configuration and
-  compare it against the direct and JSON paths.
+## 2. Center of Mass
 
-## 3. Rohr Editor Rework
+Center of mass must exist before force-at-point, torque authoring, and accurate
+camera or debug visualization of physical bodies.
 
-Rework the existing level editor into Rohr Editor, a C program built with the
-engine that owns a serializable project model and previews the same public
-configuration consumed by generated games.
+- Add an explicit rigid-body center of mass used by integration, torque,
+  contacts, joints, and debug rendering.
+- Author it relative to the stable local origin. When unspecified, calculate
+  the shape centroid as the automatic default.
+- Add an editor convenience action that moves the origin to the centroid.
+- Define how vertex, origin, and mass edits affect automatic versus explicit
+  centers of mass.
+- Test centroid defaults, explicit offsets, transformed bodies, and shape edits.
 
-Begin with a small reliable workflow:
+## 3. Force-at-Point and Torque Response
 
-- Project create, save, load, and version migration.
-- Entity list and component inspector.
-- Asset and file-path configuration.
-- Scene/level preview.
-- Validation and C generation.
+- Add a force-at-point operation that derives torque from the force vector and
+  its offset from the center of mass.
+- A force through the center of mass must produce no torque.
+- Accumulate derived torque for the current physics tick; do not create a
+  persistent hidden torque component.
+- Test aligned, perpendicular, rotated, zero-mass, static, and
+  kinematic-driven bodies.
 
-Add the UI canvas, asset browser, richer level tools, and build/run integration
-after the project model and generator are stable. The editor authors game
-structure; developers continue to write custom gameplay rules in C.
+## 4. Authored Motion, Forces, and Torques
 
-Add reusable editor and UI drawing tools for lines, arrows, handles, selection
-outlines, relationship links, axes, and transform gizmos. Keep these tools
-available through direct C APIs so they are useful outside Rohr Editor.
+This editor work depends on the center-of-mass and force-at-point semantics
+being stable.
 
-### Example Generation Coverage
+- Expose initial velocity and acceleration for every movable ECS-backed item.
+- Add object-owned force definitions with a target body, local position,
+  direction, and magnitude. A body-locked force transforms its local position
+  and direction each tick before applying force-at-point.
+- Keep one-frame ECS force components separate from persistent authored force
+  emitters.
+- Add object-owned torque definitions with a target body, signed magnitude,
+  visibility, and circular-arrow representation. Torque has no position offset.
+- Give forces and torques hierarchy entries, editors, viewport handles,
+  visibility, multi-select, reorder, delete, and transactional undo/redo.
 
-Add the remaining editor and generator features needed to author the existing
-examples while keeping runtime behavior in developer-owned C:
+## 5. Camera Authoring
 
-- Soft-body triangles and filled surfaces.
-- Standalone particle definitions.
-- Configurable soft-body node radius.
-- Beam and triangle topology tooling.
-- Textures, colors, and rendering configuration.
-- UI layouts.
+Camera authoring follows the attachment model but does not depend on force
+authoring, so it can begin as soon as section 1 is stable.
+
+- Make cameras object-owned items with position, orientation, zoom, viewport
+  dimensions, attachment, visibility, and all remaining camera properties.
+- Draw a camera origin, rotation handle, and dotted view boundary. Allow
+  resizing through boundary handles and numeric fields.
+- Use the shared attachment model so dragging an attached camera or body keeps
+  their relationship consistent with sprites and animations.
+- Add hierarchy, selection, multi-edit, delete, undo/redo, CLI, JSON, generated
+  C, project-load, editor-load, and runtime-load coverage.
+
+## 6. Deterministic Joint Anchor Placement
+
+- Audit pin, weld, and spring authoring so argument order has one meaning:
+  `joint_create(anchor_1, anchor_2)` moves the object associated with
+  `anchor_1` toward `anchor_2` when placement is requested.
+- Preserve the rule for future bounded or maximum-length joints.
+- Keep low-level runtime constraint construction free of implicit body movement;
+  expose placement as an explicit authoring/helper operation.
+- Test reversed arguments, world anchors, shared anchors, locked anchors, and
+  connected groups.
+
+## 7. Physics Robustness and Scaling
+
+Complete these as separate physics commits after the immediate COM and force
+semantics are stable.
+
+- Add bounded adaptive substeps based on predicted movement and collision
+  feature size, exposing the selected count through debug statistics.
+- Add swept collision detection for fast rigid bodies, particles, and soft-body
+  boundaries through the existing contact pipeline.
+- Add non-convex polygon support through validated decomposition while keeping
+  SAT and contact response explicit.
+- Profile before adding a sparse broad-phase interaction candidate index.
+- Keep active constraints compact and hot iteration free of full-capacity
+  scans.
+
+## 8. Asset Ownership, Audio, and Input Foundations
+
+These runtime foundations should precede broad asset-heavy example authoring.
+
+- Add engine-owned texture and animation handles with explicit sharing,
+  unloading, failure cleanup, and shutdown behavior.
+- Build a small SDL-backed audio API for sounds, looping, mixing, volume, and
+  destruction without adding another framework.
+- Add an engine-owned per-frame input snapshot, gamepads, analog axes, text
+  input, device changes, and a small action-mapping layer.
+- Implement texture ownership, audio, and input as separate commits.
+
+## 9. Remaining Example Authoring Coverage
+
+- Filled soft-body surfaces and topology tooling beyond simple triangles.
+- Standalone particle definitions and particle emitters.
+- UI layout authoring using primitive UI components.
 - Spawn templates and repeated entity arrays.
-- Runtime behavior support for controls, torque, timed spawning, scoring, and
-  recording.
+- Runtime behavior hooks for controls, timed spawning, scoring, and recording;
+  behavior remains developer-owned C rather than serialized arbitrary code.
 
-## 4. Composable UI Entities
+## 10. Object Add Palette
 
-Replace the widget-specific direction with a small UI-specific entity and
-component registry that remains independent from the world ECS. Do not begin
-with special button, label, or slider runtime types. A control is initially
-just a useful combination of explicit components built through a generic
-`UIEntityConfig` and builder.
+This improves editor usability but does not unblock runtime or generated-C
+features, so it follows the missing authoring foundations.
 
-Initial components should cover:
+- Replace the object editor's long add list with one Add button that opens a
+  grid of named item tiles, following the auto-shape palette style.
+- Keep the palette open after adding an item.
+- Close it on Escape, an empty click, or opening another menu.
+- Add keyboard navigation, disabled-state explanations, and pointer-event
+  tests.
 
-- Screen-space transform, size, angle, and deterministic draw order.
-- Rectangle and text rendering.
-- Mutable visibility.
-- Hoverable, pressable, and clickable behavior as separate capabilities.
-- Interaction-driven colors.
-- Later, draggable, numeric value, axis mapping, hierarchy, clipping, focus,
-  layout, and animation components.
+## 11. Game-State Serialization Refactor
 
-Reuse `math2d` geometry and point-containment operations for screen-space hit
-testing, including rotated controls, without routing UI through the physics
-collision or response pipeline. Validate required component combinations
-rather than silently adding behavioral dependencies.
+This is maintenance rather than a feature dependency, so it should happen
+after higher-value runtime gaps unless the serializer blocks new work.
 
-## 5. Immediate UI Interaction and Reactive Values
+- Rename JSON construction helpers such as `state_vec2_write()` and
+  `state_color_write()` to names such as `state_vec2_json_create()`.
+- Reserve `_write` for functions that actually write into an output
+  destination.
+- Add save/load round-trip tests before moving code.
+- Split the large serializer into focused asset, UI, entity, and component
+  modules without changing the format.
 
-Keep UI entity components focused on definitions, configuration, and bindings.
-Calculate hover, press, click, drag, and changed events once per frame, cache
-them only for that frame, and expose explicit state queries. Retain only the
-minimal cross-frame context required for pointer capture, focus, and input
-transitions.
+## 12. Multiple Windows
 
-Use a clear frame pipeline:
+This is a large public-API change and should wait until the single-window
+authoring/runtime path is stable.
 
-1. Begin the UI frame with a logical screen-space input snapshot.
-2. Resolve visibility, transforms, draw order, and hit shapes.
-3. Calculate interaction and pointer capture once.
-4. Apply bindings and actions.
-5. Let game code inspect transient state.
-6. Draw visible UI entities without changing interaction state.
-7. End the frame and clear transient events as appropriate.
+- Add engine-owned window handles and APIs for creating, configuring,
+  presenting, and destroying multiple windows.
+- Remove assumptions that graphics, UI, input, cameras, or presentation state
+  belong to one global window.
+- Define event routing, focus, ownership, and shutdown behavior first.
+- Validate native Linux and Windows behavior.
 
-Add a small typed UI value store for UI-owned and application settings such as
-volume, fullscreen, selected tabs, and menu visibility. UI entities may both
-read and drive these values through bindings. Outside code reads and writes the
-same authoritative store entries. Do not move core simulation state such as
-health, position, or velocity into the UI store merely for display.
+## 13. Multiple Viewports per Window
 
-Support declarative built-in actions for common mutations such as setting,
-toggling, incrementing, and decrementing typed values. Reserve explicit
-function-pointer callbacks with documented borrowed context lifetimes for
-custom game behavior. JSON and generated C must map to the same direct binding
-and action APIs.
+- Allow each window to own multiple viewport handles with independent
+  rectangles, cameras, logical sizing, clipping, and draw queues.
+- Define how input coordinates and UI focus resolve through overlapping
+  viewports.
+- Test resize, clipping, camera assignment, destruction, and event routing.
 
-## 6. UI and Editor Testing Foundation
+## 14. Viewport Layout Editor
 
-- Test UI entity generations, deletion, component masks, names, and pool
-  limits.
-- Test front-to-back hit selection and deterministic draw ordering.
-- Test one-frame hover-enter, hover-exit, click, changed, drag-start, and
-  drag-end events.
-- Test pointer capture when press and release occur over different elements.
-- Test direct config, JSON-loaded config, editor preview, and generated C for
-  behavioral parity.
-- Test generated output determinism and compile it in continuous integration.
-- Add a headless example that constructs the same UI directly without JSON.
+This depends on stable window and viewport handles.
 
-## 7. Non-Convex Polygon Collision Support
+- Add an object/project-level viewport layout model.
+- Support adding, selecting, resizing, splitting, reordering, and assigning a
+  camera to viewports.
+- Generate the same layout through direct C, CLI, JSON, and generated C.
+- Test overlapping layouts, invalid camera references, resize behavior, and
+  save/load/codegen parity.
 
-Improve SAT collision handling to support non-convex polygons while preserving
-the existing collision pipeline and documenting any resulting simulation
-behavior changes before implementation.
+## Ongoing Maintenance
 
-## 8. Expanded Joint Options
-
-Add more joint types and configuration options while keeping joint ownership
-and lifetimes explicit. Document the intended effect of each option on the
-physics pipeline and existing simulation behavior before implementation.
-
-Add bounded joint-result information and current/previous joint state tracking
-similar to overlap and contact queries. Expose useful values such as applied
-constraint impulse or force, current error, relative velocity, limit state,
-and whether a joint entered, stayed in, or exited a limit or broken state.
-
-## 9. Flexible Obstacle Prototype
-
-Build flexible obstacles in a game first by composing particles with spring or
-other joints. Use the prototype to identify missing physics primitives,
-stability requirements, ownership rules, and reusable configuration before
-considering an engine-level helper or abstraction.
-
-## 10. Automated Tests and Validation
-
-Add a headless test suite for entity lifetimes, object-pool growth,
-relationships, serialization, collision detection, and physics constraints.
-Add sanitizer and continuous-integration builds so memory errors, undefined
-behavior, and regressions are caught early.
-
-## 11. Fixed-Step Simulation Runner
-
-Provide an optional, explicit loop helper that accumulates frame time and runs
-physics at a fixed interval. Include a catch-up limit, separate rendering
-timing, pause and single-step support, and optional render interpolation.
-
-Add adaptive physics substeps that select a bounded substep count from
-predicted entity movement and collision-feature size. Keep all interacting
-entities on one global substep count, expose the selected count through debug
-statistics, and retain explicit minimum and maximum limits so simulation cost
-cannot grow without bound.
-
-Add swept collision detection for fast-moving rigid bodies, particles, and
-soft-body boundary edges where bounded substeps cannot reliably prevent
-tunneling. Integrate swept contacts with the existing contact constraint and
-interaction-event pipeline instead of creating a separate response path.
-
-Any change to physics stepping must document how it affects existing
-simulation behavior before it is implemented.
-
-## 12. Asset Ownership and Lifetime Management
-
-Introduce engine-owned texture, animation, and future audio asset handles.
-Define clear load, sharing, unload, failure-cleanup, and shutdown behavior, and
-avoid loading duplicate copies of the same asset.
-
-## 13. Audio
-
-Add a small audio system for loading sounds, one-shot playback, looping music,
-and volume control. Keep ownership explicit and use existing SDL facilities
-where practical rather than adding a large dependency.
-
-## 14. Unified Input
-
-Build an engine-owned per-frame input snapshot over the existing keyboard and
-mouse primitives. Add gamepad support, analog axes, mouse wheel and text input,
-device connection handling, and a simple action-mapping layer.
-
-## 15. Collision Filtering, Triggers, and Queries
-
-Add collision layers and masks, non-resolving sensors or triggers, and
-enter/stay/exit collision events. Expose bounded contact data and basic
-raycast or shape-query operations without replacing the existing physics
-pipeline.
-
-The intended effect on collision and simulation behavior must be documented
-before this work begins.
-
-Evaluate a sparse broad-phase interaction candidate list so narrow-phase
-checks iterate likely pairs instead of all entity combinations. Keep the
-current interaction table authoritative, avoid duplicate pair processing, and
-adopt the extra index only when profiling demonstrates a useful scaling gain.
-
-## 16. Configurable Platform and Renderer Setup
-
-Replace compile-time-only window settings with a small initialization
-descriptor. Allow applications to select the title, logical resolution,
-window size, flags, VSync, initialized subsystems, and a headless mode for
-tests or simulation tools.
-
-## 17. Module and File Naming Cleanup
-
-Audit and rename modules, source files, headers, and internal symbols so their
-names match their current responsibilities and the public API conventions.
-Perform this as focused mechanical changes, preserve subsystem boundaries, and
-avoid combining naming-only changes with simulation or ownership changes.
-
-## 18. Rendering, Mass, Camera, and Audio Authoring
-
-- Keep sprites and animated sprites owned by an object; they are not top-level
-  project assets.
-- Add position and angle offsets for object-owned sprites and animated sprites
-  attached to a parent rigid body.
-- Support object-owned, free-placed sprites and animated sprites with no parent
-  body. Their transforms remain relative to the owning object.
-- Add configurable rigid-body center-of-mass offsets. When unspecified, the
-  center of mass defaults to the shape centroid. Decide whether authored
-  offsets are relative to the centroid or the body's local origin before
-  defining the public API.
-- Allow a soft body to specify one total mass and distribute it evenly across
-  its nodes by default.
-- Investigate center-of-mass-aware soft-body mass distribution. The proposed
-  behavior weights each node's share of the total mass according to its
-  distance from the requested center of mass; define and test the exact
-  weighting rule before implementation.
-- Make cameras authorable as either free-placed objects or attachments to a
-  parent. Expose position, orientation, zoom, and the remaining camera
-  properties through the editor, CLI, JSON, generated C, and direct C API.
-- Add sound authoring and runtime support. Build a small Rohr audio API over
-  SDL's audio facilities after deciding asset ownership, loading, playback,
-  looping, mixing, volume, and destruction behavior.
+- Add CI enforcement for first-party and generated snake_case filenames while
+  allowing required ecosystem names such as `CMakeLists.txt` and `README.md`.
+- Add sanitizer builds and malformed-project fuzz/fixture coverage.
+- Continue converting fixed-capacity editor collections to dynamic arrays.
+- Split oversized modules when tests make the move mechanical and safe.
 
 ## Later Features
 
-These features are useful after the foundations above are reliable:
-
 - Tile maps
-- Particle emitters
 - Prefabs
 - Navigation and pathfinding
 - Scripting
 - Networking
 - Asset hot reload
-
-## Scaling, Testing, and Refactoring Direction
-
-- Keep systems independently callable so applications can compose their own
-  update loops.
-- Prefer stable handles and explicit ownership for shared resources.
-- Make subsystem state resettable so tests can run in isolation.
-- Use fixed inputs and delta times for reproducible simulation tests.
-- Add focused abstractions only when a demonstrated ownership, lifetime, or
-  usability problem requires them.
-- Preserve the engine's plain-C, data-oriented architecture while extending
-  public API coverage incrementally.
