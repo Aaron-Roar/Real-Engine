@@ -34,6 +34,8 @@ typedef enum EditorCommandType {
     EDITOR_COMMAND_SPRITE_PATH_SET,
     EDITOR_COMMAND_SPRITE_POSITION_SET,
     EDITOR_COMMAND_SPRITE_SIZE_SET,
+    EDITOR_COMMAND_SPRITE_BODY_SET,
+    EDITOR_COMMAND_SPRITE_FOLLOW_ROTATION_SET,
     EDITOR_COMMAND_SPRITE_VISIBILITY_SET,
     EDITOR_COMMAND_ANIMATED_SPRITE_ADD,
     EDITOR_COMMAND_ANIMATED_SPRITE_REMOVE,
@@ -293,8 +295,12 @@ typedef struct EditorCommand {
             sprite_position_set;
         struct { EditorObjectId object; EditorSpriteId sprite; Scale size; }
             sprite_size_set;
+        struct { EditorObjectId object; EditorSpriteId sprite;
+            EditorRigidBodyId body; } sprite_body_set;
         struct { EditorObjectId object; EditorSpriteId sprite; bool visible; }
             sprite_visibility_set;
+        struct { EditorObjectId object; EditorSpriteId sprite; bool enabled; }
+            sprite_boolean_set;
         struct { EditorObjectId object; char name[EDITOR_OBJECT_NAME_MAX]; }
             animated_sprite_add;
         struct { EditorObjectId object; EditorAnimatedSpriteId sprite; }

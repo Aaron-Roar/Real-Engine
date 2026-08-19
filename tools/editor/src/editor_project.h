@@ -218,7 +218,9 @@ typedef struct EditorSprite {
     char name[EDITOR_OBJECT_NAME_MAX];
     char path[EDITOR_ASSET_PATH_MAX];
     Position position;
+    EditorRigidBodyId rigid_body;
     Scale size;
+    bool follow_body_rotation;
     bool visible;
 } EditorSprite;
 

@@ -137,6 +137,7 @@ static TextureAsset *editor_preview_texture_get(const char *path) {
         EditorPreviewTexture *entry =
             &editor_preview_textures[editor_preview_texture_count++];
         TextureAssetResult result;
+        *entry = (EditorPreviewTexture){0};
         snprintf(entry->path, sizeof(entry->path), "%s", resolved);
         result = rohr_graphics_texture_load((TextureDescriptor){resolved, {1.0f, 1.0f}});
         if(rohr_error_check(result)) {
@@ -1921,11 +1922,23 @@ static bool editor_group_transform_apply(EditorProject *project,
                     body->rotation + angle}};
         } else if(ref.kind == EDITOR_SELECTION_SPRITE) {
             EditorSprite *sprite = editor_project_sprite_get(object, ref.item);
+            EditorRigidBody *attached = sprite == NULL ? NULL :
+                editor_project_rigid_body_get(object, sprite->rigid_body);
             if(sprite == NULL) continue;
-            command = (EditorCommand){.type = EDITOR_COMMAND_SPRITE_POSITION_SET,
-                .data.sprite_position_set = {object->id, sprite->id,
-                    {desired.x - object->position.x,
-                        desired.y - object->position.y}}};
+            if(attached != NULL) {
+                EditorSelectionRef body_ref = {EDITOR_SELECTION_RIGID_BODY,
+                    object->id, 0, 0, attached->id};
+                if(editor_group_rigid_body_already_driven(project, state, i,
+                        body_ref)) continue;
+                command = (EditorCommand){.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
+                    .data.rigid_body_transform = {object->id, attached->id,
+                        {desired.x - object->position.x,
+                            desired.y - object->position.y},
+                        attached->rotation + angle}};
+            } else command = (EditorCommand){.type = EDITOR_COMMAND_SPRITE_POSITION_SET,
+                    .data.sprite_position_set = {object->id, sprite->id,
+                        {desired.x - object->position.x,
+                            desired.y - object->position.y}}};
         } else if(ref.kind == EDITOR_SELECTION_ANIMATED_SPRITE) {
             EditorAnimatedSprite *sprite = editor_project_animated_sprite_get(object,
                 ref.item);
@@ -2170,11 +2183,20 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
             primary_button == MOUSE_BUTTON_STATE_PRESSED)) {
         EditorSprite *sprite = editor_project_sprite_get(object,
             state->selected_sprite);
+        EditorRigidBody *attached = sprite == NULL ? NULL :
+            editor_project_rigid_body_get(object, sprite->rigid_body);
         if(sprite != NULL) {
-            EditorCommand command = {.type = EDITOR_COMMAND_SPRITE_POSITION_SET,
-                .data.sprite_position_set = {object->id, sprite->id,
-                    {pointer.x - object->position.x - state->drag_offset.x,
-                        pointer.y - object->position.y - state->drag_offset.y}}};
+            Position desired = {pointer.x - state->drag_offset.x,
+                pointer.y - state->drag_offset.y};
+            EditorCommand command = attached != NULL ?
+                (EditorCommand){.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
+                    .data.rigid_body_transform = {object->id, attached->id,
+                        {desired.x - object->position.x,
+                            desired.y - object->position.y}, attached->rotation}} :
+                (EditorCommand){.type = EDITOR_COMMAND_SPRITE_POSITION_SET,
+                    .data.sprite_position_set = {object->id, sprite->id,
+                        {desired.x - object->position.x,
+                            desired.y - object->position.y}}};
             (void)editor_command_execute(project, &command);
         }
         return true;
@@ -2887,6 +2909,10 @@ static bool editor_viewport_path_selected(const EditorViewportState *state,
 
 static Position editor_sprite_world_get(const EditorObject *object,
         const EditorSprite *sprite) {
+    for(size_t i = 0; i < object->rigid_body_count; i += 1)
+        if(object->rigid_bodies[i].id == sprite->rigid_body)
+            return (Position){object->position.x + object->rigid_bodies[i].position.x,
+                object->position.y + object->rigid_bodies[i].position.y};
     return (Position){object->position.x + sprite->position.x,
         object->position.y + sprite->position.y};
 }
@@ -2927,14 +2953,19 @@ static void editor_viewport_sprites_draw(const EditorObject *object,
         TextureAsset *texture;
         Position world;
         Scale screen_size;
+        float rotation = 0.0f;
         bool selected;
         if(!sprite->visible) continue;
         texture = editor_preview_texture_get(sprite->path);
         world = editor_sprite_world_get(object, sprite);
+        if(sprite->follow_body_rotation)
+            for(size_t body = 0; body < object->rigid_body_count; body += 1)
+                if(object->rigid_bodies[body].id == sprite->rigid_body)
+                    rotation = object->rigid_bodies[body].rotation;
         screen_size = (Scale){sprite->size.x * editor_view_scale,
             sprite->size.y * editor_view_scale};
         if(texture != NULL) rohr_graphics_screen_texture_draw(*texture,
-            editor_view_world_to_screen(world), screen_size, 0.0f);
+            editor_view_world_to_screen(world), screen_size, rotation);
         selected = object_highlighted ||
             (state->selection == EDITOR_SELECTION_SPRITE &&
                 state->selected_sprite == sprite->id) ||

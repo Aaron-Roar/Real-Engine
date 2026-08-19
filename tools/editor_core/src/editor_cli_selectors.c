@@ -587,6 +587,22 @@ EditorResult editor_command_cli_named_parse(const EditorProject *project,
         if(strcmp(action, "add") != 0)
             RESOLVE_AND_PUSH(editor_cli_sprite_resolve(object,
                 &selectors.sprite, &item_id));
+        if(strcmp(action, "connect") == 0) {
+            if(rest_count != 2 || strcmp(rest[0], "body") != 0)
+                return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                    "sprite connect requires body");
+            if(!editor_cli_argument_push(normalized, &normalized_count, rest[0]))
+                goto capacity_error;
+            if(strcmp(rest[1], "none") == 0) item_id = 0;
+            else {
+                selectors.body.name = rest[1];
+                result = editor_cli_body_resolve(object, &selectors.body, &item_id);
+                if(editor_result_check(result)) return result;
+            }
+            if(!editor_cli_id_push(normalized, &normalized_count, id_buffers,
+                    &id_buffer_count, item_id)) goto capacity_error;
+            rest_count = 0;
+        }
     } else if(strcmp(domain, "object") == 0) {
         if(strcmp(action, "add") == 0 || strcmp(action, "list") == 0)
             return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
@@ -688,13 +704,19 @@ EditorResult editor_command_cli_named_parse(const EditorProject *project,
                     goto capacity_error;
             rest_count = 0;
         } else if(strcmp(action, "connect") == 0) {
-            if(rest_count != 1 || strcmp(rest[0], "body") != 0)
+            if(rest_count != 2 || strcmp(rest[0], "body") != 0)
                 return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
                     "animated-sprite connect requires body");
             if(!editor_cli_argument_push(normalized, &normalized_count, rest[0]))
                 goto capacity_error;
-            RESOLVE_AND_PUSH(editor_cli_body_resolve(object,
-                &selectors.body, &item_id));
+            if(strcmp(rest[1], "none") == 0) item_id = 0;
+            else {
+                selectors.body.name = rest[1];
+                result = editor_cli_body_resolve(object, &selectors.body, &item_id);
+                if(editor_result_check(result)) return result;
+            }
+            if(!editor_cli_id_push(normalized, &normalized_count, id_buffers,
+                    &id_buffer_count, item_id)) goto capacity_error;
             rest_count = 0;
         }
     } else if(strcmp(domain, "soft-node") == 0 || strcmp(domain, "soft-beam") == 0 ||

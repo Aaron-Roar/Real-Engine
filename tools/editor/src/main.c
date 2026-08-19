@@ -1417,6 +1417,36 @@ static bool editor_single_selected_delete(
         }
         return false;
     }
+    if(viewport_state->selection == EDITOR_SELECTION_SPRITE) {
+        EditorSprite *sprite = editor_project_sprite_get(selected,
+            viewport_state->selected_sprite);
+        EditorCommand command;
+        if(sprite == NULL) return false;
+        command = (EditorCommand){.type = EDITOR_COMMAND_SPRITE_REMOVE,
+            .data.sprite_remove = {.object = selected->id,
+                .sprite = sprite->id}};
+        if(editor_command_execute(project, &command).kind == ERROR_RESULT_ERROR)
+            return false;
+        viewport_state->mode = EDITOR_VIEWPORT_OBJECT;
+        viewport_state->selection = EDITOR_SELECTION_OBJECT;
+        viewport_state->selected_sprite = 0;
+        return true;
+    }
+    if(viewport_state->selection == EDITOR_SELECTION_ANIMATED_SPRITE) {
+        EditorAnimatedSprite *sprite = editor_project_animated_sprite_get(selected,
+            viewport_state->selected_animated_sprite);
+        EditorCommand command;
+        if(sprite == NULL) return false;
+        command = (EditorCommand){.type = EDITOR_COMMAND_ANIMATED_SPRITE_REMOVE,
+            .data.animated_sprite_remove = {.object = selected->id,
+                .sprite = sprite->id}};
+        if(editor_command_execute(project, &command).kind == ERROR_RESULT_ERROR)
+            return false;
+        viewport_state->mode = EDITOR_VIEWPORT_OBJECT;
+        viewport_state->selection = EDITOR_SELECTION_OBJECT;
+        viewport_state->selected_animated_sprite = 0;
+        return true;
+    }
     if(viewport_state->selection == EDITOR_SELECTION_OBJECT) {
         EditorCommand command = {.type = EDITOR_COMMAND_ITEM_REMOVE,
             .data.item_remove = {EDITOR_ITEM_OBJECT, selected->id, 0, 0, 0}};
@@ -4707,9 +4737,15 @@ int main(void) {
                 size_t sprite_index = (size_t)(sprite - selected->sprites);
                 char edited_name[EDITOR_OBJECT_NAME_MAX];
                 char edited_path[EDITOR_ASSET_PATH_MAX];
-                Position edited_position = sprite->position;
+                EditorRigidBody *attached_body = editor_project_rigid_body_get(
+                    selected, sprite->rigid_body);
+                Position edited_position = attached_body != NULL ?
+                    attached_body->position : sprite->position;
                 float width = sprite->size.x;
                 float height = sprite->size.y;
+                const TextAsset *body_options[EDITOR_RIGID_BODY_MAX + 1];
+                size_t body_selected = 0;
+                bool follow = sprite->follow_body_rotation;
                 bool visible = sprite->visible;
                 UIButtonStyle delete_style = editor_delete_button_style_get();
                 snprintf(edited_name, sizeof(edited_name), "%s", sprite->name);
@@ -4733,35 +4769,54 @@ int main(void) {
                         .string_capacity = sizeof(edited_path)}, &path_field,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 82.0f, 80.0f,
                         EDITOR_TOOLS_WIDTH - 92.0f, 28.0f}, NULL);
+                body_options[0] = &none_label;
+                for(size_t i = 0; i < selected->rigid_body_count &&
+                        i < EDITOR_RIGID_BODY_MAX; i += 1) {
+                    (void)editor_named_text_sync(&font, selected->rigid_bodies[i].name,
+                        &rigid_body_labels[i], rigid_body_cache[i],
+                        EDITOR_OBJECT_NAME_MAX);
+                    body_options[i + 1] = &rigid_body_labels[i];
+                    if(selected->rigid_bodies[i].id == sprite->rigid_body)
+                        body_selected = i + 1;
+                }
+                rohr_ui_label(&rigid_body_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    118.0f, 90.0f, 28.0f});
+                UIDropdownResult body_result = rohr_ui_dropdown("editor.sprite.body",
+                    body_options, selected->rigid_body_count + 1, body_selected,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 118.0f,
+                        EDITOR_TOOLS_WIDTH - 110.0f, 28.0f}, NULL);
                 rohr_ui_label(&x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
-                    118.0f, 70.0f, 28.0f});
+                    156.0f, 70.0f, 28.0f});
                 UIFieldResult x_result = rohr_ui_field("editor.sprite.x",
                     (UIFieldBinding){.kind = UI_FIELD_FLOAT,
                         .number = &edited_position.x}, &x_field,
-                    (UIRect){EDITOR_VIEWPORT_WIDTH + 82.0f, 118.0f,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 82.0f, 156.0f,
                         EDITOR_TOOLS_WIDTH - 92.0f, 28.0f}, NULL);
                 rohr_ui_label(&y_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
-                    156.0f, 70.0f, 28.0f});
+                    194.0f, 70.0f, 28.0f});
                 UIFieldResult y_result = rohr_ui_field("editor.sprite.y",
                     (UIFieldBinding){.kind = UI_FIELD_FLOAT,
                         .number = &edited_position.y}, &y_field,
-                    (UIRect){EDITOR_VIEWPORT_WIDTH + 82.0f, 156.0f,
-                        EDITOR_TOOLS_WIDTH - 92.0f, 28.0f}, NULL);
-                rohr_ui_label(&width_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
-                    194.0f, 70.0f, 28.0f});
-                UIFieldResult width_result = rohr_ui_field("editor.sprite.width",
-                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &width}, &x_field,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 82.0f, 194.0f,
                         EDITOR_TOOLS_WIDTH - 92.0f, 28.0f}, NULL);
-                rohr_ui_label(&height_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                rohr_ui_label(&width_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     232.0f, 70.0f, 28.0f});
+                UIFieldResult width_result = rohr_ui_field("editor.sprite.width",
+                    (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &width}, &x_field,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 82.0f, 232.0f,
+                        EDITOR_TOOLS_WIDTH - 92.0f, 28.0f}, NULL);
+                rohr_ui_label(&height_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
+                    270.0f, 70.0f, 28.0f});
                 UIFieldResult height_result = rohr_ui_field("editor.sprite.height",
                     (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &height}, &y_field,
-                    (UIRect){EDITOR_VIEWPORT_WIDTH + 82.0f, 232.0f,
+                    (UIRect){EDITOR_VIEWPORT_WIDTH + 82.0f, 270.0f,
                         EDITOR_TOOLS_WIDTH - 92.0f, 28.0f}, NULL);
                 bool visible_changed = editor_checkbox("editor.sprite.visible",
                     &terminal_visible_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
-                        270.0f, EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, &visible);
+                        346.0f, EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, &visible);
+                bool follow_changed = editor_checkbox("editor.sprite.follow",
+                    &follow_rotation_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f,
+                        308.0f, EDITOR_TOOLS_WIDTH - 20.0f, 28.0f}, &follow);
                 if(name_result.changed) {
                     EditorCommand command = {.type = EDITOR_COMMAND_SPRITE_RENAME,
                         .data.sprite_rename = {.object = selected->id,
@@ -4778,10 +4833,23 @@ int main(void) {
                         sizeof(command.data.sprite_path_set.path), "%s", edited_path);
                     (void)editor_command_execute(&project, &command);
                 }
+                if(body_result.changed) {
+                    EditorCommand command = {.type = EDITOR_COMMAND_SPRITE_BODY_SET,
+                        .data.sprite_body_set = {.object = selected->id,
+                            .sprite = sprite->id, .body = body_result.selected_index == 0 ?
+                                0 : selected->rigid_bodies[
+                                    body_result.selected_index - 1].id}};
+                    (void)editor_command_execute(&project, &command);
+                }
                 if(x_result.changed || y_result.changed) {
-                    EditorCommand command = {.type = EDITOR_COMMAND_SPRITE_POSITION_SET,
-                        .data.sprite_position_set = {.object = selected->id,
-                            .sprite = sprite->id, .position = edited_position}};
+                    EditorCommand command = attached_body != NULL ?
+                        (EditorCommand){.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
+                            .data.rigid_body_transform = {selected->id,
+                                attached_body->id, edited_position,
+                                attached_body->rotation}} :
+                        (EditorCommand){.type = EDITOR_COMMAND_SPRITE_POSITION_SET,
+                            .data.sprite_position_set = {.object = selected->id,
+                                .sprite = sprite->id, .position = edited_position}};
                     (void)editor_command_execute(&project, &command);
                 }
                 if(width_result.changed || height_result.changed) {
@@ -4795,6 +4863,13 @@ int main(void) {
                         EDITOR_COMMAND_SPRITE_VISIBILITY_SET,
                         .data.sprite_visibility_set = {.object = selected->id,
                             .sprite = sprite->id, .visible = visible}};
+                    (void)editor_command_execute(&project, &command);
+                }
+                if(follow_changed) {
+                    EditorCommand command = {
+                        .type = EDITOR_COMMAND_SPRITE_FOLLOW_ROTATION_SET,
+                        .data.sprite_boolean_set = {.object = selected->id,
+                            .sprite = sprite->id, .enabled = follow}};
                     (void)editor_command_execute(&project, &command);
                 }
                 field_editing = name_result.active || path_result.active ||
@@ -5381,16 +5456,17 @@ int main(void) {
                         if(!editor_named_text_sync(&font, name, label, cache,
                                 EDITOR_OBJECT_NAME_MAX)) goto fail;
                         if(selection_kind == EDITOR_SELECTION_SPRITE) {
-                            bool changed = editor_checkbox(visibility_id,
-                                &terminal_visible_label,
+                            bool changed = rohr_ui_button(visibility_id,
+                                visible ? &visibility_visible_label :
+                                    &visibility_hidden_label,
                                 (UIRect){EDITOR_VIEWPORT_WIDTH + 10.0f, y,
-                                    26.0f, 26.0f}, &visible);
+                                    26.0f, 26.0f}, NULL).clicked;
                             if(changed) {
                                 EditorCommand command = {
                                     .type = EDITOR_COMMAND_SPRITE_VISIBILITY_SET,
                                     .data.sprite_visibility_set = {
                                         .object = selected->id, .sprite = item.id,
-                                        .visible = visible}};
+                                        .visible = !visible}};
                                 (void)editor_command_execute(&project, &command);
                             }
                         } else if(selection_kind == EDITOR_SELECTION_ANIMATED_SPRITE) {
@@ -5426,19 +5502,27 @@ int main(void) {
                                 EDITOR_TOOLS_WIDTH - 50.0f, 26.0f}, result,
                             hierarchy_pointer, hierarchy_primary, panel_scroll_offset,
                             hierarchy_index + 1 == selected->hierarchy_count);
-                        if(result.clicked || result.focus_changed) {
-                            viewport_state.selection = selection_kind;
-                            if(selection_kind == EDITOR_SELECTION_RIGID_BODY)
-                                viewport_state.selected_rigid_body = item.id;
-                            else if(selection_kind == EDITOR_SELECTION_JOINT)
-                                viewport_state.selected_joint = item.id;
-                            else if(selection_kind == EDITOR_SELECTION_SOFT_BODY)
-                                viewport_state.selected_soft_body = item.id;
-                            else if(selection_kind == EDITOR_SELECTION_SPRITE)
-                                viewport_state.selected_sprite = item.id;
-                            else viewport_state.selected_animated_sprite = item.id;
-                            if(result.double_clicked) (void)editor_navigation_selected_open(
-                                &project, &viewport_state);
+                        if(result.clicked) {
+                            bool additive =
+                                rohr_controller_key_down_get(&keyboard, SDLK_LCTRL) ||
+                                rohr_controller_key_down_get(&keyboard, SDLK_RCTRL);
+                            EditorSelectionRef ref = {selection_kind,
+                                selected->id, 0, 0, item.id};
+                            bool retained_multi = result.double_clicked &&
+                                viewport_state.selected_item_count > 1 &&
+                                editor_viewport_selection_contains(
+                                    &viewport_state, ref);
+                            if(!retained_multi)
+                                (void)editor_viewport_selection_set(&project,
+                                    &viewport_state, ref, additive);
+                            if(result.double_clicked && !retained_multi)
+                                (void)editor_navigation_selected_open(
+                                    &project, &viewport_state);
+                        } else if(result.focus_changed) {
+                            (void)editor_viewport_selection_set(&project,
+                                &viewport_state,
+                                (EditorSelectionRef){selection_kind,
+                                    selected->id, 0, 0, item.id}, false);
                         }
                     }
                 }

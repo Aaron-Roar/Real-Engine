@@ -598,31 +598,33 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
         "    return result;\n"
         "}\n\n");
     fprintf(source,
-        "static EngineResult generated_sprite_create(Entity *output, Position position,\n"
-        "    const char *path, Scale size, bool visible) {\n"
-        "    EntityResult added = rohr_entity_add();\n"
-        "    AnimationAssetResult loaded;\n"
-        "    AnimatedSprite sprite;\n"
+        "static EngineResult generated_sprite_create(Entity *output, Entity target,\n"
+        "    Position position, const char *path, Scale size, bool follow_rotation,\n"
+        "    bool visible) {\n"
+        "    EntityResult added = {.kind = ERROR_RESULT_VALUE};\n"
+        "    TextureAssetResult loaded;\n"
+        "    Sprite sprite;\n"
         "    EngineResult result;\n"
-        "    if(rohr_error_check(added)) return rohr_error_result_error(added.result.error);\n"
-        "    *output = added.result.value;\n"
-        "    result = rohr_physics_position_set(*output, position);\n"
-        "    if(rohr_error_check(result)) goto fail;\n"
-        "    loaded = rohr_graphics_animation_load((AnimationDescriptor){\n"
-        "        .amount_of_descriptors = 1,\n"
-        "        .texture_descriptors = {{.file = path, .size = size}}});\n"
+        "    bool owned = target == ENTITY_INVALID;\n"
+        "    if(owned) { added = rohr_entity_add();\n"
+        "      if(rohr_error_check(added)) return rohr_error_result_error(added.result.error);\n"
+        "      target = added.result.value;\n"
+        "      result = rohr_physics_position_set(target, position);\n"
+        "      if(rohr_error_check(result)) goto fail; }\n"
+        "    *output = target;\n"
+        "    loaded = rohr_graphics_texture_load((TextureDescriptor){path, size});\n"
         "    if(rohr_error_check(loaded)) {\n"
         "        result = rohr_error_result_error(loaded.result.error);\n"
         "        goto fail;\n"
         "    }\n"
-        "    sprite = rohr_graphics_animated_sprite_create(loaded.result.value,\n"
-        "        (Scale){1.0f, 1.0f});\n"
+        "    sprite = rohr_graphics_sprite_create(loaded.result.value, (Scale){1.0f, 1.0f});\n"
+        "    sprite.follow_entity_rotation = follow_rotation;\n"
         "    sprite.visible = visible;\n"
-        "    result = rohr_graphics_animated_sprite_add(*output, sprite);\n"
+        "    result = rohr_graphics_sprite_add(*output, sprite);\n"
         "    if(rohr_error_check(result)) goto fail;\n"
         "    return rohr_error_result_value(true);\n"
         "fail:\n"
-        "    (void)rohr_entity_delete(*output);\n"
+        "    if(owned) (void)rohr_entity_delete(*output);\n"
         "    *output = ENTITY_INVALID;\n"
         "    return result;\n"
         "}\n\n");
@@ -746,14 +748,21 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
         for(size_t sprite_index = 0; sprite_index < object->sprite_count;
                 sprite_index += 1) {
             const EditorSprite *sprite = &object->sprites[sprite_index];
+            const EditorRigidBody *body = editor_workspace_body_get(object,
+                sprite->rigid_body);
+            char target[EDITOR_OBJECT_NAME_MAX + 16];
+            if(body == NULL) snprintf(target, sizeof(target), "ENTITY_INVALID");
+            else snprintf(target, sizeof(target), "object->%s", body->name);
             fprintf(source,
-                "    result = generated_sprite_create(&object->sprite_%s, "
+                "    result = generated_sprite_create(&object->sprite_%s, %s, "
                 "(Position){position.x + %#.9gf, position.y + %#.9gf}, ",
-                sprite->name, sprite->position.x, sprite->position.y);
+                sprite->name, target,
+                sprite->position.x, sprite->position.y);
             editor_workspace_c_string_write(source, sprite->path);
-            fprintf(source, ", (Scale){%#.9gf, %#.9gf}, %s);\n"
+            fprintf(source, ", (Scale){%#.9gf, %#.9gf}, %s, %s);\n"
                 "    if(rohr_error_check(result)) goto fail;\n",
                 sprite->size.x, sprite->size.y,
+                sprite->follow_body_rotation ? "true" : "false",
                 sprite->visible ? "true" : "false");
         }
         for(size_t sprite_index = 0; sprite_index < object->animated_sprite_count;
@@ -1029,6 +1038,7 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
         for(size_t sprite_index = 0; sprite_index < object->sprite_count;
                 sprite_index += 1) {
             const EditorSprite *sprite = &object->sprites[sprite_index];
+            if(editor_workspace_body_get(object, sprite->rigid_body) != NULL) continue;
             fprintf(source,
                 "    if(object->sprite_%s != ENTITY_INVALID) "
                 "(void)rohr_entity_delete(object->sprite_%s);\n",
@@ -1167,6 +1177,7 @@ static bool editor_workspace_main_write(const EditorWorkspace *workspace,
         "        rohr_graphics_background_draw((Color){18, 22, 30, 255});\n"
         "        rohr_graphics_layer_set(0);\n");
     fprintf(file, "        project_objects_draw_all(&objects);\n");
+    fprintf(file, "        rohr_graphics_sprites_draw();\n");
     fprintf(file, "        rohr_graphics_animated_sprites_draw();\n");
     fprintf(file,
         "        rohr_graphics_show();\n"

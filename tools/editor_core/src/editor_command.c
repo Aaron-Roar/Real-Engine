@@ -968,6 +968,8 @@ property_invalid:
         case EDITOR_COMMAND_SPRITE_PATH_SET:
         case EDITOR_COMMAND_SPRITE_POSITION_SET:
         case EDITOR_COMMAND_SPRITE_SIZE_SET:
+        case EDITOR_COMMAND_SPRITE_BODY_SET:
+        case EDITOR_COMMAND_SPRITE_FOLLOW_ROTATION_SET:
         case EDITOR_COMMAND_SPRITE_VISIBILITY_SET: {
             EditorSpriteId id = command->type == EDITOR_COMMAND_SPRITE_RENAME ?
                 command->data.sprite_rename.sprite :
@@ -977,6 +979,10 @@ property_invalid:
                     command->data.sprite_position_set.sprite :
                 command->type == EDITOR_COMMAND_SPRITE_SIZE_SET ?
                     command->data.sprite_size_set.sprite :
+                command->type == EDITOR_COMMAND_SPRITE_BODY_SET ?
+                    command->data.sprite_body_set.sprite :
+                command->type == EDITOR_COMMAND_SPRITE_FOLLOW_ROTATION_SET ?
+                    command->data.sprite_boolean_set.sprite :
                     command->data.sprite_visibility_set.sprite;
             EditorObjectId object_id = command->type == EDITOR_COMMAND_SPRITE_RENAME ?
                 command->data.sprite_rename.object :
@@ -986,6 +992,10 @@ property_invalid:
                     command->data.sprite_position_set.object :
                 command->type == EDITOR_COMMAND_SPRITE_SIZE_SET ?
                     command->data.sprite_size_set.object :
+                command->type == EDITOR_COMMAND_SPRITE_BODY_SET ?
+                    command->data.sprite_body_set.object :
+                command->type == EDITOR_COMMAND_SPRITE_FOLLOW_ROTATION_SET ?
+                    command->data.sprite_boolean_set.object :
                     command->data.sprite_visibility_set.object;
             EditorSprite *sprite = editor_project_sprite_get(
                 editor_object_query_get(project, object_id), id);
@@ -1009,7 +1019,27 @@ property_invalid:
                         EDITOR_ERROR_INVALID_ARGUMENT,
                         "sprite size must be positive").result.error);
                 sprite->size = command->data.sprite_size_set.size;
-            } else sprite->visible = command->data.sprite_visibility_set.visible;
+            } else if(command->type == EDITOR_COMMAND_SPRITE_BODY_SET) {
+                EditorObject *object = editor_object_query_get(project, object_id);
+                if(command->data.sprite_body_set.body != 0 &&
+                        editor_project_rigid_body_get(
+                            object,
+                            command->data.sprite_body_set.body) == NULL)
+                    return editor_command_not_found("rigid body",
+                        command->data.sprite_body_set.body);
+                for(size_t i = 0; object != NULL &&
+                        i < object->sprite_count; i += 1)
+                    if(object->sprites[i].id != sprite->id &&
+                            command->data.sprite_body_set.body != 0 &&
+                            object->sprites[i].rigid_body ==
+                                command->data.sprite_body_set.body)
+                        return editor_command_error(editor_result_error(
+                            EDITOR_ERROR_REFERENCE_INVALID,
+                            "rigid body already has a static sprite").result.error);
+                sprite->rigid_body = command->data.sprite_body_set.body;
+            } else if(command->type == EDITOR_COMMAND_SPRITE_FOLLOW_ROTATION_SET)
+                sprite->follow_body_rotation = command->data.sprite_boolean_set.enabled;
+            else sprite->visible = command->data.sprite_visibility_set.visible;
             return (EditorCommandResult){.kind = ERROR_RESULT_VALUE};
         }
         case EDITOR_COMMAND_ANIMATED_SPRITE_ADD: {
@@ -1499,6 +1529,24 @@ EditorResult editor_command_cli_parse(int count, char **arguments,
                 command->type = EDITOR_COMMAND_SPRITE_SIZE_SET;
                 command->data.sprite_size_set.object = object;
                 command->data.sprite_size_set.sprite = id;
+                return editor_result_value(true);
+            }
+            if(strcmp(action, "connect") == 0 && count == 8 &&
+                    strcmp(arguments[6], "body") == 0 &&
+                    editor_command_uint_parse(arguments[7],
+                        &command->data.sprite_body_set.body)) {
+                command->type = EDITOR_COMMAND_SPRITE_BODY_SET;
+                command->data.sprite_body_set.object = object;
+                command->data.sprite_body_set.sprite = id;
+                return editor_result_value(true);
+            }
+            if(strcmp(action, "set") == 0 && count == 8 &&
+                    strcmp(arguments[6], "follow-body-rotation") == 0 &&
+                    editor_command_bool_parse(arguments[7],
+                        &command->data.sprite_boolean_set.enabled)) {
+                command->type = EDITOR_COMMAND_SPRITE_FOLLOW_ROTATION_SET;
+                command->data.sprite_boolean_set.object = object;
+                command->data.sprite_boolean_set.sprite = id;
                 return editor_result_value(true);
             }
             if(strcmp(action, "set") == 0 && count == 8 &&

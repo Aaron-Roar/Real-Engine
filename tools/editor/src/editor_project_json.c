@@ -376,8 +376,12 @@ bool editor_project_save(const EditorProject *project, const char *path) {
             yyjson_mut_obj_add_strcpy(document, sprite, "path", object->sprites[j].path);
             yyjson_mut_obj_add_val(document, sprite, "position",
                 editor_json_position_write(document, object->sprites[j].position));
+            yyjson_mut_obj_add_uint(document, sprite, "rigid_body",
+                object->sprites[j].rigid_body);
             yyjson_mut_obj_add_real(document, sprite, "width", object->sprites[j].size.x);
             yyjson_mut_obj_add_real(document, sprite, "height", object->sprites[j].size.y);
+            yyjson_mut_obj_add_bool(document, sprite, "follow_body_rotation",
+                object->sprites[j].follow_body_rotation);
             yyjson_mut_obj_add_bool(document, sprite, "visible",
                 object->sprites[j].visible);
             yyjson_mut_arr_add_val(sprites, sprite);
@@ -812,6 +816,16 @@ static bool editor_json_references_valid(EditorProject *project) {
                 if(!found_a || !found_b) return false;
             }
         }
+        for(size_t j = 0; j < object->sprite_count; j += 1) {
+            EditorSprite *sprite = &object->sprites[j];
+            if(sprite->rigid_body != 0 &&
+                    editor_project_rigid_body_get(object, sprite->rigid_body) == NULL)
+                return false;
+            for(size_t other = 0; other < j; other += 1)
+                if(sprite->rigid_body != 0 &&
+                        object->sprites[other].rigid_body == sprite->rigid_body)
+                    return false;
+        }
         for(size_t j = 0; j < object->animated_sprite_count; j += 1) {
             EditorAnimatedSprite *sprite = &object->animated_sprite_items[j];
             if(sprite->rigid_body != 0 &&
@@ -1035,8 +1049,11 @@ EditorResult editor_project_load(EditorProject *project, const char *path) {
                     yyjson_get_len(path_value) >= EDITOR_ASSET_PATH_MAX ||
                     !editor_json_position_read(yyjson_obj_get(sprite_value, "position"),
                         &sprite->position) ||
+                    !editor_json_uint(sprite_value, "rigid_body", &sprite->rigid_body) ||
                     !editor_json_real(sprite_value, "width", &sprite->size.x) ||
                     !editor_json_real(sprite_value, "height", &sprite->size.y) ||
+                    !editor_json_bool(sprite_value, "follow_body_rotation",
+                        &sprite->follow_body_rotation) ||
                     !editor_json_bool(sprite_value, "visible", &sprite->visible) ||
                     sprite->size.x <= 0.0f || sprite->size.y <= 0.0f) goto done;
             editor_project_property_name_format(sprite->name, sizeof(sprite->name),

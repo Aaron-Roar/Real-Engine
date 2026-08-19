@@ -14,7 +14,8 @@ static void workspace_fixture_remove(const char *root) {
     static const char *files[] = {
         "project.rohr.json", "objects/project.rohr.json", "src/main.c",
         "src/generated/project_objects.c", "src/generated/project_objects.h",
-        "CMakeLists.txt", ".gitignore", "editor.lua"
+        "CMakeLists.txt", ".gitignore", "editor.lua",
+        "assets/tutorial_frame_1.png", "assets/tutorial_frame_2.png"
     };
     static const char *directories[] = {
         "src/generated", "src", "assets", "objects"
@@ -32,21 +33,15 @@ static void workspace_fixture_remove(const char *root) {
 }
 
 static bool file_contains(const char *path, const char *text) {
-    FILE *file;
-    char contents[16384];
-    size_t length;
+    char *contents;
+    bool found;
 
     if(path == NULL || text == NULL) return false;
-    file = fopen(path, "rb");
-    if(file == NULL) return false;
-    length = fread(contents, 1, sizeof(contents) - 1, file);
-    if(ferror(file)) {
-        fclose(file);
-        return false;
-    }
-    contents[length] = '\0';
-    fclose(file);
-    return strstr(contents, text) != NULL;
+    contents = SDL_LoadFile(path, NULL);
+    if(contents == NULL) return false;
+    found = strstr(contents, text) != NULL;
+    SDL_free(contents);
+    return found;
 }
 
 static bool file_replace(const char *path, const char *text) {
@@ -128,7 +123,7 @@ int main(void) {
                 strcmp(loaded_project.objects[0].name, "Starter") != 0 ||
                 !position_equal(loaded_project.objects[0].position,
                     (Position){0.0f, 0.0f}) ||
-                loaded_project.objects[0].rigid_body_count != 2 ||
+                loaded_project.objects[0].rigid_body_count != 7 ||
                 !position_equal(loaded_project.objects[0].rigid_bodies[0].position,
                     (Position){0.0f, -200.0f}) ||
                 !position_equal(loaded_project.objects[0].rigid_bodies[1].position,
@@ -211,7 +206,7 @@ int main(void) {
             }
             if(generated_sprite != NULL) generated_sprite->size = (Scale){32.0f, 24.0f};
             if(generated_animation != NULL && generated_sprite != NULL) {
-                generated_animation->rigid_body = generated_body->id;
+                generated_animation->rigid_body = generated_object->rigid_bodies[2].id;
                 generated_animation->scale = (Scale){2.0f, 3.0f};
                 generated_animation->time_per_frame = 0.125;
                 generated_animation->follow_body_rotation = false;
@@ -254,10 +249,11 @@ int main(void) {
             return 1;
         }
         workspace_command.type = EDITOR_WORKSPACE_COMMAND_GENERATE_C;
-        if(editor_result_check(editor_workspace_command_execute(
-                    &loaded_workspace, &loaded_project, &workspace_command)) ||
-                editor_result_check(editor_workspace_command_cli_write(
-                    &workspace_command, cli_command, sizeof(cli_command))) ||
+        EditorResult generation_result = editor_workspace_command_execute(
+            &loaded_workspace, &loaded_project, &workspace_command);
+        EditorResult cli_result = editor_workspace_command_cli_write(
+            &workspace_command, cli_command, sizeof(cli_command));
+        if(editor_result_check(generation_result) || editor_result_check(cli_result) ||
                 strstr(cli_command, "editor-cli --project ") != cli_command ||
                 strstr(cli_command, " generate-c") == NULL ||
                 !file_contains(path, "7.00000000f") ||
@@ -288,7 +284,7 @@ int main(void) {
             return 1;
         }
         snprintf(path, sizeof(path), "%s/src/generated/project_objects.h", fixture);
-        if(!file_contains(path, "Entity soft_body_1;") ||
+        if(!file_contains(path, "Entity soft_body;") ||
                 file_contains(path, "Entity soft_body_soft_body_1;") ||
                 !file_contains(path, "typedef struct ProjectObjects") ||
                 !file_contains(path, "EngineResult project_objects_create_all")) {
@@ -301,10 +297,12 @@ int main(void) {
             return 1;
         }
         snprintf(path, sizeof(path), "%s/objects", fixture);
-        if(editor_result_check(editor_workspace_load(
-                    &loaded_workspace, &loaded_project, path)) ||
+        EditorResult nested_load = editor_workspace_load(
+            &loaded_workspace, &loaded_project, path);
+        if(editor_result_check(nested_load) ||
                 !loaded_workspace.open || loaded_project.object_count != 1) {
-            fprintf(stderr, "nested workspace load failed: %s\n", path);
+            fprintf(stderr, "nested workspace load failed: %s: %s\n", path,
+                nested_load.result.error.message);
             workspace_fixture_remove(fixture);
             return 1;
         }

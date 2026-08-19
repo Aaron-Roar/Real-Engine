@@ -371,6 +371,37 @@ int main(void) {
         animation = editor_project_animated_sprite_get(frame_object, animation_id);
         if(animation == NULL || animation->frame_count != 2) return 1;
     }
+    {
+        EditorObject *sprite_object = editor_project_selected_get(&project);
+        size_t sprite_count = sprite_object == NULL ? 0 : sprite_object->sprite_count;
+        size_t animation_count = sprite_object == NULL ? 0 :
+            sprite_object->animated_sprite_count;
+        EditorSprite *sprite = editor_project_sprite_add(&project, sprite_object,
+            "standalone", "assets/standalone.png");
+        EditorAnimatedSprite *animation = editor_project_animated_sprite_add(
+            &project, sprite_object);
+        EditorSelectionRef sprite_ref;
+        EditorSelectionRef animation_ref;
+        if(sprite == NULL || animation == NULL) return 1;
+        sprite_ref = (EditorSelectionRef){EDITOR_SELECTION_SPRITE,
+            sprite_object->id, 0, 0, sprite->id};
+        animation_ref = (EditorSelectionRef){EDITOR_SELECTION_ANIMATED_SPRITE,
+            sprite_object->id, 0, 0, animation->id};
+        editor_history_reset(&history);
+        editor_viewport_selection_clear(&state);
+        if(!editor_viewport_selection_set(&project, &state, sprite_ref, false) ||
+                !editor_viewport_selection_set(&project, &state,
+                    animation_ref, true) || state.selected_item_count != 2 ||
+                !editor_navigation_multi_selection_delete(
+                    &project, &state, &history) ||
+                sprite_object->sprite_count != sprite_count ||
+                sprite_object->animated_sprite_count != animation_count ||
+                history.undo_count != 1 || !editor_history_undo(&history)) return 1;
+        sprite_object = editor_project_selected_get(&project);
+        if(sprite_object == NULL ||
+                sprite_object->sprite_count != sprite_count + 1 ||
+                sprite_object->animated_sprite_count != animation_count + 1) return 1;
+    }
     editor_history_destroy(&history);
     editor_viewport_state_destroy(&state);
     return 0;

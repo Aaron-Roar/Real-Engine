@@ -1052,6 +1052,9 @@ bool editor_project_rigid_body_remove(EditorObject *object, EditorRigidBodyId id
         for(size_t j = 0; j < object->animated_sprite_count; j += 1)
             if(object->animated_sprite_items[j].rigid_body == id)
                 object->animated_sprite_items[j].rigid_body = 0;
+        for(size_t j = 0; j < object->sprite_count; j += 1)
+            if(object->sprites[j].rigid_body == id)
+                object->sprites[j].rigid_body = 0;
         editor_project_rigid_body_destroy(&object->rigid_bodies[i]);
         for(size_t j = i + 1; j < object->rigid_body_count; j += 1) {
             object->rigid_bodies[j - 1] = object->rigid_bodies[j];
@@ -2026,7 +2029,7 @@ EditorSprite *editor_project_sprite_add(EditorProject *project, EditorObject *ob
                 object->sprite_capacity, object->sprite_count + 1)) return NULL;
     sprite = &object->sprites[object->sprite_count++];
     *sprite = (EditorSprite){.id = project->next_sprite_id++,
-        .size = {64.0f, 64.0f}, .visible = true};
+        .size = {64.0f, 64.0f}, .follow_body_rotation = true, .visible = true};
     editor_project_property_name_format(sprite->name, sizeof(sprite->name), name);
     snprintf(sprite->path, sizeof(sprite->path), "%s", path);
     editor_project_hierarchy_item_add(object, EDITOR_HIERARCHY_SPRITE, sprite->id);

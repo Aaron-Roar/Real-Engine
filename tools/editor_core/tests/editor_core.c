@@ -1039,6 +1039,28 @@ static int sprite_commands_test(void) {
             parsed.type != EDITOR_COMMAND_SPRITE_POSITION_SET ||
             parsed.data.sprite_position_set.sprite != asset->id) return 1;
 
+    command = (EditorCommand){.type = EDITOR_COMMAND_SPRITE_BODY_SET,
+        .data.sprite_body_set = {.object = object->id, .sprite = asset->id,
+            .body = body->id}};
+    executed = editor_command_execute(&project, &command);
+    if(executed.kind != ERROR_RESULT_VALUE || asset->rigid_body != body->id) return 1;
+    result = editor_command_cli_standard_write(&project, &command, &executed,
+        "project.rohr.json", text, sizeof(text));
+    if(editor_result_check(result) || strstr(text, "--property body") == NULL) return 1;
+    count = 0;
+    for(char *token = strtok(text, " "); token != NULL && count < 32;
+            token = strtok(NULL, " ")) arguments[count++] = token;
+    result = editor_command_cli_standard_parse(&project, count, arguments, &path,
+        &parsed);
+    if(editor_result_check(result) || parsed.type != EDITOR_COMMAND_SPRITE_BODY_SET ||
+            parsed.data.sprite_body_set.body != body->id) return 1;
+
+    command = (EditorCommand){.type = EDITOR_COMMAND_SPRITE_FOLLOW_ROTATION_SET,
+        .data.sprite_boolean_set = {.object = object->id, .sprite = asset->id,
+            .enabled = false}};
+    executed = editor_command_execute(&project, &command);
+    if(executed.kind != ERROR_RESULT_VALUE || asset->follow_body_rotation) return 1;
+
     command = (EditorCommand){.type = EDITOR_COMMAND_ANIMATED_SPRITE_POSITION_SET,
         .data.animated_sprite_position_set = {.object = object->id,
             .sprite = animated->id, .position = {30.0f, 40.0f}}};

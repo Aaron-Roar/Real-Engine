@@ -1356,6 +1356,9 @@ void rohr_graphics_animated_sprite_update(AnimatedSprite *sprite, Tick current_t
  * @return EngineResult describing success or failure.
  */
 EngineResult rohr_graphics_animated_sprite_add(Entity entity, AnimatedSprite sprite);
+Sprite rohr_graphics_sprite_create(TextureAsset asset, Scale scale);
+EngineResult rohr_graphics_sprite_add(Entity entity, Sprite sprite);
+void rohr_graphics_sprites_draw(void);
 
 /**
  * @brief Draws all animated sprite components.

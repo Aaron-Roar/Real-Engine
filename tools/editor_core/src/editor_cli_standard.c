@@ -159,6 +159,10 @@ static EditorResult cli_sprite_command_write(const EditorProject *project,
                 command->data.sprite_position_set.object :
             command->type == EDITOR_COMMAND_SPRITE_SIZE_SET ?
                 command->data.sprite_size_set.object :
+            command->type == EDITOR_COMMAND_SPRITE_BODY_SET ?
+                command->data.sprite_body_set.object :
+            command->type == EDITOR_COMMAND_SPRITE_FOLLOW_ROTATION_SET ?
+                command->data.sprite_boolean_set.object :
                 command->data.sprite_visibility_set.object;
         object = cli_object_get(project, object_id);
         if(!cli_object_selector_add(project, object_id, output, capacity, &used)) goto full;
@@ -170,6 +174,10 @@ static EditorResult cli_sprite_command_write(const EditorProject *project,
                 command->data.sprite_position_set.sprite :
             command->type == EDITOR_COMMAND_SPRITE_SIZE_SET ?
                 command->data.sprite_size_set.sprite :
+            command->type == EDITOR_COMMAND_SPRITE_BODY_SET ?
+                command->data.sprite_body_set.sprite :
+            command->type == EDITOR_COMMAND_SPRITE_FOLLOW_ROTATION_SET ?
+                command->data.sprite_boolean_set.sprite :
                 command->data.sprite_visibility_set.sprite;
         if(command->type == EDITOR_COMMAND_SPRITE_ADD) {
             ADD("--sprite"); ADD(command->data.sprite_add.name); ADD("add");
@@ -195,6 +203,17 @@ static EditorResult cli_sprite_command_write(const EditorProject *project,
                     ADD("size");
                     snprintf(number, sizeof(number), "%.9g", command->data.sprite_size_set.size.x); ADD(number);
                     snprintf(number, sizeof(number), "%.9g", command->data.sprite_size_set.size.y); ADD(number);
+                } else if(command->type == EDITOR_COMMAND_SPRITE_BODY_SET) {
+                    ADD("body");
+                    if(command->data.sprite_body_set.body == 0) ADD("none");
+                    else {
+                        const EditorRigidBody *body = editor_project_rigid_body_get(
+                            (EditorObject *)object, command->data.sprite_body_set.body);
+                        ADD(body != NULL ? body->name : "none");
+                    }
+                } else if(command->type == EDITOR_COMMAND_SPRITE_FOLLOW_ROTATION_SET) {
+                    ADD("follow-body-rotation");
+                    ADD(command->data.sprite_boolean_set.enabled ? "true" : "false");
                 } else {
                     ADD("visibility");
                     ADD(command->data.sprite_visibility_set.visible ? "true" : "false");
@@ -442,7 +461,8 @@ EditorResult editor_command_cli_standard_parse(const EditorProject *project,
         else if(strcmp(property, "anchor-a") == 0 || strcmp(property, "anchor-b") == 0)
             domain = "joint";
         else if(strcmp(property, "rigid-body") == 0) domain = "anchor";
-        else if(strcmp(property, "body") == 0) domain = "animated-sprite";
+        else if(strcmp(property, "body") == 0 && domain == NULL)
+            domain = "animated-sprite";
         else if(strcmp(property, "node-a") == 0 || strcmp(property, "node-b") == 0)
             domain = "soft-beam";
     }

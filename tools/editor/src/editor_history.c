@@ -266,6 +266,12 @@ static EditorHistoryAggregateChange *editor_history_command_aggregate_capture(
         case EDITOR_COMMAND_SPRITE_SIZE_SET:
             return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
                 command->data.sprite_size_set.object, 0);
+        case EDITOR_COMMAND_SPRITE_BODY_SET:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.sprite_body_set.object, 0);
+        case EDITOR_COMMAND_SPRITE_FOLLOW_ROTATION_SET:
+            return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
+                command->data.sprite_boolean_set.object, 0);
         case EDITOR_COMMAND_ANIMATED_SPRITE_ADD:
             return editor_history_aggregate_capture(project, EDITOR_ITEM_OBJECT,
                 command->data.animated_sprite_add.object, 0);
@@ -989,12 +995,19 @@ void editor_history_command_begin(EditorHistory *history,
         return;
     }
     if(command->type >= EDITOR_COMMAND_SPRITE_ADD &&
-            command->type <= EDITOR_COMMAND_SPRITE_SIZE_SET) {
+            command->type <= EDITOR_COMMAND_SPRITE_VISIBILITY_SET) {
         EditorObjectId object = command->type == EDITOR_COMMAND_SPRITE_ADD ?
             command->data.sprite_add.object : command->type == EDITOR_COMMAND_SPRITE_REMOVE ?
             command->data.sprite_remove.object : command->type == EDITOR_COMMAND_SPRITE_RENAME ?
             command->data.sprite_rename.object : command->type == EDITOR_COMMAND_SPRITE_PATH_SET ?
-            command->data.sprite_path_set.object : command->data.sprite_size_set.object;
+            command->data.sprite_path_set.object : command->type ==
+                EDITOR_COMMAND_SPRITE_POSITION_SET ? command->data.sprite_position_set.object :
+                command->type == EDITOR_COMMAND_SPRITE_SIZE_SET ?
+                    command->data.sprite_size_set.object : command->type ==
+                    EDITOR_COMMAND_SPRITE_BODY_SET ? command->data.sprite_body_set.object :
+                    command->type == EDITOR_COMMAND_SPRITE_FOLLOW_ROTATION_SET ?
+                        command->data.sprite_boolean_set.object :
+                        command->data.sprite_visibility_set.object;
         history->pending_sprites = editor_history_sprites_capture(project, object);
         return;
     }

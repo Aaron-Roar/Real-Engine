@@ -309,8 +309,10 @@ static Camera graphics_camera_from_config_get(CameraConfig config) {
 }
 
 MEMORY_DEFINE_OBJECT_POOL(AnimatedSpritePool, AnimatedSprite)
+MEMORY_DEFINE_OBJECT_POOL(SpritePool, Sprite)
 
 AnimatedSpritePool animated_sprites_pool = {0};
+SpritePool sprites_pool = {0};
 const Color hit_box_color = {255,0,0,255};
 const Color particle_color = {0,0,255,255};
 
@@ -370,6 +372,10 @@ EngineResult graphics_tables_init(void) {
         graphics_tables_destroy();
         return error_result_error(ERROR_ENGINE_GRAPHICS_TABLES_INIT_FAILED);
     }
+    if(SpritePool_init(&sprites_pool, 0).kind == ERROR_RESULT_ERROR) {
+        graphics_tables_destroy();
+        return error_result_error(ERROR_ENGINE_GRAPHICS_TABLES_INIT_FAILED);
+    }
     return error_result_value(true);
 }
 
@@ -379,7 +385,7 @@ EngineResult graphics_tables_ensure_capacity(size_t capacity) {
     if(capacity > MAX_ENTITIES) {
         return error_result_error(ERROR_ENGINE_MAX_ENTITIES_EXCEEDED);
     }
-    if(capacity <= animated_sprites_pool.capacity) {
+    if(capacity <= animated_sprites_pool.capacity && capacity <= sprites_pool.capacity) {
         return error_result_value(true);
     }
     new_capacity = animated_sprites_pool.capacity == 0 ? 16 : animated_sprites_pool.capacity;
@@ -395,11 +401,15 @@ EngineResult graphics_tables_ensure_capacity(size_t capacity) {
     ).kind == ERROR_RESULT_ERROR) {
         return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED);
     }
+    if(new_capacity > sprites_pool.capacity && SpritePool_expand(&sprites_pool,
+            new_capacity - sprites_pool.capacity).kind == ERROR_RESULT_ERROR)
+        return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED);
     return error_result_value(true);
 }
 
 void graphics_tables_destroy(void) {
     (void)AnimatedSpritePool_destroy(&animated_sprites_pool);
+    (void)SpritePool_destroy(&sprites_pool);
 }
 
 bool graphics_recording_start(const char *output_path, int fps) {
@@ -2458,6 +2468,38 @@ void graphics_sprite_draw(AnimatedSprite sprite, Position pos, Orientation ort) 
 
     graphics_texture_draw_flipped(asset, pos, ort,
         sprite.direction == DIRECTION_LEFT ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
+}
+
+Sprite graphics_sprite_create(TextureAsset asset, Scale scale) {
+    return (Sprite){.texture = asset, .direction = DIRECTION_RIGHT,
+        .scale = scale, .follow_entity_rotation = true, .visible = true};
+}
+
+EngineResult graphics_sprite_add(Entity entity, Sprite sprite) {
+    EntityIndex index;
+    EngineResult result;
+    if(!entity_index_get(entity, &index) || !entity_index_alive_check(index))
+        return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
+    (void)SpritePool_store_at(&sprites_pool, index, sprite);
+    result = entity_components_add(entity, ROHR_SPRITE);
+    return result.kind == ERROR_RESULT_ERROR ? result : error_result_value(true);
+}
+
+void graphics_sprites_draw(void) {
+    for(int i = 0; i < MAX_ENTITIES; i += 1) {
+        TextureAsset asset;
+        if(!entity_index_alive_check(i) ||
+                !entity_index_components_check(i, ROHR_SPRITE) ||
+                !sprite_components[i].visible)
+            continue;
+        asset = sprite_components[i].texture;
+        asset.size.x *= sprite_components[i].scale.x;
+        asset.size.y *= sprite_components[i].scale.y;
+        graphics_texture_draw_flipped(asset, positions[i],
+            sprite_components[i].follow_entity_rotation ? orientations[i] : 0.0f,
+            sprite_components[i].direction == DIRECTION_LEFT ?
+                SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
+    }
 }
 
 EngineResult graphics_animated_sprite_add(Entity entity, AnimatedSprite sprite) {

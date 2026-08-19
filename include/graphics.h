@@ -215,6 +215,18 @@ ERROR_DECLARE_RESULT_TYPE(AnimationAssetResult, AnimationAsset);
 /** Horizontal facing direction for sprite drawing. */
 typedef enum {DIRECTION_LEFT, DIRECTION_RIGHT} Direction;
 
+/** Runtime static sprite state attached to an entity. */
+typedef struct Sprite {
+    TextureAsset texture;
+    Direction direction;
+    Scale scale;
+    bool follow_entity_rotation;
+    bool visible;
+} Sprite;
+
+MEMORY_DECLARE_OBJECT_POOL(SpritePool, Sprite);
+extern SpritePool sprites_pool;
+#define sprite_components sprites_pool.objects
 
 /** Runtime animated sprite state. */
 typedef struct {
@@ -355,6 +367,15 @@ void graphics_animated_sprite_update(AnimatedSprite *sprite, Tick current_tick,
 
 /** Attach an animated sprite to an entity. */
 EngineResult graphics_animated_sprite_add(Entity entity, AnimatedSprite sprite);
+
+/** Create static sprite runtime state from a texture asset. */
+Sprite graphics_sprite_create(TextureAsset asset, Scale scale);
+
+/** Attach a static sprite to an entity. */
+EngineResult graphics_sprite_add(Entity entity, Sprite sprite);
+
+/** Draw all live static sprites. */
+void graphics_sprites_draw(void);
 
 /** Draw all live animated sprites. */
 void graphics_animated_sprites_draw(void);
