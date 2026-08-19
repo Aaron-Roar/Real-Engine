@@ -374,8 +374,14 @@ Sprite graphics_sprite_create(TextureAsset asset, Scale scale);
 /** Attach a static sprite to an entity. */
 EngineResult graphics_sprite_add(Entity entity, Sprite sprite);
 
+/** Draw the static sprite attached to one entity. */
+bool graphics_sprite_draw(Entity entity);
+
 /** Draw all live static sprites. */
 void graphics_sprites_draw(void);
+
+/** Draw the animated sprite attached to one entity. */
+bool graphics_animated_sprite_draw(Entity entity);
 
 /** Draw all live animated sprites. */
 void graphics_animated_sprites_draw(void);

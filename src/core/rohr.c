@@ -312,7 +312,9 @@ void rohr_graphics_animated_sprite_update(AnimatedSprite *sprite, Tick current_t
 EngineResult rohr_graphics_animated_sprite_add(Entity entity, AnimatedSprite sprite) { return graphics_animated_sprite_add(entity, sprite); }
 Sprite rohr_graphics_sprite_create(TextureAsset asset, Scale scale) { return graphics_sprite_create(asset, scale); }
 EngineResult rohr_graphics_sprite_add(Entity entity, Sprite sprite) { return graphics_sprite_add(entity, sprite); }
+bool rohr_graphics_sprite_draw(Entity entity) { return graphics_sprite_draw(entity); }
 void rohr_graphics_sprites_draw(void) { graphics_sprites_draw(); }
+bool rohr_graphics_animated_sprite_draw(Entity entity) { return graphics_animated_sprite_draw(entity); }
 void rohr_graphics_animated_sprites_draw(void) { graphics_animated_sprites_draw(); }
 void rohr_graphics_sprite_frames_update(Tick current_tick, Time current_time) { graphics_sprite_frames_update(current_tick, current_time); }
 void rohr_graphics_textures_scale(Entity entity, Scale scale) { graphics_textures_scale(entity, scale); }

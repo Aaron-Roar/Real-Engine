@@ -1115,6 +1115,8 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
         fprintf(source, "    %s_draw(&objects->%s);\n", variable, variable);
     }
     fprintf(source,
+        "    rohr_graphics_sprites_draw();\n"
+        "    rohr_graphics_animated_sprites_draw();\n"
         "}\n\n"
         "void project_objects_destroy_all(ProjectObjects *objects) {\n"
         "    if(objects == NULL) return;\n");
@@ -1177,8 +1179,6 @@ static bool editor_workspace_main_write(const EditorWorkspace *workspace,
         "        rohr_graphics_background_draw((Color){18, 22, 30, 255});\n"
         "        rohr_graphics_layer_set(0);\n");
     fprintf(file, "        project_objects_draw_all(&objects);\n");
-    fprintf(file, "        rohr_graphics_sprites_draw();\n");
-    fprintf(file, "        rohr_graphics_animated_sprites_draw();\n");
     fprintf(file,
         "        rohr_graphics_show();\n"
         "    }\n"

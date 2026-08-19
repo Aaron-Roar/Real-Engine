@@ -2460,7 +2460,8 @@ void graphics_screen_texture_draw(TextureAsset texture_asset, Position center,
     command->data.texture.flip = SDL_FLIP_NONE;
 }
 
-void graphics_sprite_draw(AnimatedSprite sprite, Position pos, Orientation ort) {
+static void graphics_animated_sprite_value_draw(AnimatedSprite sprite,
+        Position pos, Orientation ort) {
     TextureAsset asset = {0};
     asset = sprite.animation.texture_list.textures[sprite.animation_frame];
     asset.size.x = asset.size.x * sprite.scale.x;
@@ -2485,20 +2486,32 @@ EngineResult graphics_sprite_add(Entity entity, Sprite sprite) {
     return result.kind == ERROR_RESULT_ERROR ? result : error_result_value(true);
 }
 
+bool graphics_sprite_draw(Entity entity) {
+    EntityIndex index;
+    TextureAsset asset;
+
+    if(!entity_index_get(entity, &index) || !entity_index_alive_check(index) ||
+            !entity_index_components_check(index, ROHR_SPRITE) ||
+            index >= sprites_pool.capacity || !sprites_pool.used[index] ||
+            !sprite_components[index].visible) return false;
+    asset = sprite_components[index].texture;
+    asset.size.x *= sprite_components[index].scale.x;
+    asset.size.y *= sprite_components[index].scale.y;
+    graphics_texture_draw_flipped(asset, positions[index],
+        sprite_components[index].follow_entity_rotation ? orientations[index] : 0.0f,
+        sprite_components[index].direction == DIRECTION_LEFT ?
+            SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
+    return true;
+}
+
 void graphics_sprites_draw(void) {
     for(int i = 0; i < MAX_ENTITIES; i += 1) {
-        TextureAsset asset;
+        EntityResult entity;
         if(!entity_index_alive_check(i) ||
-                !entity_index_components_check(i, ROHR_SPRITE) ||
-                !sprite_components[i].visible)
-            continue;
-        asset = sprite_components[i].texture;
-        asset.size.x *= sprite_components[i].scale.x;
-        asset.size.y *= sprite_components[i].scale.y;
-        graphics_texture_draw_flipped(asset, positions[i],
-            sprite_components[i].follow_entity_rotation ? orientations[i] : 0.0f,
-            sprite_components[i].direction == DIRECTION_LEFT ?
-                SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
+                !entity_index_components_check(i, ROHR_SPRITE)) continue;
+        entity = entity_from_index_get(i);
+        if(entity.kind == ERROR_RESULT_VALUE)
+            (void)graphics_sprite_draw(entity.result.value);
     }
 }
 
@@ -2517,13 +2530,27 @@ EngineResult graphics_animated_sprite_add(Entity entity, AnimatedSprite sprite) 
     return error_result_value(true);
 }
 
+bool graphics_animated_sprite_draw(Entity entity) {
+    EntityIndex index;
+
+    if(!entity_index_get(entity, &index) || !entity_index_alive_check(index) ||
+            !entity_index_components_check(index, ROHR_ANIMATED_SPRITE) ||
+            index >= animated_sprites_pool.capacity ||
+            !animated_sprites_pool.used[index] || !animated_sprites[index].visible)
+        return false;
+    graphics_animated_sprite_value_draw(animated_sprites[index], positions[index],
+        animated_sprites[index].follow_entity_rotation ? orientations[index] : 0.0f);
+    return true;
+}
+
 void graphics_animated_sprites_draw(void) {
     RohrComponentMask filter = ROHR_ANIMATED_SPRITE;
     for(int i = 0; i < MAX_ENTITIES; i += 1) {
         if(entity_index_alive_check(i) && entity_index_components_check(i, filter) &&
                 animated_sprites[i].visible) {
-            graphics_sprite_draw(animated_sprites[i], positions[i],
-                animated_sprites[i].follow_entity_rotation ? orientations[i] : 0.0f);
+            EntityResult entity = entity_from_index_get(i);
+            if(entity.kind == ERROR_RESULT_VALUE)
+                (void)graphics_animated_sprite_draw(entity.result.value);
         }
     }
 }

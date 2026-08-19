@@ -279,6 +279,8 @@ int main(void) {
                 !file_contains(path, "void starter_draw") ||
                 !file_contains(path, "EngineResult project_objects_create_all") ||
                 !file_contains(path, "void project_objects_draw_all") ||
+                !file_contains(path, "rohr_graphics_sprites_draw();") ||
+                !file_contains(path, "rohr_graphics_animated_sprites_draw();") ||
                 !file_contains(path, "void project_objects_destroy_all")) {
             workspace_fixture_remove(fixture);
             return 1;

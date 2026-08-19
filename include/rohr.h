@@ -1358,7 +1358,11 @@ void rohr_graphics_animated_sprite_update(AnimatedSprite *sprite, Tick current_t
 EngineResult rohr_graphics_animated_sprite_add(Entity entity, AnimatedSprite sprite);
 Sprite rohr_graphics_sprite_create(TextureAsset asset, Scale scale);
 EngineResult rohr_graphics_sprite_add(Entity entity, Sprite sprite);
+bool rohr_graphics_sprite_draw(Entity entity);
 void rohr_graphics_sprites_draw(void);
+
+/** Draw the animated sprite attached to one entity. */
+bool rohr_graphics_animated_sprite_draw(Entity entity);
 
 /**
  * @brief Draws all animated sprite components.
