@@ -667,6 +667,78 @@ ContactInfo system_resolve_collision(
     return result;
 }
 
+static ContactInfo system_resolve_collision_manifold(
+    Entity first,
+    Entity second,
+    const ContactManifold *manifold,
+    bool restitution_enabled,
+    const ContactInfo *previous_contact
+) {
+    ContactInfo result;
+    OverlapInfo overlap;
+
+    if(manifold == NULL || manifold->count == 0) return (ContactInfo){0};
+    overlap = (OverlapInfo){
+        .detected = true,
+        .normal = manifold->normal,
+        .depth = manifold->depth
+    };
+    {
+        bool first_particle = entity_index_components_check(first, ROHR_PARTICLE);
+        bool second_particle = entity_index_components_check(second, ROHR_PARTICLE);
+        float inverse_mass_first = physics_entity_simulated_get(first)
+            ? 1.0f / mass[first] : 0.0f;
+        float inverse_mass_second = physics_entity_simulated_get(second)
+            ? 1.0f / mass[second] : 0.0f;
+        float inverse_inertia_first = 0.0f;
+        float inverse_inertia_second = 0.0f;
+
+        (void)first_particle;
+        (void)second_particle;
+        if(!first_particle && inverse_mass_first > 0.0f) {
+            float inertia = physics_polygon_moment_of_inertia(
+                hit_boxes[first], mass[first]);
+            if(inertia > 0.0f) inverse_inertia_first = 1.0f / inertia;
+        }
+        if(!second_particle && inverse_mass_second > 0.0f) {
+            float inertia = physics_polygon_moment_of_inertia(
+                hit_boxes[second], mass[second]);
+            if(inertia > 0.0f) inverse_inertia_second = 1.0f / inertia;
+        }
+        result = (ContactInfo){
+            .detected = true,
+            .normal = overlap.normal,
+            .depth = overlap.depth,
+            .point_count = manifold->count
+        };
+        for(uint8_t i = 0; i < manifold->count; i += 1) {
+            const ContactPointInfo *previous_point = NULL;
+            result.points[i].feature_id = manifold->feature_ids[i];
+            result.points[i].position = manifold->points[i];
+            if(previous_contact != NULL) {
+                for(uint8_t previous = 0;
+                        previous < previous_contact->point_count;
+                        previous += 1) {
+                    if(result.points[i].feature_id != 0 &&
+                            result.points[i].feature_id ==
+                                previous_contact->points[previous].feature_id) {
+                        previous_point = &previous_contact->points[previous];
+                        break;
+                    }
+                }
+            }
+            system_contact_point_solve(
+                first, second, overlap, result.points[i].position,
+                restitution_enabled, inverse_mass_first, inverse_mass_second,
+                inverse_inertia_first, inverse_inertia_second, previous_point,
+                &result.points[i].relative_velocity,
+                &result.points[i].normal_impulse,
+                &result.points[i].friction_impulse);
+        }
+    }
+    return result;
+}
+
 typedef struct SystemBroadphaseQuery {
     Entity source;
     EntityIndex source_index;
@@ -761,8 +833,11 @@ static void system_rigid_contact_constraint_solve(
     SystemContactConstraint *constraint,
     float position_fraction
 ) {
-    ContactInfo result;
-    ContactInfo previous_contact;
+    ContactInfo representative = {0};
+    ContactInfo previous_contacts[CONTACT_MANIFOLD_MAX] = {0};
+    bool previous_contact_matched[CONTACT_MANIFOLD_MAX] = {0};
+    ContactManifoldSet manifolds;
+    uint8_t previous_contact_count;
     EntityIndex first;
     EntityIndex second;
     OverlapInfo overlap;
@@ -774,22 +849,74 @@ static void system_rigid_contact_constraint_solve(
     second = constraint->value.rigid.second_index;
     overlap = system_entity_overlap_get(first, second);
     if(!overlap.detected) return;
-    constraint->value.rigid.overlap = overlap;
     responds = constraint->value.rigid.responds;
     first_solve = !constraint->value.rigid.solved;
-    previous_contact = constraint->value.rigid.contact;
-    result = responds
-        ? system_resolve_collision(
-            first, second, overlap, first_solve, &previous_contact)
-        : (ContactInfo){0};
-    constraint->value.rigid.contact = result;
+    previous_contact_count = constraint->value.rigid.manifold_contact_count;
+    for(uint8_t i = 0; i < constraint->value.rigid.manifold_contact_count; i += 1)
+        previous_contacts[i] = constraint->value.rigid.manifold_contacts[i];
+    if(entity_index_components_check(first, ROHR_PARTICLE) ||
+            entity_index_components_check(second, ROHR_PARTICLE)) {
+        representative = responds
+            ? system_resolve_collision(
+                first, second, overlap, first_solve,
+                previous_contact_count > 0 ? &previous_contacts[0] : NULL)
+            : (ContactInfo){0};
+        constraint->value.rigid.manifold_contact_count = representative.detected;
+        if(representative.detected)
+            constraint->value.rigid.manifold_contacts[0] = representative;
+        constraint->value.rigid.contact = representative;
+        constraint->value.rigid.overlap = overlap;
+        constraint->value.rigid.solved = true;
+        if(responds) {
+            overlap.depth *= position_fraction;
+            system_separate_entities_tuned(first, second, overlap);
+            physics_step_hitbox_dirty_add(first);
+            physics_step_hitbox_dirty_add(second);
+        }
+        return;
+    }
+    manifolds = contact_manifold_set_polygon_get(
+        world_hit_boxes[first], world_hit_boxes[second]);
+    constraint->value.rigid.manifold_contact_count = 0;
+    for(uint8_t i = 0; responds && i < manifolds.count; i += 1) {
+        const ContactInfo *previous = NULL;
+        ContactInfo contact;
+
+        for(uint8_t candidate = 0; candidate < previous_contact_count;
+                candidate += 1) {
+            if(previous_contact_matched[candidate] ||
+                    math_dot_product(previous_contacts[candidate].normal,
+                        manifolds.values[i].normal) < 0.98f) continue;
+            previous = &previous_contacts[candidate];
+            previous_contact_matched[candidate] = true;
+            break;
+        }
+        contact = system_resolve_collision_manifold(
+            first, second, &manifolds.values[i], first_solve, previous);
+
+        constraint->value.rigid.manifold_contacts[
+            constraint->value.rigid.manifold_contact_count++] = contact;
+        if(!representative.detected || contact.depth > representative.depth)
+            representative = contact;
+        overlap = (OverlapInfo){
+            .detected = true,
+            .normal = manifolds.values[i].normal,
+            .depth = manifolds.values[i].depth * position_fraction
+        };
+        system_separate_entities_tuned(first, second, overlap);
+        (void)system_generate_global_hitbox(first);
+        (void)system_generate_global_hitbox(second);
+    }
+    if(!responds) representative = (ContactInfo){0};
+    constraint->value.rigid.contact = representative;
+    constraint->value.rigid.overlap = representative.detected
+        ? (OverlapInfo){true, representative.normal, representative.depth}
+        : overlap;
     constraint->value.rigid.solved = true;
     if(responds) {
         if(physics_step_debug_stats_enabled && first_solve) {
             physics_step_debug_stats.contact_count += 1;
         }
-        overlap.depth *= position_fraction;
-        system_separate_entities_tuned(first, second, overlap);
         physics_step_hitbox_dirty_add(first);
         physics_step_hitbox_dirty_add(second);
     }

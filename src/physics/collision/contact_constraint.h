@@ -6,6 +6,7 @@
 
 #include "entity_components.h"
 #include "physics.h"
+#include "physics/collision/contact_manifold.h"
 
 typedef struct SystemSoftBoundaryQuery {
     Entity node_a;
@@ -42,6 +43,8 @@ typedef struct SystemContactConstraint {
             bool responds;
             bool solved;
             ContactInfo contact;
+            ContactInfo manifold_contacts[CONTACT_MANIFOLD_MAX];
+            uint8_t manifold_contact_count;
         } rigid;
         SystemSoftBoundaryQuery soft;
     } value;

@@ -102,7 +102,7 @@ static ContactManifold contact_manifold_convex_get(
     Shape second,
     Axis normal
 ) {
-    ContactManifold manifold = {0};
+    ContactManifold manifold = {.normal = normal};
     ContactFace first_face;
     ContactFace second_face;
     ContactFace reference;
@@ -155,12 +155,98 @@ static ContactManifold contact_manifold_convex_get(
     return manifold;
 }
 
+static void contact_manifold_point_add(
+    ContactManifold *manifold,
+    Vec2D point,
+    uint32_t feature
+) {
+    Axis tangent;
+    float projections[CONTACT_MANIFOLD_POINT_MAX];
+    float projection;
+
+    if(manifold == NULL) return;
+    tangent = (Axis){-manifold->normal.y, manifold->normal.x};
+    projection = math_dot_product(point, tangent);
+    for(uint8_t i = 0; i < manifold->count; i += 1) {
+        Vec2D delta = math_vector_subtract(point, manifold->points[i]);
+        if(math_dot_product(delta, delta) <= 0.000001f) return;
+        projections[i] = math_dot_product(manifold->points[i], tangent);
+    }
+    if(manifold->count < CONTACT_MANIFOLD_POINT_MAX) {
+        manifold->points[manifold->count] = point;
+        manifold->feature_ids[manifold->count] = feature;
+        manifold->count += 1;
+        return;
+    }
+    if(projection < projections[0] && projections[0] <= projections[1]) {
+        manifold->points[0] = point;
+        manifold->feature_ids[0] = feature;
+    } else if(projection < projections[1] && projections[1] < projections[0]) {
+        manifold->points[1] = point;
+        manifold->feature_ids[1] = feature;
+    } else if(projection > projections[0] && projections[0] >= projections[1]) {
+        manifold->points[0] = point;
+        manifold->feature_ids[0] = feature;
+    } else if(projection > projections[1] && projections[1] > projections[0]) {
+        manifold->points[1] = point;
+        manifold->feature_ids[1] = feature;
+    }
+}
+
+ContactManifoldSet contact_manifold_set_polygon_get(Shape first, Shape second) {
+    ContactManifoldSet set = {0};
+    uint8_t first_count;
+    uint8_t second_count;
+
+    if(!first.collision_geometry_prepared &&
+            !physics_shape_collision_prepare(first, &first)) return set;
+    if(!second.collision_geometry_prepared &&
+            !physics_shape_collision_prepare(second, &second)) return set;
+    first_count = physics_shape_collision_piece_count_get(&first);
+    second_count = physics_shape_collision_piece_count_get(&second);
+    for(uint8_t first_index = 0; first_index < first_count; first_index += 1) {
+        Shape first_piece = physics_shape_collision_piece_get(&first, first_index);
+        for(uint8_t second_index = 0; second_index < second_count; second_index += 1) {
+            Shape second_piece = physics_shape_collision_piece_get(
+                &second, second_index);
+            OverlapInfo overlap = physics_sat_collision_piece_overlap_get(
+                &first, first_index, &second, second_index);
+            ContactManifold candidate;
+            ContactManifold *target = NULL;
+
+            if(!overlap.detected) continue;
+            candidate = contact_manifold_convex_get(
+                first_piece, second_piece, overlap.normal);
+            if(candidate.count == 0) continue;
+            for(uint8_t i = 0; i < set.count; i += 1) {
+                if(math_dot_product(set.values[i].normal, overlap.normal) >= 0.98f) {
+                    target = &set.values[i];
+                    break;
+                }
+            }
+            if(target == NULL) {
+                if(set.count >= CONTACT_MANIFOLD_MAX) continue;
+                target = &set.values[set.count++];
+                target->normal = overlap.normal;
+            }
+            if(overlap.depth > target->depth) target->depth = overlap.depth;
+            for(uint8_t point = 0; point < candidate.count; point += 1) {
+                uint32_t feature = ((uint32_t)first_index << 16) |
+                    ((uint32_t)second_index << 8) | (uint32_t)(point + 1);
+                contact_manifold_point_add(
+                    target, candidate.points[point], feature);
+            }
+        }
+    }
+    return set;
+}
+
 ContactManifold contact_manifold_polygon_get(
     Shape first,
     Shape second,
     Axis normal
 ) {
-    ContactManifold merged = {0};
+    ContactManifold merged = {.normal = normal};
     Position minimum_point = {0};
     Position maximum_point = {0};
     uint32_t minimum_feature = 0;
