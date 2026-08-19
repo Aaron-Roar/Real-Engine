@@ -1,6 +1,7 @@
 #include "rohr.h"
 
 #include <stdio.h>
+#include <string.h>
 
 static bool presentation_set(GraphicsWindowPresentationConfig *config,
         GraphicsWindowMode mode) {
@@ -20,6 +21,13 @@ int main(void) {
     GraphicsWindowPresentationConfig active;
     if(rohr_error_check(rohr_engine_init()) ||
             rohr_error_check(rohr_graphics_start())) return 1;
+    if(!presentation_set(&config, GRAPHICS_WINDOW_MODE_WINDOWED)) goto fail;
+    if(SDL_GetCurrentVideoDriver() != NULL &&
+            strcmp(SDL_GetCurrentVideoDriver(), "dummy") == 0) {
+        rohr_graphics_end();
+        rohr_engine_shutdown();
+        return 0;
+    }
     if(!presentation_set(&config, GRAPHICS_WINDOW_MODE_BORDERLESS_FULLSCREEN))
         goto fail;
     active = rohr_graphics_window_presentation_get();

@@ -4,7 +4,7 @@ return {
     editor = {
         font = "/fonts/base.ttf",
         config_path_override = "/config/editor.lua",
-        gui_state_path_override = "/config/editor-gui-state.lua",
+        gui_state_path_override = "/config/editor_gui_state.lua",
     },
     build = {
         project = {

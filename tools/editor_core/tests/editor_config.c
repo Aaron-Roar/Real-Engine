@@ -32,7 +32,7 @@ int main(int count, char **program_arguments) {
             config.gui_state_path_set ||
             !config.gui_state_path_override_set ||
             strcmp(config.gui_state_path_override,
-                "/config/editor-gui-state.lua") != 0) return 1;
+                "/config/editor_gui_state.lua") != 0) return 1;
     command = editor_config_command_get(&config, EDITOR_CONFIG_FRONTEND_CLI,
         EDITOR_CONFIG_OPERATION_CONFIGURE);
     if(command == NULL || strcmp(command->arguments[0], "base-configure") != 0)

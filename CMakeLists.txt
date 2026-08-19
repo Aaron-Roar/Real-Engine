@@ -398,6 +398,7 @@ if(ROHR_BUILD_TESTS)
     target_link_libraries(window_presentation_test PRIVATE rohr_engine)
     set_target_properties(window_presentation_test PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
+    add_test(NAME window_presentation COMMAND window_presentation_test)
 
     add_executable(timing_test tests/timing.c)
     target_link_libraries(timing_test PRIVATE rohr_engine)
@@ -527,7 +528,9 @@ if(ROHR_BUILD_TESTS)
         controller_mappings
         cameras
         graphics_layer_order
+        window_presentation
         timing
+        ui_field
         joints
         soft_body
         collision_sensor
@@ -548,7 +551,9 @@ if(ROHR_BUILD_TESTS)
         controller_mappings_test
         cameras_test
         graphics_layer_order_test
+        window_presentation_test
         timing_test
+        ui_field_test
         joints_test
         soft_body_test
         collision_sensor_test

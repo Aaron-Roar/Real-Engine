@@ -8,9 +8,8 @@ a.out
 *.dylib
 *.exe
 *.lock
-#!flake.lock
+!flake.lock
 .cache/
-build/
 *.mp4
 !docs/assets/*.mp4
 AGENTS.md

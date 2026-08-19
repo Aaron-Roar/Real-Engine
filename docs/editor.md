@@ -9,11 +9,12 @@ runtime behavior remains developer-owned C code.
 From the engine repository:
 
 ```sh
-nix develop
-cmake --preset linux
-cmake --build build --target rohr_editor
-./build/editor/rohr_editor
+./dev.sh build
+./build/tools/rohr-gui/rohr-gui
 ```
+
+For an installed SDK, launch `bin/rohr-gui` or place `bin/` on `PATH` and run
+`rohr-gui`.
 
 On startup, choose **New Project** or **Load Project**. The directory browser
 starts in the current working directory. Single-click a directory to select it

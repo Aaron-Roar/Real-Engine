@@ -246,12 +246,14 @@ Examples and tests can be disabled for library-only builds with
 
 ## Editor
 
-Build and run the editor from the configured engine build:
+Build and run the editor through the supported development workflow:
 
 ```sh
-cmake --build build --target rohr_editor
-./build/editor/rohr_editor
+./dev.sh build
+./build/tools/rohr-gui/rohr-gui
 ```
+
+The command-line editor is written to `build/tools/rohr-cli/rohr-cli`.
 
 The editor saves authored objects as JSON and generates replaceable C under a
 game project's `src/generated/` directory. It does not overwrite developer-owned

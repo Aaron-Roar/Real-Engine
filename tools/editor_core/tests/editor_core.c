@@ -142,7 +142,7 @@ static int auto_shape_command_test(void) {
     const char *path;
     char output[1024];
     char point_ids[3][16];
-    char *arguments[] = {"editor-cli", "--soft-body", "cloth",
+    char *arguments[] = {"rohr-cli", "--soft-body", "cloth",
         "--object", "ShapeObject", "--property", "auto-shape",
         "circle", "isosceles", "100", "100", "25", "0", "points",
         "1", "2", "3"};
@@ -234,16 +234,16 @@ static int standard_cli_commands_test(void) {
     EditorResult result;
     const char *path;
     char output[1024];
-    char *transform[] = {"editor-cli", "--body", "car_body", "--project",
+    char *transform[] = {"rohr-cli", "--body", "car_body", "--project",
         "project.rohr.json", "--object", "FastCar", "--property", "transform",
         "10", "20", "0.5"};
-    char *mass_arguments[] = {"editor-cli", "--property", "mass", "5",
+    char *mass_arguments[] = {"rohr-cli", "--property", "mass", "5",
         "--body", "car_body"};
-    char *add_body[] = {"editor-cli", "--object", "FastCar", "--body",
+    char *add_body[] = {"rohr-cli", "--object", "FastCar", "--body",
         "new_frame", "add"};
-    char *position[] = {"editor-cli", "--body", "car_body", "--property",
+    char *position[] = {"rohr-cli", "--body", "car_body", "--property",
         "position", "30", "40"};
-    char *rotation[] = {"editor-cli", "--body", "car_body", "--property",
+    char *rotation[] = {"rohr-cli", "--body", "car_body", "--property",
         "rotation", "1.25"};
     editor_project_init(&project);
     object = editor_project_object_add(&project, (Position){0});
@@ -300,24 +300,24 @@ static int named_selector_commands_test(void) {
     const char *path;
     char body_id[16];
     char cli_text[512];
-    char *named_arguments[] = {"editor-cli", "rigid-body", "transform",
+    char *named_arguments[] = {"rohr-cli", "rigid-body", "transform",
         "project.rohr.json", "--object", "fast car", "--body", "car body",
         "10", "20", "0.5"};
-    char *id_arguments[] = {"editor-cli", "rigid-body", "set",
+    char *id_arguments[] = {"rohr-cli", "rigid-body", "set",
         "project.rohr.json", "--object", "FastCar", "--body-id", body_id,
         "mass", "5"};
-    char *vertex_arguments[] = {"editor-cli", "vertex", "position",
+    char *vertex_arguments[] = {"rohr-cli", "vertex", "position",
         "project.rohr.json", "--object", "FastCar", "--body", "car_body",
         "--hitbox", "hitbox_1", "--vertex", "vertex_1", "3", "4"};
-    char *missing_arguments[] = {"editor-cli", "rigid-body", "transform",
+    char *missing_arguments[] = {"rohr-cli", "rigid-body", "transform",
         "project.rohr.json", "--object", "FastCar", "--body", "missing",
         "0", "0", "0"};
-    char *global_body_arguments[] = {"editor-cli", "rigid-body", "transform",
+    char *global_body_arguments[] = {"rohr-cli", "rigid-body", "transform",
         "project.rohr.json", "--body", "car_body", "10", "20", "0.5"};
-    char *reordered_arguments[] = {"editor-cli", "rigid-body", "transform",
+    char *reordered_arguments[] = {"rohr-cli", "rigid-body", "transform",
         "project.rohr.json", "--body", "car_body", "--object", "FastCar",
         "10", "20", "0.5"};
-    char *global_vertex_arguments[] = {"editor-cli", "vertex", "position",
+    char *global_vertex_arguments[] = {"rohr-cli", "vertex", "position",
         "project.rohr.json", "--vertex", "vertex_1", "3", "4"};
 
     editor_project_init(&project);
@@ -435,9 +435,9 @@ static int transform_commands_test(void) {
     EditorResult parse_result;
     const char *parsed_path;
     char cli_text[512];
-    char *camera_arguments[] = {"editor-cli", "viewport", "camera",
+    char *camera_arguments[] = {"rohr-cli", "viewport", "camera",
         "project.rohr.json", "31", "32", "2.5"};
-    char *coordinates_arguments[] = {"editor-cli", "viewport", "coordinates",
+    char *coordinates_arguments[] = {"rohr-cli", "viewport", "coordinates",
         "project.rohr.json", "local"};
 
     editor_project_init(&project);
@@ -503,10 +503,10 @@ static int transform_commands_test(void) {
         EditorCommand navigation = {.type = EDITOR_COMMAND_NAVIGATION_SET,
             .data.navigation = {.mode = 3, .selection = 3, .object = object->id,
                 .rigid_body = rigid_body->id, .hitbox = hitbox->id}};
-        char *navigation_arguments[] = {"editor-cli", "navigation", "set",
+        char *navigation_arguments[] = {"rohr-cli", "navigation", "set",
             "project.rohr.json", "hitbox", "hitbox", "1", "1", "1", "0",
             "0", "0", "0", "0", "0", "0", "none"};
-        char *named_navigation_arguments[] = {"editor-cli", "navigation", "set",
+        char *named_navigation_arguments[] = {"rohr-cli", "navigation", "set",
             "project.rohr.json", "hitbox", "hitbox", "none",
             "--object", object->name, "--body", rigid_body->name,
             "--hitbox", hitbox->name};
@@ -585,7 +585,7 @@ static int item_commands_test(void) {
     uint32_t beam_id;
     char cli_text[512];
     const char *path;
-    char *rename_arguments[] = {"editor-cli", "soft-node", "rename",
+    char *rename_arguments[] = {"rohr-cli", "soft-node", "rename",
         "project.rohr.json", "1", "1", "1", "renamed node"};
 
     editor_project_init(&project);
@@ -682,13 +682,13 @@ static int property_commands_test(void) {
     EditorCommand parsed;
     const char *path;
     char cli_text[512];
-    char *node_arguments[] = {"editor-cli", "soft-node", "set",
+    char *node_arguments[] = {"rohr-cli", "soft-node", "set",
         "project.rohr.json", "1", "1", "1", "friction", "0.75"};
-    char *joint_arguments[] = {"editor-cli", "joint", "set",
+    char *joint_arguments[] = {"rohr-cli", "joint", "set",
         "project.rohr.json", "1", "1", "kind", "weld"};
-    char *color_arguments[] = {"editor-cli", "rigid-body", "set",
+    char *color_arguments[] = {"rohr-cli", "rigid-body", "set",
         "project.rohr.json", "1", "1", "surface-color", "#336699CC"};
-    char *named_color_arguments[] = {"editor-cli", "--project", "project.rohr.json",
+    char *named_color_arguments[] = {"rohr-cli", "--project", "project.rohr.json",
         "--body", "rigid_body_1", "--property", "outline-color", "#11223344"};
 
     editor_project_init(&project);
@@ -804,9 +804,9 @@ static int relationship_commands_test(void) {
     EditorCommand parsed;
     const char *path;
     char cli_text[512];
-    char *joint_arguments[] = {"editor-cli", "joint", "connect",
+    char *joint_arguments[] = {"rohr-cli", "joint", "connect",
         "project.rohr.json", "1", "1", "anchor-b", "none"};
-    char *beam_arguments[] = {"editor-cli", "soft-beam", "connect",
+    char *beam_arguments[] = {"rohr-cli", "soft-beam", "connect",
         "project.rohr.json", "1", "1", "1", "node-a", "2"};
 
     editor_project_init(&project);
@@ -872,9 +872,9 @@ static int collision_filter_commands_test(void) {
     EditorCommandResult result;
     const char *path;
     char cli_text[512];
-    char *add_arguments[] = {"editor-cli", "collision-mask", "add",
+    char *add_arguments[] = {"rohr-cli", "collision-mask", "add",
         "project.rohr.json", "Player Body"};
-    char *node_arguments[] = {"editor-cli", "soft-node", "filter",
+    char *node_arguments[] = {"rohr-cli", "soft-node", "filter",
         "project.rohr.json", "1", "1", "1", "collide-with", "player_body",
         "true"};
 
@@ -1145,7 +1145,7 @@ int main(void) {
     const char *parsed_path;
     char cli_text[512];
     char *cli_arguments[] = {
-        "editor-cli", "object", "add", "project.rohr.json",
+        "rohr-cli", "object", "add", "project.rohr.json",
         "TestObject", "7", "9"
     };
 
