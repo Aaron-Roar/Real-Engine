@@ -70,7 +70,9 @@ bool editor_rigid_body_editor_create(EditorRigidBodyEditor *editor,
     CREATE("Collide With", collide_with_label); CREATE("Origin", origin_label);
     CREATE("Add Hitbox", add_hitbox_label); CREATE("Delete Rigid Body", delete_label);
     CREATE("[X]", visible_label); CREATE("[ ]", hidden_label);
-    CREATE("", x_field); CREATE("", y_field); CREATE("", number_field);
+    CREATE("", x_field); CREATE("", y_field); CREATE("", rotation_field);
+    CREATE("", mass_field); CREATE("", friction_field);
+    CREATE("", restitution_field);
 #undef CREATE
     for(size_t i = 0; i < EDITOR_RIGID_BODY_MAX; i += 1) {
         char name[32]; snprintf(name, sizeof(name), "body_%zu", i + 1);
@@ -96,7 +98,9 @@ void editor_rigid_body_editor_destroy(EditorRigidBodyEditor *editor) {
     DESTROY(rotation_locked_label); DESTROY(collision_label); DESTROY(particle_label);
     DESTROY(collision_category_label); DESTROY(collide_with_label); DESTROY(origin_label);
     DESTROY(add_hitbox_label); DESTROY(delete_label); DESTROY(visible_label);
-    DESTROY(hidden_label); DESTROY(x_field); DESTROY(y_field); DESTROY(number_field);
+    DESTROY(hidden_label); DESTROY(x_field); DESTROY(y_field);
+    DESTROY(rotation_field); DESTROY(mass_field); DESTROY(friction_field);
+    DESTROY(restitution_field);
 #undef DESTROY
     for(size_t i = 0; i < EDITOR_RIGID_BODY_MAX; i += 1)
         rohr_graphics_text_destroy(&editor->body_names[i]);
@@ -164,7 +168,7 @@ bool editor_rigid_body_editor_draw(EditorRigidBodyEditor *editor,
         (UIRect){x + 8.0f, 144.0f, 76.0f, 26.0f});
     rotation_result = rohr_ui_field("editor.rigid_body.rotation",
         (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &rotation},
-        &editor->number_field, (UIRect){x + 86.0f, 144.0f,
+        &editor->rotation_field, (UIRect){x + 86.0f, 144.0f,
             width - 96.0f, 26.0f}, NULL);
     if(x_result.changed || y_result.changed || rotation_result.changed) {
         EditorCommand command = {.type = EDITOR_COMMAND_RIGID_BODY_TRANSFORM,
@@ -173,23 +177,26 @@ bool editor_rigid_body_editor_draw(EditorRigidBodyEditor *editor,
     }
     field_active = name_result.active || x_result.active || y_result.active ||
         rotation_result.active;
-#define FLOAT_FIELD(field_id, label, field_y, label_width, property, source, min_value, clamp_max) do { \
+#define FLOAT_FIELD(field_id, label, field, field_y, label_width, property, source, min_value, clamp_max) do { \
     float value = (source); UIFieldResult result; \
     rohr_ui_label(&(label), (UIRect){x + 8.0f, (field_y), (label_width), 26.0f}); \
     result = rohr_ui_field((field_id), (UIFieldBinding){.kind = UI_FIELD_FLOAT, \
-        .number = &value}, &editor->number_field, \
+        .number = &value}, &(field), \
         (UIRect){x + (label_width) + 10.0f, (field_y), width - (label_width) - 20.0f, 26.0f}, NULL); \
     if(result.changed) value = fmaxf((min_value), value); \
     if(result.changed && (clamp_max) >= 0.0f) value = fminf((clamp_max), value); \
     if(result.changed) property_float_set(context->project, object->id, body->id, \
         (property), value); field_active = field_active || result.active; \
 } while(0)
-    FLOAT_FIELD("editor.rigid_body.mass", editor->mass_label, 180.0f, 76.0f,
+    FLOAT_FIELD("editor.rigid_body.mass", editor->mass_label, editor->mass_field,
+        180.0f, 76.0f,
         EDITOR_PROPERTY_MASS, body->mass_value, 0.0f, -1.0f);
-    FLOAT_FIELD("editor.rigid_body.friction", editor->friction_label, 212.0f, 76.0f,
+    FLOAT_FIELD("editor.rigid_body.friction", editor->friction_label,
+        editor->friction_field, 212.0f, 76.0f,
         EDITOR_PROPERTY_FRICTION, body->friction, 0.0f, -1.0f);
-    FLOAT_FIELD("editor.rigid_body.restitution", editor->restitution_label, 244.0f,
-        96.0f, EDITOR_PROPERTY_RESTITUTION, body->restitution, 0.0f, 1.0f);
+    FLOAT_FIELD("editor.rigid_body.restitution", editor->restitution_label,
+        editor->restitution_field, 244.0f, 96.0f,
+        EDITOR_PROPERTY_RESTITUTION, body->restitution, 0.0f, 1.0f);
 #undef FLOAT_FIELD
     rohr_ui_label(&editor->border_color_label,
         (UIRect){x + 8.0f, 276.0f, 104.0f, 26.0f});

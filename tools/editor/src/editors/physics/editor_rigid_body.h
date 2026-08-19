@@ -20,7 +20,8 @@ typedef struct EditorRigidBodyEditor {
     TextAsset collision_category_label, collide_with_label;
     TextAsset origin_label, add_hitbox_label, delete_label;
     TextAsset visible_label, hidden_label;
-    TextAsset x_field, y_field, number_field;
+    TextAsset x_field, y_field, rotation_field;
+    TextAsset mass_field, friction_field, restitution_field;
     TextAsset body_names[EDITOR_RIGID_BODY_MAX];
     TextAsset hitbox_names[EDITOR_BODY_HITBOX_MAX];
     char body_cache[EDITOR_RIGID_BODY_MAX][EDITOR_OBJECT_NAME_MAX];

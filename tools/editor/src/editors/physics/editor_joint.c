@@ -65,7 +65,8 @@ bool editor_joint_editor_create(EditorJointEditor *editor, FontAsset *font) {
     CREATE("Add Anchor", add_anchor_label); CREATE("Damping", damping_label);
     CREATE("Rest Length", rest_length_label); CREATE("Stiffness", stiffness_label);
     CREATE("[X]", visible_label); CREATE("[ ]", hidden_label);
-    CREATE("Delete Joint", delete_label); CREATE("", number_field);
+    CREATE("Delete Joint", delete_label); CREATE("", damping_field);
+    CREATE("", rest_length_field); CREATE("", stiffness_field);
 #undef CREATE
     for(size_t i = 0; i < EDITOR_JOINT_MAX; i += 1) {
         char name[32]; snprintf(name, sizeof(name), "joint_%zu", i + 1);
@@ -89,7 +90,7 @@ void editor_joint_editor_destroy(EditorJointEditor *editor) {
     DESTROY(anchor_b_label); DESTROY(none_label); DESTROY(add_anchor_label);
     DESTROY(damping_label); DESTROY(rest_length_label); DESTROY(stiffness_label);
     DESTROY(visible_label); DESTROY(hidden_label); DESTROY(delete_label);
-    DESTROY(number_field);
+    DESTROY(damping_field); DESTROY(rest_length_field); DESTROY(stiffness_field);
 #undef DESTROY
     for(size_t i = 0; i < EDITOR_JOINT_MAX; i += 1)
         rohr_graphics_text_destroy(&editor->joint_names[i]);
@@ -101,14 +102,15 @@ void editor_joint_editor_destroy(EditorJointEditor *editor) {
 static bool nonnegative_field(EditorJointEditor *editor,
         const EditorModeContext *context, EditorObjectId object,
         EditorJointId joint, const char *id, const TextAsset *label,
-        float y, float label_width, EditorPropertyKind property, float source) {
+        TextAsset *field, float y, float label_width,
+        EditorPropertyKind property, float source) {
     float value = source;
     UIFieldResult result;
     rohr_ui_label(label,
         (UIRect){context->x + 8.0f, y, label_width, 26.0f});
     result = rohr_ui_field(id,
         (UIFieldBinding){.kind = UI_FIELD_FLOAT, .number = &value},
-        &editor->number_field,
+        field,
         (UIRect){context->x + label_width + 10.0f, y,
             context->width - label_width - 20.0f, 26.0f}, NULL);
     if(result.changed) property_float_set(context->project, object, joint,
@@ -276,20 +278,23 @@ bool editor_joint_editor_draw(EditorJointEditor *editor,
     }
     if(joint->kind == EDITOR_JOINT_REVOLUTE)
         field_active = nonnegative_field(editor, context, object->id, joint->id,
-            "editor.joint.revolute.damping", &editor->damping_label, 442.0f,
-            76.0f, EDITOR_PROPERTY_DAMPING, joint->damping) || field_active;
+            "editor.joint.revolute.damping", &editor->damping_label,
+            &editor->damping_field, 442.0f, 76.0f, EDITOR_PROPERTY_DAMPING,
+            joint->damping) || field_active;
     else if(joint->kind == EDITOR_JOINT_SPRING) {
         field_active = nonnegative_field(editor, context, object->id, joint->id,
             "editor.joint.spring.rest_length", &editor->rest_length_label,
-            442.0f, 96.0f, EDITOR_PROPERTY_REST_LENGTH,
+            &editor->rest_length_field, 442.0f, 96.0f,
+            EDITOR_PROPERTY_REST_LENGTH,
             joint->rest_length) || field_active;
         field_active = nonnegative_field(editor, context, object->id, joint->id,
             "editor.joint.spring.stiffness", &editor->stiffness_label,
-            474.0f, 90.0f, EDITOR_PROPERTY_STIFFNESS,
+            &editor->stiffness_field, 474.0f, 90.0f,
+            EDITOR_PROPERTY_STIFFNESS,
             joint->stiffness) || field_active;
         field_active = nonnegative_field(editor, context, object->id, joint->id,
             "editor.joint.spring.damping", &editor->damping_label,
-            506.0f, 76.0f, EDITOR_PROPERTY_DAMPING,
+            &editor->damping_field, 506.0f, 76.0f, EDITOR_PROPERTY_DAMPING,
             joint->damping) || field_active;
     }
     if(context->delete_y_get != NULL && context->delete_open_item != NULL) {
