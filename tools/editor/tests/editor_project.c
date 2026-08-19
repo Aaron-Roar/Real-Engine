@@ -146,7 +146,9 @@ int main(void) {
         if(!SDL_GetPathInfo(path, &info) || info.type != SDL_PATHTYPE_FILE ||
                 !file_contains(path,
                     "rohr_physics_gravity_set((Acceleration){0.0f, -900.0f})") ||
-                !file_contains(path, "starter_create(&starter")) {
+                !file_contains(path, "project_objects_create_all(&objects") ||
+                !file_contains(path, "project_objects_draw_all(&objects") ||
+                !file_contains(path, "project_objects_destroy_all(&objects")) {
             workspace_fixture_remove(fixture);
             return 1;
         }
@@ -278,13 +280,18 @@ int main(void) {
                 !file_contains(path, "assets/fly frame.png") ||
                 !file_contains(path, "animated.follow_entity_rotation = false") ||
                 !file_contains(path, "(Scale){2.00000000f, 3.00000000f}") ||
-                !file_contains(path, "void starter_draw")) {
+                !file_contains(path, "void starter_draw") ||
+                !file_contains(path, "EngineResult project_objects_create_all") ||
+                !file_contains(path, "void project_objects_draw_all") ||
+                !file_contains(path, "void project_objects_destroy_all")) {
             workspace_fixture_remove(fixture);
             return 1;
         }
         snprintf(path, sizeof(path), "%s/src/generated/project_objects.h", fixture);
         if(!file_contains(path, "Entity soft_body_1;") ||
-                file_contains(path, "Entity soft_body_soft_body_1;")) {
+                file_contains(path, "Entity soft_body_soft_body_1;") ||
+                !file_contains(path, "typedef struct ProjectObjects") ||
+                !file_contains(path, "EngineResult project_objects_create_all")) {
             workspace_fixture_remove(fixture);
             return 1;
         }

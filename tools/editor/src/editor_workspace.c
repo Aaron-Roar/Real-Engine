@@ -1061,6 +1061,60 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
         }
         fprintf(source, "    *object = (%s){0};\n}\n\n", object->name);
     }
+    fprintf(header, "typedef struct ProjectObjects {\n");
+    for(size_t object_index = 0; object_index < project->object_count; object_index += 1) {
+        char variable[EDITOR_OBJECT_NAME_MAX];
+        editor_project_property_name_format(variable, sizeof(variable),
+            project->objects[object_index].name);
+        fprintf(header, "    %s %s;\n", project->objects[object_index].name, variable);
+    }
+    fprintf(header,
+        "    bool created;\n"
+        "} ProjectObjects;\n\n"
+        "EngineResult project_objects_create_all(ProjectObjects *objects);\n"
+        "void project_objects_draw_all(const ProjectObjects *objects);\n"
+        "void project_objects_destroy_all(ProjectObjects *objects);\n\n");
+    fprintf(source,
+        "EngineResult project_objects_create_all(ProjectObjects *objects) {\n"
+        "    EngineResult result;\n"
+        "    if(objects == NULL) return rohr_error_result_error("
+            "ERROR_MEMORY_POOL_NULL_POINTER);\n"
+        "    *objects = (ProjectObjects){0};\n");
+    for(size_t object_index = 0; object_index < project->object_count; object_index += 1) {
+        const EditorObject *object = &project->objects[object_index];
+        char variable[EDITOR_OBJECT_NAME_MAX];
+        editor_project_property_name_format(variable, sizeof(variable), object->name);
+        fprintf(source,
+            "    result = %s_create(&objects->%s, (Position){%#.9gf, %#.9gf});\n"
+            "    if(rohr_error_check(result)) goto fail;\n",
+            variable, variable, object->position.x, object->position.y);
+    }
+    fprintf(source,
+        "    objects->created = true;\n"
+        "    return rohr_error_result_value(true);\n"
+        "fail:\n"
+        "    project_objects_destroy_all(objects);\n"
+        "    return result;\n"
+        "}\n\n"
+        "void project_objects_draw_all(const ProjectObjects *objects) {\n"
+        "    if(objects == NULL) return;\n");
+    for(size_t object_index = 0; object_index < project->object_count; object_index += 1) {
+        char variable[EDITOR_OBJECT_NAME_MAX];
+        editor_project_property_name_format(variable, sizeof(variable),
+            project->objects[object_index].name);
+        fprintf(source, "    %s_draw(&objects->%s);\n", variable, variable);
+    }
+    fprintf(source,
+        "}\n\n"
+        "void project_objects_destroy_all(ProjectObjects *objects) {\n"
+        "    if(objects == NULL) return;\n");
+    for(size_t object_index = project->object_count; object_index > 0; object_index -= 1) {
+        char variable[EDITOR_OBJECT_NAME_MAX];
+        editor_project_property_name_format(variable, sizeof(variable),
+            project->objects[object_index - 1].name);
+        fprintf(source, "    %s_destroy(&objects->%s);\n", variable, variable);
+    }
+    fprintf(source, "    *objects = (ProjectObjects){0};\n}\n\n");
     fprintf(header, "#endif\n");
     {
         bool header_closed = fclose(header) == 0;
@@ -1090,24 +1144,12 @@ static bool editor_workspace_main_write(const EditorWorkspace *workspace,
         "}\n\n"
         "int main(void) {\n"
         "    KeyboardState keyboard = {0};\n");
-    for(size_t i = 0; i < project->object_count; i += 1) {
-        char variable[EDITOR_OBJECT_NAME_MAX];
-        editor_project_property_name_format(variable, sizeof(variable),
-            project->objects[i].name);
-        fprintf(file, "    %s %s = {0};\n", project->objects[i].name, variable);
-    }
+    fprintf(file, "    ProjectObjects objects = {0};\n");
     fprintf(file,
         "    if(!ok(rohr_engine_init()) || !ok(rohr_graphics_start()) ||\n"
         "            !ok(rohr_physics_gravity_set((Acceleration){0.0f, -900.0f}))) goto fail;\n"
         );
-    for(size_t i = 0; i < project->object_count; i += 1) {
-        char variable[EDITOR_OBJECT_NAME_MAX];
-        editor_project_property_name_format(variable, sizeof(variable),
-            project->objects[i].name);
-        fprintf(file, "    if(!ok(%s_create(&%s, (Position){%#.9gf, %#.9gf}))) goto fail;\n",
-            variable, variable, project->objects[i].position.x,
-            project->objects[i].position.y);
-    }
+    fprintf(file, "    if(!ok(project_objects_create_all(&objects))) goto fail;\n");
     fprintf(file,
         "    while(true) {\n"
         "        SDL_Event event;\n"
@@ -1124,22 +1166,19 @@ static bool editor_workspace_main_write(const EditorWorkspace *workspace,
         "        rohr_graphics_layer_set(-100);\n"
         "        rohr_graphics_background_draw((Color){18, 22, 30, 255});\n"
         "        rohr_graphics_layer_set(0);\n");
-    for(size_t object_index = 0; object_index < project->object_count; object_index += 1) {
-        const EditorObject *object = &project->objects[object_index];
-        char variable[EDITOR_OBJECT_NAME_MAX];
-        editor_project_property_name_format(variable, sizeof(variable), object->name);
-        fprintf(file, "        %s_draw(&%s);\n", variable, variable);
-    }
+    fprintf(file, "        project_objects_draw_all(&objects);\n");
     fprintf(file, "        rohr_graphics_animated_sprites_draw();\n");
     fprintf(file,
         "        rohr_graphics_show();\n"
         "    }\n"
         "done:\n"
+        "    project_objects_destroy_all(&objects);\n"
         "    rohr_graphics_end();\n"
         "    rohr_engine_shutdown();\n"
         "    return 0;\n"
         "fail:\n"
         "    fprintf(stderr, \"Game initialization failed\\n\");\n"
+        "    project_objects_destroy_all(&objects);\n"
         "    rohr_graphics_end();\n"
         "    rohr_engine_shutdown();\n"
         "    return 1;\n"
