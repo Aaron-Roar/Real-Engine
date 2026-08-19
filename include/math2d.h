@@ -6,6 +6,7 @@
 #define MAX_VECTORS 100
 #define MAX_VERTICIES 50
 #define MIN_VERTICIES 3
+#define MAX_CONCAVE_PIECES (MAX_VERTICIES - 2)
 
 #define PI_F 3.14159265358979323846f
 
@@ -44,12 +45,23 @@ typedef struct Vec2DList {
     Vec2D vectors[MAX_VECTORS];
 } Vec2DList;
 
-/** Convex polygon or circle-like shape in local or world space. */
+/** Triangle indexing the original vertices of an internally decomposed shape. */
+typedef struct ShapeConcavePiece {
+    uint8_t vertex_indices[3];
+} ShapeConcavePiece;
+
+/** Polygon or circle-like shape in local or world space. */
 typedef struct Shape {
     /** Number of valid vertices. */
     uint16_t amount_of_vertices;
     /** Vertex coordinates. Local shapes must be translated before rendering/collision. */
     Vec2D vertices[MAX_VERTICIES]; //Local coordinate of vertices. Must be translated to world coordinate
+    /** Internal convex decomposition; zero pieces keeps the convex fast path. */
+    ShapeConcavePiece concave_pieces[MAX_CONCAVE_PIECES];
+    /** Number of cached pieces generated for a concave polygon. */
+    uint8_t concave_piece_count;
+    /** Internal marker distinguishing prepared convex shapes from raw input. */
+    bool collision_geometry_prepared;
 } Shape;
 
 /** Axis vector used for projection and constraints. */

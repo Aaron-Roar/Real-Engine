@@ -1,4 +1,5 @@
 #include "graphics.h"
+#include "physics/collision/shape_decomposition.h"
 #include "core/engine_internal.h"
 #include "console.h"
 #include "engine.h"
@@ -57,7 +58,13 @@ typedef struct GraphicsCommand {
         struct { SDL_FRect rectangle; Color color; } rect;
         struct { Position center; float width; float height; float angle; Color color; } quad;
         struct { SDL_FPoint points[MAX_VERTICIES + 1]; int count; Color color; } lines;
-        struct { SDL_FPoint points[MAX_VERTICIES]; int count; Color color; } shape;
+        struct {
+            SDL_FPoint points[MAX_VERTICIES];
+            int indices[MAX_CONCAVE_PIECES * 3];
+            int count;
+            int index_count;
+            Color color;
+        } shape;
         struct { TTF_Text *text; Position position; } text;
         struct {
             SDL_Texture *texture;
@@ -2036,8 +2043,6 @@ static void graphics_commands_execute(void) {
                 }
                 case GRAPHICS_COMMAND_SHAPE_FILLED: {
                     SDL_Vertex vertices[MAX_VERTICIES] = {0};
-                    int indices[(MAX_VERTICIES - 2) * 3];
-                    int index_count = 0;
                     Color color = command->data.shape.color;
                     for(int i = 0; i < command->data.shape.count; i += 1) {
                         vertices[i].position = command->data.shape.points[i];
@@ -2045,14 +2050,10 @@ static void graphics_commands_execute(void) {
                             (SDL_FColor){color.red / 255.0f, color.green / 255.0f,
                                          color.blue / 255.0f, color.alpha / 255.0f};
                     }
-                    for(int i = 1; i < command->data.shape.count - 1; i += 1) {
-                        indices[index_count++] = 0;
-                        indices[index_count++] = i;
-                        indices[index_count++] = i + 1;
-                    }
                     (void)SDL_RenderGeometry(sdl_renderer, NULL, vertices,
-                                             command->data.shape.count, indices,
-                                             index_count);
+                                             command->data.shape.count,
+                                             command->data.shape.indices,
+                                             command->data.shape.index_count);
                     break;
                 }
                 case GRAPHICS_COMMAND_TEXT:
@@ -2151,9 +2152,12 @@ bool graphics_shape_outline_draw(Shape shape, Color color) {
 
 bool graphics_shape_filled_draw(Shape shape, Color color)
 {
+    Shape prepared;
     if (shape.amount_of_vertices < 3) {
         return false;
     }
+
+    if(!physics_shape_collision_prepare(shape, &prepared)) return false;
 
     GraphicsCommand *command;
 
@@ -2165,10 +2169,25 @@ bool graphics_shape_filled_draw(Shape shape, Color color)
     command = graphics_command_append(GRAPHICS_COMMAND_SHAPE_FILLED);
     if(command == NULL) return false;
     command->data.shape.count = shape.amount_of_vertices;
+    command->data.shape.index_count = 0;
     command->data.shape.color = color;
     for(int i = 0; i < shape.amount_of_vertices; i += 1)
         command->data.shape.points[i] = (SDL_FPoint){
             shape.vertices[i].x, shape.vertices[i].y};
+    if(prepared.concave_piece_count == 0) {
+        for(int i = 1; i < shape.amount_of_vertices - 1; i += 1) {
+            command->data.shape.indices[command->data.shape.index_count++] = 0;
+            command->data.shape.indices[command->data.shape.index_count++] = i;
+            command->data.shape.indices[command->data.shape.index_count++] = i + 1;
+        }
+    } else {
+        for(uint8_t piece = 0; piece < prepared.concave_piece_count; piece += 1) {
+            for(uint8_t vertex = 0; vertex < 3; vertex += 1) {
+                command->data.shape.indices[command->data.shape.index_count++] =
+                    prepared.concave_pieces[piece].vertex_indices[vertex];
+            }
+        }
+    }
     return true;
 }
 

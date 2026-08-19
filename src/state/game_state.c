@@ -11,6 +11,7 @@
 #include "entity_components.h"
 #include "graphics.h"
 #include "physics.h"
+#include "physics/collision/shape_decomposition.h"
 #include "yyjson.h"
 
 #define STATE_MAX_ANIMATIONS MAX_TEXTURES
@@ -1129,6 +1130,7 @@ static EngineResult state_shape_load(EntityIndex index, yyjson_val *value) {
     size_t vertex_index;
     size_t vertex_count;
     Shape shape = {0};
+    Shape prepared;
 
     if(!yyjson_is_arr(value)) {
         return error_result_error(ERROR_ENGINE_STATE_INVALID);
@@ -1143,7 +1145,10 @@ static EngineResult state_shape_load(EntityIndex index, yyjson_val *value) {
         }
     }
     shape.amount_of_vertices = (uint16_t)vertex_count;
-    if(ShapePool_store_at(&hit_boxes_pool, index, shape).kind == ERROR_RESULT_ERROR) {
+    if(!physics_shape_collision_prepare(shape, &prepared)) {
+        return error_result_error(ERROR_ENGINE_INVALID_SHAPE);
+    }
+    if(ShapePool_store_at(&hit_boxes_pool, index, prepared).kind == ERROR_RESULT_ERROR) {
         return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
     }
     entity_mask[index] |= ROHR_HIT_BOX;

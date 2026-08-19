@@ -104,8 +104,12 @@ semantics are stable.
   feature size, exposing the selected count through debug statistics.
 - Add swept collision detection for fast rigid bodies, particles, and soft-body
   boundaries through the existing contact pipeline.
-- Add non-convex polygon support through validated decomposition while keeping
-  SAT and contact response explicit.
+- Profile concave contacts, then cache the selected convex-piece pair between
+  overlap detection and manifold generation if it materially reduces work.
+- Improve concave boundary response by merging contacts across adjacent convex
+  pieces and suppressing internal decomposition edges.
+- Add compound contours and holes only after their ownership and authoring
+  representation are explicit.
 - Profile before adding a sparse broad-phase interaction candidate index.
 - Keep active constraints compact and hot iteration free of full-capacity
   scans.

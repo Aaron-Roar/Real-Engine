@@ -187,6 +187,7 @@ set(ROHR_ENGINE_SOURCES
     src/physics/collision/interaction_state.c
     src/physics/collision/overlap_query.c
     src/physics/collision/overlap_geometry.c
+    src/physics/collision/shape_decomposition.c
     src/physics/constraints/constraint_solver.c
     src/physics/constraints/transform_lock.c
     src/physics/joints/joint_constraint.c
@@ -456,6 +457,14 @@ if(ROHR_BUILD_TESTS)
     set_target_properties(contact_manifold_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
     add_test(NAME contact_manifold COMMAND contact_manifold_test)
 
+    add_executable(concave_collision_test tests/concave_collision.c)
+    target_include_directories(concave_collision_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(concave_collision_test PRIVATE rohr_engine)
+    set_target_properties(concave_collision_test PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
+    add_test(NAME concave_collision COMMAND concave_collision_test)
+
     add_executable(component_registry_test
         tests/component_registry.c
     )
@@ -562,6 +571,7 @@ if(ROHR_BUILD_TESTS)
         physics_interaction_set_test
         constraint_solver_test
         contact_manifold_test
+        concave_collision_test
         component_registry_test
         generated_components_test
     )

@@ -1415,7 +1415,9 @@ Applies torque to an entity for one physics tick.
 EngineResult rohr_physics_hitbox_set(Entity entity, Shape hitbox);
 ```
 
-Sets an entity hitbox component value without enabling physical collision response.
+Sets a simple polygon hitbox and prepares hidden convex decomposition when
+needed. Degenerate and self-intersecting outlines are rejected. This does not
+enable physical collision response.
 
 | Parameter | Description |
 | --- | --- |

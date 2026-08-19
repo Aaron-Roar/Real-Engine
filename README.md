@@ -33,8 +33,11 @@ Rohr Engine currently focuses on data-oriented 2D simulation:
 * Object pools back engine tables and grow as entities are added.
 * Entity table indices are still preserved for compute-heavy loops.
 * Systems use explicit component masks instead of hidden object behavior.
-* Physics supports convex polygon and circle-style shape data.
-* Collision uses SAT for convex polygon overlap checks.
+* Physics supports convex and simple concave polygon shape data, plus
+  circle-style particle data.
+* Collision validates polygon outlines and decomposes concave polygons into
+  cached convex pieces before SAT and contact response. Self-intersections and
+  holes are not supported.
 * Rigid bodies support mass, velocity, acceleration, angular velocity, restitution, and friction.
 * Constraints include joints, axis locks, angle locks, and transform locks.
 * Sprite animation is driven through SDL3 textures.

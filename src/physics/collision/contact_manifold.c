@@ -1,4 +1,6 @@
 #include "contact_manifold.h"
+#include "physics.h"
+#include "shape_decomposition.h"
 
 #include <float.h>
 #include <math.h>
@@ -94,7 +96,7 @@ static uint8_t contact_segment_clip(
     return count;
 }
 
-ContactManifold contact_manifold_polygon_get(
+static ContactManifold contact_manifold_convex_get(
     Shape first,
     Shape second,
     Axis normal
@@ -150,4 +152,39 @@ ContactManifold contact_manifold_polygon_get(
         };
     }
     return manifold;
+}
+
+ContactManifold contact_manifold_polygon_get(
+    Shape first,
+    Shape second,
+    Axis normal
+) {
+    ContactManifold best = {0};
+    float best_depth = FLT_MAX;
+    uint8_t first_count;
+    uint8_t second_count;
+
+    if(!first.collision_geometry_prepared &&
+            !physics_shape_collision_prepare(first, &first)) return best;
+    if(!second.collision_geometry_prepared &&
+            !physics_shape_collision_prepare(second, &second)) return best;
+    first_count = physics_shape_collision_piece_count_get(&first);
+    second_count = physics_shape_collision_piece_count_get(&second);
+    for(uint8_t first_index = 0; first_index < first_count; first_index += 1) {
+        Shape first_piece = physics_shape_collision_piece_get(&first, first_index);
+        for(uint8_t second_index = 0; second_index < second_count; second_index += 1) {
+            Shape second_piece = physics_shape_collision_piece_get(
+                &second, second_index);
+            OverlapInfo overlap = physics_sat_overlap_get(first_piece, second_piece);
+            ContactManifold candidate;
+            if(!overlap.detected || overlap.depth >= best_depth ||
+                    math_dot_product(overlap.normal, normal) < 0.99f) continue;
+            candidate = contact_manifold_convex_get(
+                first_piece, second_piece, overlap.normal);
+            if(candidate.count == 0) continue;
+            best = candidate;
+            best_depth = overlap.depth;
+        }
+    }
+    return best;
 }

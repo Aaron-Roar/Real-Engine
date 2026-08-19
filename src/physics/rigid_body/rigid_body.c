@@ -7,7 +7,7 @@ Shape physics_shape_world_translate(
     Position position,
     Orientation angle
 ) {
-    Shape world_shape = {.amount_of_vertices = shape.amount_of_vertices};
+    Shape world_shape = shape;
     Position center = math_polygon_centroid(shape);
     float cosine = cosf(angle);
     float sine = sinf(angle);

@@ -61,6 +61,8 @@ typedef enum EngineError {
     ERROR_ENGINE_ENTITY_NOT_FOUND,
     /** A required component is missing. */
     ERROR_ENGINE_COMPONENT_MISSING,
+    /** A polygon shape is degenerate, self-intersecting, or otherwise invalid. */
+    ERROR_ENGINE_INVALID_SHAPE,
     /** A texture asset could not be loaded. */
     ERROR_ENGINE_TEXTURE_LOAD_FAILED,
     /** A font asset could not be loaded. */

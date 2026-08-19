@@ -529,7 +529,11 @@ EntityResult physics_torque_create(Entity entity, Torque t);
 EngineResult physics_torque_component_set(Entity entity, Torque torque);
 /** Create a torque entity that applies for one physics tick. */
 EngineResult physics_torque_for_one_tick_apply(Entity entity, Torque t);
-/** Set an entity's hitbox. This does not enable physical collision response. */
+/**
+ * Set an entity's simple polygon hitbox and prepare any required convex
+ * decomposition. This rejects degenerate and self-intersecting outlines and
+ * does not enable physical collision response.
+ */
 EngineResult physics_hitbox_set(Entity entity, Shape hitbox);
 /** Return the default collision filter: default category against all categories. */
 CollisionFilterConfig physics_collision_filter_config_default_get(void);
