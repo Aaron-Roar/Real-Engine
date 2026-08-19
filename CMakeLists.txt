@@ -175,7 +175,12 @@ set(ROHR_ENGINE_SOURCES
     src/physics/broadphase/aabb_tree.c
     src/physics/collision/contact_constraint.c
     src/physics/collision/contact_manifold.c
+    src/physics/collision/contact_query.c
+    src/physics/collision/collision_filter.c
+    src/physics/collision/collision_material.c
+    src/physics/collision/interaction_query.c
     src/physics/collision/interaction_set.c
+    src/physics/collision/overlap_query.c
     src/physics/constraints/constraint_solver.c
     src/physics/joints/joint_constraint.c
     src/physics/joints/joint_solver.c

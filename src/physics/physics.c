@@ -450,7 +450,7 @@ Position physics_approximate_contact_point(Position p1, Position p2)
         .y = (p1.y + p2.y) * 0.5f
     };
 }
-static EngineResult physics_live_index_get(Entity entity, EntityIndex *index) {
+EngineResult physics_live_index_get(Entity entity, EntityIndex *index) {
     if(index == NULL) {
         return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
     }
@@ -961,77 +961,6 @@ EngineResult physics_hitbox_set(Entity entity, Shape hitbox) {
     return error_result_value(true);
 }
 
-CollisionFilterConfig physics_collision_filter_config_default_get(void) {
-    return (CollisionFilterConfig) {
-        .category = ROHR_COLLISION_CATEGORY_DEFAULT,
-        .collides_with = ROHR_COLLISION_CATEGORY_ALL
-    };
-}
-
-EngineResult physics_collision_filter_set(Entity entity, CollisionFilterConfig config) {
-    EntityIndex index;
-    EngineResult result = physics_live_index_get(entity, &index);
-
-    if(result.kind == ERROR_RESULT_ERROR) return result;
-    if(!entity_index_components_check(index, ROHR_HIT_BOX)) {
-        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
-    }
-    if(CollisionFilterConfigPool_store_at(&collision_filters_pool, index, config).kind
-            == ERROR_RESULT_ERROR) {
-        return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED);
-    }
-    entity_mask[index] |= ROHR_COLLISION_FILTER;
-    return error_result_value(true);
-}
-
-CollisionFilterConfigResult physics_collision_filter_get(Entity entity) {
-    EntityIndex index;
-    EngineResult result = physics_live_index_get(entity, &index);
-
-    if(result.kind == ERROR_RESULT_ERROR) {
-        return ERROR_RESULT_MAKE_ERROR(CollisionFilterConfigResult, result.result.error);
-    }
-    if(!entity_index_components_check(index, ROHR_HIT_BOX)) {
-        return ERROR_RESULT_MAKE_ERROR(CollisionFilterConfigResult, ERROR_ENGINE_COMPONENT_MISSING);
-    }
-    if(!entity_index_components_check(index, ROHR_COLLISION_FILTER)) {
-        return ERROR_RESULT_MAKE_VALUE(CollisionFilterConfigResult, physics_collision_filter_config_default_get());
-    }
-    return ERROR_RESULT_MAKE_VALUE(CollisionFilterConfigResult, collision_filters[index]);
-}
-
-EngineResult physics_collision_category_set(Entity entity, RohrCollisionCategoryMask category) {
-    CollisionFilterConfigResult result = physics_collision_filter_get(entity);
-
-    if(result.kind == ERROR_RESULT_ERROR) return error_result_error(result.result.error);
-    result.result.value.category = category;
-    return physics_collision_filter_set(entity, result.result.value);
-}
-
-EngineResult physics_collision_with_set(Entity entity, RohrCollisionCategoryMask categories) {
-    CollisionFilterConfigResult result = physics_collision_filter_get(entity);
-
-    if(result.kind == ERROR_RESULT_ERROR) return error_result_error(result.result.error);
-    result.result.value.collides_with = categories;
-    return physics_collision_filter_set(entity, result.result.value);
-}
-
-EngineResult physics_collision_with_all_set(Entity entity) {
-    return physics_collision_with_set(entity, ROHR_COLLISION_CATEGORY_ALL);
-}
-
-EngineResult physics_collision_with_none_set(Entity entity) {
-    return physics_collision_with_set(entity, ROHR_COLLISION_CATEGORY_NONE);
-}
-
-bool physics_collision_between_check(Entity entity_1, Entity entity_2) {
-    CollisionFilterConfigResult first = physics_collision_filter_get(entity_1);
-    CollisionFilterConfigResult second = physics_collision_filter_get(entity_2);
-
-    if(first.kind == ERROR_RESULT_ERROR || second.kind == ERROR_RESULT_ERROR) return false;
-    return (first.result.value.collides_with & second.result.value.category) != 0
-        && (second.result.value.collides_with & first.result.value.category) != 0;
-}
 EngineResult physics_orientation_set(Entity entity, Orientation angle) {
     EntityIndex index;
     EngineResult result = physics_live_index_get(entity, &index);
@@ -1134,27 +1063,6 @@ ShapeResult physics_global_hit_box_get(Entity entity) {
         return ERROR_RESULT_MAKE_ERROR(ShapeResult, ERROR_ENGINE_COMPONENT_MISSING);
     }
     return ERROR_RESULT_MAKE_ERROR(ShapeResult, ERROR_ENGINE_INVALID_ENTITY);
-}
-EngineResult physics_restitution_set(Entity entity, Restitution restitution) {
-    EntityIndex index;
-    EngineResult result = physics_live_index_get(entity, &index);
-
-    if(result.kind == ERROR_RESULT_ERROR) {
-        return result;
-    }
-     if(restitution < 0) {
-        (void)RestitutionPool_store_at(&restitutions_pool, index, 0);
-        console_debug_write(LOG_ENGINE, "Set Entity: %d Restitution: %f\n", entity, 0);
-     }
-     else if(restitution > 1) {
-        (void)RestitutionPool_store_at(&restitutions_pool, index, 1);
-        console_debug_write(LOG_ENGINE, "Set Entity: %d Restitution: %f\n", entity, 1);
-     }
-     else {
-        (void)RestitutionPool_store_at(&restitutions_pool, index, restitution);
-        console_debug_write(LOG_ENGINE, "Set Entity: %d Restitution: %f\n", entity, restitution);
-     }
-     return entity_components_add(entity, ROHR_COLLISION);
 }
 EngineResult physics_dynamic_set(Entity entity) {
     EntityIndex index;
@@ -1272,21 +1180,6 @@ EngineResult physics_axis_lock_set(Entity entity, Axis axis, Position axis_point
             .y = axis_point.y
         }
     });
-    return error_result_value(true);
-}
-EngineResult physics_friction_set(Entity entity, float friction) {
-    EntityIndex index;
-    EngineResult result = physics_live_index_get(entity, &index);
-
-    if(result.kind == ERROR_RESULT_ERROR) {
-        return result;
-    }
-    if(friction < 0) {
-        (void)FrictionPool_store_at(&frictions_pool, index, 0);
-    }
-    else if(friction >= 0) {
-        (void)FrictionPool_store_at(&frictions_pool, index, friction);
-    }
     return error_result_value(true);
 }
 EngineResult physics_transform_lock_set(
@@ -1989,159 +1882,6 @@ SoftBodyTriangleResult physics_soft_body_triangle_get(Entity triangle) {
         return ERROR_RESULT_MAKE_ERROR(SoftBodyTriangleResult, ERROR_ENGINE_COMPONENT_MISSING);
     }
     return ERROR_RESULT_MAKE_VALUE(SoftBodyTriangleResult, soft_body_triangles[index]);
-}
-
-static bool physics_interaction_entity_valid(Entity entity) {
-    EntityIndex index;
-
-    return entity_index_get(entity, &index) && entity_index_alive_check(index);
-}
-
-static bool physics_interaction_entities_valid(Entity entity, Entity target) {
-    return physics_interaction_entity_valid(entity) &&
-        physics_interaction_entity_valid(target);
-}
-
-static bool physics_interaction_flag_check(
-    Entity entity,
-    Entity target,
-    PhysicsInteractionFlags flags
-) {
-    return physics_interaction_entities_valid(entity, target) &&
-        physics_interaction_current_check(entity, target, flags);
-}
-
-static OverlapInfo physics_interaction_overlap_get(
-    Entity entity,
-    Entity target,
-    PhysicsInteractionFlags flags
-) {
-    PhysicsInteraction interaction;
-
-    if(!physics_interaction_flag_check(entity, target, flags) ||
-            !physics_interaction_current_get(entity, target, &interaction)) {
-        return (OverlapInfo){.detected = false};
-    }
-    return interaction.overlap;
-}
-
-static bool physics_interaction_entered_check(
-    Entity entity,
-    Entity target,
-    PhysicsInteractionFlags flags
-) {
-    if(!physics_interaction_entities_valid(entity, target)) return false;
-    return physics_interaction_current_check(entity, target, flags) &&
-        !physics_interaction_previous_check(entity, target, flags);
-}
-
-static bool physics_interaction_stayed_check(
-    Entity entity,
-    Entity target,
-    PhysicsInteractionFlags flags
-) {
-    if(!physics_interaction_entities_valid(entity, target)) return false;
-    return physics_interaction_current_check(entity, target, flags) &&
-        physics_interaction_previous_check(entity, target, flags);
-}
-
-static bool physics_interaction_exited_check(
-    Entity entity,
-    Entity target,
-    PhysicsInteractionFlags flags
-) {
-    if(!physics_interaction_entities_valid(entity, target)) return false;
-    return !physics_interaction_current_check(entity, target, flags) &&
-        physics_interaction_previous_check(entity, target, flags);
-}
-
-bool physics_overlap_check(Entity entity, Entity target) {
-    return physics_interaction_flag_check(entity, target, PHYSICS_INTERACTION_OVERLAP);
-}
-
-OverlapInfo physics_overlap_get(Entity entity, Entity target) {
-    return physics_interaction_overlap_get(entity, target, PHYSICS_INTERACTION_OVERLAP);
-}
-
-bool physics_overlap_entered_check(Entity entity, Entity target) {
-    return physics_interaction_entered_check(entity, target, PHYSICS_INTERACTION_OVERLAP);
-}
-
-bool physics_overlap_stayed_check(Entity entity, Entity target) {
-    return physics_interaction_stayed_check(entity, target, PHYSICS_INTERACTION_OVERLAP);
-}
-
-bool physics_overlap_exited_check(Entity entity, Entity target) {
-    return physics_interaction_exited_check(entity, target, PHYSICS_INTERACTION_OVERLAP);
-}
-
-size_t physics_overlap_count_get(Entity entity) {
-    if(!physics_interaction_entity_valid(entity)) return 0;
-    return physics_interaction_current_count_get(entity, PHYSICS_INTERACTION_OVERLAP);
-}
-
-size_t physics_overlaps_get(
-    Entity entity,
-    EntityInteraction *results,
-    size_t capacity
-) {
-    if(!physics_interaction_entity_valid(entity)) return 0;
-    return physics_interaction_current_entities_get(
-        entity, PHYSICS_INTERACTION_OVERLAP, results, capacity
-    );
-}
-
-bool physics_contact_check(Entity entity, Entity target) {
-    return physics_interaction_flag_check(entity, target, PHYSICS_INTERACTION_CONTACT);
-}
-
-ContactInfo physics_contact_get(Entity entity, Entity target) {
-    PhysicsInteraction interaction;
-
-    if(!physics_interaction_flag_check(
-                entity, target, PHYSICS_INTERACTION_CONTACT) ||
-            !physics_interaction_current_get(entity, target, &interaction)) {
-        return (ContactInfo){.detected = false};
-    }
-    return interaction.contact;
-}
-
-Vec2D physics_contact_total_impulse_get(ContactInfo contact) {
-    Vec2D total = {0};
-
-    for(uint8_t i = 0; i < contact.point_count; i += 1) {
-        total.x += contact.points[i].normal_impulse.x +
-            contact.points[i].friction_impulse.x;
-        total.y += contact.points[i].normal_impulse.y +
-            contact.points[i].friction_impulse.y;
-    }
-    return total;
-}
-
-bool physics_contact_entered_check(Entity entity, Entity target) {
-    return physics_interaction_entered_check(entity, target, PHYSICS_INTERACTION_CONTACT);
-}
-
-bool physics_contact_stayed_check(Entity entity, Entity target) {
-    return physics_interaction_stayed_check(entity, target, PHYSICS_INTERACTION_CONTACT);
-}
-
-bool physics_contact_exited_check(Entity entity, Entity target) {
-    return physics_interaction_exited_check(entity, target, PHYSICS_INTERACTION_CONTACT);
-}
-
-size_t physics_contact_count_get(Entity entity) {
-    if(!physics_interaction_entity_valid(entity)) return 0;
-    return physics_interaction_current_count_get(entity, PHYSICS_INTERACTION_CONTACT);
-}
-
-size_t physics_contacts_get(
-    Entity entity,
-    EntityContact *results,
-    size_t capacity
-) {
-    if(!physics_interaction_entity_valid(entity)) return 0;
-    return physics_interaction_current_contacts_get(entity, results, capacity);
 }
 
 EngineResult physics_dt_per_tick_set(Time dt) {
