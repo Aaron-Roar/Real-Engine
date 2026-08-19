@@ -393,6 +393,7 @@ void rohr_graphics_contacts_debug_set(bool enabled) { graphics_contacts_debug_se
 bool rohr_graphics_contacts_debug_check(void) { return graphics_contacts_debug_check(); }
 void rohr_graphics_contacts_draw(void) { graphics_contacts_draw(); }
 bool rohr_graphics_recording_start(const char *output_path, int fps) { return graphics_recording_start(output_path, fps); }
+void rohr_graphics_particle_draw(Entity entity, Fill fill_type) { graphics_particle_draw(entity, fill_type); }
 void rohr_graphics_particles_draw(void) { graphics_particles_draw(); }
 void rohr_graphics_local_origins_draw(void) { graphics_local_origins_draw(); }
 

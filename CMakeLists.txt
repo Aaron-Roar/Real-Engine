@@ -427,6 +427,12 @@ if(ROHR_BUILD_TESTS)
     set_target_properties(collision_sensor_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
     add_test(NAME collision_sensor COMMAND collision_sensor_test)
 
+    add_executable(particle_collision_mode_test tests/particle_collision_mode.c)
+    target_link_libraries(particle_collision_mode_test PRIVATE rohr_engine)
+    set_target_properties(particle_collision_mode_test PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
+    add_test(NAME particle_collision_mode COMMAND particle_collision_mode_test)
+
     add_executable(entity_pair_set_test tests/entity_pair_set.c)
     target_include_directories(entity_pair_set_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(entity_pair_set_test PRIVATE rohr_engine)
@@ -552,6 +558,7 @@ if(ROHR_BUILD_TESTS)
         joints
         soft_body
         collision_sensor
+        particle_collision_mode
         entity_pair_set
         aabb_tree
         physics_interaction_set
@@ -576,6 +583,7 @@ if(ROHR_BUILD_TESTS)
         joints_test
         soft_body_test
         collision_sensor_test
+        particle_collision_mode_test
         entity_pair_set_test
         aabb_tree_test
         physics_interaction_set_test

@@ -367,10 +367,11 @@ Position system_collision_contact_point(Entity entity_1, Entity entity_2, Overla
 
     Position point_1 = {0};
     Position point_2 = {0};
-    bool entity_1_particle =
-        entity_index_components_check(entity_1, ROHR_PARTICLE);
-    bool entity_2_particle =
+    bool particle_pair =
+        entity_index_components_check(entity_1, ROHR_PARTICLE) &&
         entity_index_components_check(entity_2, ROHR_PARTICLE);
+    bool entity_1_particle = particle_pair;
+    bool entity_2_particle = particle_pair;
 
     if(entity_1_particle) {
         Vec1D r1 = math_circle_radius(shape_1, math_polygon_centroid(shape_1));
@@ -620,7 +621,7 @@ ContactInfo system_resolve_collision(
     };
     ContactManifold manifold = {0};
 
-    if(!first_particle && !second_particle) {
+    if(!(first_particle && second_particle)) {
         manifold = contact_manifold_polygon_get(
             world_hit_boxes[first], world_hit_boxes[second], overlap.normal);
     }
@@ -854,7 +855,7 @@ static void system_rigid_contact_constraint_solve(
     previous_contact_count = constraint->value.rigid.manifold_contact_count;
     for(uint8_t i = 0; i < constraint->value.rigid.manifold_contact_count; i += 1)
         previous_contacts[i] = constraint->value.rigid.manifold_contacts[i];
-    if(entity_index_components_check(first, ROHR_PARTICLE) ||
+    if(entity_index_components_check(first, ROHR_PARTICLE) &&
             entity_index_components_check(second, ROHR_PARTICLE)) {
         representative = responds
             ? system_resolve_collision(

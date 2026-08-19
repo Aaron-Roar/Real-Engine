@@ -1560,6 +1560,13 @@ void rohr_graphics_contacts_draw(void);
 bool rohr_graphics_recording_start(const char *output_path, int fps);
 
 /**
+ * @brief Draws one particle entity using its collision circle.
+ * @param entity Particle entity to draw.
+ * @param fill_type Whether to draw the circle filled or outlined.
+ */
+void rohr_graphics_particle_draw(Entity entity, Fill fill_type);
+
+/**
  * @brief Draws active particle components.
  */
 void rohr_graphics_particles_draw(void);

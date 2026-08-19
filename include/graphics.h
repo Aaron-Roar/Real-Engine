@@ -551,6 +551,8 @@ bool graphics_recording_start(
     int fps
 );
 
+/** Draw one particle entity using its collision circle. */
+void graphics_particle_draw(Entity entity, Fill fill_type);
 /** Draw all particle entities. */
 void graphics_particles_draw(void);
 
