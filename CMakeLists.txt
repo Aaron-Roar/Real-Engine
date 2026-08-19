@@ -174,16 +174,19 @@ set(ROHR_ENGINE_SOURCES
     src/math/math2d.c
     src/physics/broadphase/aabb_tree.c
     src/physics/body/body_state.c
+    src/physics/body/force_state.c
     src/physics/body/motion_state.c
     src/physics/collision/contact_constraint.c
     src/physics/collision/contact_manifold.c
     src/physics/collision/contact_query.c
+    src/physics/collision/hitbox.c
     src/physics/collision/collision_filter.c
     src/physics/collision/collision_material.c
     src/physics/collision/interaction_query.c
     src/physics/collision/interaction_set.c
     src/physics/collision/overlap_query.c
     src/physics/constraints/constraint_solver.c
+    src/physics/constraints/transform_lock.c
     src/physics/joints/joint_constraint.c
     src/physics/joints/joint_solver.c
     src/physics/particles/particle.c
