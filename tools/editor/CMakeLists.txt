@@ -13,6 +13,7 @@ add_executable(rohr_editor_gui
     src/panels/editor_origin_panel.c
     src/panels/editor_terminal_panel.c
     src/panels/editor_visual_settings_panel.c
+    src/panels/editor_error_notifications.c
     src/main.c
 )
 

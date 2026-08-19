@@ -17,6 +17,7 @@
 #include "panels/editor_notification_panel.h"
 #include "panels/editor_terminal_panel.h"
 #include "panels/editor_visual_settings_panel.h"
+#include "panels/editor_error_notifications.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -5840,10 +5841,16 @@ int main(void) {
                     .type = EDITOR_WORKSPACE_COMMAND_SAVE};
                 snprintf(command.directory, sizeof(command.directory), "%s",
                     workspace.directory);
-                if(workspace.open && !editor_result_check(
-                        editor_workspace_operation_execute(&workspace, &project,
-                            &command))) {
-                    saved_project_hash = editor_project_hash_get(&project);
+                if(workspace.open) {
+                    EditorResult result = editor_workspace_operation_execute(
+                        &workspace, &project, &command);
+                    if(editor_result_check(result)) {
+                        editor_result_stderr_print(result);
+                        editor_error_notification_failure(&notification_panel,
+                            "Save project", result);
+                    } else {
+                        saved_project_hash = editor_project_hash_get(&project);
+                    }
                 }
             } else if(file_menu.changed && file_menu.selected_index == 3) {
                 if(editor_project_hash_get(&project) == saved_project_hash) {
@@ -5947,7 +5954,11 @@ int main(void) {
                         editor_visual_settings_panel_grid_visible_set(
                             &visual_settings_panel,
                             !visual_settings_panel.state.grid_visible);
-                    if(editor_result_check(result)) editor_result_stderr_print(result);
+                    if(editor_result_check(result)) {
+                        editor_result_stderr_print(result);
+                        editor_error_notification_failure(&notification_panel,
+                            "Visual settings", result);
+                    }
                 } else if(view_menu.changed && view_menu.selected_index == 2)
                     editor_terminal_panel_visible_toggle(&terminal_panel);
             }
@@ -5973,7 +5984,11 @@ int main(void) {
                     workspace.open) {
                 EditorResult result = editor_build_settings_panel_open(
                     &build_settings_panel, workspace.directory);
-                if(editor_result_check(result)) editor_result_stderr_print(result);
+                if(editor_result_check(result)) {
+                    editor_result_stderr_print(result);
+                    editor_error_notification_failure(&notification_panel,
+                        "Build settings", result);
+                }
             } else if(settings_menu.changed && settings_menu.selected_index == 1) {
                 editor_visual_settings_panel_open(&visual_settings_panel);
             }
@@ -6025,10 +6040,12 @@ int main(void) {
                         120.0f, 36.0f}, NULL).clicked) {
                 EditorWorkspaceCommand command = {
                     .type = EDITOR_WORKSPACE_COMMAND_SAVE};
+                EditorResult result;
                 snprintf(command.directory, sizeof(command.directory), "%s",
                     workspace.directory);
-                if(!editor_result_check(editor_workspace_operation_execute(
-                        &workspace, &project, &command))) {
+                result = editor_workspace_operation_execute(
+                    &workspace, &project, &command);
+                if(!editor_result_check(result)) {
                     if(close_action == EDITOR_CLOSE_PROGRAM) {
                         running = false;
                     } else {
@@ -6041,6 +6058,10 @@ int main(void) {
                         panel_scroll_offset = 0.0f;
                     }
                     close_action = EDITOR_CLOSE_NONE;
+                } else {
+                    editor_result_stderr_print(result);
+                    editor_error_notification_failure(&notification_panel,
+                        "Save project", result);
                 }
             }
             if(rohr_ui_button("editor.close.dont_save", &dont_save_label,
@@ -6247,6 +6268,15 @@ int main(void) {
                     }
                 } else {
                     editor_result_stderr_print(load_result);
+                    editor_error_notification_failure(&notification_panel,
+                        workspace_browser_action == EDITOR_WORKSPACE_BROWSER_NEW ?
+                            "Create project" :
+                        workspace_browser_action ==
+                                EDITOR_WORKSPACE_BROWSER_ADD_ANIMATION_FRAME ?
+                            "Load frame" :
+                        workspace_browser_action == EDITOR_WORKSPACE_BROWSER_ADD_SPRITE ?
+                            "Load sprite" : "Load project",
+                        load_result);
                     file_browser.active = true;
                 }
                 if(opened) workspace_browser_action = EDITOR_WORKSPACE_BROWSER_NONE;
