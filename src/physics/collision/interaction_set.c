@@ -1,7 +1,47 @@
 #include "interaction_set.h"
 
+#include <float.h>
 #include <stdint.h>
 #include <stdlib.h>
+
+static void physics_contact_tick_merge(
+    ContactInfo *stored,
+    const ContactInfo *added
+) {
+    if(stored == NULL || added == NULL || !added->detected) return;
+    if(!stored->detected) {
+        *stored = *added;
+        return;
+    }
+    for(uint8_t added_index = 0; added_index < added->point_count; added_index += 1) {
+        uint8_t nearest = 0;
+        float nearest_distance = FLT_MAX;
+        for(uint8_t stored_index = 0; stored_index < stored->point_count;
+                stored_index += 1) {
+            Vec2D delta = math_vector_subtract(
+                added->points[added_index].position,
+                stored->points[stored_index].position);
+            float distance = math_dot_product(delta, delta);
+            if(distance < nearest_distance) {
+                nearest = stored_index;
+                nearest_distance = distance;
+            }
+        }
+        if(stored->point_count == 0) continue;
+        stored->points[nearest].normal_impulse.x +=
+            added->points[added_index].normal_impulse.x;
+        stored->points[nearest].normal_impulse.y +=
+            added->points[added_index].normal_impulse.y;
+        stored->points[nearest].friction_impulse.x +=
+            added->points[added_index].friction_impulse.x;
+        stored->points[nearest].friction_impulse.y +=
+            added->points[added_index].friction_impulse.y;
+    }
+    if(added->depth > stored->depth) {
+        stored->normal = added->normal;
+        stored->depth = added->depth;
+    }
+}
 #include <string.h>
 
 #define PHYSICS_INTERACTION_SET_MIN_CAPACITY 8
@@ -174,9 +214,11 @@ EngineResult physics_interaction_set_record(
     );
     if(found) {
         set->entries[slot].flags |= flags;
-        set->entries[slot].overlap = overlap;
+        if(!set->entries[slot].overlap.detected ||
+                overlap.depth > set->entries[slot].overlap.depth)
+            set->entries[slot].overlap = overlap;
         if((flags & PHYSICS_INTERACTION_CONTACT) != 0) {
-            set->entries[slot].contact = contact;
+            physics_contact_tick_merge(&set->entries[slot].contact, &contact);
         }
         return error_result_value(false);
     }

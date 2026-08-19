@@ -6,6 +6,9 @@
 #include <float.h>
 #include <math.h>
 
+#define RIGID_CONTACT_PENETRATION_SLOP 0.01f
+#define RIGID_CONTACT_POSITION_CORRECTION_MAX 5.0f
+
 static double physics_rigid_elapsed_ms(uint64_t start) {
     return (double)(SDL_GetPerformanceCounter() - start) * 1000.0 /
         (double)SDL_GetPerformanceFrequency();
@@ -256,9 +259,15 @@ void system_separate_entities_tuned(
         return;
     }
 
-    Vec2D correction = {
-        .x = collision.normal.x * collision.depth,
-        .y = collision.normal.y * collision.depth
+    float correction_depth = fminf(
+        fmaxf(collision.depth - RIGID_CONTACT_PENETRATION_SLOP, 0.0f),
+        RIGID_CONTACT_POSITION_CORRECTION_MAX);
+    Vec2D correction;
+
+    if(correction_depth <= 0.0f) return;
+    correction = (Vec2D){
+        .x = collision.normal.x * correction_depth,
+        .y = collision.normal.y * correction_depth
     };
 
     float share_1 = inv_mass_1 / inv_mass_sum;
@@ -414,7 +423,8 @@ Vec2D system_friction_impulse_apply(
     float inv_mass_1,
     float inv_mass_2,
     float inv_inertia_1,
-    float inv_inertia_2
+    float inv_inertia_2,
+    Vec2D previous_impulse
 ) {
     bool moving_1 = physics_entity_movable_get(entity_1);
     bool moving_2 = physics_entity_movable_get(entity_2);
@@ -449,8 +459,8 @@ Vec2D system_friction_impulse_apply(
 
     float tangent_mag = sqrtf(tangent.x * tangent.x + tangent.y * tangent.y);
 
-    if(tangent_mag <= 0) {
-        return (Vec2D){0};
+    if(tangent_mag <= 0.000001f) {
+        return previous_impulse;
     }
 
     tangent.x /= tangent_mag;
@@ -469,33 +479,33 @@ Vec2D system_friction_impulse_apply(
         return (Vec2D){0};
     }
 
-    float jt = -math_dot_product(rel_v, tangent) / denominator;
+    float impulse_delta = -math_dot_product(rel_v, tangent) / denominator;
+    float previous_magnitude = math_dot_product(previous_impulse, tangent);
 
     float mu = sqrtf(frictions[entity_1] * frictions[entity_2]);
 
     float max_friction = fabsf(normal_impulse_magnitude) * mu;
 
-    if(jt > max_friction) {
-        jt = max_friction;
-    }
-    else if(jt < -max_friction) {
-        jt = -max_friction;
-    }
+    float impulse_magnitude = fmaxf(-max_friction,
+        fminf(previous_magnitude + impulse_delta, max_friction));
+    impulse_delta = impulse_magnitude - previous_magnitude;
 
     Vec2D friction_impulse = {
-        .x = tangent.x * jt,
-        .y = tangent.y * jt
+        .x = tangent.x * impulse_delta,
+        .y = tangent.y * impulse_delta
     };
 
     velocities[entity_1].x -= friction_impulse.x * inv_mass_1;
     velocities[entity_1].y -= friction_impulse.y * inv_mass_1;
-
     velocities[entity_2].x += friction_impulse.x * inv_mass_2;
     velocities[entity_2].y += friction_impulse.y * inv_mass_2;
 
     angular_velocities[entity_1] -= math_cross_2d(r1, friction_impulse) * inv_inertia_1;
     angular_velocities[entity_2] += math_cross_2d(r2, friction_impulse) * inv_inertia_2;
-    return friction_impulse;
+    return (Vec2D){
+        tangent.x * impulse_magnitude,
+        tangent.y * impulse_magnitude
+    };
 }
 
 static void system_contact_point_solve(
@@ -508,6 +518,7 @@ static void system_contact_point_solve(
     float inverse_mass_second,
     float inverse_inertia_first,
     float inverse_inertia_second,
+    const ContactPointInfo *previous,
     Velocity *relative_velocity,
     Vec2D *normal_impulse,
     Vec2D *friction_impulse
@@ -540,11 +551,15 @@ static void system_contact_point_solve(
     float second_lever;
     float denominator;
     float impulse_magnitude;
+    float previous_impulse_magnitude;
+    float accumulated_impulse_magnitude;
     Vec2D impulse;
 
     if(relative_velocity != NULL) *relative_velocity = current_relative_velocity;
-    if(normal_velocity > 0.0f) return;
-    restitution = restitution_enabled
+    previous_impulse_magnitude = previous == NULL ? 0.0f :
+        math_dot_product(previous->normal_impulse, overlap.normal);
+    restitution = restitution_enabled && previous_impulse_magnitude <= 0.0f &&
+            normal_velocity < 0.0f
         ? fminf(restitutions[first], restitutions[second]) : 0.0f;
     if(fabsf(normal_velocity) < 1.0f) restitution = 0.0f;
     first_lever = math_cross_2d(first_offset, overlap.normal);
@@ -554,6 +569,9 @@ static void system_contact_point_solve(
         second_lever * second_lever * inverse_inertia_second;
     if(denominator <= 0.0f) return;
     impulse_magnitude = -(1.0f + restitution) * normal_velocity / denominator;
+    accumulated_impulse_magnitude = fmaxf(
+        previous_impulse_magnitude + impulse_magnitude, 0.0f);
+    impulse_magnitude = accumulated_impulse_magnitude - previous_impulse_magnitude;
     impulse = (Vec2D){
         overlap.normal.x * impulse_magnitude,
         overlap.normal.y * impulse_magnitude
@@ -566,12 +584,17 @@ static void system_contact_point_solve(
         inverse_inertia_first;
     angular_velocities[second] += math_cross_2d(second_offset, impulse) *
         inverse_inertia_second;
-    if(normal_impulse != NULL) *normal_impulse = impulse;
+    if(normal_impulse != NULL) *normal_impulse = (Vec2D){
+        overlap.normal.x * accumulated_impulse_magnitude,
+        overlap.normal.y * accumulated_impulse_magnitude
+    };
     if(friction_impulse != NULL) {
         *friction_impulse = system_friction_impulse_apply(
             first, second, overlap, first_offset, second_offset,
-            impulse_magnitude, inverse_mass_first, inverse_mass_second,
-            inverse_inertia_first, inverse_inertia_second);
+            accumulated_impulse_magnitude,
+            inverse_mass_first, inverse_mass_second,
+            inverse_inertia_first, inverse_inertia_second,
+            previous == NULL ? (Vec2D){0} : previous->friction_impulse);
     }
 }
 
@@ -579,7 +602,8 @@ ContactInfo system_resolve_collision(
     Entity first,
     Entity second,
     OverlapInfo overlap,
-    bool restitution_enabled
+    bool restitution_enabled,
+    const ContactInfo *previous_contact
 ) {
     bool first_particle = entity_index_components_check(first, ROHR_PARTICLE);
     bool second_particle = entity_index_components_check(second, ROHR_PARTICLE);
@@ -606,6 +630,7 @@ ContactInfo system_resolve_collision(
     }
     result.point_count = manifold.count;
     for(uint8_t i = 0; i < manifold.count; i += 1) {
+        result.points[i].feature_id = manifold.feature_ids[i];
         result.points[i].position = manifold.points[i];
     }
     if(inverse_mass_first + inverse_mass_second <= 0.0f) return result;
@@ -618,10 +643,23 @@ ContactInfo system_resolve_collision(
         if(inertia > 0.0f) inverse_inertia_second = 1.0f / inertia;
     }
     for(uint8_t i = 0; i < result.point_count; i += 1) {
+        const ContactPointInfo *previous_point = NULL;
+        if(previous_contact != NULL) {
+            for(uint8_t previous = 0; previous < previous_contact->point_count;
+                    previous += 1) {
+                if(result.points[i].feature_id != 0 &&
+                        result.points[i].feature_id ==
+                            previous_contact->points[previous].feature_id) {
+                    previous_point = &previous_contact->points[previous];
+                    break;
+                }
+            }
+        }
         system_contact_point_solve(
             first, second, overlap, result.points[i].position, restitution_enabled,
             inverse_mass_first, inverse_mass_second,
             inverse_inertia_first, inverse_inertia_second,
+            previous_point,
             &result.points[i].relative_velocity,
             &result.points[i].normal_impulse,
             &result.points[i].friction_impulse);
@@ -690,6 +728,13 @@ void physics_rigid_contact_point_impulses_accumulate(
             float distance;
 
             if(matched[current_index]) continue;
+            if(previous->points[previous_index].feature_id != 0 &&
+                    previous->points[previous_index].feature_id ==
+                        current->points[current_index].feature_id) {
+                nearest = current_index;
+                nearest_distance = 0.0f;
+                break;
+            }
             delta = math_vector_subtract(
                 current->points[current_index].position,
                 previous->points[previous_index].position);
@@ -734,13 +779,10 @@ static void system_rigid_contact_constraint_solve(
     first_solve = !constraint->value.rigid.solved;
     previous_contact = constraint->value.rigid.contact;
     result = responds
-        ? system_resolve_collision(first, second, overlap,
-            first_solve)
+        ? system_resolve_collision(
+            first, second, overlap, first_solve, &previous_contact)
         : (ContactInfo){0};
     constraint->value.rigid.contact = result;
-    physics_rigid_contact_point_impulses_accumulate(
-        &constraint->value.rigid.contact,
-        &previous_contact);
     constraint->value.rigid.solved = true;
     if(responds) {
         if(physics_step_debug_stats_enabled && first_solve) {
@@ -829,7 +871,7 @@ void system_collisions_apply(void) {
             if(collision.detected == true) {
                 bool responds = entity_index_components_check(i, ROHR_COLLISION) && entity_index_components_check(j, ROHR_COLLISION);
                 ContactInfo contact = responds
-                    ? system_resolve_collision(i, j, collision, true)
+                    ? system_resolve_collision(i, j, collision, true, NULL)
                     : (ContactInfo){0};
                 physics_step_interaction_by_index_record(
                     i,

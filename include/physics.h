@@ -112,6 +112,8 @@ typedef Vec2D Velocity;
 #define PHYSICS_CONTACT_POINT_MAX 2
 /** Solver information for one world-space point in a contact manifold. */
 typedef struct ContactPointInfo {
+    /** Stable engine feature identifier used to retain solver impulses. */
+    uint32_t feature_id;
     /** World-space contact position. */
     Position position;
     /** Pre-resolution velocity of the second entity relative to the first. */

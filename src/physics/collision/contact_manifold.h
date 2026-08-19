@@ -7,6 +7,7 @@
 
 typedef struct ContactManifold {
     Vec2D points[CONTACT_MANIFOLD_POINT_MAX];
+    uint32_t feature_ids[CONTACT_MANIFOLD_POINT_MAX];
     uint8_t count;
 } ContactManifold;
 

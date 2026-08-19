@@ -163,6 +163,8 @@ ContactManifold contact_manifold_polygon_get(
     ContactManifold merged = {0};
     Position minimum_point = {0};
     Position maximum_point = {0};
+    uint32_t minimum_feature = 0;
+    uint32_t maximum_feature = 0;
     Axis tangent = {-normal.y, normal.x};
     float minimum_projection = FLT_MAX;
     float maximum_projection = -FLT_MAX;
@@ -189,20 +191,27 @@ ContactManifold contact_manifold_polygon_get(
                 first_piece, second_piece, normal);
             for(uint8_t point = 0; point < candidate.count; point += 1) {
                 float projection = math_dot_product(candidate.points[point], tangent);
+                uint32_t feature = ((uint32_t)first_index << 16) |
+                    ((uint32_t)second_index << 8) | (uint32_t)(point + 1);
                 if(projection < minimum_projection) {
                     minimum_projection = projection;
                     minimum_point = candidate.points[point];
+                    minimum_feature = feature;
                 }
                 if(projection > maximum_projection) {
                     maximum_projection = projection;
                     maximum_point = candidate.points[point];
+                    maximum_feature = feature;
                 }
             }
         }
     }
     if(minimum_projection == FLT_MAX) return merged;
     merged.points[merged.count++] = minimum_point;
-    if(maximum_projection - minimum_projection > 0.0001f)
+    merged.feature_ids[0] = minimum_feature;
+    if(maximum_projection - minimum_projection > 0.0001f) {
         merged.points[merged.count++] = maximum_point;
+        merged.feature_ids[1] = maximum_feature;
+    }
     return merged;
 }

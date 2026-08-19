@@ -465,6 +465,15 @@ if(ROHR_BUILD_TESTS)
         RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
     add_test(NAME concave_collision COMMAND concave_collision_test)
 
+    add_executable(rigid_contact_stability_test
+        tests/rigid_contact_stability.c)
+    target_include_directories(rigid_contact_stability_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(rigid_contact_stability_test PRIVATE rohr_engine)
+    set_target_properties(rigid_contact_stability_test PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
+    add_test(NAME rigid_contact_stability COMMAND rigid_contact_stability_test)
+
     add_executable(component_registry_test
         tests/component_registry.c
     )
@@ -548,6 +557,7 @@ if(ROHR_BUILD_TESTS)
         physics_interaction_set
         constraint_solver
         contact_manifold
+        rigid_contact_stability
         component_registry
         generated_components
         PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy"
@@ -572,6 +582,7 @@ if(ROHR_BUILD_TESTS)
         constraint_solver_test
         contact_manifold_test
         concave_collision_test
+        rigid_contact_stability_test
         component_registry_test
         generated_components_test
     )

@@ -106,8 +106,11 @@ semantics are stable.
   boundaries through the existing contact pipeline.
 - Profile concave contacts, then cache the selected convex-piece pair between
   overlap detection and manifold generation if it materially reduces work.
-- Profile persistent concave stacks and add per-piece-pair manifold warm
-  starting only if the merged two-point manifold remains a measurable cost.
+- Profile persistent concave stacks and replace piece/point feature identifiers
+  with original boundary-edge identifiers if topology changes still disturb
+  warm-start matching.
+- Add rigid-body sleeping only after wake propagation and world-scale-aware
+  thresholds are validated without changing ordinary falling or friction.
 - Add compound contours and holes only after their ownership and authoring
   representation are explicit.
 - Profile before adding a sparse broad-phase interaction candidate index.
