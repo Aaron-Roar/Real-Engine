@@ -50,6 +50,20 @@ static bool editor_json_real(yyjson_val *object, const char *key, float *value) 
     return true;
 }
 
+static bool editor_json_optional_real(yyjson_val *object, const char *key,
+        float *value, float fallback) {
+    yyjson_val *item;
+    if(object == NULL || key == NULL || value == NULL) return false;
+    item = yyjson_obj_get(object, key);
+    if(item == NULL) {
+        *value = fallback;
+        return true;
+    }
+    if(!yyjson_is_num(item)) return false;
+    *value = (float)yyjson_get_num(item);
+    return true;
+}
+
 static bool editor_json_bool(yyjson_val *object, const char *key, bool *value) {
     yyjson_val *item = yyjson_obj_get(object, key);
     if(!yyjson_is_bool(item) || value == NULL) return false;
@@ -736,7 +750,8 @@ static bool editor_json_animated_sprite_read(yyjson_val *value,
             !editor_json_uint(value, "rigid_body", &sprite->rigid_body) ||
             !editor_json_position_read(yyjson_obj_get(value, "editor_position"),
                 &sprite->editor_position) ||
-            !editor_json_real(value, "editor_rotation", &sprite->editor_rotation) ||
+            !editor_json_optional_real(value, "editor_rotation",
+                &sprite->editor_rotation, 0.0f) ||
             !editor_json_uint64(value, "ticks_per_frame", &ticks) ||
             !editor_json_uint(value, "starting_frame", &sprite->starting_frame) ||
             !editor_json_real(value, "scale_x", &sprite->scale.x) ||
@@ -1054,7 +1069,8 @@ EditorResult editor_project_load(EditorProject *project, const char *path) {
                     yyjson_get_len(path_value) >= EDITOR_ASSET_PATH_MAX ||
                     !editor_json_position_read(yyjson_obj_get(sprite_value, "position"),
                         &sprite->position) ||
-                    !editor_json_real(sprite_value, "rotation", &sprite->rotation) ||
+                    !editor_json_optional_real(sprite_value, "rotation",
+                        &sprite->rotation, 0.0f) ||
                     !editor_json_uint(sprite_value, "rigid_body", &sprite->rigid_body) ||
                     !editor_json_real(sprite_value, "width", &sprite->size.x) ||
                     !editor_json_real(sprite_value, "height", &sprite->size.y) ||

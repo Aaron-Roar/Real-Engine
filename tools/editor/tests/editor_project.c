@@ -57,6 +57,34 @@ static bool file_replace(const char *path, const char *text) {
     return fclose(file) == 0 && written;
 }
 
+static bool file_property_line_remove_after(const char *path,
+        const char *section, const char *property) {
+    char *contents;
+    char *at;
+    char *line_begin;
+    char *line_end;
+    bool success;
+
+    if(path == NULL || section == NULL || property == NULL) return false;
+    contents = SDL_LoadFile(path, NULL);
+    if(contents == NULL) return false;
+    at = strstr(contents, section);
+    if(at != NULL) at = strstr(at, property);
+    if(at == NULL) {
+        SDL_free(contents);
+        return false;
+    }
+    line_begin = at;
+    while(line_begin > contents && line_begin[-1] != '\n') line_begin -= 1;
+    line_end = strchr(at, '\n');
+    if(line_end == NULL) line_end = contents + strlen(contents);
+    else line_end += 1;
+    memmove(line_begin, line_end, strlen(line_end) + 1);
+    success = file_replace(path, contents);
+    SDL_free(contents);
+    return success;
+}
+
 int main(void) {
     static EditorProject project;
     EditorObject *object;
@@ -917,6 +945,24 @@ int main(void) {
                 reloaded_project.objects[0].animated_sprite_count != 2 ||
                 reloaded_project.objects[0].animated_sprite_items[0].rigid_body == 0 ||
                 reloaded_project.objects[0].animated_sprite_items[1].rigid_body != 0) {
+            workspace_fixture_remove(fixture);
+            return 1;
+        }
+        editor_project_destroy(&reloaded_project);
+        snprintf(path, sizeof(path), "%s/objects/project.rohr.json", fixture);
+        if(!file_property_line_remove_after(path, "\"sprites\"", "\"rotation\"") ||
+                !file_property_line_remove_after(path, "\"animated_sprites\"",
+                    "\"editor_rotation\"")) {
+            workspace_fixture_remove(fixture);
+            return 1;
+        }
+        result = editor_workspace_load(&reloaded_workspace, &reloaded_project, fixture);
+        if(editor_result_check(result) || reloaded_project.object_count != 1 ||
+                reloaded_project.objects[0].sprite_count != 1 ||
+                reloaded_project.objects[0].sprites[0].rotation != 0.0f ||
+                reloaded_project.objects[0].animated_sprite_count != 2 ||
+                reloaded_project.objects[0].animated_sprite_items[0].editor_rotation !=
+                    0.0f) {
             workspace_fixture_remove(fixture);
             return 1;
         }
