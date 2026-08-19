@@ -93,7 +93,7 @@ int main(void) {
     if(!result_ok(rohr_engine_time_per_tick_set(1.0 / 120.0)) ||
             !result_ok(rohr_graphics_start())) goto fail;
     if(!result_ok(rohr_ui_physics_debug_panel_init(&debug_panel,
-            (FontDescriptor){"assets/debug/JetBrainsMono-BoldItalic.ttf", 11.0f}))) goto fail;
+            (FontDescriptor){"assets/debug/jetbrains_mono_bold_italic.ttf", 11.0f}))) goto fail;
     if(!room_create(walls)) goto fail;
 
     bodies[0] = body_create((Position){-220.0f, 110.0f}, (Vec2D){70.0f, 22.0f}, 3.0f, pin_category, true);

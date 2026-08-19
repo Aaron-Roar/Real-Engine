@@ -1,6 +1,9 @@
 #if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
 #define _POSIX_C_SOURCE 200809L
 #endif
+#if !defined(_WIN32) && !defined(_XOPEN_SOURCE)
+#define _XOPEN_SOURCE 700
+#endif
 
 #include "rohr.h"
 #include "editor_project.h"
@@ -2161,7 +2164,7 @@ int main(void) {
     }
     {
         FontAssetResult result = rohr_graphics_font_load((FontDescriptor){
-            .file = "assets/JetBrainsMono-BoldItalic.ttf",
+            .file = "assets/jetbrains_mono_bold_italic.ttf",
             .point_size = 12.0f
         });
 
@@ -2174,7 +2177,7 @@ int main(void) {
     }
     {
         FontAssetResult result = rohr_graphics_font_load((FontDescriptor){
-            .file = "assets/JetBrainsMono-BoldItalic.ttf",
+            .file = "assets/jetbrains_mono_bold_italic.ttf",
             .point_size = 9.0f
         });
 

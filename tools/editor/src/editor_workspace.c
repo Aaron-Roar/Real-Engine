@@ -1253,7 +1253,7 @@ static bool editor_workspace_config_template_copy(const EditorWorkspace *workspa
     void *contents;
     FILE *file;
     EditorResult result = editor_config_sdk_path_get(source, sizeof(source),
-        "project-editor.lua", true);
+        "project_editor.lua", true);
     if(editor_result_check(result) || !editor_workspace_path_join(destination,
             sizeof(destination), workspace->directory, "editor.lua")) return false;
     contents = SDL_LoadFile(source, &size);

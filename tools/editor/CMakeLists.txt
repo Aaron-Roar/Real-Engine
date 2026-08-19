@@ -31,8 +31,8 @@ add_custom_command(TARGET rohr_editor_gui POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
         $<TARGET_FILE_DIR:rohr_editor_gui>/assets
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets/JetBrainsMono-BoldItalic.ttf
-        $<TARGET_FILE_DIR:rohr_editor_gui>/assets/JetBrainsMono-BoldItalic.ttf
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/jetbrains_mono_bold_italic.ttf
+        $<TARGET_FILE_DIR:rohr_editor_gui>/assets/jetbrains_mono_bold_italic.ttf
     VERBATIM
 )
 install(TARGETS rohr_editor_gui RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

@@ -1,4 +1,4 @@
-include(${CMAKE_CURRENT_LIST_DIR}/cmake/RohrExample.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/cmake/rohr_example.cmake)
 
 add_subdirectory(view-port ${CMAKE_BINARY_DIR}/example-build/view-port)
 add_subdirectory(flies-in-pit ${CMAKE_BINARY_DIR}/example-build/flies-in-pit)

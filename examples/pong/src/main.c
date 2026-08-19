@@ -265,7 +265,7 @@ int main(void) {
     }
     {
         EngineResult debug_result = rohr_ui_physics_debug_panel_init(&debug_panel,
-            (FontDescriptor){"assets/debug/JetBrainsMono-BoldItalic.ttf", 11.0f});
+            (FontDescriptor){"assets/debug/jetbrains_mono_bold_italic.ttf", 11.0f});
         if(rohr_error_check(debug_result)) {
             PRINT_ENGINE_ERROR(debug_result);
             goto fail;

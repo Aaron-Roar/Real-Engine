@@ -412,7 +412,7 @@ int main(void) {
             !result_ok(rohr_physics_substeps_set(4)) ||
             !result_ok(rohr_graphics_start())) goto fail;
     if(!result_ok(rohr_ui_physics_debug_panel_init(&debug_panel,
-            (FontDescriptor){"assets/debug/JetBrainsMono-BoldItalic.ttf", 11.0f}))) goto fail;
+            (FontDescriptor){"assets/debug/jetbrains_mono_bold_italic.ttf", 11.0f}))) goto fail;
     if(!rohr_controller_axis_add(&controller, "torque", (ControllerAxisBinding){
                 .positive_x = SDLK_D,
                 .negative_x = SDLK_A,

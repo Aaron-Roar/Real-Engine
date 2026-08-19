@@ -23,7 +23,7 @@ int main(int count, char **program_arguments) {
     char lua_error[EDITOR_ERROR_MESSAGE_MAX];
 
     editor_config_init(&config);
-    if(!path_get(path, sizeof(path), "config-base.lua")) return 1;
+    if(!path_get(path, sizeof(path), "config_base.lua")) return 1;
     result = editor_config_file_merge(&config, path, true);
     if(editor_result_check(result) || !config.font_set ||
             strcmp(config.font, "/fonts/base.ttf") != 0 ||
@@ -42,7 +42,7 @@ int main(int count, char **program_arguments) {
     if(command == NULL || strcmp(command->arguments[0], "cli-compile") != 0)
         return 1;
 
-    if(!path_get(path, sizeof(path), "config-project.lua")) return 1;
+    if(!path_get(path, sizeof(path), "config_project.lua")) return 1;
     result = editor_config_file_merge(&config, path, true);
     if(editor_result_check(result)) return 1;
     command = editor_config_command_get(&config, EDITOR_CONFIG_FRONTEND_CLI,
@@ -58,7 +58,7 @@ int main(int count, char **program_arguments) {
     if(editor_result_check(result) || strcmp(output[0], "project-cli-compile") != 0 ||
             strcmp(output[1], "/game path/build") != 0 || output[2] != NULL) return 1;
 
-    if(!path_get(path, sizeof(path), "config-malformed.lua")) return 1;
+    if(!path_get(path, sizeof(path), "config_malformed.lua")) return 1;
     result = editor_config_file_merge(&config, path, true);
     if(!editor_result_check(result) ||
             strstr(result.result.error.message, "array of strings") == NULL) return 1;

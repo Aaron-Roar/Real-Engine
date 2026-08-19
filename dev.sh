@@ -109,7 +109,7 @@ sdk_windows_cross() {
         exit 1
     fi
     sdk_build windows \
-        -DCMAKE_TOOLCHAIN_FILE="$project_root/cmake/toolchains/mingw-w64.cmake" \
+        -DCMAKE_TOOLCHAIN_FILE="$project_root/cmake/toolchains/mingw_w64.cmake" \
         -DROHR_HOST_C_COMPILER="$(command -v cc)"
 }
 

@@ -24,4 +24,4 @@ RUN dnf install -y \
         wayland-protocols-devel \
     && dnf clean all
 
-ENTRYPOINT ["/bin/sh", "/workspace/packaging/linux/build-sdk.sh"]
+ENTRYPOINT ["/bin/sh", "/workspace/packaging/linux/build_sdk.sh"]

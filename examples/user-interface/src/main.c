@@ -46,7 +46,7 @@ int main(void) {
         }
     }
     if(rohr_error_check(rohr_ui_physics_debug_panel_init(&debug_panel,
-            (FontDescriptor){"assets/debug/JetBrainsMono-BoldItalic.ttf", 11.0f}))) goto fail;
+            (FontDescriptor){"assets/debug/jetbrains_mono_bold_italic.ttf", 11.0f}))) goto fail;
     {
         EngineResult state_result = rohr_game_state_file_load(
             "assets/user-interface/game.json"

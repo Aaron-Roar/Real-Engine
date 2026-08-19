@@ -53,7 +53,7 @@
       },
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/mingw-w64.cmake",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/mingw_w64.cmake",
         "ROHR_BUILD_OUTPUT_DIRECTORY": "${sourceDir}/build/windows-cross",
         "ROHR_BUILD_EXAMPLES": "ON",
         "ROHR_BUILD_TESTS": "ON"

@@ -154,7 +154,7 @@ not require an engine source path.
 Each SDK command also configures and links a separate consumer project against
 the installed package. The test runs as `installed_sdk_consumer_linux` or
 `installed_sdk_consumer_windows`, matching the target platform.
-New projects copy the SDK's portable `project-editor.lua` template to a
+New projects copy the SDK's portable `project_editor.lua` template to a
 top-level `editor.lua`. See [Editor documentation](docs/editor.md#lua-configuration)
 for CLI configuration precedence and command placeholders.
 

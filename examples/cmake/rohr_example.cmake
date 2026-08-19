@@ -30,8 +30,8 @@ function(rohr_stage_example_assets target project_dir)
     add_custom_command(TARGET ${target} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory ${runtime_dir}/assets/debug
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${ROHR_EXAMPLES_SOURCE_DIR}/user-interface/assets/JetBrainsMono-BoldItalic.ttf
-            ${runtime_dir}/assets/debug/JetBrainsMono-BoldItalic.ttf
+            ${ROHR_EXAMPLES_SOURCE_DIR}/user-interface/assets/jetbrains_mono_bold_italic.ttf
+            ${runtime_dir}/assets/debug/jetbrains_mono_bold_italic.ttf
         VERBATIM
     )
     if(EXISTS ${ROHR_EXAMPLES_SOURCE_DIR}/${project_dir}/assets)

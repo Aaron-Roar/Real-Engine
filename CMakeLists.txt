@@ -259,7 +259,7 @@ install(FILES
     config/editor.lua
     DESTINATION ${CMAKE_INSTALL_DATADIR}/rohr)
 install(FILES
-    config/project-editor.lua
+    config/project_editor.lua
     DESTINATION ${CMAKE_INSTALL_DATADIR}/rohr)
 install(FILES
     examples/flies-around-ball/assets/elder-fly/flying/f1.png
@@ -276,7 +276,7 @@ install(FILES lib/lua/LICENSE
     DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/rohr
     RENAME Lua-LICENSE)
 
-include(cmake/RohrHostTools.cmake)
+include(cmake/rohr_host_tools.cmake)
 
 if(ROHR_BUILD_TESTS OR ROHR_BUILD_SDK_CONSUMER_TESTS)
     include(CTest)
