@@ -18,6 +18,7 @@ static SDL_Window *sdl_window = NULL;
 static TTF_TextEngine *ttf_text_engine = NULL;
 static bool ttf_initialized = false;
 static bool graphics_aabb_tree_debug_enabled = false;
+static bool graphics_contacts_debug_enabled = false;
 static Camera camera = {0};
 static bool graphics_vsync_enabled = true;
 static int graphics_frame_limit = 0;
@@ -375,6 +376,7 @@ EngineResult graphics_tables_init(void) {
     drawing_screen = SCREEN_INVALID;
     camera_before_screen = CAMERA_INVALID;
     graphics_aabb_tree_debug_enabled = false;
+    graphics_contacts_debug_enabled = false;
     if(AnimatedSpritePool_init(&animated_sprites_pool, 0).kind == ERROR_RESULT_ERROR) {
         graphics_tables_destroy();
         return error_result_error(ERROR_ENGINE_GRAPHICS_TABLES_INIT_FAILED);
@@ -666,6 +668,86 @@ void graphics_aabb_tree_draw(void) {
             255
         });
     }
+}
+
+static bool graphics_contact_debug_draw(
+    const PhysicsInteraction *interaction,
+    void *context
+) {
+    const Color point_color = {255, 215, 45, 255};
+    const Color normal_color = {60, 220, 255, 255};
+    const float point_radius = 4.0f;
+    const float normal_length = 28.0f;
+    const float arrow_length = 7.0f;
+    const float arrow_width = 4.0f;
+    Axis normal;
+
+    (void)context;
+    if(interaction == NULL || !interaction->contact.detected) return true;
+    normal = interaction->contact.normal;
+    for(uint8_t index = 0; index < interaction->contact.point_count; index += 1) {
+        Position point = graphics_world_to_screen_get(
+            interaction->contact.points[index].position);
+        Position normal_sample = graphics_world_to_screen_get((Position){
+            interaction->contact.points[index].position.x + normal.x,
+            interaction->contact.points[index].position.y + normal.y
+        });
+        Vec2D direction = {
+            normal_sample.x - point.x,
+            normal_sample.y - point.y
+        };
+        float magnitude = math_vector_magnitude(direction);
+        SDL_FPoint horizontal[2] = {
+            {point.x - point_radius, point.y},
+            {point.x + point_radius, point.y}
+        };
+        SDL_FPoint vertical[2] = {
+            {point.x, point.y - point_radius},
+            {point.x, point.y + point_radius}
+        };
+
+        (void)graphics_lines_draw(horizontal, 2, point_color);
+        (void)graphics_lines_draw(vertical, 2, point_color);
+        if(magnitude <= 0.00001f) continue;
+        direction.x /= magnitude;
+        direction.y /= magnitude;
+        {
+            SDL_FPoint end = {
+                point.x + direction.x * normal_length,
+                point.y + direction.y * normal_length
+            };
+            Vec2D perpendicular = {-direction.y, direction.x};
+            SDL_FPoint shaft[2] = {{point.x, point.y}, end};
+            SDL_FPoint arrow[3] = {
+                {end.x - direction.x * arrow_length +
+                    perpendicular.x * arrow_width,
+                 end.y - direction.y * arrow_length +
+                    perpendicular.y * arrow_width},
+                end,
+                {end.x - direction.x * arrow_length -
+                    perpendicular.x * arrow_width,
+                 end.y - direction.y * arrow_length -
+                    perpendicular.y * arrow_width}
+            };
+            (void)graphics_lines_draw(shaft, 2, normal_color);
+            (void)graphics_lines_draw(arrow, 3, normal_color);
+        }
+    }
+    return true;
+}
+
+void graphics_contacts_debug_set(bool enabled) {
+    graphics_contacts_debug_enabled = enabled;
+}
+
+bool graphics_contacts_debug_check(void) {
+    return graphics_contacts_debug_enabled;
+}
+
+void graphics_contacts_draw(void) {
+    if(!graphics_contacts_debug_enabled || sdl_renderer == NULL) return;
+    physics_interaction_current_visit(
+        PHYSICS_INTERACTION_CONTACT, graphics_contact_debug_draw, NULL);
 }
 
 void graphics_textures_scale(Entity entity, Scale scale) {

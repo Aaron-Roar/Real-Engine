@@ -79,6 +79,16 @@ size_t physics_interaction_current_contacts_get(
     EntityContact *results,
     size_t capacity
 );
+typedef bool (*PhysicsInteractionVisitFunction)(
+    const PhysicsInteraction *interaction,
+    void *context
+);
+/** Visit each current interaction carrying every requested flag once. */
+void physics_interaction_current_visit(
+    PhysicsInteractionFlags flags,
+    PhysicsInteractionVisitFunction function,
+    void *context
+);
 /** Initialize graphics tables. */
 EngineResult graphics_tables_init(void);
 /** Ensure graphics tables can address capacity slots. */

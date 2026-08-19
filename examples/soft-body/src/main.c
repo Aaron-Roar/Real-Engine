@@ -420,6 +420,7 @@ int main(void) {
                 .negative_y = SDLK_UNKNOWN
             })) goto fail;
     rohr_graphics_aabb_tree_debug_set(broadphase_debug);
+    rohr_graphics_contacts_debug_set(broadphase_debug);
     for(uint32_t i = 0; i < LEVEL_WALL_COUNT; i += 1) {
         walls[i] = wall_create(level_wall_positions[i], level_wall_dimensions[i]);
         if(walls[i] == ENTITY_INVALID) goto fail;
@@ -500,6 +501,7 @@ int main(void) {
                     key_event.state == KEY_STATE_PRESSED) {
                 broadphase_debug = !broadphase_debug;
                 rohr_graphics_aabb_tree_debug_set(broadphase_debug);
+                rohr_graphics_contacts_debug_set(broadphase_debug);
             }
             if(event.type == SDL_EVENT_QUIT ||
                     rohr_controller_key_pressed_get(
@@ -543,6 +545,7 @@ int main(void) {
         rohr_graphics_background_draw(background_color);
         rohr_graphics_layer_set(100);
         rohr_graphics_aabb_tree_draw();
+        rohr_graphics_contacts_draw();
         rohr_graphics_layer_set(0);
         for(uint32_t i = 0; i < LEVEL_WALL_COUNT; i += 1) {
             rohr_graphics_hit_box_colored_draw(walls[i], GRAPHICS_FILLED, wall_color);

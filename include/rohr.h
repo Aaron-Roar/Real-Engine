@@ -1544,6 +1544,12 @@ void rohr_graphics_aabb_tree_debug_set(bool enabled);
 bool rohr_graphics_aabb_tree_debug_check(void);
 /** Draw the current physics AABB-tree bounds when debug drawing is enabled. */
 void rohr_graphics_aabb_tree_draw(void);
+/** Enable or disable current-contact manifold debug drawing. */
+void rohr_graphics_contacts_debug_set(bool enabled);
+/** Return whether current-contact manifold debug drawing is enabled. */
+bool rohr_graphics_contacts_debug_check(void);
+/** Draw current contact manifold points and first-to-second normals when enabled. */
+void rohr_graphics_contacts_draw(void);
 
 /**
  * @brief Starts recording rendered frames to a video file.

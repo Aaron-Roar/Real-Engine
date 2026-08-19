@@ -389,6 +389,9 @@ Position rohr_graphics_mouse_screen_position_get(void) { return graphics_mouse_s
 void rohr_graphics_aabb_tree_debug_set(bool enabled) { graphics_aabb_tree_debug_set(enabled); }
 bool rohr_graphics_aabb_tree_debug_check(void) { return graphics_aabb_tree_debug_check(); }
 void rohr_graphics_aabb_tree_draw(void) { graphics_aabb_tree_draw(); }
+void rohr_graphics_contacts_debug_set(bool enabled) { graphics_contacts_debug_set(enabled); }
+bool rohr_graphics_contacts_debug_check(void) { return graphics_contacts_debug_check(); }
+void rohr_graphics_contacts_draw(void) { graphics_contacts_draw(); }
 bool rohr_graphics_recording_start(const char *output_path, int fps) { return graphics_recording_start(output_path, fps); }
 void rohr_graphics_particles_draw(void) { graphics_particles_draw(); }
 void rohr_graphics_local_origins_draw(void) { graphics_local_origins_draw(); }

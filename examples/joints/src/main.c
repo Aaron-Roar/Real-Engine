@@ -171,8 +171,10 @@ int main(void) {
         rohr_graphics_hit_box_colored_draw(bodies[5], GRAPHICS_FILLED, spring_color);
         rohr_graphics_joints_draw(joint_color);
         rohr_graphics_aabb_tree_debug_set(true);
+        rohr_graphics_contacts_debug_set(true);
         rohr_graphics_layer_set(100);
         rohr_graphics_aabb_tree_draw();
+        rohr_graphics_contacts_draw();
         rohr_graphics_layer_set(0);
         rohr_graphics_layer_set(200);
         rohr_ui_physics_debug_panel_draw(&debug_panel);

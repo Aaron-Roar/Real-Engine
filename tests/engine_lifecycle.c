@@ -5,6 +5,23 @@
 #include <stdio.h>
 #include <string.h>
 
+typedef struct ContactVisitState {
+    size_t count;
+    uint8_t point_count;
+} ContactVisitState;
+
+static bool contact_visit(
+    const PhysicsInteraction *interaction,
+    void *context
+) {
+    ContactVisitState *state = context;
+    if(interaction == NULL || state == NULL || !interaction->contact.detected)
+        return false;
+    state->count += 1;
+    state->point_count = interaction->contact.point_count;
+    return true;
+}
+
 int main(void) {
     const RohrCollisionCategoryMask player = UINT64_C(1) << 1;
     const RohrCollisionCategoryMask enemy = UINT64_C(1) << 2;
@@ -187,6 +204,15 @@ int main(void) {
     }
     rohr_system_physics_update(0.0);
     contact = rohr_physics_contact_get(first.result.value, second.result.value);
+    {
+        ContactVisitState visit = {0};
+        physics_interaction_current_visit(
+            PHYSICS_INTERACTION_CONTACT, contact_visit, &visit);
+        if(visit.count != 1 || visit.point_count == 0) {
+            rohr_engine_shutdown();
+            return 1;
+        }
+    }
     if(!rohr_physics_overlap_check(first.result.value, second.result.value) ||
             !rohr_physics_overlap_get(first.result.value, second.result.value).detected ||
             !rohr_physics_overlap_entered_check(first.result.value, second.result.value) ||

@@ -538,6 +538,12 @@ void graphics_aabb_tree_debug_set(bool enabled);
 bool graphics_aabb_tree_debug_check(void);
 /** Draw the current physics AABB-tree bounds when enabled. */
 void graphics_aabb_tree_draw(void);
+/** Enable or disable current-contact manifold debug drawing. */
+void graphics_contacts_debug_set(bool enabled);
+/** Return whether current-contact manifold debug drawing is enabled. */
+bool graphics_contacts_debug_check(void);
+/** Draw current contact manifold points and normals when enabled. */
+void graphics_contacts_draw(void);
 
 /** Start recording frames to an output file through ffmpeg. */
 bool graphics_recording_start(

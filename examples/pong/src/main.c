@@ -85,6 +85,7 @@ static void pong_render_camera(CameraId camera, void *context_value) {
     );
     rohr_graphics_layer_set(100);
     rohr_graphics_aabb_tree_draw();
+    rohr_graphics_contacts_draw();
     rohr_graphics_layer_set(0);
 }
 
@@ -272,6 +273,7 @@ int main(void) {
         }
     }
     rohr_graphics_aabb_tree_debug_set(broadphase_debug);
+    rohr_graphics_contacts_debug_set(broadphase_debug);
     if(!game_components_init()) {
         goto fail;
     }
@@ -422,6 +424,7 @@ int main(void) {
                     key_event.state == KEY_STATE_PRESSED) {
                 broadphase_debug = !broadphase_debug;
                 rohr_graphics_aabb_tree_debug_set(broadphase_debug);
+                rohr_graphics_contacts_debug_set(broadphase_debug);
             }
             if(event.type == SDL_EVENT_QUIT) exit_requested = true;
         }

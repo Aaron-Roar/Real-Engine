@@ -1,5 +1,6 @@
 #include "physics.h"
 
+#include "core/engine_internal.h"
 #include "physics/collision/interaction_set.h"
 
 static PhysicsInteractionSet current_interactions = {0};
@@ -113,4 +114,17 @@ size_t physics_interaction_current_contacts_get(
     );
 }
 
-
+void physics_interaction_current_visit(
+    PhysicsInteractionFlags flags,
+    PhysicsInteractionVisitFunction function,
+    void *context
+) {
+    if(function == NULL) return;
+    for(size_t index = 0; index < current_interactions.capacity; index += 1) {
+        const PhysicsInteraction *interaction;
+        if(current_interactions.occupied[index] == 0) continue;
+        interaction = &current_interactions.entries[index];
+        if((interaction->flags & flags) != flags) continue;
+        if(!function(interaction, context)) return;
+    }
+}

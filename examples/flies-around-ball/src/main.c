@@ -200,8 +200,10 @@ int main(void) {
             rohr_graphics_particles_draw();
         }
         rohr_graphics_aabb_tree_debug_set(true);
+        rohr_graphics_contacts_debug_set(true);
         rohr_graphics_layer_set(100);
         rohr_graphics_aabb_tree_draw();
+        rohr_graphics_contacts_draw();
         if(phase_3) {
             rohr_graphics_local_origins_draw();
         }
