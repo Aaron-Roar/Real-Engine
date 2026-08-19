@@ -716,6 +716,12 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
                         set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT &&
                         set->value.number > 0.0f)
                     body->particle_radius = set->value.number;
+                else if(set->property == EDITOR_PROPERTY_PARTICLE_ORIGIN_X &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT)
+                    body->particle_origin.x = set->value.number;
+                else if(set->property == EDITOR_PROPERTY_PARTICLE_ORIGIN_Y &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_FLOAT)
+                    body->particle_origin.y = set->value.number;
                 else if(set->property == EDITOR_PROPERTY_PARTICLE_AUTO_FIT &&
                         set->value_kind == EDITOR_PROPERTY_VALUE_BOOL)
                     body->particle_auto_fit = set->value.boolean;
@@ -1475,6 +1481,8 @@ static bool editor_command_property_parse(const char *name,
     EDITOR_FLOAT_PROPERTY("damping", EDITOR_PROPERTY_DAMPING)
     EDITOR_FLOAT_PROPERTY("length", EDITOR_PROPERTY_LINE_LENGTH)
     EDITOR_FLOAT_PROPERTY("particle-radius", EDITOR_PROPERTY_PARTICLE_RADIUS)
+    EDITOR_FLOAT_PROPERTY("particle-origin-x", EDITOR_PROPERTY_PARTICLE_ORIGIN_X)
+    EDITOR_FLOAT_PROPERTY("particle-origin-y", EDITOR_PROPERTY_PARTICLE_ORIGIN_Y)
     EDITOR_FLOAT_PROPERTY("node-radius", EDITOR_PROPERTY_NODE_RADIUS)
     EDITOR_BOOL_PROPERTY("gravity", EDITOR_PROPERTY_GRAVITY)
     EDITOR_BOOL_PROPERTY("static", EDITOR_PROPERTY_STATIC)
@@ -1518,6 +1526,8 @@ static const char *editor_command_property_name_get(EditorPropertyKind property)
         case EDITOR_PROPERTY_COLLISION: return "collision";
         case EDITOR_PROPERTY_PARTICLE: return "particle";
         case EDITOR_PROPERTY_PARTICLE_RADIUS: return "particle-radius";
+        case EDITOR_PROPERTY_PARTICLE_ORIGIN_X: return "particle-origin-x";
+        case EDITOR_PROPERTY_PARTICLE_ORIGIN_Y: return "particle-origin-y";
         case EDITOR_PROPERTY_PARTICLE_AUTO_FIT: return "particle-auto-fit";
         case EDITOR_PROPERTY_NODE_RADIUS: return "node-radius";
         case EDITOR_PROPERTY_POSITION_LOCKED: return "position-locked";

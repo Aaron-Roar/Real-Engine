@@ -938,7 +938,9 @@ Position editor_project_particle_center_get(const EditorRigidBody *body) {
     float twice_area = 0.0f;
     Position weighted = {0};
 
-    if(body == NULL || body->hitbox_count == 0) return (Position){0};
+    if(body == NULL) return (Position){0};
+    if(body->particle) return body->particle_origin;
+    if(body->hitbox_count == 0) return (Position){0};
     hitbox = &body->hitboxes[0];
     if(hitbox->vertex_count == 0) return (Position){0};
     for(uint32_t i = 0; i < hitbox->vertex_count; i += 1) {

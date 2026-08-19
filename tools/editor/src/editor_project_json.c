@@ -127,6 +127,8 @@ static yyjson_mut_val *editor_json_body_write(yyjson_mut_doc *document,
     yyjson_mut_obj_add_bool(document, value, "particle_auto_fit",
         body->particle_auto_fit);
     yyjson_mut_obj_add_real(document, value, "particle_radius", particle_radius);
+    yyjson_mut_obj_add_val(document, value, "particle_origin",
+        editor_json_position_write(document, body->particle_origin));
     yyjson_mut_obj_add_uint(document, value, "particle_ring_color",
         body->particle_ring_color);
     yyjson_mut_obj_add_uint(document, value, "particle_fill_color",
@@ -491,6 +493,7 @@ static bool editor_json_body_read(yyjson_val *value, EditorRigidBody *body,
     yyjson_val *particle = yyjson_obj_get(value, "particle");
     yyjson_val *particle_auto_fit = yyjson_obj_get(value, "particle_auto_fit");
     yyjson_val *particle_radius = yyjson_obj_get(value, "particle_radius");
+    yyjson_val *particle_origin = yyjson_obj_get(value, "particle_origin");
     yyjson_val *particle_ring_color = yyjson_obj_get(value, "particle_ring_color");
     yyjson_val *particle_fill_color = yyjson_obj_get(value, "particle_fill_color");
     yyjson_val *border_color = yyjson_obj_get(value, "border_color");
@@ -519,6 +522,8 @@ static bool editor_json_body_read(yyjson_val *value, EditorRigidBody *body,
             value, "particle_auto_fit", &body->particle_auto_fit)) return false;
     if((particle_radius != NULL && !editor_json_real(
                 value, "particle_radius", &body->particle_radius)) ||
+            (particle_origin != NULL && !editor_json_position_read(
+                particle_origin, &body->particle_origin)) ||
             (particle_ring_color != NULL && !editor_json_uint(
                 value, "particle_ring_color", &body->particle_ring_color)) ||
             (particle_fill_color != NULL && !editor_json_uint(

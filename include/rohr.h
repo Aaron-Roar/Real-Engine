@@ -1137,6 +1137,14 @@ EntityResult rohr_physics_joint_create(
  * @return Geometric overlap information.
  */
 OverlapInfo rohr_physics_particle_overlap_get(Shape shape_1, Shape shape_2);
+/** Set a particle circle's origin relative to its rigid-body origin. */
+EngineResult rohr_physics_particle_origin_set(Entity entity, Position local_origin);
+/** Get a particle circle's origin relative to its rigid-body origin. */
+PositionResult rohr_physics_particle_origin_get(Entity entity);
+/** Set a particle circle's radius independently of its polygon hitbox. */
+EngineResult rohr_physics_particle_radius_set(Entity entity, float radius);
+/** Get a particle circle's effective radius. */
+ParticleRadiusResult rohr_physics_particle_radius_get(Entity entity);
 
 /** Return whether two entities overlap during the current physics step. */
 bool rohr_physics_overlap_check(Entity entity, Entity target);

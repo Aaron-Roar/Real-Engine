@@ -247,6 +247,10 @@ EntityResult rohr_physics_joint_create(Entity a, Entity b, JointType type, Vec2D
     return physics_joint_create(a, b, type, local_anchor_a, local_anchor_b, stiffness, damping);
 }
 OverlapInfo rohr_physics_particle_overlap_get(Shape shape_1, Shape shape_2) { return physics_particle_overlap_get(shape_1, shape_2); }
+EngineResult rohr_physics_particle_origin_set(Entity entity, Position local_origin) { return physics_particle_origin_set(entity, local_origin); }
+PositionResult rohr_physics_particle_origin_get(Entity entity) { return physics_particle_origin_get(entity); }
+EngineResult rohr_physics_particle_radius_set(Entity entity, float radius) { return physics_particle_radius_set(entity, radius); }
+ParticleRadiusResult rohr_physics_particle_radius_get(Entity entity) { return physics_particle_radius_get(entity); }
 bool rohr_physics_overlap_check(Entity entity, Entity target) { return physics_overlap_check(entity, target); }
 OverlapInfo rohr_physics_overlap_get(Entity entity, Entity target) { return physics_overlap_get(entity, target); }
 bool rohr_physics_overlap_entered_check(Entity entity, Entity target) { return physics_overlap_entered_check(entity, target); }

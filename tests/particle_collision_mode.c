@@ -21,6 +21,8 @@ int main(void) {
     EntityResult second_result;
     Entity first;
     Entity second;
+    PositionResult particle_origin;
+    ParticleRadiusResult particle_radius;
 
     if(rohr_physics_sat_overlap_get(
             lower_triangle_get(), upper_triangle_get()).detected) {
@@ -41,8 +43,16 @@ int main(void) {
                 second, (Position){1.5f, 1.5f})) ||
             rohr_error_check(rohr_physics_static_set(first)) ||
             rohr_error_check(rohr_physics_static_set(second)) ||
-            rohr_error_check(rohr_entity_components_add(first, ROHR_PARTICLE)))
+            rohr_error_check(rohr_physics_particle_origin_set(
+                first, (Position){0.1f, -0.2f})) ||
+            rohr_error_check(rohr_physics_particle_radius_set(first, 1.5f)))
         goto fail;
+    particle_origin = rohr_physics_particle_origin_get(first);
+    particle_radius = rohr_physics_particle_radius_get(first);
+    if(rohr_error_check(particle_origin) || rohr_error_check(particle_radius) ||
+            particle_origin.result.value.x != 0.1f ||
+            particle_origin.result.value.y != -0.2f ||
+            particle_radius.result.value != 1.5f) goto fail;
 
     rohr_system_physics_update(0.0);
     if(rohr_physics_overlap_check(first, second)) {
@@ -61,6 +71,11 @@ int main(void) {
 
     if(rohr_error_check(rohr_entity_components_add(second, ROHR_PARTICLE)))
         goto fail;
+    if(rohr_error_check(rohr_physics_particle_radius_set(second, 1.5f)) ||
+            rohr_error_check(rohr_physics_position_set(
+                second, (Position){10.0f, 1.5f})) ||
+            rohr_error_check(rohr_physics_particle_origin_set(
+                second, (Position){-8.0f, 0.0f}))) goto fail;
     rohr_system_physics_update(0.0);
     if(!rohr_physics_overlap_check(first, second)) {
         fprintf(stderr, "particle pair did not use circle overlap\n");

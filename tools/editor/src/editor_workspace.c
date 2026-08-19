@@ -556,6 +556,7 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
         "    float rotation, Shape hitbox, float mass_value, float friction,\n"
         "    float restitution, bool static_body, bool rotation_locked,\n"
         "    bool gravity_enabled, bool collision_enabled, bool particle,\n"
+        "    Position particle_origin, float particle_radius,\n"
         "    RohrCollisionCategoryMask collision_category,\n"
         "    RohrCollisionCategoryMask collision_with) {\n"
         "    EntityResult added = rohr_entity_add();\n"
@@ -573,7 +574,10 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
         "        collision_enabled ? collision_with : ROHR_COLLISION_CATEGORY_NONE));\n"
         "    if(collision_enabled) {\n"
         "        GENERATED_APPLY(rohr_entity_components_add(*output, ROHR_COLLISION));\n"
-        "        if(particle) GENERATED_APPLY(rohr_entity_components_add(*output, ROHR_PARTICLE));\n"
+        "        if(particle) {\n"
+        "            GENERATED_APPLY(rohr_physics_particle_origin_set(*output, particle_origin));\n"
+        "            GENERATED_APPLY(rohr_physics_particle_radius_set(*output, particle_radius));\n"
+        "        }\n"
         "    }\n"
         "    GENERATED_APPLY(rohr_physics_friction_set(*output, friction));\n"
         "    GENERATED_APPLY(rohr_physics_restitution_set(*output, restitution));\n"
@@ -710,7 +714,6 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
         for(size_t body_index = 0; body_index < object->rigid_body_count; body_index += 1) {
             const EditorRigidBody *body = &object->rigid_bodies[body_index];
             const EditorHitbox *hitbox = body->hitbox_count > 0 ? &body->hitboxes[0] : NULL;
-            Position particle_center = editor_project_particle_center_get(body);
             float particle_radius = body->particle_auto_fit ?
                 editor_project_particle_auto_radius_get(body) : body->particle_radius;
 
@@ -719,15 +722,8 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 "(Position){position.x + %#.9gf, position.y + %#.9gf}, %#.9gf, "
                 "(Shape){.amount_of_vertices = %u, .vertices = {",
                 body->name, body->position.x, body->position.y, body->rotation,
-                body->particle ? 4 : hitbox == NULL ? 0 : hitbox->vertex_count);
-            if(body->particle) {
-                fprintf(source, "{%#.9gf, %#.9gf}, {%#.9gf, %#.9gf}, "
-                    "{%#.9gf, %#.9gf}, {%#.9gf, %#.9gf}",
-                    particle_center.x + particle_radius, particle_center.y,
-                    particle_center.x, particle_center.y + particle_radius,
-                    particle_center.x - particle_radius, particle_center.y,
-                    particle_center.x, particle_center.y - particle_radius);
-            } else if(hitbox != NULL) {
+                hitbox == NULL ? 0 : hitbox->vertex_count);
+            if(hitbox != NULL) {
                 for(uint32_t vertex = 0; vertex < hitbox->vertex_count; vertex += 1) {
                     fprintf(source, "%s{%#.9gf, %#.9gf}", vertex == 0 ? "" : ", ",
                         hitbox->vertices[vertex].position.x,
@@ -736,6 +732,7 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
             }
             fprintf(source,
                 "}}, %#.9gf, %#.9gf, %#.9gf, %s, %s, %s, %s, %s, "
+                "(Position){%#.9gf, %#.9gf}, %#.9gf, "
                 "UINT64_C(%llu), UINT64_C(%llu));\n"
                 "    if(rohr_error_check(result)) goto fail;\n",
                 body->mass_value, body->friction, body->restitution,
@@ -744,6 +741,8 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 body->gravity_enabled ? "true" : "false",
                 body->collision_enabled ? "true" : "false",
                 body->particle ? "true" : "false",
+                body->particle_origin.x, body->particle_origin.y,
+                particle_radius,
                 (unsigned long long)body->collision_category,
                 (unsigned long long)body->collision_with);
         }

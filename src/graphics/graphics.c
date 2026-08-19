@@ -5,6 +5,7 @@
 #include "engine.h"
 #include "systems.h"
 #include "physics.h"
+#include "physics/physics_internal.h"
 #include "core/platform_process.h"
 #include "window_presentation.h"
 #include "graphics_layer_order.h"
@@ -2315,13 +2316,15 @@ void graphics_hit_boxes_draw(void) {
 }
 
 void graphics_particle_draw(Entity entity, Fill fill_type) {
-    ShapeResult shape_result = physics_global_hit_box_get(entity);
-    if(shape_result.kind == ERROR_RESULT_ERROR) {
-        return;
-    }
-    Shape shape = shape_result.result.value;
-    Position center = math_polygon_centroid(shape);
-    float radius = math_circle_radius(shape, center);
+    EntityIndex index;
+    Position center;
+    float radius;
+
+    if(!entity_index_get(entity, &index) ||
+            !entity_index_components_check(index, ROHR_PARTICLE)) return;
+    center = physics_particle_world_origin_by_index_get(index);
+    radius = physics_particle_radius_by_index_get(index);
+    if(radius <= 0.0f) return;
     Shape circle = math_circle_create(radius, 10);
     Shape world_circle = physics_shape_world_translate(circle, center, 0);
     if(fill_type == GRAPHICS_FILLED) {

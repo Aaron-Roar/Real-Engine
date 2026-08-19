@@ -291,7 +291,8 @@ int main(void) {
                 strstr(cli_command, "rohr-cli --project ") != cli_command ||
                 strstr(cli_command, " generate-c") == NULL ||
                 !file_contains(path, "7.00000000f") ||
-                !file_contains(path, "ROHR_PARTICLE") ||
+                !file_contains(path, "rohr_physics_particle_origin_set") ||
+                !file_contains(path, "rohr_physics_particle_radius_set") ||
                 !file_contains(path, "generated_world_anchor_create") ||
                 !file_contains(path, "rohr_physics_joint_anchor_create") ||
                 !file_contains(path, "rohr_physics_joint_spring_set") ||
@@ -414,6 +415,7 @@ int main(void) {
             chassis->particle_radius <= 0.0f) return 1;
     chassis->particle_auto_fit = false;
     chassis->particle_radius = 42.0f;
+    chassis->particle_origin = (Position){3.0f, -4.0f};
     chassis->particle_ring_color = UINT32_C(0xff8800ff);
     chassis->particle_fill_color = UINT32_C(0x22446680);
     chassis->border_color = UINT32_C(0xabcdef12);
@@ -633,6 +635,8 @@ int main(void) {
                 !loaded_object->rigid_bodies[0].particle ||
                 loaded_object->rigid_bodies[0].particle_auto_fit ||
                 fabsf(loaded_object->rigid_bodies[0].particle_radius - 42.0f) > 0.001f ||
+                !position_equal(loaded_object->rigid_bodies[0].particle_origin,
+                    (Position){3.0f, -4.0f}) ||
                 loaded_object->rigid_bodies[0].particle_ring_color !=
                     UINT32_C(0xff8800ff) ||
                 loaded_object->rigid_bodies[0].particle_fill_color !=

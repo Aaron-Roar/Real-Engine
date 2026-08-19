@@ -1,4 +1,5 @@
 #include "physics/physics_step_internal.h"
+#include "physics/physics_internal.h"
 #include "systems.h"
 #include "console.h"
 #include "physics/collision/contact_manifold.h"
@@ -228,7 +229,7 @@ OverlapInfo system_entity_overlap_get(Entity entity_1, Entity entity_2) {
     Shape shape1 = world_hit_boxes[entity_1];
     Shape shape2 = world_hit_boxes[entity_2];
     if(entity_index_components_check(entity_1, ROHR_PARTICLE) && entity_index_components_check(entity_2, ROHR_PARTICLE)) {
-        return physics_particle_overlap_get(shape1, shape2);
+        return physics_particle_entities_overlap_get(entity_1, entity_2);
     }
     return physics_sat_overlap_get(shape1, shape2);
 }
@@ -344,9 +345,11 @@ Position system_support_point_average(Shape shape, Vec2D direction)
 }
 
 Position system_particle_edge_get(Entity entity, Vec2D normal, Vec1D radius) {
+    Position center = physics_particle_world_origin_by_index_get(entity);
+
     return (Position) {
-        .x = positions[entity].x + normal.x*radius,
-        .y = positions[entity].y + normal.y*radius,
+        .x = center.x + normal.x * radius,
+        .y = center.y + normal.y * radius,
     };
 }
 
@@ -374,13 +377,13 @@ Position system_collision_contact_point(Entity entity_1, Entity entity_2, Overla
     bool entity_2_particle = particle_pair;
 
     if(entity_1_particle) {
-        Vec1D r1 = math_circle_radius(shape_1, math_polygon_centroid(shape_1));
+        Vec1D r1 = physics_particle_radius_by_index_get(entity_1);
         point_1 = system_particle_edge_get(entity_1, normal, r1);
     } else {
         point_1 = system_support_point_average(shape_1, normal);
     }
     if(entity_2_particle) {
-        Vec1D r2 = math_circle_radius(shape_2, math_polygon_centroid(shape_2));
+        Vec1D r2 = physics_particle_radius_by_index_get(entity_2);
         point_2 = system_particle_edge_get(entity_2, opposite_normal, r2);
     } else {
         point_2 = system_support_point_average(shape_2, opposite_normal);
@@ -923,6 +926,20 @@ static void system_rigid_contact_constraint_solve(
     }
 }
 
+static AABB system_broadphase_bounds_get(EntityIndex index) {
+    AABB bounds = math_aabb_create(world_hit_boxes[index]);
+
+    if(entity_index_components_check(index, ROHR_PARTICLE)) {
+        Position center = physics_particle_world_origin_by_index_get(index);
+        float radius = physics_particle_radius_by_index_get(index);
+        bounds.min_x = fminf(bounds.min_x, center.x - radius);
+        bounds.max_x = fmaxf(bounds.max_x, center.x + radius);
+        bounds.min_y = fminf(bounds.min_y, center.y - radius);
+        bounds.max_y = fmaxf(bounds.max_y, center.y + radius);
+    }
+    return bounds;
+}
+
 static void system_broadphase_build(void) {
     aabb_tree_clear(&physics_broadphase_tree);
     for(uint32_t alive_position = 0;
@@ -938,7 +955,7 @@ static void system_broadphase_build(void) {
         (void)aabb_tree_insert(
             &physics_broadphase_tree,
             entity,
-            math_aabb_create(world_hit_boxes[index])
+            system_broadphase_bounds_get(index)
         );
     }
 }
@@ -960,7 +977,7 @@ static void system_broadphase_collisions_apply(void) {
         };
         (void)aabb_tree_query(
             &physics_broadphase_tree,
-            math_aabb_create(world_hit_boxes[index]),
+            system_broadphase_bounds_get(index),
             system_broadphase_pair_apply,
             &query
         );

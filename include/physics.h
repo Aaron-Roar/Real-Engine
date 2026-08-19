@@ -109,6 +109,14 @@ typedef Vec1D Orientation;
 typedef Vec2D Position;
 /** Entity linear velocity. */
 typedef Vec2D Velocity;
+/** Particle circle geometry stored relative to its rigid body's origin. */
+typedef struct ParticleGeometry {
+    Position local_origin;
+    float radius;
+    bool origin_explicit;
+    bool radius_explicit;
+} ParticleGeometry;
+ERROR_DECLARE_RESULT_TYPE(ParticleRadiusResult, float);
 #define PHYSICS_CONTACT_POINT_MAX 2
 /** Solver information for one world-space point in a contact manifold. */
 typedef struct ContactPointInfo {
@@ -337,6 +345,8 @@ ERROR_DECLARE_RESULT_TYPE(SoftBodyNodeAnchorPinResult, SoftBodyNodeAnchorPin);
 
 /** Pool storing positions by EntityIndex. */
 MEMORY_DECLARE_OBJECT_POOL(PositionPool, Position);
+/** Pool storing explicit particle circle geometry by EntityIndex. */
+MEMORY_DECLARE_OBJECT_POOL(ParticleGeometryPool, ParticleGeometry);
 /** Pool storing velocities by EntityIndex. */
 MEMORY_DECLARE_OBJECT_POOL(VelocityPool, Velocity);
 /** Pool storing accelerations by EntityIndex. */
@@ -375,6 +385,7 @@ MEMORY_DECLARE_OBJECT_POOL(SoftBodyBeamPool, SoftBodyBeam);
 MEMORY_DECLARE_OBJECT_POOL(SoftBodyTrianglePool, SoftBodyTriangle);
 
 extern PositionPool positions_pool;
+extern ParticleGeometryPool particle_geometries_pool;
 extern VelocityPool velocities_pool;
 extern AccelerationPool accelerations_pool;
 extern MassPool mass_pool;
@@ -701,6 +712,10 @@ EntityResult physics_joint_create(
  * Run particle collision detection between two circle-like shapes.
  */
 OverlapInfo physics_particle_overlap_get(Shape shape_1, Shape shape_2);
+EngineResult physics_particle_origin_set(Entity entity, Position local_origin);
+PositionResult physics_particle_origin_get(Entity entity);
+EngineResult physics_particle_radius_set(Entity entity, float radius);
+ParticleRadiusResult physics_particle_radius_get(Entity entity);
 
 /** Return whether two entities overlap during the current physics step. */
 bool physics_overlap_check(Entity entity, Entity target);

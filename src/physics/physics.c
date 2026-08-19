@@ -2,6 +2,7 @@
 #include "physics/physics_internal.h"
 
 MEMORY_DEFINE_OBJECT_POOL(PositionPool, Position)
+MEMORY_DEFINE_OBJECT_POOL(ParticleGeometryPool, ParticleGeometry)
 MEMORY_DEFINE_OBJECT_POOL(VelocityPool, Velocity)
 MEMORY_DEFINE_OBJECT_POOL(AccelerationPool, Acceleration)
 MEMORY_DEFINE_OBJECT_POOL(MassPool, float)
@@ -24,6 +25,7 @@ MEMORY_DEFINE_OBJECT_POOL(SoftBodyBeamPool, SoftBodyBeam)
 MEMORY_DEFINE_OBJECT_POOL(SoftBodyTrianglePool, SoftBodyTriangle)
 
 PositionPool positions_pool = {0};
+ParticleGeometryPool particle_geometries_pool = {0};
 OrientationPool orientations_pool = {0};
 VelocityPool velocities_pool = {0};
 AccelerationPool accelerations_pool = {0};
@@ -56,6 +58,7 @@ EngineResult physics_tables_init(void) {
     physics_body_state_table_init();
     if(error_check(physics_interaction_state_init())) { goto fail; }
     if(PositionPool_init(&positions_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
+    if(ParticleGeometryPool_init(&particle_geometries_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(OrientationPool_init(&orientations_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(VelocityPool_init(&velocities_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(AccelerationPool_init(&accelerations_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
@@ -104,6 +107,7 @@ EngineResult physics_tables_ensure_capacity(size_t capacity) {
         new_capacity = MAX_ENTITIES;
     }
     if(new_capacity > positions_pool.capacity && PositionPool_expand(&positions_pool, new_capacity - positions_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
+    if(new_capacity > particle_geometries_pool.capacity && ParticleGeometryPool_expand(&particle_geometries_pool, new_capacity - particle_geometries_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
     if(new_capacity > orientations_pool.capacity && OrientationPool_expand(&orientations_pool, new_capacity - orientations_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
     if(new_capacity > velocities_pool.capacity && VelocityPool_expand(&velocities_pool, new_capacity - velocities_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
     if(new_capacity > accelerations_pool.capacity && AccelerationPool_expand(&accelerations_pool, new_capacity - accelerations_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
@@ -134,6 +138,7 @@ EngineResult physics_tables_ensure_capacity(size_t capacity) {
 void physics_tables_destroy(void) {
     physics_interaction_state_destroy();
     (void)PositionPool_destroy(&positions_pool);
+    (void)ParticleGeometryPool_destroy(&particle_geometries_pool);
     (void)OrientationPool_destroy(&orientations_pool);
     (void)VelocityPool_destroy(&velocities_pool);
     (void)AccelerationPool_destroy(&accelerations_pool);
@@ -162,6 +167,9 @@ void physics_tables_destroy(void) {
 
 void physics_entity_clear(Entity entity, EntityIndex index) {
     physics_body_state_entity_clear(index);
+    if(index < particle_geometries_pool.capacity &&
+            particle_geometries_pool.used[index])
+        (void)ParticleGeometryPool_release_at(&particle_geometries_pool, index);
     if(index < angular_velocity_maximums_pool.capacity &&
             angular_velocity_maximums_pool.used[index]) {
         (void)AngularVelocityPool_release_at(&angular_velocity_maximums_pool, index);

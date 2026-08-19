@@ -45,6 +45,7 @@ static const CliHelpDomain cli_help_domains[] = {
         "friction <number>, restitution <0..1>, gravity <true|false>, "
         "static <true|false>, rotation-locked <true|false>, collision <true|false>, "
         "particle <true|false>, particle-radius <number>, "
+        "particle-origin-x <number>, particle-origin-y <number>, "
         "particle-auto-fit <true|false>, outline-color <hex>, surface-color <hex>, "
         "particle-ring-color <hex>, particle-fill-color <hex>, visibility <true|false>, "
         "category <mask> <true|false>, collide-with <mask> <true|false>",

@@ -29,5 +29,11 @@ void physics_soft_body_entity_clear(Entity entity, EntityIndex index);
 EngineResult physics_interaction_state_init(void);
 void physics_interaction_state_destroy(void);
 void physics_config_init(void);
+Position physics_particle_world_origin_by_index_get(EntityIndex index);
+float physics_particle_radius_by_index_get(EntityIndex index);
+OverlapInfo physics_particle_entities_overlap_get(
+    EntityIndex first,
+    EntityIndex second
+);
 
 #endif

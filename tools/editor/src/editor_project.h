@@ -87,6 +87,7 @@ typedef struct EditorRigidBody {
     bool particle_auto_fit;
     bool visible;
     float particle_radius;
+    Position particle_origin;
     uint32_t particle_ring_color;
     uint32_t particle_fill_color;
     uint32_t border_color;
