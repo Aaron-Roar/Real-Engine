@@ -1253,6 +1253,19 @@ static EditorHitbox *editor_selected_hitbox_get(EditorObject *object,
     return body == NULL ? NULL : editor_project_hitbox_get(body, state->selected_hitbox);
 }
 
+static void editor_rigid_body_dropdown_preview_set(EditorViewportState *state,
+        const EditorObject *object, UIDropdownResult result,
+        EditorRigidBodyId selected) {
+    if(state == NULL || object == NULL) return;
+    if(result.hovered_index >= 0) {
+        size_t option = (size_t)result.hovered_index;
+        state->preview_rigid_body = option == 0 || option > object->rigid_body_count ?
+            0 : object->rigid_bodies[option - 1].id;
+    } else if(result.button_hovered) {
+        state->preview_rigid_body = selected;
+    }
+}
+
 static void editor_anchor_preview_set(EditorViewportState *state,
     EditorObject *object, EditorAnchorId id) {
     EditorAnchor *anchor;
@@ -3765,12 +3778,8 @@ int main(void) {
                                 selected->rigid_body_count + 1, selected_body,
                                 (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 510.0f,
                                     EDITOR_TOOLS_WIDTH - 110.0f, 28.0f}, NULL);
-                            if(result.button_hovered) {
-                                viewport_state.preview_rigid_body = anchor->rigid_body;
-                            } else if(result.hovered_index > 0) {
-                                viewport_state.preview_rigid_body =
-                                    selected->rigid_bodies[result.hovered_index - 1].id;
-                            }
+                            editor_rigid_body_dropdown_preview_set(&viewport_state,
+                                selected, result, anchor->rigid_body);
                             if(result.changed) editor_relationship_set(&project,
                                 EDITOR_RELATIONSHIP_ANCHOR_RIGID_BODY, selected->id,
                                 0, anchor->id, 0, result.selected_index == 0 ? 0 :
@@ -3907,12 +3916,8 @@ int main(void) {
                         selected->rigid_body_count + 1, selected_body,
                         (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 158.0f,
                             EDITOR_TOOLS_WIDTH - 110.0f, 28.0f}, NULL);
-                    if(result.button_hovered) {
-                        viewport_state.preview_rigid_body = anchor->rigid_body;
-                    } else if(result.hovered_index > 0) {
-                        viewport_state.preview_rigid_body =
-                            selected->rigid_bodies[result.hovered_index - 1].id;
-                    }
+                    editor_rigid_body_dropdown_preview_set(&viewport_state,
+                        selected, result, anchor->rigid_body);
                     if(result.changed) editor_relationship_set(&project,
                         EDITOR_RELATIONSHIP_ANCHOR_RIGID_BODY, selected->id, 0,
                         anchor->id, 0, result.selected_index == 0 ? 0 :
@@ -4784,6 +4789,8 @@ int main(void) {
                     body_options, selected->rigid_body_count + 1, body_selected,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 118.0f,
                         EDITOR_TOOLS_WIDTH - 110.0f, 28.0f}, NULL);
+                editor_rigid_body_dropdown_preview_set(&viewport_state, selected,
+                    body_result, sprite->rigid_body);
                 rohr_ui_label(&x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     156.0f, 70.0f, 28.0f});
                 UIFieldResult x_result = rohr_ui_field("editor.sprite.x",
@@ -5039,6 +5046,8 @@ int main(void) {
                     selected->rigid_body_count + 1, body_selected,
                     (UIRect){EDITOR_VIEWPORT_WIDTH + 100.0f, 80.0f,
                         EDITOR_TOOLS_WIDTH - 110.0f, 28.0f}, NULL);
+                editor_rigid_body_dropdown_preview_set(&viewport_state, selected,
+                    body_result, sprite->rigid_body);
                 rohr_ui_label(&x_label, (UIRect){EDITOR_VIEWPORT_WIDTH + 8.0f,
                     118.0f, 90.0f, 28.0f});
                 UIFieldResult position_x = rohr_ui_field(
