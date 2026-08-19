@@ -96,6 +96,15 @@ static Position editor_sprite_rotation_handle_get(Position center,
     return editor_rotation_control_position_get(center, rotation, length);
 }
 
+static bool editor_sprite_point_contains(Position center, Scale size,
+        Orientation rotation, Position point) {
+    Vec2D offset = {point.x - center.x, point.y - center.y};
+    Vec2D local = math_vector_rotate(offset, -rotation);
+
+    return fabsf(local.x) <= fabsf(size.x) * 0.5f &&
+        fabsf(local.y) <= fabsf(size.y) * 0.5f;
+}
+
 static Orientation editor_sprite_world_rotation_get(const EditorObject *object,
         const EditorSprite *sprite) {
     Orientation rotation = sprite->rotation;
@@ -2710,17 +2719,20 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
     if(object->visible) {
         for(size_t i = object->animated_sprite_count; i > 0; i -= 1) {
             EditorAnimatedSprite *animation = &object->animated_sprite_items[i - 1];
+            size_t preview_frame = animation->frame_count == 0 ? 0 :
+                editor_animation_preview_frame_get(object, animation);
             EditorAnimationFrame *frame = animation->frame_count == 0 ? NULL :
-                &animation->frames[0];
+                &animation->frames[preview_frame];
             Position world;
             Scale size;
+            Orientation rotation;
             EditorSelectionRef selection;
             if(!animation->visible || frame == NULL) continue;
-            world = editor_animated_sprite_world_get(object, animation, NULL);
+            world = editor_animated_sprite_world_get(object, animation, &rotation);
             size = (Scale){frame->size.x * animation->scale.x,
                 frame->size.y * animation->scale.y};
-            if(fabsf(pointer.x - world.x) > size.x * 0.5f ||
-                    fabsf(pointer.y - world.y) > size.y * 0.5f) continue;
+            if(!editor_sprite_point_contains(
+                    world, size, rotation, pointer)) continue;
             selection = (EditorSelectionRef){EDITOR_SELECTION_ANIMATED_SPRITE,
                 object->id, 0, 0, animation->id};
             (void)editor_viewport_selection_set(project, state, selection,
@@ -2736,11 +2748,13 @@ bool editor_viewport_update(EditorViewportState *state, EditorProject *project,
         for(size_t i = object->sprite_count; i > 0; i -= 1) {
             EditorSprite *sprite = &object->sprites[i - 1];
             Position world;
+            Orientation rotation;
             EditorSelectionRef selection;
             if(!sprite->visible) continue;
             world = editor_sprite_world_get(object, sprite);
-            if(fabsf(pointer.x - world.x) > sprite->size.x * 0.5f ||
-                    fabsf(pointer.y - world.y) > sprite->size.y * 0.5f) continue;
+            rotation = editor_sprite_world_rotation_get(object, sprite);
+            if(!editor_sprite_point_contains(
+                    world, sprite->size, rotation, pointer)) continue;
             selection = (EditorSelectionRef){EDITOR_SELECTION_SPRITE,
                 object->id, 0, 0, sprite->id};
             (void)editor_viewport_selection_set(project, state, selection,

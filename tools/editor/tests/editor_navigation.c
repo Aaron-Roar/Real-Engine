@@ -420,6 +420,55 @@ int main(void) {
                 sprite_object->sprite_count != sprite_count + 1 ||
                 sprite_object->animated_sprite_count != animation_count + 1) return 1;
     }
+    {
+        EditorObject *pointer_object = editor_project_object_add(
+            &project, (Position){0});
+        EditorSprite *sprite;
+        EditorAnimatedSprite *animation;
+        Position center = {EDITOR_VIEWPORT_WIDTH * 0.5f,
+            EDITOR_MENU_HEIGHT +
+                (EDITOR_VIEWPORT_BOTTOM - EDITOR_MENU_HEIGHT) * 0.5f};
+        Position pointer;
+
+        if(pointer_object == NULL) return 1;
+        sprite = editor_project_sprite_add(
+            &project, pointer_object, "rotated_sprite", "sprite.png");
+        animation = editor_project_animated_sprite_add(
+            &project, pointer_object);
+        if(sprite == NULL || animation == NULL ||
+                !editor_project_animation_frame_add(&project, animation,
+                    "frame", "frame.png", (Scale){20.0f, 80.0f})) return 1;
+        sprite->position = (Position){-100.0f, 0.0f};
+        sprite->size = (Scale){80.0f, 20.0f};
+        sprite->rotation = 0.78539816339f;
+        animation->editor_position = (Position){100.0f, 0.0f};
+        animation->editor_rotation = 0.78539816339f;
+        project.viewport_local_view = false;
+        project.viewport_camera_offset = (Vec2D){0};
+        project.viewport_camera_zoom = 1.0f;
+        editor_viewport_object_editor_enter(&state);
+
+        pointer = (Position){center.x - 75.2512627f,
+            center.y - 24.7487373f};
+        if(!editor_viewport_update(&state, &project, pointer,
+                MOUSE_BUTTON_STATE_PRESSED, MOUSE_BUTTON_STATE_UP,
+                false, 0.0f, false) || state.mode != EDITOR_VIEWPORT_SPRITE ||
+                state.selection != EDITOR_SELECTION_SPRITE ||
+                state.selected_sprite != sprite->id) return 1;
+        (void)editor_viewport_update(&state, &project, pointer,
+            MOUSE_BUTTON_STATE_RELEASED, MOUSE_BUTTON_STATE_UP,
+            false, 0.0f, false);
+        editor_viewport_object_editor_enter(&state);
+
+        pointer = (Position){center.x + 75.2512627f,
+            center.y - 24.7487373f};
+        if(!editor_viewport_update(&state, &project, pointer,
+                MOUSE_BUTTON_STATE_PRESSED, MOUSE_BUTTON_STATE_UP,
+                false, 0.0f, false) ||
+                state.mode != EDITOR_VIEWPORT_ANIMATED_SPRITE ||
+                state.selection != EDITOR_SELECTION_ANIMATED_SPRITE ||
+                state.selected_animated_sprite != animation->id) return 1;
+    }
     editor_history_destroy(&history);
     editor_viewport_state_destroy(&state);
     return 0;
