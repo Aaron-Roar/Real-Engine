@@ -864,3 +864,4 @@ bool editor_bulk_panel_draw(EditorBulkPanel *panel, EditorProject *project,
     }
     return editing;
 }
+

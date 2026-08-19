@@ -1,7 +1,7 @@
-#include "editor_file_browser.h"
+#include "browser/editor_file_browser.h"
 #include "editor_navigation.h"
 #include "editor_layout.h"
-#include "panels/editor_bulk_panel.h"
+#include "editors/multi/editor_bulk_panel.h"
 
 #include <stdio.h>
 #include <string.h>

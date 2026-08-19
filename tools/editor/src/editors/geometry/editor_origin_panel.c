@@ -94,3 +94,4 @@ bool editor_origin_panel_draw(EditorOriginPanel *panel,
     }
     return x_result.active || y_result.active;
 }
+

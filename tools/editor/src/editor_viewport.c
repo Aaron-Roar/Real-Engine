@@ -1,6 +1,7 @@
 #include "editor_viewport.h"
 #include "editor_command.h"
 #include "editor_layout.h"
+#include "viewport/controls/editor_rotation_control.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -92,8 +93,7 @@ static bool editor_viewport_selection_primary_apply(EditorProject *project,
 static Position editor_sprite_rotation_handle_get(Position center,
         Orientation rotation) {
     float length = EDITOR_VIEWPORT_ROTATION_ARM_LENGTH / editor_view_scale;
-    return (Position){center.x + sinf(rotation) * length,
-        center.y - cosf(rotation) * length};
+    return editor_rotation_control_position_get(center, rotation, length);
 }
 
 static Orientation editor_sprite_world_rotation_get(const EditorObject *object,
@@ -304,18 +304,18 @@ static Position editor_anchor_world_local_get(const EditorObject *object,
 
 static Position editor_soft_body_rotation_handle_get(const EditorObject *object,
     const EditorSoftBody *body) {
-    return (Position){object->position.x + body->position.x +
-            sinf(body->rotation) * EDITOR_VIEWPORT_ROTATION_ARM_LENGTH,
-        object->position.y + body->position.y -
-            cosf(body->rotation) * EDITOR_VIEWPORT_ROTATION_ARM_LENGTH};
+    return editor_rotation_control_position_get(
+        (Position){object->position.x + body->position.x,
+            object->position.y + body->position.y},
+        body->rotation, EDITOR_VIEWPORT_ROTATION_ARM_LENGTH);
 }
 
 static Position editor_body_rotation_handle_get(const EditorObject *object,
     const EditorRigidBody *body) {
-    return (Position){object->position.x + body->position.x +
-            sinf(body->rotation) * EDITOR_VIEWPORT_ROTATION_ARM_LENGTH,
-        object->position.y + body->position.y -
-            cosf(body->rotation) * EDITOR_VIEWPORT_ROTATION_ARM_LENGTH};
+    return editor_rotation_control_position_get(
+        (Position){object->position.x + body->position.x,
+            object->position.y + body->position.y},
+        body->rotation, EDITOR_VIEWPORT_ROTATION_ARM_LENGTH);
 }
 
 static float editor_segment_distance_squared(Position point, Position start, Position end) {

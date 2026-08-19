@@ -42,3 +42,4 @@ bool editor_bulk_property_set(EditorProject *project, EditorViewportState *state
     EditorHistory *history, const EditorPropertySetCommand *property);
 
 #endif
+

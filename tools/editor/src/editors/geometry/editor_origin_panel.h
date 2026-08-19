@@ -1,7 +1,7 @@
 #ifndef ROHR_EDITOR_ORIGIN_PANEL_H
 #define ROHR_EDITOR_ORIGIN_PANEL_H
 
-#include "editor_panel.h"
+#include "panels/editor_panel.h"
 
 typedef struct EditorOriginPanel {
     TextAsset title;

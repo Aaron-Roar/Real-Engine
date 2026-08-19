@@ -1,21 +1,42 @@
 add_executable(rohr_editor_gui
-    src/editor_file_browser.c
+    src/browser/editor_file_browser.c
     src/editor_history.c
     src/editor_shortcuts.c
     src/editor_navigation.c
     src/editor_viewport.c
-    src/panels/editor_bulk_panel.c
+    src/editors/multi/editor_bulk_panel.c
     src/panels/editor_build_settings_panel.c
     src/panels/editor_build_notifications.c
     src/panels/editor_generation_report.c
     src/panels/editor_notification_panel.c
     src/panels/editor_notification_store.c
-    src/panels/editor_origin_panel.c
+    src/editors/geometry/editor_origin_panel.c
     src/panels/editor_terminal_panel.c
     src/panels/editor_visual_settings_panel.c
     src/panels/editor_error_notifications.c
     src/states/editor_app_state.c
     src/states/editor_project_launcher_state.c
+    src/editors/editor_mode_controls.c
+    src/editors/geometry/editor_vertex.c
+    src/editors/geometry/editor_line.c
+    src/editors/geometry/editor_auto_shape.c
+    src/editors/geometry/editor_hitbox.c
+    src/editors/physics/editor_particle.c
+    src/editors/physics/editor_anchor.c
+    src/editors/physics/editor_rigid_body.c
+    src/editors/physics/editor_joint.c
+    src/editors/soft_body/editor_soft_beam.c
+    src/editors/soft_body/editor_soft_node.c
+    src/editors/soft_body/editor_soft_area.c
+    src/editors/soft_body/editor_soft_body.c
+    src/editors/render/editor_animation_frame.c
+    src/editors/render/editor_sprite.c
+    src/editors/render/editor_animated_sprite.c
+    src/editors/object/editor_object.c
+    src/editors/object/editor_hierarchy.c
+    src/viewport/controls/editor_rotation_control.c
+    src/viewport/controls/editor_coordinate_toggle.c
+    src/viewport/menus/editor_viewport_context_menu.c
     src/main.c
 )
 
@@ -63,11 +84,12 @@ if(ROHR_BUILD_TESTS)
 
     add_executable(editor_navigation_test
         tests/editor_navigation.c
-        src/editor_file_browser.c
+        src/browser/editor_file_browser.c
         src/editor_history.c
         src/editor_navigation.c
         src/editor_viewport.c
-        src/panels/editor_bulk_panel.c
+        src/viewport/controls/editor_rotation_control.c
+        src/editors/multi/editor_bulk_panel.c
     )
     target_include_directories(editor_navigation_test PRIVATE
         src ${PROJECT_SOURCE_DIR}/lib)
@@ -82,6 +104,7 @@ if(ROHR_BUILD_TESTS)
         src/editor_history.c
         src/editor_shortcuts.c
         src/editor_viewport.c
+        src/viewport/controls/editor_rotation_control.c
     )
     target_include_directories(editor_history_test PRIVATE
         src ${PROJECT_SOURCE_DIR}/lib)
