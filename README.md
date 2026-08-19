@@ -116,7 +116,9 @@ CMake:
 ```sh
 ./dev.sh build    # Configure and build the engine, tools, tests, and examples
 ./dev.sh test     # Build and run the test suite
-./dev.sh sdk      # Build and install a portable SDK under dist/rohr
+./dev.sh sdk      # Build the native Release SDK under dist/linux or dist/windows
+./dev.sh sdk-linux
+./dev.sh sdk-windows # Cross-build; requires an x86_64-w64-mingw32 toolchain
 ./dev.sh clean    # Remove build/ and dist/
 ```
 
@@ -124,17 +126,20 @@ On Windows, use `dev.bat build`, `dev.bat test`, `dev.bat sdk`, or
 `dev.bat clean`. CMake remains the authoritative build system; the wrappers only
 provide memorable entry points.
 
-The SDK layout produced by `./dev.sh sdk` is:
+The SDK layout produced by `./dev.sh sdk` is platform-specific:
 
 ```text
-dist/rohr/
-├── bin/          # editor-cli and editor-gui
-├── include/      # Rohr and SDL public headers
-├── lib or lib64/ # Static libraries and CMake packages
-└── share/        # Editor Lua defaults, project template, and licenses
+dist/
+├── linux/
+│   ├── bin/          # editor-cli and editor-gui
+│   ├── include/      # Rohr and SDL public headers
+│   ├── lib or lib64/ # Static libraries and CMake packages
+│   └── share/        # Editor Lua defaults, project template, and licenses
+└── windows/          # Equivalent Windows SDK produced on/cross-built for Windows
 ```
 
-Release archives should contain the contents of `dist/rohr`. The installed
+Release archives should contain the contents of the relevant platform directory.
+The installed
 tools find this SDK relative to their own executable, so project creation does
 not require an engine source path.
 New projects copy the SDK's portable `project-editor.lua` template to a
