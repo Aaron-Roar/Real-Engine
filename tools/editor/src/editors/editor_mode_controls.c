@@ -94,7 +94,9 @@ bool editor_mode_named_text_sync(FontAsset *font,
     if(font == NULL || name == NULL || label == NULL || cache == NULL ||
             cache_capacity == 0) return false;
     if(strncmp(cache, name, cache_capacity) == 0) return true;
-    if(!rohr_graphics_text_value_set(label, name)) return false;
+    if(label->text == NULL) {
+        if(!editor_mode_text_create(font, name, label)) return false;
+    } else if(!rohr_graphics_text_value_set(label, name)) return false;
     snprintf(cache, cache_capacity, "%s", name);
     return true;
 }

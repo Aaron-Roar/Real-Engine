@@ -3320,6 +3320,10 @@ int main(void) {
                             prior_pointer_selection, false);
                     (void)editor_viewport_selection_set(&project, &viewport_state,
                         selection, pan_modifier);
+                    if(selection.kind == EDITOR_SELECTION_SPRITE ||
+                            selection.kind == EDITOR_SELECTION_ANIMATED_SPRITE)
+                        (void)editor_navigation_selected_open(
+                            &project, &viewport_state);
                     pointer_selection_handled = true;
                 }
             }
@@ -3333,7 +3337,9 @@ int main(void) {
         if(workspace.open) {
             EditorNavigationState navigation_after = editor_navigation_state_get(
                 &project, &viewport_state);
-            bool selection_changed = navigation_before.selection !=
+            bool selection_changed = navigation_before.mode !=
+                    navigation_after.mode ||
+                navigation_before.selection !=
                     navigation_after.selection ||
                 navigation_before.object != navigation_after.object ||
                 navigation_before.rigid_body != navigation_after.rigid_body ||
@@ -3343,6 +3349,11 @@ int main(void) {
                 navigation_before.soft_body != navigation_after.soft_body ||
                 navigation_before.soft_node != navigation_after.soft_node ||
                 navigation_before.soft_beam != navigation_after.soft_beam ||
+                navigation_before.sprite != navigation_after.sprite ||
+                navigation_before.animated_sprite !=
+                    navigation_after.animated_sprite ||
+                navigation_before.animation_frame !=
+                    navigation_after.animation_frame ||
                 navigation_before.selected_line != navigation_after.selected_line ||
                 navigation_before.selected_vertex != navigation_after.selected_vertex;
             if(selection_changed && !pointer_selection_handled) {
