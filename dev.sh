@@ -55,21 +55,6 @@ sdk_build() {
     echo "Rohr $platform SDK: $sdk_directory"
 }
 
-sdk_native() {
-    case "$(uname -s)" in
-        Linux*)
-            sdk_nix
-            ;;
-        MINGW*|MSYS*|CYGWIN*)
-            sdk_build windows
-            ;;
-        *)
-            echo "Error: SDK packaging is not configured for $(uname -s)." >&2
-            exit 1
-            ;;
-    esac
-}
-
 sdk_linux_generic() {
     if command -v docker >/dev/null 2>&1; then
         container_runtime=docker
@@ -113,6 +98,12 @@ sdk_windows_cross() {
         -DROHR_HOST_C_COMPILER="$(command -v cc)"
 }
 
+sdk_all() {
+    sdk_nix
+    sdk_linux_generic
+    sdk_windows_cross
+}
+
 case "$operation" in
     build)
         build
@@ -122,7 +113,7 @@ case "$operation" in
         ctest --test-dir "$build_directory" --output-on-failure
         ;;
     sdk)
-        sdk_native
+        sdk_all
         ;;
     sdk-linux)
         sdk_linux_generic

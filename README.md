@@ -116,9 +116,9 @@ CMake:
 ```sh
 ./dev.sh build    # Configure and build the engine, tools, tests, and examples
 ./dev.sh test     # Build and run the test suite
-./dev.sh sdk      # Build the Nix SDK on Linux
+./dev.sh sdk      # Build every SDK distribution
 ./dev.sh sdk-linux # Build generic Linux in a Docker/Podman baseline container
-./dev.sh sdk-nix   # Build the Nix package explicitly
+./dev.sh sdk-nix   # Build the Nix SDK
 ./dev.sh sdk-windows # Cross-build; requires an x86_64-w64-mingw32 toolchain
 ./dev.sh clean    # Remove build/ and dist/
 ```
