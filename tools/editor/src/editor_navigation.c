@@ -677,3 +677,35 @@ void editor_navigation_current_selection_clear(EditorProject *project,
     }
     (void)editor_navigation_open_item_selection_set(state);
 }
+
+bool editor_navigation_viewport_transform_history_update(EditorProject *project,
+        EditorViewportState *state, EditorHistory *history, bool was_active) {
+    bool active;
+    bool tracked = false;
+    if(project == NULL || state == NULL || history == NULL) return false;
+    active = editor_viewport_transform_active_check(state);
+    if(was_active == active) return true;
+    if(was_active) return editor_history_transaction_end(history);
+    if(!editor_history_transaction_begin(history)) {
+        editor_viewport_transform_cancel(state);
+        return false;
+    }
+    for(size_t i = 0; i < state->selected_item_count; i += 1) {
+        if(!editor_history_transaction_object_track(history,
+                state->selected_items[i].object)) {
+            tracked = false;
+            break;
+        }
+        tracked = true;
+    }
+    if(!tracked && project->selected != 0)
+        tracked = editor_history_transaction_object_track(
+            history, project->selected);
+    if(!tracked) {
+        editor_history_transaction_cancel(history);
+        editor_viewport_transform_cancel(state);
+        return false;
+    }
+    editor_history_transaction_commands_suppress_set(history, true);
+    return true;
+}

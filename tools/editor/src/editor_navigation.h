@@ -14,5 +14,7 @@ bool editor_navigation_multi_selection_delete(EditorProject *project,
 bool editor_navigation_selection_reorder(EditorProject *project,
     EditorViewportState *state, EditorSelectionRef source,
     EditorSelectionRef target, bool after, EditorHistory *history);
+bool editor_navigation_viewport_transform_history_update(EditorProject *project,
+    EditorViewportState *state, EditorHistory *history, bool was_active);
 
 #endif

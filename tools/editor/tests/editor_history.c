@@ -1,5 +1,6 @@
 #include "editor_history.h"
 #include "editor_layout.h"
+#include "editor_navigation.h"
 #include "editor_shortcuts.h"
 #include "editor_viewport.h"
 
@@ -33,6 +34,29 @@ static Position test_world_to_screen(Position world) {
             (editor_viewport_bottom - EDITOR_MENU_HEIGHT) * 0.5f - world.y};
 }
 
+static bool viewport_pointer_update(EditorHistory *history,
+        EditorViewportState *viewport, EditorProject *project, Position pointer,
+        MouseButtonState button) {
+    bool active = editor_viewport_transform_active_check(viewport);
+    bool consumed = editor_viewport_update(viewport, project, pointer, button,
+        MOUSE_BUTTON_STATE_UP, false, 0.0f, false);
+    assert(editor_navigation_viewport_transform_history_update(
+        project, viewport, history, active));
+    return consumed;
+}
+
+static bool auto_shape_pointer_update(EditorHistory *history,
+        EditorViewportState *viewport, EditorProject *project,
+        EditorAutoShapeConfig *config, Position pointer,
+        MouseButtonState button) {
+    bool active = editor_viewport_transform_active_check(viewport);
+    bool consumed = editor_viewport_auto_shape_update(viewport, project, config,
+        pointer, button, MOUSE_BUTTON_STATE_UP, false, 0.0f, false);
+    assert(editor_navigation_viewport_transform_history_update(
+        project, viewport, history, active));
+    return consumed;
+}
+
 static void shortcut_apply(EditorHistory *history, SDL_Keycode key) {
     SDL_Event shortcut = {0};
     EditorHistoryShortcutResult result;
@@ -55,6 +79,37 @@ int main(void) {
     EditorCommand command = {.type = EDITOR_COMMAND_ITEM_ADD,
         .data.item_add = {.kind = EDITOR_ITEM_OBJECT}};
     EditorCommandResult result;
+
+    {
+        EditorViewportState transform = {0};
+#define TRANSFORM_FLAG_CHECK(member) \
+        do { \
+            editor_viewport_state_init(&transform); \
+            transform.member = true; \
+            assert(editor_viewport_transform_active_check(&transform)); \
+            editor_viewport_transform_cancel(&transform); \
+            assert(!editor_viewport_transform_active_check(&transform)); \
+        } while(0)
+        TRANSFORM_FLAG_CHECK(dragged_body);
+        TRANSFORM_FLAG_CHECK(rotated_body);
+        TRANSFORM_FLAG_CHECK(dragged_anchor);
+        TRANSFORM_FLAG_CHECK(dragged_soft_node);
+        TRANSFORM_FLAG_CHECK(dragged_soft_body);
+        TRANSFORM_FLAG_CHECK(dragged_sprite);
+        TRANSFORM_FLAG_CHECK(dragged_animated_sprite);
+        TRANSFORM_FLAG_CHECK(rotated_sprite);
+        TRANSFORM_FLAG_CHECK(rotated_animated_sprite);
+        TRANSFORM_FLAG_CHECK(rotated_soft_body);
+        TRANSFORM_FLAG_CHECK(dragged_origin);
+        TRANSFORM_FLAG_CHECK(group_dragging);
+        TRANSFORM_FLAG_CHECK(group_rotating);
+        editor_viewport_state_init(&transform);
+        transform.dragged_vertex = 0;
+        assert(editor_viewport_transform_active_check(&transform));
+        editor_viewport_transform_cancel(&transform);
+        assert(!editor_viewport_transform_active_check(&transform));
+#undef TRANSFORM_FLAG_CHECK
+    }
     EditorViewportState viewport = {0};
 
     editor_project_init(&project);
@@ -166,17 +221,17 @@ int main(void) {
         Position grab = test_world_to_screen(world);
         grab.x += 5.0f;
         grab.y -= 3.0f;
-        editor_history_continuous_set(&history, true);
-        assert(editor_viewport_update(&viewport, &project, grab,
-            MOUSE_BUTTON_STATE_PRESSED, MOUSE_BUTTON_STATE_UP, false, 0.0f, false));
+        assert(viewport_pointer_update(&history, &viewport, &project, grab,
+            MOUSE_BUTTON_STATE_PRESSED));
         assert(history.undo_count == 0);
-        assert(editor_viewport_update(&viewport, &project, grab,
-            MOUSE_BUTTON_STATE_DOWN, MOUSE_BUTTON_STATE_UP, false, 0.0f, false));
+        assert(viewport_pointer_update(&history, &viewport, &project, grab,
+            MOUSE_BUTTON_STATE_DOWN));
         assert(history.undo_count == 0);
         grab.x += 20.0f;
-        assert(editor_viewport_update(&viewport, &project, grab,
-            MOUSE_BUTTON_STATE_DOWN, MOUSE_BUTTON_STATE_UP, false, 0.0f, false));
-        editor_history_continuous_set(&history, false);
+        assert(viewport_pointer_update(&history, &viewport, &project, grab,
+            MOUSE_BUTTON_STATE_DOWN));
+        assert(!viewport_pointer_update(&history, &viewport, &project, grab,
+            MOUSE_BUTTON_STATE_RELEASED));
         assert(history.undo_count == 1);
         assert(editor_history_memory_get(&history) < 4096);
         shortcut_apply(&history, SDLK_Z);
@@ -199,16 +254,16 @@ int main(void) {
             project.objects[0].position.y + original.y});
         grab.x += 4.0f;
         grab.y -= 2.0f;
-        editor_history_continuous_set(&history, true);
-        assert(editor_viewport_update(&viewport, &project, grab,
-            MOUSE_BUTTON_STATE_PRESSED, MOUSE_BUTTON_STATE_UP, false, 0.0f, false));
-        assert(editor_viewport_update(&viewport, &project, grab,
-            MOUSE_BUTTON_STATE_DOWN, MOUSE_BUTTON_STATE_UP, false, 0.0f, false));
+        assert(viewport_pointer_update(&history, &viewport, &project, grab,
+            MOUSE_BUTTON_STATE_PRESSED));
+        assert(viewport_pointer_update(&history, &viewport, &project, grab,
+            MOUSE_BUTTON_STATE_DOWN));
         assert(history.undo_count == 0);
         grab.x += 20.0f;
-        assert(editor_viewport_update(&viewport, &project, grab,
-            MOUSE_BUTTON_STATE_DOWN, MOUSE_BUTTON_STATE_UP, false, 0.0f, false));
-        editor_history_continuous_set(&history, false);
+        assert(viewport_pointer_update(&history, &viewport, &project, grab,
+            MOUSE_BUTTON_STATE_DOWN));
+        assert(!viewport_pointer_update(&history, &viewport, &project, grab,
+            MOUSE_BUTTON_STATE_RELEASED));
         assert(history.undo_count == 1);
         shortcut_apply(&history, SDLK_Z);
         assert(anchor->position.x == original.x);
@@ -234,16 +289,16 @@ int main(void) {
             project.objects[0].position.y + soft_body->position.y + original.y});
         grab.x += 3.0f;
         grab.y -= 4.0f;
-        editor_history_continuous_set(&history, true);
-        assert(editor_viewport_update(&viewport, &project, grab,
-            MOUSE_BUTTON_STATE_PRESSED, MOUSE_BUTTON_STATE_UP, false, 0.0f, false));
-        assert(editor_viewport_update(&viewport, &project, grab,
-            MOUSE_BUTTON_STATE_DOWN, MOUSE_BUTTON_STATE_UP, false, 0.0f, false));
+        assert(viewport_pointer_update(&history, &viewport, &project, grab,
+            MOUSE_BUTTON_STATE_PRESSED));
+        assert(viewport_pointer_update(&history, &viewport, &project, grab,
+            MOUSE_BUTTON_STATE_DOWN));
         assert(history.undo_count == 0);
         grab.x += 20.0f;
-        assert(editor_viewport_update(&viewport, &project, grab,
-            MOUSE_BUTTON_STATE_DOWN, MOUSE_BUTTON_STATE_UP, false, 0.0f, false));
-        editor_history_continuous_set(&history, false);
+        assert(viewport_pointer_update(&history, &viewport, &project, grab,
+            MOUSE_BUTTON_STATE_DOWN));
+        assert(!viewport_pointer_update(&history, &viewport, &project, grab,
+            MOUSE_BUTTON_STATE_RELEASED));
         assert(history.undo_count == 1);
         shortcut_apply(&history, SDLK_Z);
         assert(soft_node->position.x == original.x);
@@ -285,15 +340,13 @@ int main(void) {
         Position grab = test_world_to_screen((Position){
             project.objects[0].position.x + body->position.x,
             project.objects[0].position.y + body->position.y - config.radius});
-        editor_history_continuous_set(&history, true);
-        assert(editor_viewport_auto_shape_update(&viewport, &project, &config,
-            grab, MOUSE_BUTTON_STATE_PRESSED, MOUSE_BUTTON_STATE_UP,
-            false, 0.0f, false));
+        assert(auto_shape_pointer_update(&history, &viewport, &project, &config,
+            grab, MOUSE_BUTTON_STATE_PRESSED));
         grab.y += 20.0f;
-        assert(editor_viewport_auto_shape_update(&viewport, &project, &config,
-            grab, MOUSE_BUTTON_STATE_DOWN, MOUSE_BUTTON_STATE_UP,
-            false, 0.0f, false));
-        editor_history_continuous_set(&history, false);
+        assert(auto_shape_pointer_update(&history, &viewport, &project, &config,
+            grab, MOUSE_BUTTON_STATE_DOWN));
+        assert(!auto_shape_pointer_update(&history, &viewport, &project, &config,
+            grab, MOUSE_BUTTON_STATE_RELEASED));
         assert(fabsf(config.radius - 50.0f) < 0.001f);
         assert(fabsf(hitbox->vertices[0].position.y + 50.0f) < 0.001f);
         for(size_t i = 0; i < hitbox->vertex_count; i += 1) {
@@ -332,15 +385,13 @@ int main(void) {
             Position grab = test_world_to_screen((Position){
                 project.objects[0].position.x + soft_body->position.x,
                 project.objects[0].position.y + soft_body->position.y - config.radius});
-            editor_history_continuous_set(&history, true);
-            assert(editor_viewport_auto_shape_update(&viewport, &project, &config,
-                grab, MOUSE_BUTTON_STATE_PRESSED, MOUSE_BUTTON_STATE_UP,
-                false, 0.0f, false));
+            assert(auto_shape_pointer_update(&history, &viewport, &project,
+                &config, grab, MOUSE_BUTTON_STATE_PRESSED));
             grab.y += 10.0f;
-            assert(editor_viewport_auto_shape_update(&viewport, &project, &config,
-                grab, MOUSE_BUTTON_STATE_DOWN, MOUSE_BUTTON_STATE_UP,
-                false, 0.0f, false));
-            editor_history_continuous_set(&history, false);
+            assert(auto_shape_pointer_update(&history, &viewport, &project,
+                &config, grab, MOUSE_BUTTON_STATE_DOWN));
+            assert(!auto_shape_pointer_update(&history, &viewport, &project,
+                &config, grab, MOUSE_BUTTON_STATE_RELEASED));
             assert(fabsf(config.radius - 50.0f) < 0.001f);
             for(size_t i = 0; i < soft_body->node_count; i += 1) {
                 float radius = hypotf(soft_body->nodes[i].position.x,
@@ -377,19 +428,13 @@ int main(void) {
         assert(editor_viewport_selection_set(&project, &viewport, soft, true));
         handle = test_world_to_screen((Position){-10.0f, 0.0f});
         target = test_world_to_screen((Position){-8.0f, 0.0f});
-        assert(editor_viewport_update(&viewport, &project, handle,
-            MOUSE_BUTTON_STATE_PRESSED, MOUSE_BUTTON_STATE_UP,
-            false, 0.0f, false));
+        assert(viewport_pointer_update(&history, &viewport, &project, handle,
+            MOUSE_BUTTON_STATE_PRESSED));
         assert(viewport.group_dragging && viewport.selected_item_count == 2);
-        assert(editor_history_transaction_begin(&history));
-        assert(editor_history_transaction_object_track(&history, rigid.object));
-        assert(editor_viewport_update(&viewport, &project, target,
-            MOUSE_BUTTON_STATE_DOWN, MOUSE_BUTTON_STATE_UP,
-            false, 0.0f, false));
-        assert(!editor_viewport_update(&viewport, &project, target,
-            MOUSE_BUTTON_STATE_RELEASED, MOUSE_BUTTON_STATE_UP,
-            false, 0.0f, false));
-        assert(editor_history_transaction_end(&history));
+        assert(viewport_pointer_update(&history, &viewport, &project, target,
+            MOUSE_BUTTON_STATE_DOWN));
+        assert(!viewport_pointer_update(&history, &viewport, &project, target,
+            MOUSE_BUTTON_STATE_RELEASED));
         assert(fabsf(body->position.x + 8.0f) < 0.001f);
         assert(fabsf(soft_body->position.x - 12.0f) < 0.001f);
         assert(history.undo_count == 1);
@@ -421,19 +466,13 @@ int main(void) {
             EDITOR_VIEWPORT_ROTATION_ARM_LENGTH});
         target = test_world_to_screen((Position){
             EDITOR_VIEWPORT_ROTATION_ARM_LENGTH, 0.0f});
-        assert(editor_viewport_update(&viewport, &project, handle,
-            MOUSE_BUTTON_STATE_PRESSED, MOUSE_BUTTON_STATE_UP,
-            false, 0.0f, false));
+        assert(viewport_pointer_update(&history, &viewport, &project, handle,
+            MOUSE_BUTTON_STATE_PRESSED));
         assert(viewport.group_rotating);
-        assert(editor_history_transaction_begin(&history));
-        assert(editor_history_transaction_object_track(&history, rigid.object));
-        assert(editor_viewport_update(&viewport, &project, target,
-            MOUSE_BUTTON_STATE_DOWN, MOUSE_BUTTON_STATE_UP,
-            false, 0.0f, false));
-        assert(!editor_viewport_update(&viewport, &project, target,
-            MOUSE_BUTTON_STATE_RELEASED, MOUSE_BUTTON_STATE_UP,
-            false, 0.0f, false));
-        assert(editor_history_transaction_end(&history));
+        assert(viewport_pointer_update(&history, &viewport, &project, target,
+            MOUSE_BUTTON_STATE_DOWN));
+        assert(!viewport_pointer_update(&history, &viewport, &project, target,
+            MOUSE_BUTTON_STATE_RELEASED));
         assert(fabsf(body->position.x) < 0.001f &&
             fabsf(body->position.y - 10.0f) < 0.001f);
         assert(fabsf(soft_body->position.x) < 0.001f &&
@@ -537,6 +576,216 @@ int main(void) {
             assert(fabsf(body->rotation - 1.57079632679f) < 0.001f);
             assert(fabsf(connected_body->rotation - 1.57079632679f) < 0.001f);
         }
+    }
+
+    {
+        EditorObject *object = &project.objects[0];
+        EditorSprite *sprite = editor_project_sprite_add(
+            &project, object, "drag_sprite", "sprite.png");
+        EditorSpriteId sprite_id;
+        Position grab;
+        Position moved;
+        assert(sprite != NULL);
+        sprite_id = sprite->id;
+        sprite->position = (Position){300.0f, 150.0f};
+        editor_history_reset(&history);
+        editor_viewport_state_init(&viewport);
+        viewport.mode = EDITOR_VIEWPORT_OBJECT;
+        grab = test_world_to_screen((Position){300.0f, 150.0f});
+        moved = grab;
+        moved.x += 25.0f;
+        assert(viewport_pointer_update(&history, &viewport, &project, grab,
+            MOUSE_BUTTON_STATE_PRESSED));
+        assert(viewport.dragged_sprite);
+        assert(viewport_pointer_update(&history, &viewport, &project, moved,
+            MOUSE_BUTTON_STATE_DOWN));
+        moved.x += 15.0f;
+        assert(viewport_pointer_update(&history, &viewport, &project, moved,
+            MOUSE_BUTTON_STATE_DOWN));
+        assert(!viewport_pointer_update(&history, &viewport, &project, moved,
+            MOUSE_BUTTON_STATE_RELEASED));
+        assert(history.undo_count == 1);
+        assert(editor_history_undo(&history));
+        object = &project.objects[0];
+        sprite = editor_project_sprite_get(object, sprite_id);
+        assert(sprite != NULL && sprite->position.x == 300.0f);
+        assert(editor_history_redo(&history));
+        object = &project.objects[0];
+        sprite = editor_project_sprite_get(object, sprite_id);
+        assert(sprite != NULL && sprite->position.x == 340.0f);
+
+        editor_history_reset(&history);
+        editor_viewport_state_init(&viewport);
+        viewport.mode = EDITOR_VIEWPORT_SPRITE;
+        viewport.selection = EDITOR_SELECTION_SPRITE;
+        viewport.selected_sprite = sprite_id;
+        grab = test_world_to_screen((Position){sprite->position.x,
+            sprite->position.y - EDITOR_VIEWPORT_ROTATION_ARM_LENGTH});
+        moved = test_world_to_screen((Position){
+            sprite->position.x + EDITOR_VIEWPORT_ROTATION_ARM_LENGTH,
+            sprite->position.y});
+        assert(viewport_pointer_update(&history, &viewport, &project, grab,
+            MOUSE_BUTTON_STATE_PRESSED));
+        assert(viewport.rotated_sprite);
+        assert(viewport_pointer_update(&history, &viewport, &project, moved,
+            MOUSE_BUTTON_STATE_DOWN));
+        assert(!viewport_pointer_update(&history, &viewport, &project, moved,
+            MOUSE_BUTTON_STATE_RELEASED));
+        assert(history.undo_count == 1);
+        assert(editor_history_undo(&history));
+        object = &project.objects[0];
+        sprite = editor_project_sprite_get(object, sprite_id);
+        assert(sprite != NULL && fabsf(sprite->rotation) < 0.001f);
+        assert(editor_history_redo(&history));
+        object = &project.objects[0];
+        sprite = editor_project_sprite_get(object, sprite_id);
+        assert(sprite != NULL &&
+            fabsf(sprite->rotation - 1.57079632679f) < 0.001f);
+        assert(editor_project_sprite_remove(object, sprite_id));
+    }
+
+    {
+        EditorObject *object = &project.objects[0];
+        EditorRigidBodyId body_id = body->id;
+        Position grab;
+        Position moved;
+        body = editor_project_rigid_body_get(object, body_id);
+        assert(body != NULL);
+        body->position = (Position){100.0f, -150.0f};
+        editor_history_reset(&history);
+        editor_viewport_state_init(&viewport);
+        viewport.mode = EDITOR_VIEWPORT_ORIGIN;
+        viewport.selection = EDITOR_SELECTION_ORIGIN;
+        viewport.selected_origin_kind = EDITOR_ORIGIN_RIGID_BODY;
+        viewport.selected_rigid_body = body_id;
+        grab = test_world_to_screen(body->position);
+        moved = grab;
+        moved.x += 30.0f;
+        assert(viewport_pointer_update(&history, &viewport, &project, grab,
+            MOUSE_BUTTON_STATE_PRESSED));
+        assert(viewport.dragged_origin);
+        assert(viewport_pointer_update(&history, &viewport, &project, moved,
+            MOUSE_BUTTON_STATE_DOWN));
+        assert(!viewport_pointer_update(&history, &viewport, &project, moved,
+            MOUSE_BUTTON_STATE_RELEASED));
+        assert(history.undo_count == 1);
+        assert(editor_history_undo(&history));
+        object = &project.objects[0];
+        body = editor_project_rigid_body_get(object, body_id);
+        assert(body != NULL && body->position.x == 100.0f);
+        assert(editor_history_redo(&history));
+        object = &project.objects[0];
+        body = editor_project_rigid_body_get(object, body_id);
+        assert(body != NULL && body->position.x == 130.0f);
+    }
+
+    {
+        EditorObject *object = &project.objects[0];
+        EditorSoftBodyId body_id = soft_body->id;
+        Position grab;
+        Position moved;
+        soft_body = NULL;
+        for(size_t i = 0; i < object->soft_body_count; i += 1)
+            if(object->soft_body_items[i].id == body_id)
+                soft_body = &object->soft_body_items[i];
+        assert(soft_body != NULL);
+        soft_body->position = (Position){-100.0f, -150.0f};
+        editor_history_reset(&history);
+        editor_viewport_state_init(&viewport);
+        viewport.mode = EDITOR_VIEWPORT_ORIGIN;
+        viewport.selection = EDITOR_SELECTION_ORIGIN;
+        viewport.selected_origin_kind = EDITOR_ORIGIN_SOFT_BODY;
+        viewport.selected_soft_body = body_id;
+        grab = test_world_to_screen(soft_body->position);
+        moved = grab;
+        moved.x += 30.0f;
+        assert(viewport_pointer_update(&history, &viewport, &project, grab,
+            MOUSE_BUTTON_STATE_PRESSED));
+        assert(viewport.dragged_origin);
+        assert(viewport_pointer_update(&history, &viewport, &project, moved,
+            MOUSE_BUTTON_STATE_DOWN));
+        assert(!viewport_pointer_update(&history, &viewport, &project, moved,
+            MOUSE_BUTTON_STATE_RELEASED));
+        assert(history.undo_count == 1);
+        assert(editor_history_undo(&history));
+        object = &project.objects[0];
+        soft_body = NULL;
+        for(size_t i = 0; i < object->soft_body_count; i += 1)
+            if(object->soft_body_items[i].id == body_id)
+                soft_body = &object->soft_body_items[i];
+        assert(soft_body != NULL && soft_body->position.x == -100.0f);
+        assert(editor_history_redo(&history));
+        object = &project.objects[0];
+        soft_body = NULL;
+        for(size_t i = 0; i < object->soft_body_count; i += 1)
+            if(object->soft_body_items[i].id == body_id)
+                soft_body = &object->soft_body_items[i];
+        assert(soft_body != NULL && soft_body->position.x == -70.0f);
+    }
+
+    {
+        EditorObject *object = &project.objects[0];
+        EditorAnimatedSprite *animation =
+            editor_project_animated_sprite_add(&project, object);
+        EditorAnimatedSpriteId animation_id;
+        Position grab;
+        Position moved;
+        assert(animation != NULL);
+        animation_id = animation->id;
+        animation->editor_position = (Position){-300.0f, 150.0f};
+        assert(editor_project_animation_frame_add(&project, animation,
+            "frame", "frame.png", (Scale){64.0f, 64.0f}));
+        editor_history_reset(&history);
+        editor_viewport_state_init(&viewport);
+        viewport.mode = EDITOR_VIEWPORT_OBJECT;
+        grab = test_world_to_screen((Position){-300.0f, 150.0f});
+        moved = grab;
+        moved.x += 40.0f;
+        assert(viewport_pointer_update(&history, &viewport, &project, grab,
+            MOUSE_BUTTON_STATE_PRESSED));
+        assert(viewport.dragged_animated_sprite);
+        assert(viewport_pointer_update(&history, &viewport, &project, moved,
+            MOUSE_BUTTON_STATE_DOWN));
+        assert(!viewport_pointer_update(&history, &viewport, &project, moved,
+            MOUSE_BUTTON_STATE_RELEASED));
+        assert(history.undo_count == 1);
+        assert(editor_history_undo(&history));
+        object = &project.objects[0];
+        animation = editor_project_animated_sprite_get(object, animation_id);
+        assert(animation != NULL && animation->editor_position.x == -300.0f);
+        assert(editor_history_redo(&history));
+        object = &project.objects[0];
+        animation = editor_project_animated_sprite_get(object, animation_id);
+        assert(animation != NULL && animation->editor_position.x == -260.0f);
+
+        editor_history_reset(&history);
+        editor_viewport_state_init(&viewport);
+        viewport.mode = EDITOR_VIEWPORT_ANIMATED_SPRITE;
+        viewport.selection = EDITOR_SELECTION_ANIMATED_SPRITE;
+        viewport.selected_animated_sprite = animation_id;
+        grab = test_world_to_screen((Position){animation->editor_position.x,
+            animation->editor_position.y - EDITOR_VIEWPORT_ROTATION_ARM_LENGTH});
+        moved = test_world_to_screen((Position){
+            animation->editor_position.x + EDITOR_VIEWPORT_ROTATION_ARM_LENGTH,
+            animation->editor_position.y});
+        assert(viewport_pointer_update(&history, &viewport, &project, grab,
+            MOUSE_BUTTON_STATE_PRESSED));
+        assert(viewport.rotated_animated_sprite);
+        assert(viewport_pointer_update(&history, &viewport, &project, moved,
+            MOUSE_BUTTON_STATE_DOWN));
+        assert(!viewport_pointer_update(&history, &viewport, &project, moved,
+            MOUSE_BUTTON_STATE_RELEASED));
+        assert(history.undo_count == 1);
+        assert(editor_history_undo(&history));
+        object = &project.objects[0];
+        animation = editor_project_animated_sprite_get(object, animation_id);
+        assert(animation != NULL && fabsf(animation->editor_rotation) < 0.001f);
+        assert(editor_history_redo(&history));
+        object = &project.objects[0];
+        animation = editor_project_animated_sprite_get(object, animation_id);
+        assert(animation != NULL &&
+            fabsf(animation->editor_rotation - 1.57079632679f) < 0.001f);
+        assert(editor_project_animated_sprite_remove(object, animation_id));
     }
 
     command = (EditorCommand){.type = EDITOR_COMMAND_ITEM_REMOVE,

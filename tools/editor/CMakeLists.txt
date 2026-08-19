@@ -102,6 +102,7 @@ if(ROHR_BUILD_TESTS)
     add_executable(editor_history_test
         tests/editor_history.c
         src/editor_history.c
+        src/editor_navigation.c
         src/editor_shortcuts.c
         src/editor_viewport.c
         src/viewport/controls/editor_rotation_control.c

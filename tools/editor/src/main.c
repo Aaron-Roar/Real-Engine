@@ -3269,38 +3269,8 @@ int main(void) {
                         viewport_wheel_y, ui_consumed);
                 viewport_state.selection_modifier = false;
             }
-            {
-                bool transform_after =
-                    editor_viewport_transform_active_check(&viewport_state);
-                if(!transform_before && transform_after) {
-                    bool tracked = false;
-                    if(!editor_history_transaction_begin(&history)) {
-                        editor_viewport_transform_cancel(&viewport_state);
-                    } else {
-                        for(size_t i = 0;
-                                i < viewport_state.selected_item_count; i += 1) {
-                            if(!editor_history_transaction_object_track(&history,
-                                    viewport_state.selected_items[i].object)) {
-                                tracked = false;
-                                break;
-                            }
-                            tracked = true;
-                        }
-                        if(!tracked && project.selected != 0)
-                            tracked = editor_history_transaction_object_track(
-                                &history, project.selected);
-                        if(!tracked) {
-                            editor_history_transaction_cancel(&history);
-                            editor_viewport_transform_cancel(&viewport_state);
-                        } else {
-                            editor_history_transaction_commands_suppress_set(
-                                &history, true);
-                        }
-                    }
-                } else if(transform_before && !transform_after) {
-                    (void)editor_history_transaction_end(&history);
-                }
-            }
+            (void)editor_navigation_viewport_transform_history_update(
+                &project, &viewport_state, &history, transform_before);
 
             if(mouse.button_states[MOUSE_BUTTON_LEFT] ==
                         MOUSE_BUTTON_STATE_PRESSED &&
