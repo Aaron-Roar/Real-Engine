@@ -22,6 +22,11 @@ option(ROHR_BUILD_SDK_CONSUMER_TESTS
     "Test an external consumer against the installed Rohr SDK" OFF)
 set(ROHR_SDK_INSTALL_PREFIX "" CACHE PATH
     "Installed SDK prefix used by external consumer tests")
+if(MSVC AND ROHR_PORTABLE_SDK)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY
+        "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING
+        "MSVC runtime linked by Rohr SDK targets" FORCE)
+endif()
 
 set(ROHR_LUA_SOURCES
     lib/lua/lapi.c
@@ -109,6 +114,10 @@ else()
     set(SDLTTF_HARFBUZZ ON CACHE BOOL "Build SDL_ttf HarfBuzz support" FORCE)
 endif()
 add_subdirectory(lib/SDL_ttf)
+if(ROHR_PORTABLE_SDK AND CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(SDL3_ttf-static PRIVATE
+        -Wno-unused-local-typedefs)
+endif()
 if(WIN32 AND SDLTTF_VENDORED)
     install(SCRIPT
         "${CMAKE_CURRENT_BINARY_DIR}/lib/SDL_ttf/external/freetype/cmake_install.cmake")

@@ -7,107 +7,161 @@
 
   outputs = { self, nixpkgs }:
     let
-      system = "x86_64-linux";
+      supportedSystems = [ "x86_64-linux" "aarch64-linux" ];
+      forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
+      packageSet = system: import nixpkgs { inherit system; };
 
-      pkgs = import nixpkgs {
-        inherit system;
-      };
+      runtimeLibraries = pkgs: with pkgs; [
+        alsa-lib
+        libdecor
+        libglvnd
+        libx11
+        libxcb
+        libxcursor
+        libxext
+        libxfixes
+        libxi
+        libxkbcommon
+        libxrandr
+        libxscrnsaver
+        libxtst
+        pipewire
+        pulseaudio
+        wayland
+      ];
 
-      buildExamples = pkgs.writeShellApplication {
-        name = "build-examples";
+      sdkPackage = system:
+        let
+          pkgs = packageSet system;
+        in pkgs.stdenv.mkDerivation {
+          pname = "rohr-sdk";
+          version = "0.1.0";
+          src = pkgs.lib.cleanSource ./.;
 
-        runtimeInputs = with pkgs; [
-          clang
-          gnumake
-          pkg-config
-          coreutils
-          ffmpeg
-        ];
+          nativeBuildInputs = with pkgs; [
+            cmake
+            gnumake
+            makeWrapper
+            pkg-config
+            wayland-scanner
+          ];
 
-        text = ''
-          if [[ ! -f Makefile ]]; then
-            echo "Error: run this command from the project root."
-            echo "No Makefile was found in: $PWD"
-            exit 1
-          fi
+          buildInputs = (runtimeLibraries pkgs) ++ (with pkgs; [
+            freetype
+            harfbuzz
+            libffi
+            wayland-protocols
+          ]);
 
-          export PKG_CONFIG_PATH="${
-            pkgs.lib.makeSearchPath "lib/pkgconfig" [
-              pkgs.sdl3
-              pkgs.sdl3-image
-              pkgs.sdl3-ttf
-            ]
-          }:${
-            pkgs.lib.makeSearchPath "share/pkgconfig" [
-              pkgs.sdl3
-              pkgs.sdl3-image
-              pkgs.sdl3-ttf
-            ]
-          }''${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+          cmakeFlags = [
+            "-DCMAKE_BUILD_TYPE=Release"
+            "-DROHR_BUILD_EXAMPLES=OFF"
+            "-DROHR_BUILD_TESTS=OFF"
+            "-DROHR_ENABLE_DOCUMENTATION=OFF"
+            "-DROHR_PORTABLE_SDK=ON"
+          ];
 
-          echo "Clearing build/examples..."
-          rm -rf build/examples
-          mkdir -p build/examples
+          postFixup = ''
+            wrapProgram "$out/bin/editor-gui" \
+              --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath (runtimeLibraries pkgs)}"
+          '';
 
-          echo "Building examples..."
-          make build
+          doInstallCheck = true;
+          installCheckPhase = ''
+            runHook preInstallCheck
+            cmake -S "$NIX_BUILD_TOP/$sourceRoot/tests/installed_sdk_consumer" \
+              -B "$TMPDIR/rohr-sdk-consumer" \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_PREFIX_PATH="$out"
+            cmake --build "$TMPDIR/rohr-sdk-consumer" --parallel
+            runHook postInstallCheck
+          '';
 
-          echo
-          echo "Built binaries:"
-          find build/examples -maxdepth 1 -type f -executable -print
-        '';
-      };
+          meta = {
+            description = "Rohr Engine SDK and editor tools";
+            platforms = supportedSystems;
+          };
+        };
+
+      buildExamples = system:
+        let
+          pkgs = packageSet system;
+        in pkgs.writeShellApplication {
+          name = "build-examples";
+
+          runtimeInputs = with pkgs; [
+            clang
+            gnumake
+            pkg-config
+            coreutils
+            ffmpeg
+          ];
+
+          text = ''
+            if [[ ! -f Makefile ]]; then
+              echo "Error: run this command from the project root."
+              echo "No Makefile was found in: $PWD"
+              exit 1
+            fi
+
+            echo "Clearing build/examples..."
+            rm -rf build/examples
+            mkdir -p build/examples
+
+            echo "Building examples..."
+            make build
+
+            echo
+            echo "Built binaries:"
+            find build/examples -maxdepth 1 -type f -executable -print
+          '';
+        };
     in {
-      apps.${system} = {
+      packages = forAllSystems (system: {
+        default = sdkPackage system;
+        sdk = sdkPackage system;
+      });
+
+      apps = forAllSystems (system: {
         default = {
           type = "app";
-          program = "${buildExamples}/bin/build-examples";
+          program = "${buildExamples system}/bin/build-examples";
+          meta.description = "Build Rohr examples";
         };
-
         build-examples = {
           type = "app";
-          program = "${buildExamples}/bin/build-examples";
+          program = "${buildExamples system}/bin/build-examples";
+          meta.description = "Build Rohr examples";
         };
-      };
+      });
 
-      devShells.${system}.default = pkgs.mkShell {
-        shellHook = ''
-          export ROHR_DEV_SHELL=1
-        '';
+      devShells = forAllSystems (system:
+        let
+          pkgs = packageSet system;
+        in {
+          default = pkgs.mkShell {
+            shellHook = ''
+              export ROHR_DEV_SHELL=1
+            '';
 
-        nativeBuildInputs = with pkgs; [
-          clang
-          cmake
-          doxygen
-          pandoc
-          gnumake
-          pkg-config
-          ffmpeg
-          wayland-scanner
-        ];
+            nativeBuildInputs = with pkgs; [
+              clang
+              cmake
+              doxygen
+              pandoc
+              gnumake
+              pkg-config
+              ffmpeg
+              wayland-scanner
+            ];
 
-        buildInputs = with pkgs; [
-          alsa-lib
-          freetype
-          harfbuzz
-          libdecor
-          libffi
-          libglvnd
-          libx11
-          libxcb
-          libxcursor
-          libxext
-          libxfixes
-          libxi
-          libxkbcommon
-          libxrandr
-          libxscrnsaver
-          libxtst
-          pipewire
-          pulseaudio
-          wayland
-          wayland-protocols
-        ];
-      };
+            buildInputs = (runtimeLibraries pkgs) ++ (with pkgs; [
+              freetype
+              harfbuzz
+              libffi
+              wayland-protocols
+            ]);
+          };
+        });
     };
 }

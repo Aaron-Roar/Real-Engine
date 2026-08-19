@@ -5,7 +5,14 @@ project_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 build_directory="$project_root/build"
 operation=${1:-build}
 
-if [ -z "${ROHR_DEV_SHELL:-}" ]; then
+needs_dev_shell=true
+case "$operation" in
+    sdk|sdk-linux|sdk-nix)
+        needs_dev_shell=false
+        ;;
+esac
+
+if [ "$needs_dev_shell" = true ] && [ -z "${ROHR_DEV_SHELL:-}" ]; then
     if ! command -v nix >/dev/null 2>&1; then
         echo "Error: Nix is required to enter the Rohr development environment." >&2
         echo "Install Nix, then run: $0 $*" >&2
@@ -51,7 +58,7 @@ sdk_build() {
 sdk_native() {
     case "$(uname -s)" in
         Linux*)
-            sdk_build linux
+            sdk_nix
             ;;
         MINGW*|MSYS*|CYGWIN*)
             sdk_build windows
@@ -61,6 +68,39 @@ sdk_native() {
             exit 1
             ;;
     esac
+}
+
+sdk_linux_generic() {
+    if command -v docker >/dev/null 2>&1; then
+        container_runtime=docker
+        set -- --user "$(id -u):$(id -g)"
+    elif command -v podman >/dev/null 2>&1; then
+        container_runtime=podman
+        set --
+    else
+        echo "Error: Docker or Podman is required for sdk-linux." >&2
+        exit 1
+    fi
+
+    mkdir -p "$project_root/dist"
+    "$container_runtime" build \
+        -f "$project_root/packaging/linux/Dockerfile" \
+        -t rohr-linux-sdk-builder "$project_root"
+    "$container_runtime" run --rm \
+        "$@" \
+        -v "$project_root:/workspace:ro" \
+        -v "$project_root/dist:/dist" \
+        rohr-linux-sdk-builder
+}
+
+sdk_nix() {
+    if ! command -v nix >/dev/null 2>&1; then
+        echo "Error: Nix is required for sdk-nix." >&2
+        exit 1
+    fi
+    mkdir -p "$project_root/dist"
+    nix build "$project_root#sdk" --out-link "$project_root/dist/nix"
+    echo "Rohr Nix SDK: $project_root/dist/nix"
 }
 
 sdk_windows_cross() {
@@ -85,7 +125,10 @@ case "$operation" in
         sdk_native
         ;;
     sdk-linux)
-        sdk_build linux
+        sdk_linux_generic
+        ;;
+    sdk-nix)
+        sdk_nix
         ;;
     sdk-windows)
         sdk_windows_cross
@@ -95,7 +138,7 @@ case "$operation" in
         cmake -E remove_directory "$project_root/dist"
         ;;
     *)
-        echo "usage: ./dev.sh [build|test|sdk|sdk-linux|sdk-windows|clean]" >&2
+        echo "usage: ./dev.sh [build|test|sdk|sdk-linux|sdk-nix|sdk-windows|clean]" >&2
         exit 1
         ;;
 esac

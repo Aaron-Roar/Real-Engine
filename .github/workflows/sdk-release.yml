@@ -1,0 +1,47 @@
+name: SDK distributions
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  linux-generic:
+    name: Generic Linux SDK
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test generic Linux SDK
+        run: ./dev.sh sdk-linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rohr-sdk-linux-x86_64
+          path: dist/rohr-sdk-linux-x86_64.tar.gz
+          if-no-files-found: error
+
+  nix:
+    name: Nix SDK
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+      - name: Build and test Nix package
+        run: nix build .#sdk --print-build-logs
+
+  windows:
+    name: Windows SDK
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test Windows SDK
+        shell: cmd
+        run: dev.bat sdk
+      - name: Create Windows SDK archive
+        shell: pwsh
+        run: Compress-Archive -Path dist/windows/* -DestinationPath dist/rohr-sdk-windows-x86_64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rohr-sdk-windows-x86_64
+          path: dist/rohr-sdk-windows-x86_64.zip
+          if-no-files-found: error

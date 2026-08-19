@@ -116,8 +116,9 @@ CMake:
 ```sh
 ./dev.sh build    # Configure and build the engine, tools, tests, and examples
 ./dev.sh test     # Build and run the test suite
-./dev.sh sdk      # Build the native Release SDK under dist/linux or dist/windows
-./dev.sh sdk-linux
+./dev.sh sdk      # Build the Nix SDK on Linux
+./dev.sh sdk-linux # Build generic Linux in a Docker/Podman baseline container
+./dev.sh sdk-nix   # Build the Nix package explicitly
 ./dev.sh sdk-windows # Cross-build; requires an x86_64-w64-mingw32 toolchain
 ./dev.sh clean    # Remove build/ and dist/
 ```
@@ -126,17 +127,25 @@ On Windows, use `dev.bat build`, `dev.bat test`, `dev.bat sdk`, or
 `dev.bat clean`. CMake remains the authoritative build system; the wrappers only
 provide memorable entry points.
 
-The SDK layout produced by `./dev.sh sdk` is platform-specific:
+SDK releases use three independently tested distribution paths:
 
 ```text
 dist/
-├── linux/
+├── linux/             # Generic Linux SDK built against the release baseline
 │   ├── bin/          # editor-cli and editor-gui
 │   ├── include/      # Rohr and SDL public headers
 │   ├── lib or lib64/ # Static libraries and CMake packages
 │   └── share/        # Editor Lua defaults, project template, and licenses
-└── windows/          # Equivalent Windows SDK produced on/cross-built for Windows
+├── nix -> /nix/store/... # Nix package output created by nix build
+└── windows/          # Native MSVC Windows SDK
 ```
+
+`./dev.sh sdk-linux` also creates
+`dist/rohr-sdk-linux-x86_64.tar.gz`. The generic build runs inside the baseline
+container under `packaging/linux/`; it intentionally contains no Nix store
+paths. `./dev.sh sdk-nix` supports the Linux systems declared by `flake.nix`
+and produces a Nix output link instead of a relocatable archive. Run
+`dev.bat sdk` on Windows for the native, statically linked runtime package.
 
 Release archives should contain the contents of the relevant platform directory.
 The installed
