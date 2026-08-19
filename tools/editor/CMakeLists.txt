@@ -14,6 +14,8 @@ add_executable(rohr_editor_gui
     src/panels/editor_terminal_panel.c
     src/panels/editor_visual_settings_panel.c
     src/panels/editor_error_notifications.c
+    src/states/editor_app_state.c
+    src/states/editor_project_launcher_state.c
     src/main.c
 )
 
@@ -39,6 +41,16 @@ install(TARGETS rohr_editor_gui RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(DIRECTORY assets/ DESTINATION ${CMAKE_INSTALL_BINDIR}/assets)
 
 if(ROHR_BUILD_TESTS)
+    add_executable(editor_app_state_test
+        tests/editor_app_state.c
+        src/states/editor_app_state.c
+    )
+    target_include_directories(editor_app_state_test PRIVATE src)
+    set_target_properties(editor_app_state_test PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests
+    )
+    add_test(NAME editor_app_state COMMAND editor_app_state_test)
+
     add_executable(editor_project_test
         tests/editor_project.c
     )

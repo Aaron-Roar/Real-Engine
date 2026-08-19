@@ -25,6 +25,8 @@
 #include "panels/editor_terminal_panel.h"
 #include "panels/editor_visual_settings_panel.h"
 #include "panels/editor_error_notifications.h"
+#include "states/editor_app_state.h"
+#include "states/editor_project_launcher_state.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -2064,6 +2066,8 @@ int main(void) {
     EditorViewportState viewport_state = {0};
     EditorFileBrowser file_browser;
     EditorWorkspace workspace = {0};
+    EditorAppStateMachine app_state;
+    EditorProjectLauncherState project_launcher_state;
     EditorOriginPanel origin_panel = {0};
     EditorBulkPanel bulk_panel = {0};
     EditorBuildSettingsPanel build_settings_panel = {0};
@@ -2112,6 +2116,7 @@ int main(void) {
     editor_operation_project = &project;
     editor_operation_enabled = &terminal_editor_operations;
     editor_project_init(&project);
+    editor_app_state_init(&app_state);
     if(!editor_history_init(&history, &project)) goto fail;
     editor_operation_history = &history;
     editor_command_executing_callback_set(editor_operation_command_executing, NULL);
@@ -2350,6 +2355,8 @@ int main(void) {
             !editor_notification_panel_create(&notification_panel, &font,
                 &notification_font) ||
             !editor_terminal_panel_create(&terminal_panel, &font)) goto fail;
+    editor_project_launcher_state_init(
+        &project_launcher_state, &new_label, &open_label);
     if(!editor_visual_settings_panel_state_set(&visual_settings_panel,
             &gui_state, gui_state_path)) goto fail;
     terminal_panel.visible = true;
@@ -5871,6 +5878,8 @@ int main(void) {
             } else if(file_menu.changed && file_menu.selected_index == 3) {
                 if(editor_project_hash_get(&project) == saved_project_hash) {
                     editor_workspace_close(&workspace, &project);
+                    editor_app_state_transition(&app_state,
+                        EDITOR_APP_STATE_PROJECT_LAUNCHER);
                     (void)editor_terminal_panel_project_open(
                         &terminal_panel, startup_directory);
                     editor_history_reset(&history);
@@ -6066,6 +6075,8 @@ int main(void) {
                         running = false;
                     } else {
                         editor_workspace_close(&workspace, &project);
+                        editor_app_state_transition(&app_state,
+                            EDITOR_APP_STATE_PROJECT_LAUNCHER);
                         (void)editor_terminal_panel_project_open(
                             &terminal_panel, startup_directory);
                         editor_history_reset(&history);
@@ -6087,6 +6098,8 @@ int main(void) {
                     running = false;
                 } else {
                     editor_workspace_close(&workspace, &project);
+                    editor_app_state_transition(&app_state,
+                        EDITOR_APP_STATE_PROJECT_LAUNCHER);
                     (void)editor_terminal_panel_project_open(
                         &terminal_panel, startup_directory);
                     editor_history_reset(&history);
@@ -6103,26 +6116,16 @@ int main(void) {
             }
         }
         rohr_graphics_layer_set(EDITOR_GRAPHICS_LAYER_OVERLAY);
-        if(!workspace.open && !file_browser.active) {
-            UIRect dialog = {editor_window_width * 0.5f - 230.0f,
-                EDITOR_MENU_HEIGHT +
-                    (EDITOR_VIEWPORT_BOTTOM - EDITOR_MENU_HEIGHT) * 0.5f - 90.0f,
-                460.0f, 180.0f};
-            rohr_ui_surface((UIRect){0.0f, EDITOR_MENU_HEIGHT, editor_window_width,
-                EDITOR_VIEWPORT_BOTTOM - EDITOR_MENU_HEIGHT},
-                (Color){12, 14, 18, 238});
-            rohr_ui_surface(dialog, (Color){42, 47, 58, 255});
-            rohr_ui_border(dialog, 2.0f, (Color){8, 9, 12, 255});
-            if(rohr_ui_button("editor.start.new", &new_label,
-                    (UIRect){dialog.x + 30.0f, dialog.y + 58.0f,
-                        190.0f, 58.0f}, NULL).clicked) {
+        if(editor_app_state_get(&app_state) ==
+                EDITOR_APP_STATE_PROJECT_LAUNCHER && !file_browser.active) {
+            EditorProjectLauncherRequest request =
+                editor_project_launcher_state_draw(&project_launcher_state,
+                    editor_window_width, EDITOR_VIEWPORT_BOTTOM);
+            if(request == EDITOR_PROJECT_LAUNCHER_REQUEST_NEW_PROJECT) {
                 workspace_browser_action = EDITOR_WORKSPACE_BROWSER_NEW;
                 (void)editor_file_browser_open(&file_browser,
                     EDITOR_FILE_BROWSER_CREATE_DIRECTORY, startup_directory, &font);
-            }
-            if(rohr_ui_button("editor.start.load", &open_label,
-                    (UIRect){dialog.x + 240.0f, dialog.y + 58.0f,
-                        190.0f, 58.0f}, NULL).clicked) {
+            } else if(request == EDITOR_PROJECT_LAUNCHER_REQUEST_LOAD_PROJECT) {
                 workspace_browser_action = EDITOR_WORKSPACE_BROWSER_LOAD;
                 (void)editor_file_browser_open(&file_browser,
                     EDITOR_FILE_BROWSER_DIRECTORY, startup_directory, &font);
@@ -6265,6 +6268,8 @@ int main(void) {
                     if(workspace_browser_action != EDITOR_WORKSPACE_BROWSER_ADD_SPRITE &&
                             workspace_browser_action !=
                                 EDITOR_WORKSPACE_BROWSER_ADD_ANIMATION_FRAME) {
+                        editor_app_state_transition(&app_state,
+                            EDITOR_APP_STATE_WORKSPACE);
                         editor_history_reset(&history);
                         saved_project_hash = editor_project_hash_get(&project);
                         editor_viewport_state_init(&viewport_state);
