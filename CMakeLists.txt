@@ -114,6 +114,37 @@ if(WIN32 AND SDLTTF_VENDORED)
         "${CMAKE_CURRENT_BINARY_DIR}/lib/SDL_ttf/external/freetype/cmake_install.cmake")
 endif()
 
+set(ROHR_SDK_RUNTIME_LIBRARY_DIRS)
+if(ROHR_PORTABLE_SDK AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    foreach(runtime_library_variable
+            ALSA_LIBRARY
+            PIPEWIRE_0.3_LIB
+            PULSE_LIB
+            WAYLAND_CLIENT_LIB
+            WAYLAND_CURSOR_LIB
+            WAYLAND_EGL_LIB
+            DECOR_0_LIB
+            XKBCOMMON_LIB
+            X11_X11_LIB
+            X11_Xcursor_LIB
+            X11_Xext_LIB
+            X11_Xfixes_LIB
+            X11_Xi_LIB
+            X11_Xrandr_LIB
+            X11_Xss_LIB
+            X11_Xtst_LIB)
+        if(DEFINED ${runtime_library_variable} AND
+                "${${runtime_library_variable}}" MATCHES "^/nix/store/")
+            get_filename_component(runtime_library_directory
+                "${${runtime_library_variable}}" DIRECTORY)
+            list(APPEND ROHR_SDK_RUNTIME_LIBRARY_DIRS
+                "${runtime_library_directory}")
+        endif()
+    endforeach()
+    list(REMOVE_DUPLICATES ROHR_SDK_RUNTIME_LIBRARY_DIRS)
+    set(CMAKE_INSTALL_RPATH "${ROHR_SDK_RUNTIME_LIBRARY_DIRS}")
+endif()
+
 set(ROHR_SDL3_IMAGE_TARGET SDL3_image::SDL3_image-static)
 set(ROHR_SDL3_TTF_TARGET SDL3_ttf::SDL3_ttf-static)
 
@@ -172,6 +203,10 @@ target_link_libraries(rohr_engine
         ${ROHR_SDL3_IMAGE_TARGET}
         ${ROHR_SDL3_TTF_TARGET}
 )
+foreach(runtime_library_directory IN LISTS ROHR_SDK_RUNTIME_LIBRARY_DIRS)
+    target_link_options(rohr_engine INTERFACE
+        "$<INSTALL_INTERFACE:-Wl,-rpath,${runtime_library_directory}>")
+endforeach()
 
 if(NOT MSVC)
     target_link_libraries(rohr_engine PUBLIC m)
