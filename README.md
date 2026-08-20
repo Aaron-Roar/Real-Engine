@@ -57,6 +57,11 @@ schema.
 
 ## Building and using Rohr
 
+> **New to Rohr or game development?** Start with the screenshot-guided
+> **[Your first Rohr project](docs/getting_started.md)** tutorial. It covers
+> downloading Rohr, building the SDK, creating a project in `rohr-gui`, and
+> running your game.
+
 **Game developers should build the SDK for their system first**, then use the
 SDK's editor and CLI for game development:
 
@@ -79,13 +84,6 @@ cd rohr-engine
 
 On native Windows, use `dev.bat sdk` from a Visual Studio Developer PowerShell.
 Keep the resulting SDK directory together and launch its `bin/rohr-gui`.
-
-## Create your first project
-
-After building the SDK, follow the screenshot-guided
-[Your first Rohr project](docs/getting_started.md) tutorial. It shows how to
-open the SDK editor, create and build a project, find its source code, and run
-the finished game.
 
 Engine contributors can build and test the repository afterward with
 `./dev.sh build` and `./dev.sh test`, or `dev.bat build` and `dev.bat test` on
