@@ -20,6 +20,7 @@ smaller internal module headers and implementations.
 
 ## Editor
 
+- [Your first Rohr project](getting_started.md)
 - [Using the editor](editor.md)
 - [Editor architecture](editor_architecture.md)
 
@@ -51,6 +52,7 @@ are generated from the Doxygen comments in the public headers under `include/`.
 
 ## Useful Pages
 
+- [Your first Rohr project](getting_started.md)
 - [Engine API reference](engine_api.md)
 - [Tools API reference](tools_api.md)
 - [Architecture](architecture.md)

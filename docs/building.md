@@ -134,6 +134,9 @@ can link against the finished SDK.
 
 ## Make a game with the SDK
 
+For a screenshot-guided walkthrough written for a first-time programmer, follow
+[Your first Rohr project](getting_started.md).
+
 Start the `rohr-gui` binary inside the SDK, create a project, save it, and choose
 **Build > Build Project**. This generates game C under `src/generated/`,
 configures the project, and compiles it.
