@@ -6,7 +6,7 @@
 #define EDITOR_SOFT_BODY_H
 
 #include "editors/editor_mode_context.h"
-#include "editors/geometry/editor_auto_shape.h"
+#include "editors/geometry/editor_auto_shape_editor.h"
 
 typedef struct EditorSoftBodyEditor {
     FontAsset *font;

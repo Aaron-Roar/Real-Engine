@@ -37,7 +37,7 @@
 #include "editors/physics/editor_joint.h"
 #include "editors/geometry/editor_vertex.h"
 #include "editors/geometry/editor_line.h"
-#include "editors/geometry/editor_auto_shape.h"
+#include "editors/geometry/editor_auto_shape_editor.h"
 #include "editors/geometry/editor_hitbox.h"
 #include "editors/render/editor_animation_frame.h"
 #include "editors/render/editor_sprite.h"

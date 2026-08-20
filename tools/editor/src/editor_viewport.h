@@ -8,7 +8,7 @@
 #include "editor_project.h"
 
 #define EDITOR_VIEWPORT_ROTATION_ARM_LENGTH 60.0f
-#include "editor_auto_shape.h"
+#include <editor_auto_shape.h>
 
 typedef enum EditorViewportMode {
     EDITOR_VIEWPORT_HIERARCHY,

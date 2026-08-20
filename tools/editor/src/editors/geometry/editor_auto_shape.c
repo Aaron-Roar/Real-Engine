@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: LGPL-3.0-only
  */
 
-#include "editor_auto_shape.h"
+#include "editor_auto_shape_editor.h"
 
 #include "editors/editor_mode_controls.h"
 #include "editor_navigation.h"
