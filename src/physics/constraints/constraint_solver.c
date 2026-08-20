@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #include "constraint_solver.h"
 
 void constraint_solver_run(

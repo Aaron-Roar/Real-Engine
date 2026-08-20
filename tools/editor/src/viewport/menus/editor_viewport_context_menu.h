@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #ifndef EDITOR_VIEWPORT_CONTEXT_MENU_H
 #define EDITOR_VIEWPORT_CONTEXT_MENU_H
 

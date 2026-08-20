@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #include "physics.h"
 #include "physics/collision/contact_manifold.h"
 #include "physics/collision/shape_decomposition.h"

@@ -1,3 +1,6 @@
+# Copyright 2026 Aaron Rohrer
+# SPDX-License-Identifier: LGPL-3.0-only
+
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/rohr_example.cmake)
 
 add_subdirectory(view-port ${CMAKE_BINARY_DIR}/example-build/view-port)

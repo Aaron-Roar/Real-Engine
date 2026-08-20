@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #ifndef ENGINE_H
 #define ENGINE_H
 #include <SDL3/SDL.h>

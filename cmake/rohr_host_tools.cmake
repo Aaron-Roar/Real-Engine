@@ -1,3 +1,6 @@
+# Copyright 2026 Aaron Rohrer
+# SPDX-License-Identifier: LGPL-3.0-only
+
 set(ROHR_HOST_TOOLS_ROOT "${CMAKE_CURRENT_LIST_DIR}/..")
 
 set(ROHR_HOST_C_COMPILER "${ROHR_HOST_C_COMPILER}" CACHE FILEPATH

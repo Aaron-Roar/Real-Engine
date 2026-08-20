@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #ifndef ROHR_EDITOR_BULK_PANEL_H
 #define ROHR_EDITOR_BULK_PANEL_H
 
@@ -42,4 +46,3 @@ bool editor_bulk_property_set(EditorProject *project, EditorViewportState *state
     EditorHistory *history, const EditorPropertySetCommand *property);
 
 #endif
-

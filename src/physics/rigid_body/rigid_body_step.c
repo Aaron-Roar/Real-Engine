@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #include "physics/physics_step_internal.h"
 #include "physics/physics_internal.h"
 #include "systems.h"

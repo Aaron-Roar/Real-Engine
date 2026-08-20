@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #include "editor_origin_panel.h"
 #include "editor_command.h"
 
@@ -94,4 +98,3 @@ bool editor_origin_panel_draw(EditorOriginPanel *panel,
     }
     return x_result.active || y_result.active;
 }
-

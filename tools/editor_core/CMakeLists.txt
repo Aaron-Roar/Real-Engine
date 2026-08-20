@@ -1,3 +1,6 @@
+# Copyright 2026 Aaron Rohrer
+# SPDX-License-Identifier: LGPL-3.0-only
+
 add_library(rohr_editor_core STATIC
     ${PROJECT_SOURCE_DIR}/tools/editor/src/editor_error.c
     ${PROJECT_SOURCE_DIR}/tools/editor/src/editor_project.c

@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #include "editor_project.h"
 #include "editor_workspace.h"
 
@@ -291,6 +295,9 @@ int main(void) {
                 strstr(cli_command, "rohr-cli --project ") != cli_command ||
                 strstr(cli_command, " generate-c") == NULL ||
                 !file_contains(path, "7.00000000f") ||
+                !file_contains(path,
+                    "This generated file is not covered by Rohr Engine's "
+                    "LGPL-3.0-only license.") ||
                 !file_contains(path, "rohr_physics_particle_origin_set") ||
                 !file_contains(path, "rohr_physics_particle_radius_set") ||
                 !file_contains(path, "generated_world_anchor_create") ||
@@ -325,7 +332,10 @@ int main(void) {
             return 1;
         }
         snprintf(path, sizeof(path), "%s/src/generated/project_objects.h", fixture);
-        if(!file_contains(path, "Entity soft_body;") ||
+        if(!file_contains(path,
+                    "This generated file is not covered by Rohr Engine's "
+                    "LGPL-3.0-only license.") ||
+                !file_contains(path, "Entity soft_body;") ||
                 file_contains(path, "Entity soft_body_soft_body_1;") ||
                 !file_contains(path, "typedef struct ProjectObjects") ||
                 !file_contains(path, "EngineResult project_objects_create_all")) {

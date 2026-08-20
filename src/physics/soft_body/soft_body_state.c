@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #include "physics.h"
 
 #include "physics/physics_internal.h"
@@ -437,5 +441,4 @@ SoftBodyTriangleResult physics_soft_body_triangle_get(Entity triangle) {
     }
     return ERROR_RESULT_MAKE_VALUE(SoftBodyTriangleResult, soft_body_triangles[index]);
 }
-
 

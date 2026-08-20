@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #include "physics.h"
 
 #include "systems.h"
@@ -60,4 +64,3 @@ void physics_update(Tick ticks) {
 void physics_dt_update(Time dt) {
     if(dt > 0.0) system_physics_update(dt);
 }
-

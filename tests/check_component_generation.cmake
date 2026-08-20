@@ -1,3 +1,6 @@
+# Copyright 2026 Aaron Rohrer
+# SPDX-License-Identifier: LGPL-3.0-only
+
 if(NOT DEFINED GENERATOR OR NOT DEFINED OUTPUT_DIRECTORY)
     message(FATAL_ERROR "GENERATOR and OUTPUT_DIRECTORY are required")
 endif()
@@ -44,3 +47,16 @@ execute_process(
 if(NOT header_result EQUAL 0 OR NOT source_result EQUAL 0)
     message(FATAL_ERROR "Generated component output is not deterministic")
 endif()
+
+foreach(generated_file
+        "${OUTPUT_DIRECTORY}/first/game_components.h"
+        "${OUTPUT_DIRECTORY}/first/game_components.c")
+    file(READ "${generated_file}" generated_content)
+    string(FIND "${generated_content}"
+        "This generated file is not covered by Rohr Engine's LGPL-3.0-only license."
+        notice_position)
+    if(notice_position LESS 0)
+        message(FATAL_ERROR
+            "Generated output is missing its licensing notice: ${generated_file}")
+    endif()
+endforeach()

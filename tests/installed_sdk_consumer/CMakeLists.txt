@@ -1,3 +1,6 @@
+# Copyright 2026 Aaron Rohrer
+# SPDX-License-Identifier: LGPL-3.0-only
+
 cmake_minimum_required(VERSION 3.20)
 
 project(rohr_installed_sdk_consumer LANGUAGES C)

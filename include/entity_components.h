@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #ifndef ENTITY_COMPONENTS_H
 #define ENTITY_COMPONENTS_H
 

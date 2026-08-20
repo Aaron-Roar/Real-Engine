@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #include "entity_components.h"
 #include "core/engine_internal.h"
 #include "systems.h"

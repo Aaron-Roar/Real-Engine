@@ -1,4 +1,7 @@
 @echo off
+rem Copyright 2026 Aaron Rohrer
+rem SPDX-License-Identifier: LGPL-3.0-only
+
 setlocal
 
 set "PROJECT_ROOT=%~dp0"

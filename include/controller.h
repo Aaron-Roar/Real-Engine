@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #ifndef CONTROLLER_H
 #define CONTROLLER_H
 #include <stdbool.h>

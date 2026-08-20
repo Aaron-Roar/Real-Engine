@@ -1,3 +1,6 @@
+# Copyright 2026 Aaron Rohrer
+# SPDX-License-Identifier: LGPL-3.0-only
+
 set(ROHR_TERMINAL_PLATFORM_SOURCE src/terminal_windows.c)
 if(UNIX)
     set(ROHR_TERMINAL_PLATFORM_SOURCE src/terminal_linux.c)

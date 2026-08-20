@@ -1,3 +1,6 @@
+# Copyright 2026 Aaron Rohrer
+# SPDX-License-Identifier: LGPL-3.0-only
+
 add_executable(rohr_editor_cli src/main.c)
 target_link_libraries(rohr_editor_cli PRIVATE rohr_editor_core)
 target_compile_definitions(rohr_editor_cli PRIVATE

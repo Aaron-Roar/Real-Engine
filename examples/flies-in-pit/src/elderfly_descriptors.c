@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #include "elderfly_descriptors.h"
 AnimationDescriptor elderfly_fly = (AnimationDescriptor) {
   .texture_descriptors = {

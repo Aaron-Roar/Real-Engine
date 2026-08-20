@@ -1,3 +1,6 @@
+# Copyright 2026 Aaron Rohrer
+# SPDX-License-Identifier: LGPL-3.0-only
+
 if(NOT DEFINED CLI OR NOT DEFINED MOCK OR NOT DEFINED TEST_ROOT)
     message(FATAL_ERROR "CLI override test received incomplete paths")
 endif()

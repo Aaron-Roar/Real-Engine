@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #include "physics.h"
 
 #include "physics/physics_internal.h"
@@ -69,5 +73,4 @@ EngineResult physics_target_set(Entity entity, Entity target) {
     entity_mask[index] |= ROHR_TARGETABLE;
     return error_result_value(true);
 }
-
 

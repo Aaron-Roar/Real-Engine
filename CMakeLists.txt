@@ -1,3 +1,6 @@
+# Copyright 2026 Aaron Rohrer
+# SPDX-License-Identifier: LGPL-3.0-only
+
 cmake_minimum_required(VERSION 3.20)
 
 project(rohr_engine LANGUAGES C)
@@ -292,6 +295,31 @@ install(FILES
 install(FILES lib/lua/LICENSE
     DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/rohr
     RENAME Lua-LICENSE)
+install(FILES
+    COPYING
+    COPYING.LESSER
+    LICENSE.md
+    THIRD_PARTY_LICENSES.md
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/rohr)
+install(FILES lib/SDL/LICENSE.txt
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/rohr
+    RENAME SDL3-LICENSE.txt)
+install(FILES lib/SDL_image/LICENSE.txt
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/rohr
+    RENAME SDL3_image-LICENSE.txt)
+install(FILES lib/SDL_ttf/LICENSE.txt
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/rohr
+    RENAME SDL3_ttf-LICENSE.txt)
+install(FILES
+    lib/SDL_ttf/external/freetype/LICENSE.TXT
+    lib/SDL_ttf/external/freetype/docs/FTL.TXT
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/rohr/freetype)
+install(FILES lib/yyjson.LICENSE
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/rohr
+    RENAME yyjson-LICENSE)
+install(FILES third_party_licenses/jetbrains_mono_ofl.txt
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/rohr
+    RENAME JetBrains-Mono-OFL.txt)
 
 include(cmake/rohr_host_tools.cmake)
 

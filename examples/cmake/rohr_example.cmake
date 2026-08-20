@@ -1,3 +1,6 @@
+# Copyright 2026 Aaron Rohrer
+# SPDX-License-Identifier: LGPL-3.0-only
+
 set(ROHR_EXAMPLES_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/..)
 
 function(rohr_example_bootstrap)

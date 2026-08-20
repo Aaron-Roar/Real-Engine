@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #ifndef SYSTEMS_H
 #define SYSTEMS_H
 #include "entity_components.h"

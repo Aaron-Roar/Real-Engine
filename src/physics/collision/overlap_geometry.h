@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #ifndef OVERLAP_GEOMETRY_H
 #define OVERLAP_GEOMETRY_H
 

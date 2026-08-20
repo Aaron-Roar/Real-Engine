@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #include "editor_bulk_panel.h"
 #include "editor_command.h"
 #include "editor_navigation.h"
@@ -864,4 +868,3 @@ bool editor_bulk_panel_draw(EditorBulkPanel *panel, EditorProject *project,
     }
     return editing;
 }
-

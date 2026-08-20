@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #include "physics.h"
 
 #include "physics/physics_internal.h"
@@ -309,5 +313,4 @@ EntityResult physics_joint_create(
 
     return ERROR_RESULT_MAKE_VALUE(EntityResult, joint);
 }
-
 

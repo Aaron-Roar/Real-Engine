@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #ifndef PLATFORM_PROCESS_H
 #define PLATFORM_PROCESS_H
 

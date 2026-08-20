@@ -1,3 +1,6 @@
+-- Copyright 2026 Aaron Rohrer
+-- SPDX-License-Identifier: LGPL-3.0-only
+
 -- Rohr SDK editor defaults.
 -- Prefer shared project commands. Frontend overrides are available for
 -- advanced cases where the CLI and GUI genuinely require different tools.

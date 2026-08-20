@@ -1,3 +1,6 @@
+# Copyright 2026 Aaron Rohrer
+# SPDX-License-Identifier: LGPL-3.0-only
+
 foreach(required_variable
         ROHR_SDK_PREFIX
         ROHR_CONSUMER_SOURCE_DIR
@@ -11,6 +14,26 @@ endforeach()
 if(NOT EXISTS "${ROHR_SDK_PREFIX}")
     message(FATAL_ERROR "Installed SDK does not exist: ${ROHR_SDK_PREFIX}")
 endif()
+
+foreach(license_file
+        COPYING
+        COPYING.LESSER
+        LICENSE.md
+        THIRD_PARTY_LICENSES.md
+        SDL3-LICENSE.txt
+        SDL3_image-LICENSE.txt
+        SDL3_ttf-LICENSE.txt
+        JetBrains-Mono-OFL.txt
+        Lua-LICENSE
+        yyjson-LICENSE
+        freetype/LICENSE.TXT
+        freetype/FTL.TXT)
+    if(NOT EXISTS
+            "${ROHR_SDK_PREFIX}/share/licenses/rohr/${license_file}")
+        message(FATAL_ERROR
+            "Installed SDK license is missing: ${license_file}")
+    endif()
+endforeach()
 
 file(REMOVE_RECURSE "${ROHR_CONSUMER_BINARY_DIR}")
 

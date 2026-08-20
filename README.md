@@ -55,9 +55,24 @@ Current limitations include no audio, swept collision/CCD, adaptive physics
 substeps, polygon holes/self-intersections, or stable release-compatible editor
 schema.
 
-## Quick contributor build
+## Building and using Rohr
 
-On Linux with Nix installed:
+**Game developers should use a supplied SDK**, not build the engine repository.
+Choose the package matching the development system:
+
+- Generic Linux SDK: portable x86_64 archive built on Rocky Linux 8 for broader
+  compatibility with newer glibc-based distributions.
+- Nix SDK: reproducible `x86_64-linux` or `aarch64-linux` package with wrapped
+  runtime dependencies.
+- Windows SDK: 64-bit package containing Rohr and its statically compiled SDL
+  libraries.
+
+Keep the SDK directory together and launch `bin/rohr-gui`. Rohr projects can
+then be created, generated, and built without cloning the engine repository or
+installing SDL separately.
+
+Engine contributors and anyone testing unreleased source can use Git and the
+development scripts:
 
 ```sh
 git clone https://github.com/Aaron-Roar/rohr-engine.git
@@ -66,27 +81,10 @@ cd rohr-engine
 ./dev.sh test
 ```
 
-Run the tools from:
-
-```sh
-./build/tools/rohr-gui/rohr-gui
-./build/tools/rohr-cli/rohr-cli --help
-```
-
-Build one of the examples, then run it from the repository root:
-
-```sh
-./build/examples/pong
-./build/examples/joints
-./build/examples/soft_body
-```
-
-Windows contributors can use `dev.bat build` and `dev.bat test` from a Visual
-Studio 2022 Developer PowerShell.
-
-See [Building and SDK usage](docs/building.md) for direct CMake commands,
-presets, dependencies, SDK production, and the intended future release-SDK
-workflow.
+Build an unreleased SDK with `./dev.sh sdk-linux`, `./dev.sh sdk-nix`, or
+`./dev.sh sdk-windows`. See [Building and using Rohr](docs/building.md) for
+beginner Git instructions, SDK selection and portability, game-project usage,
+SDK production, direct CMake commands, and native Windows development.
 
 ## Minimal public API example
 
@@ -210,9 +208,15 @@ Generated HTML is written to `build/docs/html/index.html` and is not committed.
 Pull requests for focused fixes, tests, examples, documentation, and features are
 welcome. Preserve the project direction: plain C, explicit ownership, minimal
 dependencies, independent systems, warnings treated as problems, and Linux plus
-Windows build support.
+Windows build support. Contributions are accepted under `LGPL-3.0-only`.
 
-## License status
+## License
 
-The project does not yet have a finalized license. Until a `LICENSE` file is
-added, treat redistribution and released-project use as undecided.
+Copyright 2026 Aaron Rohrer. All first-party repository content is licensed under
+the GNU Lesser General Public License version 3 only (`LGPL-3.0-only`). Generated
+game output is excluded and may be used, modified, and distributed without
+restriction. Vendored dependencies retain their original licenses.
+
+See [LICENSE.md](LICENSE.md), [COPYING](COPYING),
+[COPYING.LESSER](COPYING.LESSER), and
+[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).

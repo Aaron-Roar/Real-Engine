@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #ifndef ELDERFLY_H
 #define ELDERFLY_H
 #include "graphics.h"

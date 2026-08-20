@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #ifndef ENGINE_INTERNAL_H
 #define ENGINE_INTERNAL_H
 

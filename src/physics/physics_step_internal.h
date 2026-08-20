@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #ifndef ROHR_PHYSICS_STEP_INTERNAL_H
 #define ROHR_PHYSICS_STEP_INTERNAL_H
 

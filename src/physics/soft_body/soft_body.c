@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #include "physics/soft_body/soft_body.h"
 
 Shape soft_body_boundary_shape_create(

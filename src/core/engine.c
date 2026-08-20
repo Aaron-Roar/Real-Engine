@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <SDL3/SDL.h>

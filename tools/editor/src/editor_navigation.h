@@ -1,3 +1,7 @@
+/* Copyright 2026 Aaron Rohrer
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+
 #ifndef ROHR_EDITOR_NAVIGATION_H
 #define ROHR_EDITOR_NAVIGATION_H
 

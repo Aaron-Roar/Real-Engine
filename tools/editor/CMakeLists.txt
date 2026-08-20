@@ -1,3 +1,6 @@
+# Copyright 2026 Aaron Rohrer
+# SPDX-License-Identifier: LGPL-3.0-only
+
 add_executable(rohr_editor_gui
     src/browser/editor_file_browser.c
     src/editor_history.c
