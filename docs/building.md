@@ -1,100 +1,162 @@
 # Building and using Rohr
 
-## Game developers should use an SDK
+## Build an SDK first
 
-If you are making a game with Rohr, use the SDK built for your platform. You do
-not need the engine repository, its Git history, or a separate SDL installation.
-The SDK keeps the engine, editor, command-line tool, headers, libraries, CMake
-package, templates, and license notices together.
+Game developers should build and use an SDK. The normal workflow is:
 
-Keep the unpacked SDK directory intact. `rohr-gui` and `rohr-cli` locate SDK
-resources relative to their own executable, so the directory can be moved as a
-unit without installing Rohr system-wide.
-
-Rohr has three SDK targets:
-
-| Target | Intended user | Output from this repository |
-| --- | --- | --- |
-| Generic Linux | x86_64 Linux users who do not use Nix | `dist/linux/` and `dist/rohr-sdk-linux-x86_64.tar.gz` |
-| Nix Linux | x86_64 or AArch64 Linux users with Nix | `dist/nix`, a link to the Nix store package |
-| Windows | 64-bit Windows users | `dist/windows/` |
-
-These packages are portable within their target environment, not universally
-interchangeable. Use the Linux SDK on Linux, the Windows SDK on Windows, and the
-Nix SDK through Nix.
-
-### Generic Linux compatibility
-
-The generic Linux SDK is built inside the older Rocky Linux 8 baseline in
-`packaging/linux/Dockerfile`. Building against an older glibc baseline avoids
-accidentally requiring a newer development machine's glibc and improves
-compatibility with newer x86_64 glibc-based distributions.
-
-It still expects normal operating-system facilities such as glibc, Wayland or
-X11, and working GPU/OpenGL or Vulkan drivers. It is not intended for musl-only
-systems or non-Linux operating systems.
-
-Unpack a supplied archive and launch the editor:
-
-```sh
-tar -xzf rohr-sdk-linux-x86_64.tar.gz
-cd linux
-./bin/rohr-gui
+```text
+clone Rohr -> build the SDK for your system -> run rohr-gui -> make your game
 ```
 
-You may move or rename the `linux/` directory afterward, provided its contents
-stay together.
+The SDK contains the editor, CLI, headers, libraries, CMake package, project
+templates, configuration, and license notices. You do not need to install SDL
+separately.
 
-### Nix SDK
-
-The Nix SDK supports the `x86_64-linux` and `aarch64-linux` systems declared by
-`flake.nix`. Nix supplies and wraps the required runtime libraries, making this
-the most reproducible option for NixOS and other Linux systems with Nix.
-
-The output is a Nix store package rather than a standalone tar archive. From a
-source checkout:
+If Git is new to you, `git clone` downloads the repository and `cd` enters the
+downloaded directory:
 
 ```sh
+git clone https://github.com/Aaron-Roar/rohr-engine.git
+cd rohr-engine
+```
+
+Then follow exactly one of the platform sections below.
+
+### Generic Linux SDK
+
+Use this on an x86_64 Linux system when you do not want the Nix package. Docker
+or Podman must be installed and running.
+
+```sh
+git clone https://github.com/Aaron-Roar/rohr-engine.git
+cd rohr-engine
+./dev.sh sdk-linux
+./dist/linux/bin/rohr-gui
+```
+
+The result is available in both forms:
+
+```text
+dist/linux/
+dist/rohr-sdk-linux-x86_64.tar.gz
+```
+
+The SDK is built inside the older Rocky Linux 8 baseline. Building against an
+older glibc avoids accidentally requiring the newer glibc from the developer's
+computer and improves compatibility with newer x86_64 glibc-based Linux
+distributions.
+
+The unpacked SDK is relocatable as one directory. It still requires normal
+Linux facilities such as glibc, Wayland or X11, and working GPU/OpenGL or Vulkan
+drivers. It is not intended for musl-only systems.
+
+To test the archive itself:
+
+```sh
+mkdir rohr-sdk-test
+tar -xzf dist/rohr-sdk-linux-x86_64.tar.gz -C rohr-sdk-test
+./rohr-sdk-test/linux/bin/rohr-gui
+```
+
+### Nix SDK on Linux
+
+Use this on NixOS or another Linux system with Nix installed. It supports
+`x86_64-linux` and `aarch64-linux`.
+
+```sh
+git clone https://github.com/Aaron-Roar/rohr-engine.git
+cd rohr-engine
 ./dev.sh sdk-nix
 ./dist/nix/bin/rohr-gui
 ```
 
-Do not copy only the binary out of the package: its wrapped runtime dependencies
-are resolved through the Nix store.
+The result is:
+
+```text
+dist/nix -> /nix/store/...-rohr-sdk-...
+```
+
+Nix supplies and wraps the runtime libraries, making this the most reproducible
+Linux option. `dist/nix` is a link to the Nix store, not an independent archive.
+Do not copy only `rohr-gui` out of it; run it through the package so its wrapped
+dependencies remain available.
 
 ### Windows SDK
 
-Use a supplied Windows SDK on Windows and keep its `bin`, `include`, `lib`, and
-`share` directories together. The package includes Rohr and statically compiled
-SDL libraries, so users do not install SDL separately.
+On Windows, install Git, CMake, and Visual Studio 2022 with **Desktop development
+with C++**. Open a Visual Studio Developer PowerShell and run:
 
-SDKs built with MinGW and MSVC belong to different compiler/runtime families.
-Use the SDK matching the toolchain used to build the game. Release packages
-should identify that toolchain clearly.
-
-## Creating and building a game
-
-Start `bin/rohr-gui`, create a project, save it, and choose **Build > Build
-Project**. This generates game C under `src/generated/`, configures the project,
-and compiles it. Generated game output is not LGPL-covered Rohr source and may
-be used, modified, and distributed without restriction.
-
-The equivalent terminal workflow is:
-
-```sh
-/path/to/rohr-sdk/bin/rohr-cli --project /path/to/game generate-c
-/path/to/rohr-sdk/bin/rohr-cli --project /path/to/game build
+```powershell
+git clone https://github.com/Aaron-Roar/rohr-engine.git
+cd rohr-engine
+dev.bat sdk
+dist\windows\bin\rohr-gui.exe
 ```
 
-When the terminal is already at the project root, `--project` may be omitted:
+The result is:
+
+```text
+dist\windows\
+```
+
+Keep its `bin`, `include`, `lib`, and `share` directories together. Rohr and SDL
+are included, so SDL does not need to be installed separately.
+
+Linux developers preparing a MinGW Windows SDK can instead run:
+
+```sh
+git clone https://github.com/Aaron-Roar/rohr-engine.git
+cd rohr-engine
+./dev.sh sdk-windows
+```
+
+That requires `x86_64-w64-mingw32-gcc` and a native host C compiler. MinGW and
+MSVC SDKs use different compiler/runtime families, so games should use the SDK
+matching their compiler.
+
+### Build every SDK
+
+On a Linux release machine with Nix, Docker or Podman, MinGW-w64, and a host C
+compiler installed:
+
+```sh
+git clone https://github.com/Aaron-Roar/rohr-engine.git
+cd rohr-engine
+./dev.sh sdk
+```
+
+This attempts the generic Linux, Nix Linux, and Windows distributions. Most
+developers only need the single SDK command for their system.
+
+Every SDK build installs the exported CMake package, installs the license
+notices, and builds a separate consumer project to verify that an external game
+can link against the finished SDK.
+
+## Make a game with the SDK
+
+Start the `rohr-gui` binary inside the SDK, create a project, save it, and choose
+**Build > Build Project**. This generates game C under `src/generated/`,
+configures the project, and compiles it.
+
+Generated game output is not LGPL-covered Rohr source. It may be used, modified,
+and distributed without restriction.
+
+The CLI equivalent is:
+
+```sh
+/path/to/sdk/bin/rohr-cli --project /path/to/game generate-c
+/path/to/sdk/bin/rohr-cli --project /path/to/game build
+```
+
+If the terminal is already inside the game project:
 
 ```sh
 cd /path/to/game
-/path/to/rohr-sdk/bin/rohr-cli build
+/path/to/sdk/bin/rohr-cli build
 ```
 
-`generate-c` only replaces `src/generated/`. `compile` configures when needed
-and invokes the configured compile command. `build` generates C and then
+`generate-c` replaces only `src/generated/`. `compile` configures when needed
+and invokes the configured compiler command. `build` generates C and then
 compiles.
 
 ### Hand-written CMake game
@@ -110,61 +172,21 @@ add_executable(my_game src/main.c)
 target_link_libraries(my_game PRIVATE Rohr::Engine)
 ```
 
-If the SDK is not installed in a standard CMake location, point CMake at its
-root:
+Point CMake at the SDK directory:
 
 ```sh
-cmake -S . -B build -DCMAKE_PREFIX_PATH=/path/to/rohr-sdk
+cmake -S . -B build -DCMAKE_PREFIX_PATH=/path/to/sdk
 cmake --build build
 ```
 
-## Building SDKs from the repository
+## Build and test the engine repository
 
-Most game developers should download a supplied SDK instead. Build the SDKs
-yourself when developing Rohr, testing unreleased changes, or preparing a
-release.
+The commands below are for people changing Rohr itself. Game developers should
+use one of the SDK workflows above.
 
-If Git is unfamiliar, `git clone` downloads a working copy and `cd` enters it:
+### Linux contributor build
 
-```sh
-git clone https://github.com/Aaron-Roar/rohr-engine.git
-cd rohr-engine
-```
-
-Build only the SDK you need:
-
-```sh
-./dev.sh sdk-linux    # generic x86_64 Linux archive; requires Docker or Podman
-./dev.sh sdk-nix      # Nix package; requires Nix
-./dev.sh sdk-windows  # Windows cross-build; requires MinGW-w64 and a host C compiler
-```
-
-To attempt all three distributions:
-
-```sh
-./dev.sh sdk
-```
-
-That command requires all three platform builders to be available. Failure of
-one target does not mean the other SDK formats are unusable; during normal work,
-run the one platform command you need.
-
-On native Windows, open a Visual Studio 2022 Developer PowerShell and run:
-
-```powershell
-git clone https://github.com/Aaron-Roar/rohr-engine.git
-cd rohr-engine
-dev.bat sdk
-```
-
-Every SDK workflow installs the exported CMake package and builds a separate
-consumer project from `tests/installed_sdk_consumer`. It also verifies required
-Rohr, SDL, Lua, yyjson, FreeType, and JetBrains Mono license notices.
-
-## Building and testing Rohr itself
-
-This workflow is for engine contributors, not ordinary game projects. On Linux,
-install Nix and run:
+Install Git and Nix, then run:
 
 ```sh
 git clone https://github.com/Aaron-Roar/rohr-engine.git
@@ -173,34 +195,46 @@ cd rohr-engine
 ./dev.sh test
 ```
 
-`dev.sh` enters `nix develop` automatically. Development output is organized as:
+`dev.sh` enters `nix develop` automatically. The output is organized as:
 
 ```text
 build/
-├── examples/             example executables
-├── tests/                test executables
+├── examples/
+├── tests/
 └── tools/
     ├── rohr-cli/rohr-cli
     └── rohr-gui/rohr-gui
 ```
 
-Run the editor or an example from the repository root:
+Run development binaries from the repository root:
 
 ```sh
 ./build/tools/rohr-gui/rohr-gui
 ./build/examples/pong
 ./build/examples/joints
+./build/examples/soft_body
 ```
 
-Clean generated development and SDK output with:
+Remove generated development and SDK output with:
 
 ```sh
 ./dev.sh clean
 ```
 
-### Direct CMake and presets
+### Windows contributor build
 
-Contributors who need direct CMake control can use:
+Open a Visual Studio 2022 Developer PowerShell:
+
+```powershell
+git clone https://github.com/Aaron-Roar/rohr-engine.git
+cd rohr-engine
+dev.bat build
+dev.bat test
+```
+
+### Direct CMake workflow
+
+Contributors who need direct control can use the Linux presets:
 
 ```sh
 nix develop
@@ -209,11 +243,10 @@ cmake --build --preset linux --parallel
 ctest --preset linux
 ```
 
-Preset CMake state is stored under `build/cmake/linux`, while runnable artifacts
-remain under `build/`. Do not run `cmake --build build` unless that exact
-directory was configured by `./dev.sh build` or `cmake -S . -B build`.
+Preset CMake state is under `build/cmake/linux`, while runnable artifacts remain
+under `build/`.
 
-Useful targets include:
+Useful focused commands are:
 
 ```sh
 cmake --build --preset linux-examples --parallel
@@ -223,20 +256,10 @@ cmake --build build/cmake/linux --target docs
 cmake --build build/cmake/linux --target help
 ```
 
-Build options include `ROHR_BUILD_EXAMPLES`, `ROHR_BUILD_TESTS`,
-`ROHR_BUILD_SDK_CONSUMER_TESTS`, and `ROHR_ENABLE_DOCUMENTATION`.
+Do not run `cmake --build build` unless `build/` was configured by
+`./dev.sh build` or `cmake -S . -B build`.
 
-### Native Windows contributor build
-
-Install Visual Studio 2022 with **Desktop development with C++**, then use a
-Developer PowerShell:
-
-```powershell
-dev.bat build
-dev.bat test
-```
-
-Or use the native CMake presets:
+On native Windows, the equivalent preset workflow is:
 
 ```powershell
 cmake --preset windows
@@ -246,5 +269,5 @@ ctest --preset windows
 
 ## Optional tools
 
-`ffmpeg` is only required for recording or video-generation workflows. It is
-not required to use the editor, build a normal game, or link against Rohr.
+`ffmpeg` is only required for recording and video-generation workflows. It is
+not required to run the editor, build a normal game, or link against Rohr.

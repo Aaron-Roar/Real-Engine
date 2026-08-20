@@ -57,8 +57,8 @@ schema.
 
 ## Building and using Rohr
 
-**Game developers should use a supplied SDK**, not build the engine repository.
-Choose the package matching the development system:
+**Game developers should build the SDK for their system first**, then use the
+SDK's editor and CLI for game development:
 
 - Generic Linux SDK: portable x86_64 archive built on Rocky Linux 8 for broader
   compatibility with newer glibc-based distributions.
@@ -67,24 +67,25 @@ Choose the package matching the development system:
 - Windows SDK: 64-bit package containing Rohr and its statically compiled SDL
   libraries.
 
-Keep the SDK directory together and launch `bin/rohr-gui`. Rohr projects can
-then be created, generated, and built without cloning the engine repository or
-installing SDL separately.
-
-Engine contributors and anyone testing unreleased source can use Git and the
-development scripts:
+Clone Rohr and build one SDK:
 
 ```sh
 git clone https://github.com/Aaron-Roar/rohr-engine.git
 cd rohr-engine
-./dev.sh build
-./dev.sh test
+./dev.sh sdk-linux    # generic Linux
+./dev.sh sdk-nix      # Nix on Linux
+./dev.sh sdk-windows  # Windows cross-build from Linux
 ```
 
-Build an unreleased SDK with `./dev.sh sdk-linux`, `./dev.sh sdk-nix`, or
-`./dev.sh sdk-windows`. See [Building and using Rohr](docs/building.md) for
-beginner Git instructions, SDK selection and portability, game-project usage,
-SDK production, direct CMake commands, and native Windows development.
+On native Windows, use `dev.bat sdk` from a Visual Studio Developer PowerShell.
+Keep the resulting SDK directory together and launch its `bin/rohr-gui`.
+
+Engine contributors can build and test the repository afterward with
+`./dev.sh build` and `./dev.sh test`, or `dev.bat build` and `dev.bat test` on
+Windows.
+
+See [Building and using Rohr](docs/building.md) for separate copy-paste workflows
+for generic Linux, Nix Linux, native Windows, game projects, and engine tests.
 
 ## Minimal public API example
 
