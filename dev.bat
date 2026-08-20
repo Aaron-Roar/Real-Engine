@@ -5,9 +5,10 @@ rem SPDX-License-Identifier: LGPL-3.0-only
 setlocal
 
 set "PROJECT_ROOT=%~dp0"
-set "BUILD_DIRECTORY=%PROJECT_ROOT%build"
-set "SDK_BUILD_DIRECTORY=%PROJECT_ROOT%build\sdk\windows"
-set "SDK_DIRECTORY=%PROJECT_ROOT%dist\windows"
+if "%PROJECT_ROOT:~-1%"=="\" set "PROJECT_ROOT=%PROJECT_ROOT:~0,-1%"
+set "BUILD_DIRECTORY=%PROJECT_ROOT%\build"
+set "SDK_BUILD_DIRECTORY=%PROJECT_ROOT%\build\sdk\windows"
+set "SDK_DIRECTORY=%PROJECT_ROOT%\dist\windows"
 set "OPERATION=%~1"
 if "%OPERATION%"=="" set "OPERATION=build"
 
@@ -27,7 +28,7 @@ if "%OPERATION%"=="test" (
 exit /b 0
 
 :sdk
-cmake -E remove_directory "%PROJECT_ROOT%dist\rohr"
+cmake -E remove_directory "%PROJECT_ROOT%\dist\rohr"
 if errorlevel 1 exit /b %errorlevel%
 cmake -E remove_directory "%SDK_DIRECTORY%"
 if errorlevel 1 exit /b %errorlevel%
