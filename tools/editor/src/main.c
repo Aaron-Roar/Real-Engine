@@ -62,6 +62,7 @@
 
 #if defined(_WIN32)
 #include <direct.h>
+#include <windows.h>
 #define editor_chdir _chdir
 #else
 #include <unistd.h>
@@ -601,6 +602,26 @@ static bool editor_result_ok(EngineResult result) {
     fprintf(stderr, "error %d: %s\n", (int)result.result.error,
         rohr_error_message_get(result));
     return false;
+}
+
+static void editor_startup_failure_report(const char *stage) {
+    char message[512];
+    FILE *log;
+    if(stage == NULL || stage[0] == '\0') stage = "unknown startup stage";
+    (void)snprintf(message, sizeof(message),
+        "Rohr GUI could not start during: %s\n"
+        "See rohr_gui_error.txt beside rohr-gui for details.", stage);
+    fprintf(stderr, "%s\n", message);
+    fflush(stderr);
+    log = fopen("rohr_gui_error.txt", "wb");
+    if(log != NULL) {
+        fprintf(log, "%s\n", message);
+        fclose(log);
+    }
+#if defined(_WIN32)
+    (void)MessageBoxA(NULL, message, "Rohr GUI startup failed",
+        MB_OK | MB_ICONERROR | MB_TASKMODAL);
+#endif
 }
 
 static uint64_t editor_project_hash_get(const EditorProject *project) {
@@ -1740,6 +1761,7 @@ static bool editor_open_item_delete(
     return editor_selected_delete(project, viewport_state);
 }
 int main(void) {
+    const char *startup_stage = "editor history initialization";
     KeyboardState keyboard = {0};
     MouseState mouse = {0};
     float viewport_wheel_y = 0.0f;
@@ -1866,6 +1888,7 @@ int main(void) {
     editor_viewport_state_init(&viewport_state);
     editor_navigation_state_apply(&project, &viewport_state, &project.navigation);
     editor_file_browser_init(&file_browser);
+    startup_stage = "startup directory discovery";
     {
         char *directory = SDL_GetCurrentDirectory();
         if(directory == NULL || strlen(directory) >= sizeof(startup_directory)) {
@@ -1876,9 +1899,12 @@ int main(void) {
         SDL_free(directory);
     }
 
-    if(!editor_use_executable_directory() ||
-            !editor_result_ok(rohr_engine_init())) goto fail;
+    startup_stage = "editor executable directory selection";
+    if(!editor_use_executable_directory()) goto fail;
+    startup_stage = "engine initialization";
+    if(!editor_result_ok(rohr_engine_init())) goto fail;
     {
+        startup_stage = "GUI state loading";
         EditorResult result = editor_gui_state_resolve(&gui_state,
             gui_state_path, sizeof(gui_state_path));
         if(editor_result_check(result)) {
@@ -1886,11 +1912,15 @@ int main(void) {
             goto fail;
         }
     }
-    if(!editor_result_ok(rohr_graphics_start()) ||
-            !editor_gui_state_presentation_apply(&gui_state)) goto fail;
+    startup_stage = "graphics initialization";
+    if(!editor_result_ok(rohr_graphics_start())) goto fail;
+    startup_stage = "window presentation setup";
+    if(!editor_gui_state_presentation_apply(&gui_state)) goto fail;
+    startup_stage = "automatic aspect ratio setup";
     if(!rohr_graphics_aspect_ratio_auto_set(true)) goto fail;
     editor_window_layout_sync();
     {
+        startup_stage = "editor viewport creation";
         ViewportConfig config = rohr_viewport_config_default_get();
         ViewportIdResult result;
 
@@ -1908,6 +1938,7 @@ int main(void) {
                 !editor_result_ok(rohr_viewport_disable_set(viewport))) goto fail;
     }
     {
+        startup_stage = "editor font loading";
         FontAssetResult result = rohr_graphics_font_load((FontDescriptor){
             .file = "assets/jetbrains_mono_bold_italic.ttf",
             .point_size = 12.0f
@@ -1921,6 +1952,7 @@ int main(void) {
         font = result.result.value;
     }
     {
+        startup_stage = "notification font loading";
         FontAssetResult result = rohr_graphics_font_load((FontDescriptor){
             .file = "assets/jetbrains_mono_bold_italic.ttf",
             .point_size = 9.0f
@@ -1933,6 +1965,7 @@ int main(void) {
         }
         notification_font = result.result.value;
     }
+    startup_stage = "editor controls creation";
     if(!editor_text_create(&font, "File", &file_label) ||
             !editor_text_create(&font, "Edit", &edit_label) ||
             !editor_text_create(&font, "Undo    Ctrl+Z", &undo_label) ||
@@ -2004,10 +2037,17 @@ int main(void) {
             !editor_terminal_panel_create(&terminal_panel, &font)) goto fail;
     editor_project_launcher_state_init(
         &project_launcher_state, &new_label, &open_label);
+    startup_stage = "visual settings initialization";
     if(!editor_visual_settings_panel_state_set(&visual_settings_panel,
             &gui_state, gui_state_path)) goto fail;
     terminal_panel.visible = true;
-    if(!editor_terminal_panel_project_open(&terminal_panel, startup_directory)) goto fail;
+    if(!editor_terminal_panel_project_open(&terminal_panel, startup_directory)) {
+        terminal_panel.visible = false;
+        editor_notification_panel_push(&notification_panel, "Terminal - FAIL",
+            "The embedded terminal could not start. The editor remains usable. "
+            "Restart from a console for the platform error details.");
+    }
+    startup_stage = "color picker creation";
     if(!editor_text_create(&font, "#FFFFFFFF", &color_picker_hex_field) ||
             !editor_text_create(&font, "100.0", &color_picker_opacity_field) ||
             !editor_text_create(&font, "Opacity %", &opacity_label)) goto fail;
@@ -3455,6 +3495,7 @@ int main(void) {
     return 0;
 
 fail:
+    editor_startup_failure_report(startup_stage);
     editor_viewport_assets_destroy();
     editor_command_executed_callback_set(NULL, NULL);
     editor_command_executing_callback_set(NULL, NULL);
