@@ -62,18 +62,23 @@ static bool editor_soft_body_hierarchy_reorder(EditorProject *project,
     size_t target_index;
     size_t insertion = 0;
     bool source_selected;
+    bool reordered = false;
+    EditorSoftHierarchyItem *ordered;
+    EditorSoftHierarchyItem *selected_items;
+    EditorSoftHierarchyItem *remaining;
     if(object == NULL) return false;
     for(size_t i = 0; i < object->soft_body_count; i += 1)
         if(object->soft_body_items[i].id == source.parent) body = &object->soft_body_items[i];
     if(body == NULL) return false;
     editor_project_soft_body_hierarchy_sync(body);
     if(body->hierarchy_count == 0) return false;
-    EditorSoftHierarchyItem ordered[body->hierarchy_count];
-    EditorSoftHierarchyItem selected_items[body->hierarchy_count];
-    EditorSoftHierarchyItem remaining[body->hierarchy_count];
     target_index = editor_project_soft_body_hierarchy_index_get(body,
         editor_soft_hierarchy_kind_get(target.kind), target.item);
     if(target_index == SIZE_MAX) return false;
+    ordered = malloc(body->hierarchy_count * sizeof(*ordered));
+    selected_items = malloc(body->hierarchy_count * sizeof(*selected_items));
+    remaining = malloc(body->hierarchy_count * sizeof(*remaining));
+    if(ordered == NULL || selected_items == NULL || remaining == NULL) goto finish;
     source_selected = editor_viewport_selection_contains(state, source);
     for(size_t i = 0; i < body->hierarchy_count; i += 1) {
         EditorSelectionRef ref = editor_soft_hierarchy_selection_get(object->id,
@@ -83,7 +88,7 @@ static bool editor_soft_body_hierarchy_reorder(EditorProject *project,
             selected_items[selected_count++] = body->hierarchy[i];
         else remaining[remaining_count++] = body->hierarchy[i];
     }
-    if(selected_count == 0) return false;
+    if(selected_count == 0) goto finish;
     for(size_t i = 0; i < target_index + (after ? 1u : 0u); i += 1) {
         EditorSelectionRef ref = editor_soft_hierarchy_selection_get(object->id,
             body->id, body->hierarchy[i]);
@@ -95,11 +100,16 @@ static bool editor_soft_body_hierarchy_reorder(EditorProject *project,
     memcpy(&ordered[insertion + selected_count], &remaining[insertion],
         (remaining_count - insertion) * sizeof(*ordered));
     if(memcmp(ordered, body->hierarchy,
-            body->hierarchy_count * sizeof(*ordered)) == 0) return false;
+            body->hierarchy_count * sizeof(*ordered)) == 0) goto finish;
     if(history != NULL && (!editor_history_transaction_begin(history) ||
-            !editor_history_transaction_object_track(history, source.object))) return false;
+            !editor_history_transaction_object_track(history, source.object))) goto finish;
     memcpy(body->hierarchy, ordered, body->hierarchy_count * sizeof(*ordered));
-    return history == NULL || editor_history_transaction_end(history);
+    reordered = history == NULL || editor_history_transaction_end(history);
+finish:
+    free(ordered);
+    free(selected_items);
+    free(remaining);
+    return reordered;
 }
 
 static bool editor_selection_equal(EditorSelectionRef first,
@@ -139,15 +149,20 @@ static bool editor_object_hierarchy_reorder(EditorProject *project,
     size_t target_index;
     size_t insertion;
     bool source_selected;
+    bool reordered = false;
+    EditorHierarchyItem *ordered;
+    EditorHierarchyItem *selected_items;
+    EditorHierarchyItem *remaining;
     if(object == NULL) return false;
     editor_project_object_hierarchy_sync(object);
     if(object->hierarchy_count == 0) return false;
-    EditorHierarchyItem ordered[object->hierarchy_count];
-    EditorHierarchyItem selected_items[object->hierarchy_count];
-    EditorHierarchyItem remaining[object->hierarchy_count];
     target_index = editor_project_object_hierarchy_index_get(object,
         editor_hierarchy_kind_get(target.kind), target.item);
     if(target_index == SIZE_MAX) return false;
+    ordered = malloc(object->hierarchy_count * sizeof(*ordered));
+    selected_items = malloc(object->hierarchy_count * sizeof(*selected_items));
+    remaining = malloc(object->hierarchy_count * sizeof(*remaining));
+    if(ordered == NULL || selected_items == NULL || remaining == NULL) goto finish;
     source_selected = editor_viewport_selection_contains(state, source);
     for(size_t i = 0; i < object->hierarchy_count; i += 1) {
         EditorSelectionRef ref = editor_hierarchy_selection_get(object->id,
@@ -157,7 +172,7 @@ static bool editor_object_hierarchy_reorder(EditorProject *project,
             selected_items[selected_count++] = object->hierarchy[i];
         else remaining[remaining_count++] = object->hierarchy[i];
     }
-    if(selected_count == 0) return false;
+    if(selected_count == 0) goto finish;
     insertion = 0;
     for(size_t i = 0; i < target_index + (after ? 1u : 0u); i += 1) {
         EditorSelectionRef ref = editor_hierarchy_selection_get(object->id,
@@ -171,12 +186,17 @@ static bool editor_object_hierarchy_reorder(EditorProject *project,
     memcpy(&ordered[insertion + selected_count], &remaining[insertion],
         (remaining_count - insertion) * sizeof(*ordered));
     if(memcmp(ordered, object->hierarchy,
-            object->hierarchy_count * sizeof(*ordered)) == 0) return false;
+            object->hierarchy_count * sizeof(*ordered)) == 0) goto finish;
     if(history != NULL && (!editor_history_transaction_begin(history) ||
-            !editor_history_transaction_object_track(history, source.object))) return false;
+            !editor_history_transaction_object_track(history, source.object))) goto finish;
     memcpy(object->hierarchy, ordered,
         object->hierarchy_count * sizeof(*ordered));
-    return history == NULL || editor_history_transaction_end(history);
+    reordered = history == NULL || editor_history_transaction_end(history);
+finish:
+    free(ordered);
+    free(selected_items);
+    free(remaining);
+    return reordered;
 }
 
 static bool editor_reorder_storage_get(EditorProject *project,

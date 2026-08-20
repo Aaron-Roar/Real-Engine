@@ -5,6 +5,7 @@
 #include "editor_auto_shape.h"
 
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define EDITOR_AUTO_SHAPE_PI 3.14159265358979323846f
@@ -126,94 +127,128 @@ EditorResult editor_auto_shape_positions_get(const EditorAutoShapeConfig *config
 EditorResult editor_auto_shape_hitbox_apply(EditorHitbox *hitbox,
         const EditorAutoShapeConfig *config) {
     EditorResult result;
+    Position *output_positions;
     if(hitbox == NULL || hitbox->vertex_count == 0)
         return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
             "auto shape requires a hitbox");
-    Position output_positions[hitbox->vertex_count];
+    output_positions = malloc(hitbox->vertex_count * sizeof(*output_positions));
+    if(output_positions == NULL) return editor_result_error(EDITOR_ERROR_CAPACITY,
+        "could not allocate auto-shape hitbox positions");
     result = editor_auto_shape_positions_get(config, output_positions,
         hitbox->vertex_count);
-    if(editor_result_check(result)) return result;
-    for(size_t i = 0; i < hitbox->vertex_count; i += 1)
-        hitbox->vertices[i].position = output_positions[i];
-    return editor_result_value(true);
+    if(!editor_result_check(result)) for(size_t i = 0; i < hitbox->vertex_count;
+            i += 1) hitbox->vertices[i].position = output_positions[i];
+    free(output_positions);
+    return result;
 }
 
 EditorResult editor_auto_shape_soft_body_apply(EditorSoftBody *body,
         const EditorAutoShapeConfig *config) {
     EditorResult result;
+    Position *output_positions;
     if(body == NULL || body->node_count == 0)
         return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
             "auto shape requires a soft body");
-    Position output_positions[body->node_count];
+    output_positions = malloc(body->node_count * sizeof(*output_positions));
+    if(output_positions == NULL) return editor_result_error(EDITOR_ERROR_CAPACITY,
+        "could not allocate auto-shape soft-body positions");
     result = editor_auto_shape_positions_get(config, output_positions, body->node_count);
-    if(editor_result_check(result)) return result;
-    for(size_t i = 0; i < body->node_count; i += 1)
+    if(!editor_result_check(result)) for(size_t i = 0; i < body->node_count; i += 1)
         body->nodes[i].position = output_positions[i];
-    return editor_result_value(true);
+    free(output_positions);
+    return result;
 }
 
 EditorResult editor_auto_shape_hitbox_points_apply(EditorHitbox *hitbox,
         const EditorAutoShapeConfig *config, const EditorVertexId *points,
         size_t point_count) {
     EditorResult result;
+    Position *output_positions;
+    size_t *indices;
     if(hitbox == NULL || points == NULL || point_count == 0)
         return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
             "auto shape received invalid hitbox points");
-    Position output_positions[point_count];
-    bool found[hitbox->vertex_count];
-    size_t indices[point_count];
-    memset(found, 0, sizeof(found));
+    output_positions = malloc(point_count * sizeof(*output_positions));
+    indices = malloc(point_count * sizeof(*indices));
+    if(output_positions == NULL || indices == NULL) {
+        free(output_positions);
+        free(indices);
+        return editor_result_error(EDITOR_ERROR_CAPACITY,
+            "could not allocate selected hitbox auto-shape positions");
+    }
     result = editor_auto_shape_positions_get(config, output_positions, point_count);
-    if(editor_result_check(result)) return result;
+    if(editor_result_check(result)) goto finish;
     for(size_t point = 0; point < point_count; point += 1) {
         for(size_t vertex = 0; vertex < hitbox->vertex_count; vertex += 1) {
             if(hitbox->vertices[vertex].id != points[point]) continue;
-            if(found[vertex]) return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
-                "auto shape contains a duplicate hitbox vertex");
+            for(size_t previous = 0; previous < point; previous += 1)
+                if(indices[previous] == vertex) {
+                    result = editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                        "auto shape contains a duplicate hitbox vertex");
+                    goto finish;
+                }
             indices[point] = vertex;
-            found[vertex] = true;
             goto next_hitbox_point;
         }
-        return editor_result_error(EDITOR_ERROR_NOT_FOUND,
+        result = editor_result_error(EDITOR_ERROR_NOT_FOUND,
             "auto shape hitbox vertex was not found");
+        goto finish;
 next_hitbox_point:
         continue;
     }
     for(size_t point = 0; point < point_count; point += 1)
         hitbox->vertices[indices[point]].position = output_positions[point];
-    return editor_result_value(true);
+    result = editor_result_value(true);
+finish:
+    free(output_positions);
+    free(indices);
+    return result;
 }
 
 EditorResult editor_auto_shape_soft_body_points_apply(EditorSoftBody *body,
         const EditorAutoShapeConfig *config, const EditorSoftNodeId *points,
         size_t point_count) {
     EditorResult result;
+    Position *output_positions;
+    size_t *indices;
     if(body == NULL || points == NULL || point_count == 0)
         return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
             "auto shape received invalid soft-body nodes");
-    Position output_positions[point_count];
-    bool found[body->node_count];
-    size_t indices[point_count];
-    memset(found, 0, sizeof(found));
+    output_positions = malloc(point_count * sizeof(*output_positions));
+    indices = malloc(point_count * sizeof(*indices));
+    if(output_positions == NULL || indices == NULL) {
+        free(output_positions);
+        free(indices);
+        return editor_result_error(EDITOR_ERROR_CAPACITY,
+            "could not allocate selected soft-body auto-shape positions");
+    }
     result = editor_auto_shape_positions_get(config, output_positions, point_count);
-    if(editor_result_check(result)) return result;
+    if(editor_result_check(result)) goto finish;
     for(size_t point = 0; point < point_count; point += 1) {
         for(size_t node = 0; node < body->node_count; node += 1) {
             if(body->nodes[node].id != points[point]) continue;
-            if(found[node]) return editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
-                "auto shape contains a duplicate soft-body node");
+            for(size_t previous = 0; previous < point; previous += 1)
+                if(indices[previous] == node) {
+                    result = editor_result_error(EDITOR_ERROR_INVALID_ARGUMENT,
+                        "auto shape contains a duplicate soft-body node");
+                    goto finish;
+                }
             indices[point] = node;
-            found[node] = true;
             goto next_soft_body_point;
         }
-        return editor_result_error(EDITOR_ERROR_NOT_FOUND,
+        result = editor_result_error(EDITOR_ERROR_NOT_FOUND,
             "auto shape soft-body node was not found");
+        goto finish;
 next_soft_body_point:
         continue;
     }
     for(size_t point = 0; point < point_count; point += 1)
         body->nodes[indices[point]].position = output_positions[point];
-    return editor_result_value(true);
+    result = editor_result_value(true);
+finish:
+    free(output_positions);
+    free(indices);
+    return result;
 }
 
 bool editor_auto_shape_control_check(const EditorAutoShapeConfig *config,

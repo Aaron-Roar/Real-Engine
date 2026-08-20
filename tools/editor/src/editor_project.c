@@ -1464,13 +1464,19 @@ void editor_project_rigid_body_constraints_apply(EditorObject *object,
     size_t queue_begin = 0;
     size_t queue_end = 0;
     EditorRigidBody *body;
+    bool *resolved;
+    EditorRigidBodyId *queue;
 
     if(object == NULL || rigid_body == 0) return;
     body = editor_project_rigid_body_get(object, rigid_body);
     if(body == NULL) return;
-    bool resolved[object->rigid_body_count];
-    EditorRigidBodyId queue[object->rigid_body_count];
-    memset(resolved, 0, sizeof(resolved));
+    resolved = calloc(object->rigid_body_count, sizeof(*resolved));
+    queue = malloc(object->rigid_body_count * sizeof(*queue));
+    if(resolved == NULL || queue == NULL) {
+        free(resolved);
+        free(queue);
+        return;
+    }
     resolved[(size_t)(body - object->rigid_bodies)] = true;
     queue[queue_end++] = rigid_body;
     while(queue_begin < queue_end) {
@@ -1506,6 +1512,8 @@ void editor_project_rigid_body_constraints_apply(EditorObject *object,
             queue[queue_end++] = driven_body->id;
         }
     }
+    free(resolved);
+    free(queue);
 }
 
 EditorJoint *editor_project_joint_add(EditorProject *project, EditorObject *object,

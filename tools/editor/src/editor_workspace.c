@@ -10,6 +10,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static const EditorSprite *editor_workspace_sprite_get(const EditorObject *object,
@@ -971,8 +972,10 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
             }
             for(size_t area_index = 0; area_index < body->area_count; area_index += 1) {
                 const EditorSoftArea *area = &body->areas[area_index];
+                uint32_t (*triangles)[3];
                 if(area->node_count < 3) continue;
-                uint32_t triangles[area->node_count - 2][3];
+                triangles = malloc((area->node_count - 2) * sizeof(*triangles));
+                if(triangles == NULL) continue;
                 size_t triangle_count = editor_project_soft_area_triangulate(
                     body, area, triangles, area->node_count - 2);
                 for(size_t triangle = 0; triangle < triangle_count; triangle += 1) {
@@ -999,9 +1002,10 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                             "rohr_graphics_color_hex_create(UINT32_C(0x%08x)));\n"
                             "    if(rohr_error_check(result)) goto fail;\n",
                             body->name, node_a->name, node_b->name, node_c->name,
-                            area->color);
+                        area->color);
                     }
                 }
+                free(triangles);
             }
             for(size_t node_index = 0; node_index < body->node_count; node_index += 1) {
                 const EditorSoftNode *node = &body->nodes[node_index];

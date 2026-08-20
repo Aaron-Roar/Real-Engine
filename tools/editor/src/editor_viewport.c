@@ -430,8 +430,10 @@ static void editor_triangle_filled_draw(Position a, Position b, Position c, Colo
 
 static void editor_soft_area_filled_draw(const EditorObject *object,
         const EditorSoftBody *body, const EditorSoftArea *area, Color color) {
+    uint32_t (*triangles)[3];
     if(area == NULL || area->node_count < 3) return;
-    uint32_t triangles[area->node_count - 2][3];
+    triangles = malloc((area->node_count - 2) * sizeof(*triangles));
+    if(triangles == NULL) return;
     size_t count = editor_project_soft_area_triangulate(body, area, triangles,
         area->node_count - 2);
     for(size_t i = 0; i < count; i += 1) {
@@ -451,16 +453,25 @@ static void editor_soft_area_filled_draw(const EditorObject *object,
             editor_soft_node_world_get(object, body, b),
             editor_soft_node_world_get(object, body, c), color);
     }
+    free(triangles);
 }
 
 static void editor_hitbox_filled_draw(const EditorObject *object,
         const EditorRigidBody *body, const EditorHitbox *hitbox, Color color) {
     float minimum_y;
     float maximum_y;
+    Position *points;
+    float *intersections;
 
     if(object == NULL || body == NULL || hitbox == NULL || hitbox->vertex_count < 3)
         return;
-    Position points[hitbox->vertex_count];
+    points = malloc(hitbox->vertex_count * sizeof(*points));
+    intersections = malloc(hitbox->vertex_count * sizeof(*intersections));
+    if(points == NULL || intersections == NULL) {
+        free(points);
+        free(intersections);
+        return;
+    }
     for(uint32_t i = 0; i < hitbox->vertex_count; i += 1) {
         points[i] = editor_view_world_to_screen(
             editor_hitbox_vertex_world_get(object, body, hitbox, i));
@@ -476,7 +487,6 @@ static void editor_hitbox_filled_draw(const EditorObject *object,
     int last_row = (int)ceilf(fminf(maximum_y, EDITOR_WINDOW_HEIGHT - 1.0f));
     for(int row = first_row; row <= last_row; row += 1) {
         float scan_y = (float)row + 0.5f;
-        float intersections[hitbox->vertex_count];
         uint32_t count = 0;
         for(uint32_t edge = 0; edge < hitbox->vertex_count; edge += 1) {
             Position start = points[edge];
@@ -504,6 +514,8 @@ static void editor_hitbox_filled_draw(const EditorObject *object,
                 left, (float)row, right - left, 1.0f, color);
         }
     }
+    free(points);
+    free(intersections);
 }
 
 static void editor_quad_draw(Position center, float width, float height,
@@ -1937,14 +1949,17 @@ static bool editor_group_rigid_bodies_connected_check(EditorObject *object,
     size_t queue_begin = 0;
     size_t queue_end = 0;
     EditorRigidBody *body;
+    EditorRigidBodyId *queue;
+    bool *visited;
+    bool found = false;
 
     if(object == NULL || first == 0 || second == 0) return false;
     if(first == second) return true;
     body = editor_project_rigid_body_get(object, first);
     if(body == NULL) return false;
-    EditorRigidBodyId queue[object->rigid_body_count];
-    bool visited[object->rigid_body_count];
-    memset(visited, 0, sizeof(visited));
+    queue = malloc(object->rigid_body_count * sizeof(*queue));
+    visited = calloc(object->rigid_body_count, sizeof(*visited));
+    if(queue == NULL || visited == NULL) goto finish;
     visited[(size_t)(body - object->rigid_bodies)] = true;
     queue[queue_end++] = first;
     while(queue_begin < queue_end) {
@@ -1964,7 +1979,10 @@ static bool editor_group_rigid_bodies_connected_check(EditorObject *object,
             if(a->rigid_body == current) connected = b->rigid_body;
             else if(b->rigid_body == current) connected = a->rigid_body;
             else continue;
-            if(connected == second) return true;
+            if(connected == second) {
+                found = true;
+                goto finish;
+            }
             connected_body = editor_project_rigid_body_get(object, connected);
             if(connected_body == NULL) continue;
             connected_index = (size_t)(connected_body - object->rigid_bodies);
@@ -1973,7 +1991,10 @@ static bool editor_group_rigid_bodies_connected_check(EditorObject *object,
             queue[queue_end++] = connected;
         }
     }
-    return false;
+finish:
+    free(queue);
+    free(visited);
+    return found;
 }
 
 static bool editor_group_rigid_body_already_driven(EditorProject *project,
