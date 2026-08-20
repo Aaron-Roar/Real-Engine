@@ -9,7 +9,7 @@
 
 #include <math.h>
 
-static Acceleration physics_gravity = ROHR_PHYSICS_GRAVITY_DEFAULT;
+static Acceleration physics_gravity = {0.0f, 980.0f};
 
 void physics_force_state_init(void) {
     physics_gravity = ROHR_PHYSICS_GRAVITY_DEFAULT;

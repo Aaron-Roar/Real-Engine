@@ -48,7 +48,7 @@ exit /b 0
 :clean
 cmake -E remove_directory "%BUILD_DIRECTORY%"
 if errorlevel 1 exit /b %errorlevel%
-cmake -E remove_directory "%PROJECT_ROOT%dist"
+cmake -E remove_directory "%PROJECT_ROOT%\dist"
 exit /b %errorlevel%
 
 :usage
