@@ -80,6 +80,13 @@ cd rohr-engine
 On native Windows, use `dev.bat sdk` from a Visual Studio Developer PowerShell.
 Keep the resulting SDK directory together and launch its `bin/rohr-gui`.
 
+## Create your first project
+
+After building the SDK, follow the screenshot-guided
+[Your first Rohr project](docs/getting_started.md) tutorial. It shows how to
+open the SDK editor, create and build a project, find its source code, and run
+the finished game.
+
 Engine contributors can build and test the repository afterward with
 `./dev.sh build` and `./dev.sh test`, or `dev.bat build` and `dev.bat test` on
 Windows.
@@ -170,6 +177,7 @@ See [Editor guide](docs/editor.md) and
 
 ## Documentation
 
+- [Your first Rohr project](docs/getting_started.md)
 - [Documentation overview](docs/README.md)
 - [Architecture](docs/architecture.md)
 - [Physics](docs/physics.md)
