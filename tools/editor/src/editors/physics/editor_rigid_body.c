@@ -35,7 +35,7 @@ static void property_uint_set(EditorProject *project, EditorObjectId object,
 }
 
 static bool checkbox(const char *id, const TextAsset *label, UIRect bounds,
-        bool *checked, bool label_left) {
+        bool *checked, bool label_left, bool *hovered) {
     UIButtonResult result = rohr_ui_interaction(id, bounds);
     UIRect box = label_left ?
         (UIRect){bounds.x + bounds.width - bounds.height + 4.0f,
@@ -46,6 +46,7 @@ static bool checkbox(const char *id, const TextAsset *label, UIRect bounds,
         result.hovered || result.focused ? (Color){67, 75, 90, 255} :
         (Color){48, 54, 66, 255};
     if(result.clicked) *checked = !*checked;
+    if(hovered != NULL) *hovered = result.hovered;
     rohr_ui_surface(bounds, background);
     rohr_ui_surface(box, (Color){22, 25, 31, 255});
     rohr_ui_border(box, 2.0f, (Color){8, 9, 12, 255});
@@ -144,6 +145,8 @@ bool editor_rigid_body_editor_draw(EditorRigidBodyEditor *editor,
     float rotation;
     UIFieldResult name_result, x_result, y_result, rotation_result;
     bool field_active;
+    bool binding_pointer_inside = false;
+    bool binding_click_handled = false;
     float x, width, delete_y = 650.0f;
     if(editor == NULL || context == NULL || context->project == NULL ||
             context->viewport == NULL) return false;
@@ -240,7 +243,8 @@ bool editor_rigid_body_editor_draw(EditorRigidBodyEditor *editor,
     {
         bool value = body->gravity_enabled;
         if(checkbox("editor.rigid_body.gravity", &editor->gravity_label,
-                (UIRect){x + 10.0f, 340.0f, width - 20.0f, 28.0f}, &value, false))
+                (UIRect){x + 10.0f, 340.0f, width - 20.0f, 28.0f}, &value,
+                false, NULL))
             property_bool_set(context->project, object->id, body->id,
                 EDITOR_PROPERTY_GRAVITY, value);
     }
@@ -267,7 +271,7 @@ bool editor_rigid_body_editor_draw(EditorRigidBodyEditor *editor,
         bool collision = body->collision_enabled;
         if(checkbox("editor.rigid_body.collision", &editor->collision_label,
                 (UIRect){row_x, 436.0f, row_width * 0.52f, 28.0f},
-                &collision, false)) {
+                &collision, false, NULL)) {
             property_bool_set(context->project, object->id, body->id,
                 EDITOR_PROPERTY_COLLISION, collision);
             if(!collision) editor->collision_category_open =
@@ -277,7 +281,7 @@ bool editor_rigid_body_editor_draw(EditorRigidBodyEditor *editor,
             bool particle = body->particle;
             if(checkbox("editor.rigid_body.particle", &editor->particle_label,
                     (UIRect){row_x + row_width * 0.54f, 436.0f,
-                        row_width * 0.46f, 28.0f}, &particle, true))
+                        row_width * 0.46f, 28.0f}, &particle, true, NULL))
                 property_bool_set(context->project, object->id, body->id,
                     EDITOR_PROPERTY_PARTICLE, particle);
             if(!body->particle && context->viewport->selection ==
@@ -449,14 +453,21 @@ bool editor_rigid_body_editor_draw(EditorRigidBodyEditor *editor,
                 }
                 {
                     UIButtonStyle disabled = rohr_ui_button_style_default_get();
+                    UIRect binding_bounds = {row_x + row_width * 0.54f, y,
+                        row_width * 0.46f, 26.0f};
+                    UIButtonResult binding_button;
                     disabled.idle = disabled.hovered = (Color){38, 41, 48, 255};
-                    if(rohr_ui_button(binding_id, &editor->bind_frames_label,
-                            (UIRect){row_x + row_width * 0.54f, y,
-                                row_width * 0.46f, 26.0f},
-                            animation == NULL ? &disabled : NULL).clicked &&
-                            animation != NULL)
+                    binding_button = rohr_ui_button(binding_id,
+                        &editor->bind_frames_label, binding_bounds,
+                        animation == NULL ? &disabled : NULL);
+                    if(editor->binding_hitbox_open == hitbox->id &&
+                            binding_button.hovered)
+                        binding_pointer_inside = true;
+                    if(binding_button.clicked && animation != NULL) {
+                        binding_click_handled = true;
                         editor->binding_hitbox_open =
                             editor->binding_hitbox_open == hitbox->id ? 0 : hitbox->id;
+                    }
                 }
                 hitbox_y += 30.0f;
                 if(editor->binding_hitbox_open == hitbox->id && animation != NULL) {
@@ -464,6 +475,8 @@ bool editor_rigid_body_editor_draw(EditorRigidBodyEditor *editor,
                         animation->frame_count : MAX_ANIMATIONS_FRAMES;
                     for(size_t frame = 0; frame < frame_count; frame += 1) {
                         char frame_id[96];
+                        UIRect frame_bounds = {row_x + 18.0f, hitbox_y,
+                            row_width - 18.0f, 26.0f};
                         bool checked = editor_project_hitbox_animation_binding_check(
                             body, animation->id, animation->frames[frame].id,
                             hitbox->id);
@@ -475,9 +488,11 @@ bool editor_rigid_body_editor_draw(EditorRigidBodyEditor *editor,
                         snprintf(frame_id, sizeof(frame_id),
                             "editor.hitbox.%u.frame.%u", hitbox->id,
                             animation->frames[frame].id);
+                        bool frame_hovered = false;
                         if(checkbox(frame_id, &editor->frame_names[frame],
-                                (UIRect){row_x + 18.0f, hitbox_y,
-                                    row_width - 18.0f, 26.0f}, &checked, false)) {
+                                frame_bounds, &checked, false,
+                                &frame_hovered)) {
+                            binding_click_handled = true;
                             EditorCommand command = {.type =
                                 EDITOR_COMMAND_PROPERTY_SET,
                                 .data.property_set = {
@@ -493,6 +508,8 @@ bool editor_rigid_body_editor_draw(EditorRigidBodyEditor *editor,
                             (void)editor_command_execute(context->project,
                                 &command);
                         }
+                        binding_pointer_inside = binding_pointer_inside ||
+                            frame_hovered;
                         hitbox_y += 30.0f;
                     }
                 }
@@ -501,8 +518,14 @@ bool editor_rigid_body_editor_draw(EditorRigidBodyEditor *editor,
             }
         }
     }
+    if(editor->binding_hitbox_open != 0 &&
+            context->primary_button == MOUSE_BUTTON_STATE_PRESSED &&
+            !binding_pointer_inside && !binding_click_handled)
+        editor->binding_hitbox_open = 0;
     if(context->delete_y_get != NULL && context->delete_open_item != NULL) {
         UIButtonStyle style = editor_mode_delete_style_get();
+        float panel_delete_y = context->delete_y_get(context->delete_context);
+        if(delete_y < panel_delete_y) delete_y = panel_delete_y;
         if(rohr_ui_button("editor.rigid_body.delete", &editor->delete_label,
                 (UIRect){x + 10.0f, delete_y,
                     width - 20.0f, 34.0f}, &style).clicked)

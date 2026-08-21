@@ -726,7 +726,7 @@ static bool editor_bulk_checkbox_draw(const char *id, UIRect bounds,
 
 bool editor_bulk_panel_draw(EditorBulkPanel *panel, EditorProject *project,
         EditorViewportState *state, EditorHistory *history, float x, float width,
-        EditorBulkColorOpen color_open, void *color_context) {
+        float delete_y, EditorBulkColorOpen color_open, void *color_context) {
     const EditorBulkProperty *properties;
     size_t property_count;
     bool editing = false;
@@ -859,7 +859,7 @@ bool editor_bulk_panel_draw(EditorBulkPanel *panel, EditorProject *project,
     }
     if(editor_bulk_delete_check(state)) {
         UIButtonStyle style = rohr_ui_button_style_default_get();
-        float y = 96.0f + (float)property_count * 36.0f;
+        float y = fmaxf(96.0f + (float)property_count * 36.0f, delete_y);
         style.idle = (Color){125, 42, 48, 255};
         style.hovered = (Color){165, 52, 60, 255};
         if(rohr_ui_button("editor.bulk.delete", &panel->delete_label,

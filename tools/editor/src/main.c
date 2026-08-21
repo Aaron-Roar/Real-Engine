@@ -138,6 +138,7 @@ typedef struct EditorModeColorContext {
 typedef struct EditorModeDeleteContext {
     EditorProject *project;
     EditorViewportState *viewport;
+    const EditorRigidBodyEditor *rigid_body_editor;
 } EditorModeDeleteContext;
 
 typedef struct EditorHierarchyDragState EditorHierarchyDragState;
@@ -637,7 +638,8 @@ static uint64_t editor_project_hash_get(const EditorProject *project) {
 }
 
 static float editor_panel_content_height_get(const EditorProject *project,
-    const EditorViewportState *state) {
+    const EditorViewportState *state,
+    const EditorRigidBodyEditor *rigid_body_editor) {
     const EditorObject *object = NULL;
     float height = EDITOR_WINDOW_HEIGHT;
 
@@ -657,7 +659,20 @@ static float editor_panel_content_height_get(const EditorProject *project,
     if(state->mode == EDITOR_VIEWPORT_RIGID_BODY) {
         for(size_t i = 0; i < object->rigid_body_count; i += 1) {
             if(object->rigid_bodies[i].id == state->selected_rigid_body) {
-                return fmaxf(height, 674.0f +
+                float expanded_frames = 0.0f;
+                if(rigid_body_editor != NULL &&
+                        rigid_body_editor->binding_hitbox_open != 0) {
+                    for(size_t animation = 0;
+                            animation < object->animated_sprite_count;
+                            animation += 1)
+                        if(object->animated_sprite_items[animation].rigid_body ==
+                                object->rigid_bodies[i].id) {
+                            expanded_frames = (float)object->
+                                animated_sprite_items[animation].frame_count * 30.0f;
+                            break;
+                        }
+                }
+                return fmaxf(height, 674.0f + expanded_frames +
                     (float)(object->rigid_bodies[i].hitbox_count +
                         project->collision_mask_count + 1 +
                         (object->rigid_bodies[i].particle ? 1 : 0)) * 30.0f);
@@ -695,8 +710,10 @@ static float editor_panel_content_height_get(const EditorProject *project,
 }
 
 static float editor_panel_delete_y_get(const EditorProject *project,
-    const EditorViewportState *state) {
-    return editor_panel_content_height_get(project, state) - 50.0f;
+    const EditorViewportState *state,
+    const EditorRigidBodyEditor *rigid_body_editor) {
+    return editor_panel_content_height_get(project, state,
+        rigid_body_editor) - 50.0f;
 }
 
 static bool editor_use_executable_directory(void) {
@@ -897,7 +914,8 @@ static void editor_mode_local_color_picker_open(void *context, uint32_t *color) 
 static float editor_mode_delete_y_get(void *context) {
     EditorModeDeleteContext *mode = context;
     return mode == NULL ? 0.0f :
-        editor_panel_delete_y_get(mode->project, mode->viewport);
+        editor_panel_delete_y_get(mode->project, mode->viewport,
+            mode->rigid_body_editor);
 }
 
 static bool editor_mode_open_item_delete(void *context) {
@@ -2341,11 +2359,13 @@ int main(void) {
             panel_scroll_offset = 0.0f;
             collision_category_open = false;
             collide_with_open = false;
+            rigid_body_editor.binding_hitbox_open = 0;
         }
         panel_scroll_offset = rohr_ui_scroll_region_begin("editor.tools.scroll",
             (UIRect){EDITOR_VIEWPORT_WIDTH, EDITOR_MENU_HEIGHT,
                 EDITOR_TOOLS_WIDTH, EDITOR_WINDOW_HEIGHT - EDITOR_MENU_HEIGHT},
-            fmaxf(editor_panel_content_height_get(&project, &viewport_state),
+            fmaxf(editor_panel_content_height_get(&project, &viewport_state,
+                    &rigid_body_editor),
                 editor_bulk_panel_content_height_get(&viewport_state)),
             panel_scroll_offset, 42.0f).offset;
         viewport_state.preview_rigid_body = 0;
@@ -2367,7 +2387,9 @@ int main(void) {
                 .history = &history};
             field_editing = editor_bulk_panel_draw(&bulk_panel, &project,
                 &viewport_state, &history, EDITOR_VIEWPORT_WIDTH,
-                EDITOR_TOOLS_WIDTH, editor_bulk_color_picker_open, &bulk_color);
+                EDITOR_TOOLS_WIDTH, editor_panel_delete_y_get(&project,
+                    &viewport_state, &rigid_body_editor),
+                editor_bulk_color_picker_open, &bulk_color);
         } else if(viewport_state.mode == EDITOR_VIEWPORT_ORIGIN) {
             field_editing = editor_origin_panel_draw(&origin_panel,
                 &(EditorPanelContext){
@@ -2389,7 +2411,8 @@ int main(void) {
             EditorModeColorContext color_context = {
                 .picker = &color_picker, .project = &project};
             EditorModeDeleteContext delete_context = {
-                .project = &project, .viewport = &viewport_state};
+                .project = &project, .viewport = &viewport_state,
+                .rigid_body_editor = &rigid_body_editor};
             EditorModeHierarchyContext hierarchy_context = {
                 .drag = &hierarchy_drag, .pointer = hierarchy_pointer,
                 .primary = hierarchy_primary,

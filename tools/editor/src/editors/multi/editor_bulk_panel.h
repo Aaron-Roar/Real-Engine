@@ -40,7 +40,7 @@ bool editor_bulk_panel_create(EditorBulkPanel *panel, FontAsset *font);
 void editor_bulk_panel_destroy(EditorBulkPanel *panel);
 bool editor_bulk_panel_draw(EditorBulkPanel *panel, EditorProject *project,
     EditorViewportState *state, EditorHistory *history, float x, float width,
-    EditorBulkColorOpen color_open, void *color_context);
+    float delete_y, EditorBulkColorOpen color_open, void *color_context);
 float editor_bulk_panel_content_height_get(const EditorViewportState *state);
 bool editor_bulk_property_set(EditorProject *project, EditorViewportState *state,
     EditorHistory *history, const EditorPropertySetCommand *property);
