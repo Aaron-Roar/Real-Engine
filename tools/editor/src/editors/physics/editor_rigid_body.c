@@ -26,6 +26,14 @@ static void property_bool_set(EditorProject *project, EditorObjectId object,
     (void)editor_command_execute(project, &command);
 }
 
+static void property_uint_set(EditorProject *project, EditorObjectId object,
+        EditorRigidBodyId body, EditorPropertyKind property, uint32_t value) {
+    EditorCommand command = {.type = EDITOR_COMMAND_PROPERTY_SET,
+        .data.property_set = {EDITOR_ITEM_RIGID_BODY, object, 0, body, 0,
+            property, EDITOR_PROPERTY_VALUE_UINT, {.integer = value}}};
+    (void)editor_command_execute(project, &command);
+}
+
 static bool checkbox(const char *id, const TextAsset *label, UIRect bounds,
         bool *checked, bool label_left) {
     UIButtonResult result = rohr_ui_interaction(id, bounds);
@@ -72,7 +80,9 @@ bool editor_rigid_body_editor_create(EditorRigidBodyEditor *editor,
     CREATE("Rotation Locked", rotation_locked_label); CREATE("Collision", collision_label);
     CREATE("Particle", particle_label); CREATE("Collision Category", collision_category_label);
     CREATE("Collide With", collide_with_label); CREATE("Origin", origin_label);
-    CREATE("Add Hitbox", add_hitbox_label); CREATE("Delete Rigid Body", delete_label);
+    CREATE("Initial Active Hitbox", active_hitbox_label);
+    CREATE("Add Hitbox Variant", add_hitbox_label);
+    CREATE("Delete Rigid Body", delete_label);
     CREATE("[X]", visible_label); CREATE("[ ]", hidden_label);
     CREATE("", x_field); CREATE("", y_field); CREATE("", rotation_field);
     CREATE("", mass_field); CREATE("", friction_field);
@@ -101,7 +111,8 @@ void editor_rigid_body_editor_destroy(EditorRigidBodyEditor *editor) {
     DESTROY(dynamic_label); DESTROY(static_label); DESTROY(rotation_unlocked_label);
     DESTROY(rotation_locked_label); DESTROY(collision_label); DESTROY(particle_label);
     DESTROY(collision_category_label); DESTROY(collide_with_label); DESTROY(origin_label);
-    DESTROY(add_hitbox_label); DESTROY(delete_label); DESTROY(visible_label);
+    DESTROY(active_hitbox_label); DESTROY(add_hitbox_label);
+    DESTROY(delete_label); DESTROY(visible_label);
     DESTROY(hidden_label); DESTROY(x_field); DESTROY(y_field);
     DESTROY(rotation_field); DESTROY(mass_field); DESTROY(friction_field);
     DESTROY(restitution_field);
@@ -331,6 +342,32 @@ bool editor_rigid_body_editor_draw(EditorRigidBodyEditor *editor,
                     context->viewport->selection = EDITOR_SELECTION_PARTICLE;
                     if(particle.double_clicked)
                         context->viewport->mode = EDITOR_VIEWPORT_PARTICLE;
+                }
+                item_y += 34.0f;
+            }
+            if(body->hitbox_count > 0) {
+                const TextAsset *options[EDITOR_BODY_HITBOX_MAX];
+                size_t option_count = body->hitbox_count < EDITOR_BODY_HITBOX_MAX ?
+                    body->hitbox_count : EDITOR_BODY_HITBOX_MAX;
+                rohr_ui_label(&editor->active_hitbox_label,
+                    (UIRect){row_x, item_y, row_width, 26.0f});
+                item_y += 28.0f;
+                for(size_t i = 0; i < option_count; i += 1) {
+                    if(!editor_mode_named_text_sync(editor->font,
+                            body->hitboxes[i].name, &editor->hitbox_names[i],
+                            editor->hitbox_cache[i], EDITOR_OBJECT_NAME_MAX))
+                        return field_active;
+                    options[i] = &editor->hitbox_names[i];
+                }
+                {
+                    UIDropdownResult active = rohr_ui_dropdown(
+                        "editor.rigid_body.active_hitbox", options, option_count,
+                        body->active_hitbox_index < option_count ?
+                            body->active_hitbox_index : 0,
+                        (UIRect){row_x, item_y, row_width, 28.0f}, NULL);
+                    if(active.changed) property_uint_set(context->project,
+                        object->id, body->id, EDITOR_PROPERTY_ACTIVE_HITBOX,
+                        (uint32_t)active.selected_index);
                 }
                 item_y += 34.0f;
             }

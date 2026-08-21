@@ -22,7 +22,7 @@ typedef struct EditorRigidBodyEditor {
     TextAsset rotation_unlocked_label, rotation_locked_label;
     TextAsset collision_label, particle_label;
     TextAsset collision_category_label, collide_with_label;
-    TextAsset origin_label, add_hitbox_label, delete_label;
+    TextAsset origin_label, active_hitbox_label, add_hitbox_label, delete_label;
     TextAsset visible_label, hidden_label;
     TextAsset x_field, y_field, rotation_field;
     TextAsset mass_field, friction_field, restitution_field;

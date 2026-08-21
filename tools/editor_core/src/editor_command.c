@@ -729,6 +729,10 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
                 else if(set->property == EDITOR_PROPERTY_PARTICLE_AUTO_FIT &&
                         set->value_kind == EDITOR_PROPERTY_VALUE_BOOL)
                     body->particle_auto_fit = set->value.boolean;
+                else if(set->property == EDITOR_PROPERTY_ACTIVE_HITBOX &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_UINT &&
+                        set->value.integer < body->hitbox_count)
+                    body->active_hitbox_index = set->value.integer;
                 else if(set->property == EDITOR_PROPERTY_OUTLINE_COLOR &&
                         set->value_kind == EDITOR_PROPERTY_VALUE_UINT)
                     body->border_color = set->value.integer;
@@ -1494,6 +1498,11 @@ static bool editor_command_property_parse(const char *name,
     EDITOR_BOOL_PROPERTY("collision", EDITOR_PROPERTY_COLLISION)
     EDITOR_BOOL_PROPERTY("particle", EDITOR_PROPERTY_PARTICLE)
     EDITOR_BOOL_PROPERTY("particle-auto-fit", EDITOR_PROPERTY_PARTICLE_AUTO_FIT)
+    if(strcmp(name, "active-hitbox") == 0) {
+        *property = EDITOR_PROPERTY_ACTIVE_HITBOX;
+        *value_kind = EDITOR_PROPERTY_VALUE_UINT;
+        return true;
+    }
     EDITOR_BOOL_PROPERTY("position-locked", EDITOR_PROPERTY_POSITION_LOCKED)
     EDITOR_BOOL_PROPERTY("position-follows-body", EDITOR_PROPERTY_POSITION_FOLLOWS_BODY)
     EDITOR_BOOL_PROPERTY("rotation-follows-body", EDITOR_PROPERTY_ROTATION_FOLLOWS_BODY)
@@ -1533,6 +1542,7 @@ static const char *editor_command_property_name_get(EditorPropertyKind property)
         case EDITOR_PROPERTY_PARTICLE_ORIGIN_X: return "particle-origin-x";
         case EDITOR_PROPERTY_PARTICLE_ORIGIN_Y: return "particle-origin-y";
         case EDITOR_PROPERTY_PARTICLE_AUTO_FIT: return "particle-auto-fit";
+        case EDITOR_PROPERTY_ACTIVE_HITBOX: return "active-hitbox";
         case EDITOR_PROPERTY_NODE_RADIUS: return "node-radius";
         case EDITOR_PROPERTY_POSITION_LOCKED: return "position-locked";
         case EDITOR_PROPERTY_VISUAL_SIZE: return "visual-size";
@@ -2011,6 +2021,9 @@ collision_filter_invalid:
         } else {
             if(editor_command_property_color_check(set->property)) {
                 if(!editor_command_color_parse(arguments[value_index],
+                        &set->value.integer)) goto property_parse_invalid;
+            } else if(set->property == EDITOR_PROPERTY_ACTIVE_HITBOX) {
+                if(!editor_command_uint_parse(arguments[value_index],
                         &set->value.integer)) goto property_parse_invalid;
             } else {
                 const char *kinds[] = {"revolute", "weld", "spring"};
@@ -3004,6 +3017,8 @@ EditorResult editor_command_cli_write(const EditorCommand *command,
             } else {
                 if(editor_command_property_color_check(set->property))
                     snprintf(value, sizeof(value), "#%08X", set->value.integer);
+                else if(set->property == EDITOR_PROPERTY_ACTIVE_HITBOX)
+                    snprintf(value, sizeof(value), "%u", set->value.integer);
                 else {
                     const char *kinds[] = {"revolute", "weld", "spring"};
                     if(set->value.integer > (uint32_t)EDITOR_JOINT_SPRING)

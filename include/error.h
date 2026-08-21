@@ -65,6 +65,8 @@ typedef enum EngineError {
     ERROR_ENGINE_ENTITY_NOT_FOUND,
     /** A required component is missing. */
     ERROR_ENGINE_COMPONENT_MISSING,
+    /** An index is outside the valid range for the selected component. */
+    ERROR_ENGINE_INDEX_OUT_OF_RANGE,
     /** A polygon shape is degenerate, self-intersecting, or otherwise invalid. */
     ERROR_ENGINE_INVALID_SHAPE,
     /** A texture asset could not be loaded. */

@@ -59,6 +59,16 @@ void physics_pipeline_substep(double dt);
 void physics_pipeline_update(double dt);
 /** Result type for functions that return a Shape. */
 ERROR_DECLARE_RESULT_TYPE(ShapeResult, Shape);
+/** Result type for hitbox variant counts and indices. */
+ERROR_DECLARE_RESULT_TYPE(HitboxIndexResult, size_t);
+
+/** Ordered local-space hitbox variants owned by one entity. */
+typedef struct HitboxVariantList {
+    Shape *values;
+    size_t count;
+    size_t capacity;
+    size_t active_index;
+} HitboxVariantList;
 
 /** Geometric overlap information from narrow-phase shape tests. */
 typedef struct OverlapInfo {
@@ -361,6 +371,8 @@ MEMORY_DECLARE_OBJECT_POOL(MassPool, float);
 MEMORY_DECLARE_OBJECT_POOL(ForcePool, Force);
 /** Pool storing shapes by EntityIndex. */
 MEMORY_DECLARE_OBJECT_POOL(ShapePool, Shape);
+/** Pool storing owned hitbox variant lists by EntityIndex. */
+MEMORY_DECLARE_OBJECT_POOL(HitboxVariantListPool, HitboxVariantList);
 /** Pool storing collision filters by EntityIndex. */
 MEMORY_DECLARE_OBJECT_POOL(CollisionFilterConfigPool, CollisionFilterConfig);
 /** Pool storing orientations by EntityIndex. */
@@ -397,6 +409,7 @@ extern ForcePool forces_pool;
 extern AccelerationPool force_accelerations_pool;
 extern ShapePool hit_boxes_pool;
 extern ShapePool world_hit_boxes_pool;
+extern HitboxVariantListPool hitbox_variants_pool;
 extern CollisionFilterConfigPool collision_filters_pool;
 extern OrientationPool orientations_pool;
 extern AngularVelocityPool angular_velocities_pool;
@@ -552,6 +565,15 @@ EngineResult physics_torque_for_one_tick_apply(Entity entity, Torque t);
  * does not enable physical collision response.
  */
 EngineResult physics_hitbox_set(Entity entity, Shape hitbox);
+ShapeResult physics_hitbox_get(Entity entity);
+EngineResult physics_hitbox_remove(Entity entity);
+EngineResult physics_hitbox_add(Entity entity, Shape hitbox);
+ShapeResult physics_hitbox_at_get(Entity entity, size_t index);
+EngineResult physics_hitbox_at_set(Entity entity, size_t index, Shape hitbox);
+EngineResult physics_hitbox_at_remove(Entity entity, size_t index);
+HitboxIndexResult physics_hitbox_count_get(Entity entity);
+HitboxIndexResult physics_hitbox_active_index_get(Entity entity);
+EngineResult physics_hitbox_active_index_set(Entity entity, size_t index);
 /** Return the default collision filter: default category against all categories. */
 CollisionFilterConfig physics_collision_filter_config_default_get(void);
 /** Replace an entity's complete collision filter. */

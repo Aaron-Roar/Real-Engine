@@ -33,7 +33,7 @@ static bool editor_generation_hitbox_write(EditorTerminalPanel *terminal,
     char child_prefix[96];
     size_t child_count = hitbox->vertex_count * 2;
     if(!editor_generation_line_write(terminal, prefix,
-            last ? "└── " : "├── ", "Hitbox", hitbox->name)) return false;
+            last ? "└── " : "├── ", "Hitbox Variant", hitbox->name)) return false;
     if(!editor_generation_child_prefix_get(child_prefix, sizeof(child_prefix),
             prefix, last)) return false;
     for(uint32_t i = 0; i < hitbox->vertex_count; i += 1) {

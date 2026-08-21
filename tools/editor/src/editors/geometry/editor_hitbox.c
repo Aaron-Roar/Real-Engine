@@ -33,7 +33,7 @@ bool editor_hitbox_editor_create(EditorHitboxEditor *editor, FontAsset *font) {
     CREATE("Lines", lines_label);
     CREATE("[X]", visible_label);
     CREATE("[ ]", hidden_label);
-    CREATE("Delete Hitbox", delete_label);
+    CREATE("Delete Hitbox Variant", delete_label);
 #undef CREATE
     for(size_t i = 0; i < EDITOR_BODY_HITBOX_MAX; i += 1) {
         char name[32];

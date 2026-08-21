@@ -1129,12 +1129,11 @@ static RohrComponentMask state_flag_mask(const char *flag) {
     return ROHR_NONE;
 }
 
-static EngineResult state_shape_load(EntityIndex index, yyjson_val *value) {
+static EngineResult state_shape_load(Entity entity, yyjson_val *value) {
     yyjson_val *vertex;
     size_t vertex_index;
     size_t vertex_count;
     Shape shape = {0};
-    Shape prepared;
 
     if(!yyjson_is_arr(value)) {
         return error_result_error(ERROR_ENGINE_STATE_INVALID);
@@ -1149,14 +1148,7 @@ static EngineResult state_shape_load(EntityIndex index, yyjson_val *value) {
         }
     }
     shape.amount_of_vertices = (uint16_t)vertex_count;
-    if(!physics_shape_collision_prepare(shape, &prepared)) {
-        return error_result_error(ERROR_ENGINE_INVALID_SHAPE);
-    }
-    if(ShapePool_store_at(&hit_boxes_pool, index, prepared).kind == ERROR_RESULT_ERROR) {
-        return error_result_error(ERROR_MEMORY_POOL_ALLOCATION_FAILED);
-    }
-    entity_mask[index] |= ROHR_HIT_BOX;
-    return error_result_value(true);
+    return physics_hitbox_set(entity, shape);
 }
 
 static EngineResult state_components_load(
@@ -1263,7 +1255,7 @@ static EngineResult state_components_load(
 
     value = yyjson_obj_get(components, "hit_box");
     if(value != NULL) {
-        result = state_shape_load(index, value);
+        result = state_shape_load(entity, value);
         if(result.kind == ERROR_RESULT_ERROR) return result;
     }
 

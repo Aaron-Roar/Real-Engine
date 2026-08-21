@@ -753,6 +753,24 @@ EngineResult rohr_physics_torque_for_one_tick_apply(Entity entity, Torque t);
  * @return EngineResult describing success or failure.
  */
 EngineResult rohr_physics_hitbox_set(Entity entity, Shape hitbox);
+/** Returns the active local-space hitbox variant. */
+ShapeResult rohr_physics_hitbox_get(Entity entity);
+/** Removes every hitbox variant and the ROHR_HIT_BOX component. */
+EngineResult rohr_physics_hitbox_remove(Entity entity);
+/** Appends a local-space hitbox variant. The first variant becomes active. */
+EngineResult rohr_physics_hitbox_add(Entity entity, Shape hitbox);
+/** Returns a local-space hitbox variant by ordered index. */
+ShapeResult rohr_physics_hitbox_at_get(Entity entity, size_t index);
+/** Replaces a local-space hitbox variant by ordered index. */
+EngineResult rohr_physics_hitbox_at_set(Entity entity, size_t index, Shape hitbox);
+/** Removes one local-space hitbox variant by ordered index. */
+EngineResult rohr_physics_hitbox_at_remove(Entity entity, size_t index);
+/** Returns the number of hitbox variants owned by an entity. */
+HitboxIndexResult rohr_physics_hitbox_count_get(Entity entity);
+/** Returns the active hitbox variant index. */
+HitboxIndexResult rohr_physics_hitbox_active_index_get(Entity entity);
+/** Selects the hitbox variant used by the next physics tick. */
+EngineResult rohr_physics_hitbox_active_index_set(Entity entity, size_t index);
 
 /** Return the default collision filtering configuration. */
 CollisionFilterConfig rohr_physics_collision_filter_config_default_get(void);

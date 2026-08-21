@@ -143,6 +143,8 @@ static yyjson_mut_val *editor_json_body_write(yyjson_mut_doc *document,
     yyjson_mut_obj_add_bool(document, value, "visible", body->visible);
     yyjson_mut_obj_add_uint(document, value, "border_color", body->border_color);
     yyjson_mut_obj_add_uint(document, value, "surface_color", body->surface_color);
+    yyjson_mut_obj_add_uint(document, value, "active_hitbox_index",
+        body->active_hitbox_index);
     for(size_t i = 0; i < body->hitbox_count; i += 1) {
         yyjson_mut_arr_add_val(hitboxes, editor_json_hitbox_write(document,
             &body->hitboxes[i]));
@@ -502,6 +504,7 @@ static bool editor_json_body_read(yyjson_val *value, EditorRigidBody *body,
     yyjson_val *particle_fill_color = yyjson_obj_get(value, "particle_fill_color");
     yyjson_val *border_color = yyjson_obj_get(value, "border_color");
     yyjson_val *surface_color = yyjson_obj_get(value, "surface_color");
+    yyjson_val *active_hitbox_index = yyjson_obj_get(value, "active_hitbox_index");
     uint32_t count;
     *body = editor_project_rigid_body_default_get();
     if(!yyjson_is_obj(value) || !editor_json_uint(value, "id", &body->id) || body->id == 0 ||
@@ -549,6 +552,12 @@ static bool editor_json_body_read(yyjson_val *value, EditorRigidBody *body,
     for(size_t i = 0; i < count; i += 1)
         if(!editor_json_hitbox_read(yyjson_arr_get(hitboxes, i), &body->hitboxes[i], project))
             return false;
+    if(active_hitbox_index != NULL) {
+        uint32_t active;
+        if(!editor_json_uint(value, "active_hitbox_index", &active) ||
+                (count == 0 ? active != 0 : active >= count)) return false;
+        body->active_hitbox_index = active;
+    }
     if(project->next_rigid_body_id <= body->id) project->next_rigid_body_id = body->id + 1;
     return true;
 }

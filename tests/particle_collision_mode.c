@@ -27,6 +27,8 @@ int main(void) {
     Entity second;
     PositionResult particle_origin;
     ParticleRadiusResult particle_radius;
+    HitboxIndexResult hitbox_index;
+    HitboxIndexResult hitbox_count;
 
     if(rohr_physics_sat_overlap_get(
             lower_triangle_get(), upper_triangle_get()).detected) {
@@ -51,6 +53,20 @@ int main(void) {
                 first, (Position){0.1f, -0.2f})) ||
             rohr_error_check(rohr_physics_particle_radius_set(first, 1.5f)))
         goto fail;
+    if(rohr_error_check(rohr_physics_hitbox_add(first, upper_triangle_get())))
+        goto fail;
+    hitbox_count = rohr_physics_hitbox_count_get(first);
+    hitbox_index = rohr_physics_hitbox_active_index_get(first);
+    if(rohr_error_check(hitbox_count) || hitbox_count.result.value != 2 ||
+            rohr_error_check(hitbox_index) || hitbox_index.result.value != 0 ||
+            rohr_error_check(rohr_physics_hitbox_active_index_set(first, 1)) ||
+            rohr_error_check(rohr_physics_hitbox_at_remove(first, 0))) goto fail;
+    hitbox_count = rohr_physics_hitbox_count_get(first);
+    hitbox_index = rohr_physics_hitbox_active_index_get(first);
+    if(rohr_error_check(hitbox_count) || hitbox_count.result.value != 1 ||
+            rohr_error_check(hitbox_index) || hitbox_index.result.value != 0 ||
+            rohr_error_check(rohr_physics_hitbox_set(first,
+                lower_triangle_get()))) goto fail;
     particle_origin = rohr_physics_particle_origin_get(first);
     particle_radius = rohr_physics_particle_radius_get(first);
     if(rohr_error_check(particle_origin) || rohr_error_check(particle_radius) ||
@@ -83,6 +99,11 @@ int main(void) {
     rohr_system_physics_update(0.0);
     if(!rohr_physics_overlap_check(first, second)) {
         fprintf(stderr, "particle pair did not use circle overlap\n");
+        goto fail;
+    }
+    if(rohr_error_check(rohr_physics_hitbox_at_remove(second, 0)) ||
+            rohr_entity_components_check(second, ROHR_HIT_BOX)) {
+        fprintf(stderr, "removing final variant retained hitbox component\n");
         goto fail;
     }
 

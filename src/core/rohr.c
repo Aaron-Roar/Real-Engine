@@ -187,6 +187,15 @@ EngineResult rohr_physics_torque_component_set(Entity entity, Torque torque) {
 }
 EngineResult rohr_physics_torque_for_one_tick_apply(Entity entity, Torque t) { return physics_torque_for_one_tick_apply(entity, t); }
 EngineResult rohr_physics_hitbox_set(Entity entity, Shape hitbox) { return physics_hitbox_set(entity, hitbox); }
+ShapeResult rohr_physics_hitbox_get(Entity entity) { return physics_hitbox_get(entity); }
+EngineResult rohr_physics_hitbox_remove(Entity entity) { return physics_hitbox_remove(entity); }
+EngineResult rohr_physics_hitbox_add(Entity entity, Shape hitbox) { return physics_hitbox_add(entity, hitbox); }
+ShapeResult rohr_physics_hitbox_at_get(Entity entity, size_t index) { return physics_hitbox_at_get(entity, index); }
+EngineResult rohr_physics_hitbox_at_set(Entity entity, size_t index, Shape hitbox) { return physics_hitbox_at_set(entity, index, hitbox); }
+EngineResult rohr_physics_hitbox_at_remove(Entity entity, size_t index) { return physics_hitbox_at_remove(entity, index); }
+HitboxIndexResult rohr_physics_hitbox_count_get(Entity entity) { return physics_hitbox_count_get(entity); }
+HitboxIndexResult rohr_physics_hitbox_active_index_get(Entity entity) { return physics_hitbox_active_index_get(entity); }
+EngineResult rohr_physics_hitbox_active_index_set(Entity entity, size_t index) { return physics_hitbox_active_index_set(entity, index); }
 CollisionFilterConfig rohr_physics_collision_filter_config_default_get(void) { return physics_collision_filter_config_default_get(); }
 EngineResult rohr_physics_collision_filter_set(Entity entity, CollisionFilterConfig config) { return physics_collision_filter_set(entity, config); }
 CollisionFilterConfigResult rohr_physics_collision_filter_get(Entity entity) { return physics_collision_filter_get(entity); }

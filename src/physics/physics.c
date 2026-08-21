@@ -12,6 +12,7 @@ MEMORY_DEFINE_OBJECT_POOL(AccelerationPool, Acceleration)
 MEMORY_DEFINE_OBJECT_POOL(MassPool, float)
 MEMORY_DEFINE_OBJECT_POOL(ForcePool, Force)
 MEMORY_DEFINE_OBJECT_POOL(ShapePool, Shape)
+MEMORY_DEFINE_OBJECT_POOL(HitboxVariantListPool, HitboxVariantList)
 MEMORY_DEFINE_OBJECT_POOL(CollisionFilterConfigPool, CollisionFilterConfig)
 MEMORY_DEFINE_OBJECT_POOL(OrientationPool, Orientation)
 MEMORY_DEFINE_OBJECT_POOL(AngularVelocityPool, AngularVelocity)
@@ -38,6 +39,7 @@ MassPool mass_pool = {0};
 ForcePool forces_pool = {0};
 ShapePool hit_boxes_pool = {0};
 ShapePool world_hit_boxes_pool = {0};
+HitboxVariantListPool hitbox_variants_pool = {0};
 CollisionFilterConfigPool collision_filters_pool = {0};
 AngularVelocityPool angular_velocities_pool = {0};
 AngularVelocityPool angular_velocity_maximums_pool = {0};
@@ -71,6 +73,7 @@ EngineResult physics_tables_init(void) {
     if(ForcePool_init(&forces_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(ShapePool_init(&hit_boxes_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(ShapePool_init(&world_hit_boxes_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
+    if(HitboxVariantListPool_init(&hitbox_variants_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(CollisionFilterConfigPool_init(&collision_filters_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(AngularVelocityPool_init(&angular_velocities_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
     if(AngularVelocityPool_init(&angular_velocity_maximums_pool, 0).kind == ERROR_RESULT_ERROR) { goto fail; }
@@ -120,6 +123,7 @@ EngineResult physics_tables_ensure_capacity(size_t capacity) {
     if(new_capacity > forces_pool.capacity && ForcePool_expand(&forces_pool, new_capacity - forces_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
     if(new_capacity > hit_boxes_pool.capacity && ShapePool_expand(&hit_boxes_pool, new_capacity - hit_boxes_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
     if(new_capacity > world_hit_boxes_pool.capacity && ShapePool_expand(&world_hit_boxes_pool, new_capacity - world_hit_boxes_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
+    if(new_capacity > hitbox_variants_pool.capacity && HitboxVariantListPool_expand(&hitbox_variants_pool, new_capacity - hitbox_variants_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
     if(new_capacity > collision_filters_pool.capacity && CollisionFilterConfigPool_expand(&collision_filters_pool, new_capacity - collision_filters_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
     if(new_capacity > angular_velocities_pool.capacity && AngularVelocityPool_expand(&angular_velocities_pool, new_capacity - angular_velocities_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
     if(new_capacity > angular_velocity_maximums_pool.capacity && AngularVelocityPool_expand(&angular_velocity_maximums_pool, new_capacity - angular_velocity_maximums_pool.capacity).kind == ERROR_RESULT_ERROR) { return error_result_error(ERROR_ENGINE_TABLE_EXPANSION_FAILED); }
@@ -151,6 +155,9 @@ void physics_tables_destroy(void) {
     (void)ForcePool_destroy(&forces_pool);
     (void)ShapePool_destroy(&hit_boxes_pool);
     (void)ShapePool_destroy(&world_hit_boxes_pool);
+    for(size_t i = 0; i < hitbox_variants_pool.capacity; i += 1)
+        if(hitbox_variants_pool.used[i]) free(hitbox_variants_pool.objects[i].values);
+    (void)HitboxVariantListPool_destroy(&hitbox_variants_pool);
     (void)CollisionFilterConfigPool_destroy(&collision_filters_pool);
     (void)AngularVelocityPool_destroy(&angular_velocities_pool);
     (void)AngularVelocityPool_destroy(&angular_velocity_maximums_pool);
@@ -171,6 +178,10 @@ void physics_tables_destroy(void) {
 
 void physics_entity_clear(Entity entity, EntityIndex index) {
     physics_body_state_entity_clear(index);
+    if(index < hitbox_variants_pool.capacity && hitbox_variants_pool.used[index]) {
+        free(hitbox_variants_pool.objects[index].values);
+        (void)HitboxVariantListPool_release_at(&hitbox_variants_pool, index);
+    }
     if(index < particle_geometries_pool.capacity &&
             particle_geometries_pool.used[index])
         (void)ParticleGeometryPool_release_at(&particle_geometries_pool, index);

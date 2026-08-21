@@ -187,7 +187,9 @@ int main(void) {
         if(!SDL_GetPathInfo(path, &info) || info.type != SDL_PATHTYPE_FILE ||
                 !file_contains(path, "EngineResult starter_create") ||
                 !file_contains(path,
-                    "}}, 5.00000000f, 0.500000000f, 0.00000000f, false") ||
+                    "generated_body_create(&object->box") ||
+                !file_contains(path,
+                    "rohr_physics_hitbox_add(object->box") ||
                 !file_contains(path, "rohr_physics_collision_category_set") ||
                 !file_contains(path, "ROHR_COLLISION_CATEGORY_NONE") ||
                 !file_contains(path,
@@ -596,6 +598,9 @@ int main(void) {
         const char *path = "editor_project_round_trip.json";
         EditorObject *loaded_object;
 
+        if(editor_project_hitbox_add(&project, chassis) == NULL) return 1;
+        chassis->active_hitbox_index = 1;
+
         if(!editor_project_save(&project, path) ||
                 editor_result_check(editor_project_load(&loaded, path))) return 1;
         (void)remove(path);
@@ -653,6 +658,8 @@ int main(void) {
                     UINT32_C(0x22446680) ||
                 loaded_object->rigid_bodies[0].border_color != UINT32_C(0xabcdef12) ||
                 loaded_object->rigid_bodies[0].surface_color != UINT32_C(0x12345678) ||
+                loaded_object->rigid_bodies[0].hitbox_count != 2 ||
+                loaded_object->rigid_bodies[0].active_hitbox_index != 1 ||
                 strcmp(loaded_object->rigid_bodies[0].hitboxes[0].vertices[0].name,
                     "front_point") != 0 ||
                 strcmp(loaded_object->rigid_bodies[0].hitboxes[0].line_names[0],

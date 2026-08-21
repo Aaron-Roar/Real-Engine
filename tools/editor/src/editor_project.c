@@ -945,7 +945,8 @@ Position editor_project_particle_center_get(const EditorRigidBody *body) {
     if(body == NULL) return (Position){0};
     if(body->particle) return body->particle_origin;
     if(body->hitbox_count == 0) return (Position){0};
-    hitbox = &body->hitboxes[0];
+    hitbox = &body->hitboxes[body->active_hitbox_index < body->hitbox_count ?
+        body->active_hitbox_index : 0];
     if(hitbox->vertex_count == 0) return (Position){0};
     for(uint32_t i = 0; i < hitbox->vertex_count; i += 1) {
         Position a = hitbox->vertices[i].position;
@@ -973,9 +974,14 @@ float editor_project_particle_auto_radius_get(const EditorRigidBody *body) {
     float radius = 0.0f;
 
     if(body == NULL || body->hitbox_count == 0) return radius;
-    for(uint32_t i = 0; i < body->hitboxes[0].vertex_count; i += 1) {
-        Position point = body->hitboxes[0].vertices[i].position;
+    {
+    const EditorHitbox *active = &body->hitboxes[
+        body->active_hitbox_index < body->hitbox_count ?
+            body->active_hitbox_index : 0];
+    for(uint32_t i = 0; i < active->vertex_count; i += 1) {
+        Position point = active->vertices[i].position;
         radius = fmaxf(radius, hypotf(point.x - center.x, point.y - center.y));
+    }
     }
     return radius;
 }
@@ -1250,6 +1256,12 @@ bool editor_project_hitbox_remove(EditorRigidBody *body, EditorHitboxId id) {
             body->hitboxes[j - 1] = body->hitboxes[j];
         }
         body->hitbox_count -= 1;
+        if(i < body->active_hitbox_index) body->active_hitbox_index -= 1;
+        else if(i == body->active_hitbox_index &&
+                body->active_hitbox_index >= body->hitbox_count &&
+                body->hitbox_count > 0)
+            body->active_hitbox_index = body->hitbox_count - 1;
+        if(body->hitbox_count == 0) body->active_hitbox_index = 0;
         body->hitboxes[body->hitbox_count] = (EditorHitbox){0};
         return true;
     }

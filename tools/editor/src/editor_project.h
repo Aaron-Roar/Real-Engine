@@ -101,6 +101,7 @@ typedef struct EditorRigidBody {
     EditorHitbox *hitboxes;
     size_t hitbox_count;
     size_t hitbox_capacity;
+    size_t active_hitbox_index;
 } EditorRigidBody;
 
 typedef struct EditorCollisionMask {

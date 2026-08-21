@@ -96,6 +96,8 @@ const char *error_code_message_get(EngineError error) {
             return "entity not found";
         case ERROR_ENGINE_COMPONENT_MISSING:
             return "component missing";
+        case ERROR_ENGINE_INDEX_OUT_OF_RANGE:
+            return "component index out of range";
         case ERROR_ENGINE_INVALID_SHAPE:
             return "invalid polygon shape";
         case ERROR_ENGINE_TEXTURE_LOAD_FAILED:
