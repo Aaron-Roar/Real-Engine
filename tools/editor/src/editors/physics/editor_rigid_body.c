@@ -136,7 +136,7 @@ bool editor_rigid_body_editor_draw(EditorRigidBodyEditor *editor,
     float rotation;
     UIFieldResult name_result, x_result, y_result, rotation_result;
     bool field_active;
-    float x, width;
+    float x, width, delete_y = 650.0f;
     if(editor == NULL || context == NULL || context->project == NULL ||
             context->viewport == NULL) return false;
     x = context->x; width = context->width;
@@ -425,12 +425,13 @@ bool editor_rigid_body_editor_draw(EditorRigidBodyEditor *editor,
                             context->viewport);
                 }
             }
+            delete_y = item_y + 50.0f + (float)body->hitbox_count * 30.0f;
         }
     }
     if(context->delete_y_get != NULL && context->delete_open_item != NULL) {
         UIButtonStyle style = editor_mode_delete_style_get();
         if(rohr_ui_button("editor.rigid_body.delete", &editor->delete_label,
-                (UIRect){x + 10.0f, context->delete_y_get(context->delete_context),
+                (UIRect){x + 10.0f, delete_y,
                     width - 20.0f, 34.0f}, &style).clicked)
             (void)context->delete_open_item(context->delete_context);
     }

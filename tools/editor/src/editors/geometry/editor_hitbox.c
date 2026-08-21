@@ -199,9 +199,10 @@ bool editor_hitbox_editor_draw(EditorHitboxEditor *editor,
     }
     if(context->delete_y_get != NULL && context->delete_open_item != NULL) {
         UIButtonStyle style = editor_mode_delete_style_get();
+        float delete_y = 209.0f + (float)hitbox->vertex_count * 54.0f;
         if(rohr_ui_button("editor.hitbox.delete", &editor->delete_label,
                 (UIRect){context->x + 18.0f,
-                    context->delete_y_get(context->delete_context),
+                    delete_y,
                     context->width - 26.0f, 30.0f}, &style).clicked)
             (void)context->delete_open_item(context->delete_context);
     }

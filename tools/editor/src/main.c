@@ -657,7 +657,7 @@ static float editor_panel_content_height_get(const EditorProject *project,
     if(state->mode == EDITOR_VIEWPORT_RIGID_BODY) {
         for(size_t i = 0; i < object->rigid_body_count; i += 1) {
             if(object->rigid_bodies[i].id == state->selected_rigid_body) {
-                return fmaxf(height, 554.0f +
+                return fmaxf(height, 674.0f +
                     (float)(object->rigid_bodies[i].hitbox_count +
                         project->collision_mask_count + 1 +
                         (object->rigid_bodies[i].particle ? 1 : 0)) * 30.0f);
@@ -685,8 +685,8 @@ static float editor_panel_content_height_get(const EditorProject *project,
             if(body->id != state->selected_rigid_body) continue;
             for(size_t hitbox_index = 0; hitbox_index < body->hitbox_count; hitbox_index += 1) {
                 if(body->hitboxes[hitbox_index].id == state->selected_hitbox) {
-                    return fmaxf(height, 180.0f +
-                        (float)body->hitboxes[hitbox_index].vertex_count * 27.0f);
+                    return fmaxf(height, 249.0f +
+                        (float)body->hitboxes[hitbox_index].vertex_count * 54.0f);
                 }
             }
         }

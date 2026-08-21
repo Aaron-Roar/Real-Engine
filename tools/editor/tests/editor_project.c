@@ -189,7 +189,7 @@ int main(void) {
                 !file_contains(path,
                     "generated_body_create(&object->box") ||
                 !file_contains(path,
-                    "rohr_physics_hitbox_add(object->box") ||
+                    "rohr_physics_hitbox_set(*output, hitbox)") ||
                 !file_contains(path, "rohr_physics_collision_category_set") ||
                 !file_contains(path, "ROHR_COLLISION_CATEGORY_NONE") ||
                 !file_contains(path,

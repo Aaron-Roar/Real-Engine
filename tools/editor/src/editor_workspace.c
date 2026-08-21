@@ -568,7 +568,7 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
         " */\n\n"
         "#include \"project_objects.h\"\n\n"
         "static EngineResult generated_body_create(Entity *output, Position position,\n"
-        "    float rotation, float mass_value, float friction,\n"
+        "    float rotation, Shape hitbox, float mass_value, float friction,\n"
         "    float restitution, bool static_body, bool rotation_locked,\n"
         "    bool gravity_enabled, bool collision_enabled, bool particle,\n"
         "    Position particle_origin, float particle_radius,\n"
@@ -582,6 +582,7 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
         "goto fail; } while(0)\n"
         "    GENERATED_APPLY(rohr_physics_position_set(*output, position));\n"
         "    GENERATED_APPLY(rohr_physics_orientation_set(*output, rotation));\n"
+        "    GENERATED_APPLY(rohr_physics_hitbox_set(*output, hitbox));\n"
         "    GENERATED_APPLY(rohr_physics_collision_category_set(*output,\n"
         "        collision_enabled ? collision_category : ROHR_COLLISION_CATEGORY_NONE));\n"
         "    GENERATED_APPLY(rohr_physics_collision_with_set(*output,\n"
@@ -727,15 +728,27 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
             "    *object = (%s){0};\n", function_name, object->name, object->name);
         for(size_t body_index = 0; body_index < object->rigid_body_count; body_index += 1) {
             const EditorRigidBody *body = &object->rigid_bodies[body_index];
+            const EditorHitbox *initial_hitbox = body->hitbox_count > 0 ?
+                &body->hitboxes[0] : NULL;
             float particle_radius = body->particle_auto_fit ?
                 editor_project_particle_auto_radius_get(body) : body->particle_radius;
 
             fprintf(source,
                 "    result = generated_body_create(&object->%s, "
-                "(Position){position.x + %#.9gf, position.y + %#.9gf}, %#.9gf, ",
-                body->name, body->position.x, body->position.y, body->rotation);
+                "(Position){position.x + %#.9gf, position.y + %#.9gf}, %#.9gf, "
+                "(Shape){.amount_of_vertices = %u, .vertices = {",
+                body->name, body->position.x, body->position.y, body->rotation,
+                initial_hitbox == NULL ? 0 : initial_hitbox->vertex_count);
+            if(initial_hitbox != NULL) {
+                for(uint32_t vertex = 0; vertex < initial_hitbox->vertex_count;
+                        vertex += 1)
+                    fprintf(source, "%s{%#.9gf, %#.9gf}",
+                        vertex == 0 ? "" : ", ",
+                        initial_hitbox->vertices[vertex].position.x,
+                        initial_hitbox->vertices[vertex].position.y);
+            }
             fprintf(source,
-                "%#.9gf, %#.9gf, %#.9gf, %s, %s, %s, %s, %s, "
+                "}}, %#.9gf, %#.9gf, %#.9gf, %s, %s, %s, %s, %s, "
                 "(Position){%#.9gf, %#.9gf}, %#.9gf, "
                 "UINT64_C(%llu), UINT64_C(%llu));\n"
                 "    if(rohr_error_check(result)) goto fail;\n",
@@ -749,7 +762,7 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 particle_radius,
                 (unsigned long long)body->collision_category,
                 (unsigned long long)body->collision_with);
-            for(size_t hitbox_index = 0; hitbox_index < body->hitbox_count;
+            for(size_t hitbox_index = 1; hitbox_index < body->hitbox_count;
                     hitbox_index += 1) {
                 const EditorHitbox *hitbox = &body->hitboxes[hitbox_index];
                 fprintf(source,
