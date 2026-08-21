@@ -771,6 +771,28 @@ HitboxIndexResult rohr_physics_hitbox_count_get(Entity entity);
 HitboxIndexResult rohr_physics_hitbox_active_index_get(Entity entity);
 /** Selects the hitbox variant used by the next physics tick. */
 EngineResult rohr_physics_hitbox_active_index_set(Entity entity, size_t index);
+HitboxIdResult rohr_physics_hitbox_id_at_get(Entity entity, size_t index);
+EngineResult rohr_physics_hitbox_id_at_set(Entity entity, size_t index,
+    HitboxId id);
+ShapeResult rohr_physics_hitbox_by_id_get(Entity entity, HitboxId id);
+EngineResult rohr_physics_hitbox_by_id_set(Entity entity, HitboxId id,
+    Shape hitbox);
+EngineResult rohr_physics_hitbox_by_id_remove(Entity entity, HitboxId id);
+HitboxIdResult rohr_physics_hitbox_active_id_get(Entity entity);
+EngineResult rohr_physics_hitbox_active_id_set(Entity entity, HitboxId id);
+EngineResult rohr_physics_hitbox_animation_binding_set(Entity entity,
+    AnimationId animation_id, AnimationFrameId frame_id, HitboxId hitbox_id);
+EngineResult rohr_physics_hitbox_animation_binding_remove(Entity entity,
+    AnimationId animation_id, AnimationFrameId frame_id);
+HitboxIdResult rohr_physics_hitbox_animation_binding_get(Entity entity,
+    AnimationId animation_id, AnimationFrameId frame_id);
+EngineResult rohr_physics_hitbox_animation_binding_at_set(Entity entity,
+    size_t frame_index, size_t hitbox_index);
+EngineResult rohr_physics_hitbox_animation_binding_at_remove(Entity entity,
+    size_t frame_index);
+HitboxIndexResult rohr_physics_hitbox_animation_binding_at_get(Entity entity,
+    size_t frame_index);
+void rohr_physics_hitbox_animation_bindings_update(void);
 
 /** Return the default collision filtering configuration. */
 CollisionFilterConfig rohr_physics_collision_filter_config_default_get(void);
@@ -1389,6 +1411,10 @@ void rohr_graphics_animated_sprite_update(AnimatedSprite *sprite, Tick current_t
  * @return EngineResult describing success or failure.
  */
 EngineResult rohr_graphics_animated_sprite_add(Entity entity, AnimatedSprite sprite);
+EngineResult rohr_graphics_animated_sprite_frame_index_set(Entity entity,
+    size_t frame_index);
+AnimationFrameIndexResult rohr_graphics_animated_sprite_frame_index_get(
+    Entity entity);
 Sprite rohr_graphics_sprite_create(TextureAsset asset, Scale scale);
 EngineResult rohr_graphics_sprite_add(Entity entity, Sprite sprite);
 EngineResult rohr_graphics_sprite_body_offset_set(Entity entity, Position offset);

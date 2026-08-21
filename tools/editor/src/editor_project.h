@@ -75,6 +75,12 @@ typedef struct EditorHitbox {
     size_t vertex_capacity;
 } EditorHitbox;
 
+typedef struct EditorHitboxAnimationBinding {
+    EditorAnimatedSpriteId animation;
+    EditorSpriteId frame;
+    EditorHitboxId hitbox;
+} EditorHitboxAnimationBinding;
+
 typedef struct EditorRigidBody {
     EditorRigidBodyId id;
     char name[EDITOR_OBJECT_NAME_MAX];
@@ -102,6 +108,9 @@ typedef struct EditorRigidBody {
     size_t hitbox_count;
     size_t hitbox_capacity;
     size_t active_hitbox_index;
+    EditorHitboxAnimationBinding *hitbox_animation_bindings;
+    size_t hitbox_animation_binding_count;
+    size_t hitbox_animation_binding_capacity;
 } EditorRigidBody;
 
 typedef struct EditorCollisionMask {
@@ -378,6 +387,12 @@ void editor_project_particle_auto_fit_update(EditorProject *project);
 EditorHitbox *editor_project_hitbox_add(EditorProject *project, EditorRigidBody *body);
 EditorHitbox *editor_project_hitbox_get(EditorRigidBody *body, EditorHitboxId id);
 bool editor_project_hitbox_remove(EditorRigidBody *body, EditorHitboxId id);
+bool editor_project_hitbox_animation_binding_check(const EditorRigidBody *body,
+    EditorAnimatedSpriteId animation, EditorSpriteId frame,
+    EditorHitboxId hitbox);
+bool editor_project_hitbox_animation_binding_set(EditorRigidBody *body,
+    EditorAnimatedSpriteId animation, EditorSpriteId frame,
+    EditorHitboxId hitbox, bool enabled);
 bool editor_project_hitbox_vertex_remove(EditorHitbox *hitbox, uint32_t vertex_index);
 bool editor_project_hitbox_line_remove(EditorHitbox *hitbox, uint32_t line_index);
 bool editor_project_hitbox_vertex_insert(EditorProject *project, EditorHitbox *hitbox,

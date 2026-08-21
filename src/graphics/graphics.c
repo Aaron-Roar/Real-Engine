@@ -2468,6 +2468,7 @@ bool graphics_text_draw(const TextAsset *text, Position position) {
 
 AnimationAssetResult graphics_animation_load(AnimationDescriptor anim_desc) {
     AnimationAsset asset = {0};
+    asset.id = 1;
     asset.texture_list.amount = anim_desc.amount_of_descriptors;
     asset.ticks_per_frame = anim_desc.ticks_per_frame;
     asset.time_per_frame = anim_desc.time_per_frame;
@@ -2478,6 +2479,7 @@ AnimationAssetResult graphics_animation_load(AnimationDescriptor anim_desc) {
             return ERROR_RESULT_MAKE_ERROR(AnimationAssetResult, texture_result.result.error);
         }
         asset.texture_list.textures[i] = texture_result.result.value;
+        asset.texture_list.frame_ids[i] = (AnimationFrameId)i + 1;
     }
 
     return ERROR_RESULT_MAKE_VALUE(AnimationAssetResult, asset);
@@ -2691,6 +2693,34 @@ EngineResult graphics_animated_sprite_add(Entity entity, AnimatedSprite sprite) 
         return result;
     }
     return error_result_value(true);
+}
+
+EngineResult graphics_animated_sprite_frame_index_set(Entity entity,
+        size_t frame_index) {
+    EntityIndex index;
+    if(!entity_index_get(entity, &index) || !entity_index_alive_check(index))
+        return error_result_error(ERROR_ENGINE_INVALID_ENTITY);
+    if(index >= animated_sprites_pool.capacity ||
+            !animated_sprites_pool.used[index])
+        return error_result_error(ERROR_ENGINE_COMPONENT_MISSING);
+    if(frame_index >= (size_t)animated_sprites[index].animation.texture_list.amount)
+        return error_result_error(ERROR_ENGINE_INDEX_OUT_OF_RANGE);
+    animated_sprites[index].animation_frame = (int)frame_index;
+    return error_result_value(true);
+}
+
+AnimationFrameIndexResult graphics_animated_sprite_frame_index_get(
+        Entity entity) {
+    EntityIndex index;
+    if(!entity_index_get(entity, &index) || !entity_index_alive_check(index))
+        return ERROR_RESULT_MAKE_ERROR(AnimationFrameIndexResult,
+            ERROR_ENGINE_INVALID_ENTITY);
+    if(index >= animated_sprites_pool.capacity ||
+            !animated_sprites_pool.used[index])
+        return ERROR_RESULT_MAKE_ERROR(AnimationFrameIndexResult,
+            ERROR_ENGINE_COMPONENT_MISSING);
+    return ERROR_RESULT_MAKE_VALUE(AnimationFrameIndexResult,
+        (size_t)animated_sprites[index].animation_frame);
 }
 
 EngineResult graphics_animated_sprite_body_offset_set(Entity entity,

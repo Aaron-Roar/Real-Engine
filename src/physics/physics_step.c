@@ -198,6 +198,7 @@ void physics_pipeline_joint_constraints_solve(void *context) {
 }
 
 void system_physics_update(double dt) {
+    physics_hitbox_animation_bindings_update();
     physics_pipeline_update(dt);
 }
 

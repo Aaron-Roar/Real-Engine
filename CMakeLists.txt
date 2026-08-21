@@ -183,6 +183,7 @@ set(ROHR_ENGINE_SOURCES
     src/physics/collision/contact_manifold.c
     src/physics/collision/contact_query.c
     src/physics/collision/hitbox.c
+    src/physics/collision/hitbox_binding.c
     src/physics/collision/collision_filter.c
     src/physics/collision/collision_material.c
     src/physics/collision/interaction_query.c
@@ -460,6 +461,14 @@ if(ROHR_BUILD_TESTS)
     set_target_properties(particle_collision_mode_test PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
     add_test(NAME particle_collision_mode COMMAND particle_collision_mode_test)
+
+    add_executable(hitbox_animation_binding_test
+        tests/hitbox_animation_binding.c)
+    target_link_libraries(hitbox_animation_binding_test PRIVATE rohr_engine)
+    set_target_properties(hitbox_animation_binding_test PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${ROHR_BUILD_OUTPUT_DIRECTORY}/tests)
+    add_test(NAME hitbox_animation_binding COMMAND
+        hitbox_animation_binding_test)
 
     add_executable(entity_pair_set_test tests/entity_pair_set.c)
     target_include_directories(entity_pair_set_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)

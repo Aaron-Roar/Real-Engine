@@ -52,6 +52,7 @@ typedef struct {
 
 /** Stable handle for an engine-owned camera. */
 typedef uint32_t CameraId;
+ERROR_DECLARE_RESULT_TYPE(AnimationFrameIndexResult, size_t);
 typedef void (*CameraRenderCallback)(CameraId camera, void *context);
 
 /** Invalid camera handle. */
@@ -199,12 +200,16 @@ ERROR_DECLARE_RESULT_TYPE(TextAssetResult, TextAsset);
 typedef struct {
     /** Loaded texture assets. */
     TextureAsset textures[MAX_TEXTURES];
+    /** Stable IDs parallel to textures. */
+    AnimationFrameId frame_ids[MAX_TEXTURES];
     /** Number of valid textures. */
     int amount;
 } TextureList;
 
 /** Loaded animation asset. */
 typedef struct {
+    /** Stable animation identity used by independent adapter systems. */
+    AnimationId id;
     /** Textures used as animation frames. */
     TextureList texture_list;
     /** Frame duration measured in engine ticks. */
@@ -380,6 +385,9 @@ void graphics_animated_sprite_update(AnimatedSprite *sprite, Tick current_tick,
 
 /** Attach an animated sprite to an entity. */
 EngineResult graphics_animated_sprite_add(Entity entity, AnimatedSprite sprite);
+EngineResult graphics_animated_sprite_frame_index_set(Entity entity,
+    size_t frame_index);
+AnimationFrameIndexResult graphics_animated_sprite_frame_index_get(Entity entity);
 
 /** Create static sprite runtime state from a texture asset. */
 Sprite graphics_sprite_create(TextureAsset asset, Scale scale);

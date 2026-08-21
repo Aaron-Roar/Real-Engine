@@ -733,6 +733,23 @@ static EditorCommandResult editor_command_execute_internal(EditorProject *projec
                         set->value_kind == EDITOR_PROPERTY_VALUE_UINT &&
                         set->value.integer < body->hitbox_count)
                     body->active_hitbox_index = set->value.integer;
+                else if(set->property == EDITOR_PROPERTY_HITBOX_FRAME_BINDING &&
+                        set->value_kind == EDITOR_PROPERTY_VALUE_BOOL) {
+                    EditorAnimatedSprite *animation = NULL;
+                    for(size_t i = 0; i < object->animated_sprite_count; i += 1)
+                        if(object->animated_sprite_items[i].rigid_body == body->id) {
+                            animation = &object->animated_sprite_items[i];
+                            break;
+                        }
+                    if(animation == NULL || editor_project_hitbox_get(body,
+                            set->parent) == NULL ||
+                            !editor_project_hitbox_animation_binding_set(body,
+                                animation->id, set->index, set->parent,
+                                set->value.boolean))
+                        return editor_command_error((EditorError){
+                            EDITOR_ERROR_INVALID_ARGUMENT,
+                            "hitbox frame binding is invalid"});
+                }
                 else if(set->property == EDITOR_PROPERTY_OUTLINE_COLOR &&
                         set->value_kind == EDITOR_PROPERTY_VALUE_UINT)
                     body->border_color = set->value.integer;
@@ -1268,8 +1285,21 @@ property_invalid:
                         "animation frame is invalid or reached the runtime frame limit")
                             .result.error);
             } else if(command->type == EDITOR_COMMAND_ANIMATION_FRAME_REMOVE) {
-                if(!editor_project_animation_frame_remove(sprite,
-                        command->data.animation_frame_remove.index))
+                size_t frame_index = command->data.animation_frame_remove.index;
+                EditorSpriteId frame_id;
+                if(frame_index >= sprite->frame_count)
+                    return editor_command_error(editor_result_error(
+                        EDITOR_ERROR_NOT_FOUND,
+                        "animation frame index was not found").result.error);
+                frame_id = sprite->frames[frame_index].id;
+                for(size_t body_index = 0; body_index < object->rigid_body_count;
+                        body_index += 1) {
+                    EditorRigidBody *body = &object->rigid_bodies[body_index];
+                    (void)editor_project_hitbox_animation_binding_set(body,
+                        sprite->id, frame_id, body->hitbox_count > 0 ?
+                            body->hitboxes[0].id : 0, false);
+                }
+                if(!editor_project_animation_frame_remove(sprite, frame_index))
                     return editor_command_error(editor_result_error(
                         EDITOR_ERROR_NOT_FOUND,
                         "animation frame index was not found").result.error);
@@ -1498,6 +1528,8 @@ static bool editor_command_property_parse(const char *name,
     EDITOR_BOOL_PROPERTY("collision", EDITOR_PROPERTY_COLLISION)
     EDITOR_BOOL_PROPERTY("particle", EDITOR_PROPERTY_PARTICLE)
     EDITOR_BOOL_PROPERTY("particle-auto-fit", EDITOR_PROPERTY_PARTICLE_AUTO_FIT)
+    EDITOR_BOOL_PROPERTY("hitbox-frame-binding",
+        EDITOR_PROPERTY_HITBOX_FRAME_BINDING)
     if(strcmp(name, "active-hitbox") == 0) {
         *property = EDITOR_PROPERTY_ACTIVE_HITBOX;
         *value_kind = EDITOR_PROPERTY_VALUE_UINT;
@@ -1543,6 +1575,8 @@ static const char *editor_command_property_name_get(EditorPropertyKind property)
         case EDITOR_PROPERTY_PARTICLE_ORIGIN_Y: return "particle-origin-y";
         case EDITOR_PROPERTY_PARTICLE_AUTO_FIT: return "particle-auto-fit";
         case EDITOR_PROPERTY_ACTIVE_HITBOX: return "active-hitbox";
+        case EDITOR_PROPERTY_HITBOX_FRAME_BINDING:
+            return "hitbox-frame-binding";
         case EDITOR_PROPERTY_NODE_RADIUS: return "node-radius";
         case EDITOR_PROPERTY_POSITION_LOCKED: return "position-locked";
         case EDITOR_PROPERTY_VISUAL_SIZE: return "visual-size";
@@ -1991,6 +2025,20 @@ collision_filter_invalid:
         bool indexed;
         int property_index;
         int value_index;
+        if(strcmp(domain, "rigid-body") == 0 && count == 10 &&
+                strcmp(arguments[8], "hitbox-frame-binding") == 0) {
+            set->kind = EDITOR_ITEM_RIGID_BODY;
+            set->property = EDITOR_PROPERTY_HITBOX_FRAME_BINDING;
+            set->value_kind = EDITOR_PROPERTY_VALUE_BOOL;
+            if(!editor_command_uint_parse(arguments[4], &set->object) ||
+                    !editor_command_uint_parse(arguments[5], &set->item) ||
+                    !editor_command_uint_parse(arguments[6], &set->parent) ||
+                    !editor_command_uint_parse(arguments[7], &set->index) ||
+                    !editor_command_bool_parse(arguments[9],
+                        &set->value.boolean)) goto property_parse_invalid;
+            command->type = EDITOR_COMMAND_PROPERTY_SET;
+            return editor_result_value(true);
+        }
         if(!editor_command_item_kind_parse(domain, &set->kind)) goto property_parse_invalid;
         nested = set->kind == EDITOR_ITEM_SOFT_NODE ||
             set->kind == EDITOR_ITEM_SOFT_BEAM || set->kind == EDITOR_ITEM_SOFT_AREA;
@@ -2996,7 +3044,10 @@ EditorResult editor_command_cli_write(const EditorCommand *command,
                     !editor_command_text_append(output, output_capacity, &used, "set ") ||
                     !editor_command_shell_text_append(output, output_capacity, &used,
                         document_path)) goto capacity_error;
-            if(set->kind == EDITOR_ITEM_SOFT_NODE || set->kind == EDITOR_ITEM_SOFT_BEAM ||
+            if(set->property == EDITOR_PROPERTY_HITBOX_FRAME_BINDING)
+                snprintf(values, sizeof(values), " %u %u %u %u", set->object,
+                    set->item, set->parent, set->index);
+            else if(set->kind == EDITOR_ITEM_SOFT_NODE || set->kind == EDITOR_ITEM_SOFT_BEAM ||
                     set->kind == EDITOR_ITEM_SOFT_AREA)
                 snprintf(values, sizeof(values), " %u %u %u", set->object,
                     set->parent, set->item);

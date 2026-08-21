@@ -1428,6 +1428,25 @@ physical collision response.
 
 **Returns:** EngineResult describing success or failure.
 
+### Hitbox variants and animation bindings
+
+`rohr_physics_hitbox_at_get()` and the other `_at_` functions address variants
+by ordered index. `rohr_physics_hitbox_by_id_get()` and its matching functions
+address stable `HitboxId` values. `rohr_physics_hitbox_id_at_set()` is primarily
+for loaders and generated code restoring persistent IDs.
+
+```c
+EngineResult rohr_physics_hitbox_animation_binding_set(Entity entity,
+    AnimationId animation_id, AnimationFrameId frame_id, HitboxId hitbox_id);
+EngineResult rohr_physics_hitbox_animation_binding_at_set(Entity entity,
+    size_t frame_index, size_t hitbox_index);
+```
+
+Bindings are physics-owned. The graphics animation and frame data never store
+hitbox references. The standard physics update applies bindings before contact
+detection; custom pipelines may call
+`rohr_physics_hitbox_animation_bindings_update()` explicitly.
+
 ### `rohr_physics_collision_filter_config_default_get`
 
 ```c

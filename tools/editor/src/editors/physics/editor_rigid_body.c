@@ -82,6 +82,7 @@ bool editor_rigid_body_editor_create(EditorRigidBodyEditor *editor,
     CREATE("Collide With", collide_with_label); CREATE("Origin", origin_label);
     CREATE("Initial Active Hitbox", active_hitbox_label);
     CREATE("Add Hitbox Variant", add_hitbox_label);
+    CREATE("Bind Frames", bind_frames_label);
     CREATE("Delete Rigid Body", delete_label);
     CREATE("[X]", visible_label); CREATE("[ ]", hidden_label);
     CREATE("", x_field); CREATE("", y_field); CREATE("", rotation_field);
@@ -95,6 +96,10 @@ bool editor_rigid_body_editor_create(EditorRigidBodyEditor *editor,
     for(size_t i = 0; i < EDITOR_BODY_HITBOX_MAX; i += 1) {
         char name[32]; snprintf(name, sizeof(name), "hitbox_%zu", i + 1);
         if(!editor_mode_text_create(font, name, &editor->hitbox_names[i])) goto fail;
+    }
+    for(size_t i = 0; i < MAX_ANIMATIONS_FRAMES; i += 1) {
+        char name[32]; snprintf(name, sizeof(name), "frame_%zu", i + 1);
+        if(!editor_mode_text_create(font, name, &editor->frame_names[i])) goto fail;
     }
     return true;
 fail:
@@ -112,6 +117,7 @@ void editor_rigid_body_editor_destroy(EditorRigidBodyEditor *editor) {
     DESTROY(rotation_locked_label); DESTROY(collision_label); DESTROY(particle_label);
     DESTROY(collision_category_label); DESTROY(collide_with_label); DESTROY(origin_label);
     DESTROY(active_hitbox_label); DESTROY(add_hitbox_label);
+    DESTROY(bind_frames_label);
     DESTROY(delete_label); DESTROY(visible_label);
     DESTROY(hidden_label); DESTROY(x_field); DESTROY(y_field);
     DESTROY(rotation_field); DESTROY(mass_field); DESTROY(friction_field);
@@ -121,6 +127,8 @@ void editor_rigid_body_editor_destroy(EditorRigidBodyEditor *editor) {
         rohr_graphics_text_destroy(&editor->body_names[i]);
     for(size_t i = 0; i < EDITOR_BODY_HITBOX_MAX; i += 1)
         rohr_graphics_text_destroy(&editor->hitbox_names[i]);
+    for(size_t i = 0; i < MAX_ANIMATIONS_FRAMES; i += 1)
+        rohr_graphics_text_destroy(&editor->frame_names[i]);
     *editor = (EditorRigidBodyEditor){0};
 }
 
@@ -382,11 +390,23 @@ bool editor_rigid_body_editor_draw(EditorRigidBodyEditor *editor,
                     context->viewport->selected_hitbox = added.result.object;
                 }
             }
+            {
+            float hitbox_y = item_y + 42.0f;
+            EditorAnimatedSprite *animation = NULL;
+            for(size_t animation_index = 0;
+                    animation_index < object->animated_sprite_count;
+                    animation_index += 1) {
+                if(object->animated_sprite_items[animation_index].rigid_body ==
+                        body->id) {
+                    animation = &object->animated_sprite_items[animation_index];
+                    break;
+                }
+            }
             for(size_t i = 0; i < body->hitbox_count &&
                     i < EDITOR_BODY_HITBOX_MAX; i += 1) {
                 EditorHitbox *hitbox = &body->hitboxes[i];
-                char id[64], visibility_id[72];
-                float y = item_y + 42.0f + (float)i * 30.0f;
+                char id[64], visibility_id[72], binding_id[80];
+                float y = hitbox_y;
                 UIButtonResult result;
                 if(!editor_mode_named_text_sync(editor->font, hitbox->name,
                         &editor->hitbox_names[i], editor->hitbox_cache[i],
@@ -394,6 +414,8 @@ bool editor_rigid_body_editor_draw(EditorRigidBodyEditor *editor,
                 snprintf(id, sizeof(id), "editor.hitbox.%u", hitbox->id);
                 snprintf(visibility_id, sizeof(visibility_id),
                     "editor.hitbox.%u.visibility", hitbox->id);
+                snprintf(binding_id, sizeof(binding_id),
+                    "editor.hitbox.%u.bind_frames", hitbox->id);
                 if(rohr_ui_button(visibility_id, hitbox->visible ?
                         &editor->visible_label : &editor->hidden_label,
                         (UIRect){row_x, y, 26.0f, 26.0f}, NULL).clicked) {
@@ -403,7 +425,7 @@ bool editor_rigid_body_editor_draw(EditorRigidBodyEditor *editor,
                     (void)editor_command_execute(context->project, &command);
                 }
                 result = rohr_ui_button(id, &editor->hitbox_names[i],
-                    (UIRect){row_x + 32.0f, y, row_width - 32.0f, 26.0f},
+                    (UIRect){row_x + 32.0f, y, row_width * 0.52f - 32.0f, 26.0f},
                     ((context->viewport->selection == EDITOR_SELECTION_HITBOX &&
                         context->viewport->selected_hitbox == hitbox->id) ||
                         editor_viewport_selection_contains(context->viewport,
@@ -415,7 +437,8 @@ bool editor_rigid_body_editor_draw(EditorRigidBodyEditor *editor,
                         context->viewport,
                         (EditorSelectionRef){EDITOR_SELECTION_HITBOX,
                             object->id, body->id, 0, hitbox->id},
-                        (UIRect){row_x + 32.0f, y, row_width - 32.0f, 26.0f},
+                        (UIRect){row_x + 32.0f, y,
+                            row_width * 0.52f - 32.0f, 26.0f},
                         result, i + 1 == body->hitbox_count);
                 if(result.clicked || result.focus_changed) {
                     context->viewport->selection = EDITOR_SELECTION_HITBOX;
@@ -424,8 +447,58 @@ bool editor_rigid_body_editor_draw(EditorRigidBodyEditor *editor,
                         (void)editor_navigation_selected_open(context->project,
                             context->viewport);
                 }
+                {
+                    UIButtonStyle disabled = rohr_ui_button_style_default_get();
+                    disabled.idle = disabled.hovered = (Color){38, 41, 48, 255};
+                    if(rohr_ui_button(binding_id, &editor->bind_frames_label,
+                            (UIRect){row_x + row_width * 0.54f, y,
+                                row_width * 0.46f, 26.0f},
+                            animation == NULL ? &disabled : NULL).clicked &&
+                            animation != NULL)
+                        editor->binding_hitbox_open =
+                            editor->binding_hitbox_open == hitbox->id ? 0 : hitbox->id;
+                }
+                hitbox_y += 30.0f;
+                if(editor->binding_hitbox_open == hitbox->id && animation != NULL) {
+                    size_t frame_count = animation->frame_count < MAX_ANIMATIONS_FRAMES ?
+                        animation->frame_count : MAX_ANIMATIONS_FRAMES;
+                    for(size_t frame = 0; frame < frame_count; frame += 1) {
+                        char frame_id[96];
+                        bool checked = editor_project_hitbox_animation_binding_check(
+                            body, animation->id, animation->frames[frame].id,
+                            hitbox->id);
+                        if(!editor_mode_named_text_sync(editor->font,
+                                animation->frames[frame].name,
+                                &editor->frame_names[frame],
+                                editor->frame_cache[frame], EDITOR_OBJECT_NAME_MAX))
+                            return field_active;
+                        snprintf(frame_id, sizeof(frame_id),
+                            "editor.hitbox.%u.frame.%u", hitbox->id,
+                            animation->frames[frame].id);
+                        if(checkbox(frame_id, &editor->frame_names[frame],
+                                (UIRect){row_x + 18.0f, hitbox_y,
+                                    row_width - 18.0f, 26.0f}, &checked, false)) {
+                            EditorCommand command = {.type =
+                                EDITOR_COMMAND_PROPERTY_SET,
+                                .data.property_set = {
+                                    .kind = EDITOR_ITEM_RIGID_BODY,
+                                    .object = object->id,
+                                    .parent = hitbox->id,
+                                    .item = body->id,
+                                    .index = animation->frames[frame].id,
+                                    .property =
+                                        EDITOR_PROPERTY_HITBOX_FRAME_BINDING,
+                                    .value_kind = EDITOR_PROPERTY_VALUE_BOOL,
+                                    .value.boolean = checked}};
+                            (void)editor_command_execute(context->project,
+                                &command);
+                        }
+                        hitbox_y += 30.0f;
+                    }
+                }
             }
-            delete_y = item_y + 50.0f + (float)body->hitbox_count * 30.0f;
+            delete_y = hitbox_y + 8.0f;
+            }
         }
     }
     if(context->delete_y_get != NULL && context->delete_open_item != NULL) {

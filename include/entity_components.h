@@ -6,6 +6,11 @@
 #define ENTITY_COMPONENTS_H
 
 #include <stdint.h>
+
+typedef uint32_t AnimationId;
+typedef uint32_t AnimationFrameId;
+#define ANIMATION_ID_INVALID UINT32_C(0)
+#define ANIMATION_FRAME_ID_INVALID UINT32_C(0)
 #include <stdbool.h>
 #include <time.h>
 #include "engine.h"
@@ -134,6 +139,8 @@ typedef enum {
     ROHR_KINEMATIC_DRIVEN            = 1 << 27,
     /** Entity has a static sprite. */
     ROHR_SPRITE                      = 1 << 28,
+    /** Entity has physics-owned animation-frame to hitbox bindings. */
+    ROHR_HITBOX_ANIMATION_BINDING    = 1 << 29,
 } Component;
 
 /** Fixed-size, engine-owned entity name. */

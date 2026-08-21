@@ -62,13 +62,35 @@ ERROR_DECLARE_RESULT_TYPE(ShapeResult, Shape);
 /** Result type for hitbox variant counts and indices. */
 ERROR_DECLARE_RESULT_TYPE(HitboxIndexResult, size_t);
 
+typedef uint32_t HitboxId;
+#define HITBOX_ID_INVALID UINT32_C(0)
+ERROR_DECLARE_RESULT_TYPE(HitboxIdResult, HitboxId);
+
+typedef struct HitboxVariant {
+    HitboxId id;
+    Shape shape;
+} HitboxVariant;
+
 /** Ordered local-space hitbox variants owned by one entity. */
 typedef struct HitboxVariantList {
-    Shape *values;
+    HitboxVariant *values;
     size_t count;
     size_t capacity;
     size_t active_index;
+    HitboxId next_id;
 } HitboxVariantList;
+
+typedef struct HitboxAnimationBinding {
+    AnimationId animation_id;
+    AnimationFrameId frame_id;
+    HitboxId hitbox_id;
+} HitboxAnimationBinding;
+
+typedef struct HitboxAnimationBindingList {
+    HitboxAnimationBinding *values;
+    size_t count;
+    size_t capacity;
+} HitboxAnimationBindingList;
 
 /** Geometric overlap information from narrow-phase shape tests. */
 typedef struct OverlapInfo {
@@ -373,6 +395,8 @@ MEMORY_DECLARE_OBJECT_POOL(ForcePool, Force);
 MEMORY_DECLARE_OBJECT_POOL(ShapePool, Shape);
 /** Pool storing owned hitbox variant lists by EntityIndex. */
 MEMORY_DECLARE_OBJECT_POOL(HitboxVariantListPool, HitboxVariantList);
+MEMORY_DECLARE_OBJECT_POOL(HitboxAnimationBindingListPool,
+    HitboxAnimationBindingList);
 /** Pool storing collision filters by EntityIndex. */
 MEMORY_DECLARE_OBJECT_POOL(CollisionFilterConfigPool, CollisionFilterConfig);
 /** Pool storing orientations by EntityIndex. */
@@ -410,6 +434,7 @@ extern AccelerationPool force_accelerations_pool;
 extern ShapePool hit_boxes_pool;
 extern ShapePool world_hit_boxes_pool;
 extern HitboxVariantListPool hitbox_variants_pool;
+extern HitboxAnimationBindingListPool hitbox_animation_bindings_pool;
 extern CollisionFilterConfigPool collision_filters_pool;
 extern OrientationPool orientations_pool;
 extern AngularVelocityPool angular_velocities_pool;
@@ -574,6 +599,29 @@ EngineResult physics_hitbox_at_remove(Entity entity, size_t index);
 HitboxIndexResult physics_hitbox_count_get(Entity entity);
 HitboxIndexResult physics_hitbox_active_index_get(Entity entity);
 EngineResult physics_hitbox_active_index_set(Entity entity, size_t index);
+HitboxIdResult physics_hitbox_id_at_get(Entity entity, size_t index);
+EngineResult physics_hitbox_id_at_set(Entity entity, size_t index, HitboxId id);
+ShapeResult physics_hitbox_by_id_get(Entity entity, HitboxId id);
+EngineResult physics_hitbox_by_id_set(Entity entity, HitboxId id, Shape hitbox);
+EngineResult physics_hitbox_by_id_remove(Entity entity, HitboxId id);
+HitboxIdResult physics_hitbox_active_id_get(Entity entity);
+EngineResult physics_hitbox_active_id_set(Entity entity, HitboxId id);
+EngineResult physics_hitbox_animation_binding_set(Entity entity,
+    AnimationId animation_id, AnimationFrameId frame_id, HitboxId hitbox_id);
+EngineResult physics_hitbox_animation_binding_remove(Entity entity,
+    AnimationId animation_id, AnimationFrameId frame_id);
+HitboxIdResult physics_hitbox_animation_binding_get(Entity entity,
+    AnimationId animation_id, AnimationFrameId frame_id);
+EngineResult physics_hitbox_animation_binding_at_set(Entity entity,
+    size_t frame_index, size_t hitbox_index);
+EngineResult physics_hitbox_animation_binding_at_remove(Entity entity,
+    size_t frame_index);
+HitboxIndexResult physics_hitbox_animation_binding_at_get(Entity entity,
+    size_t frame_index);
+void physics_hitbox_animation_bindings_update(void);
+void physics_hitbox_animation_binding_hitbox_remove(EntityIndex index,
+    HitboxId hitbox_id);
+void physics_hitbox_animation_bindings_entity_clear(EntityIndex index);
 /** Return the default collision filter: default category against all categories. */
 CollisionFilterConfig physics_collision_filter_config_default_get(void);
 /** Replace an entity's complete collision filter. */

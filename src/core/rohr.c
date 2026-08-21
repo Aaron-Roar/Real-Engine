@@ -196,6 +196,20 @@ EngineResult rohr_physics_hitbox_at_remove(Entity entity, size_t index) { return
 HitboxIndexResult rohr_physics_hitbox_count_get(Entity entity) { return physics_hitbox_count_get(entity); }
 HitboxIndexResult rohr_physics_hitbox_active_index_get(Entity entity) { return physics_hitbox_active_index_get(entity); }
 EngineResult rohr_physics_hitbox_active_index_set(Entity entity, size_t index) { return physics_hitbox_active_index_set(entity, index); }
+HitboxIdResult rohr_physics_hitbox_id_at_get(Entity entity, size_t index) { return physics_hitbox_id_at_get(entity, index); }
+EngineResult rohr_physics_hitbox_id_at_set(Entity entity, size_t index, HitboxId id) { return physics_hitbox_id_at_set(entity, index, id); }
+ShapeResult rohr_physics_hitbox_by_id_get(Entity entity, HitboxId id) { return physics_hitbox_by_id_get(entity, id); }
+EngineResult rohr_physics_hitbox_by_id_set(Entity entity, HitboxId id, Shape hitbox) { return physics_hitbox_by_id_set(entity, id, hitbox); }
+EngineResult rohr_physics_hitbox_by_id_remove(Entity entity, HitboxId id) { return physics_hitbox_by_id_remove(entity, id); }
+HitboxIdResult rohr_physics_hitbox_active_id_get(Entity entity) { return physics_hitbox_active_id_get(entity); }
+EngineResult rohr_physics_hitbox_active_id_set(Entity entity, HitboxId id) { return physics_hitbox_active_id_set(entity, id); }
+EngineResult rohr_physics_hitbox_animation_binding_set(Entity entity, AnimationId animation_id, AnimationFrameId frame_id, HitboxId hitbox_id) { return physics_hitbox_animation_binding_set(entity, animation_id, frame_id, hitbox_id); }
+EngineResult rohr_physics_hitbox_animation_binding_remove(Entity entity, AnimationId animation_id, AnimationFrameId frame_id) { return physics_hitbox_animation_binding_remove(entity, animation_id, frame_id); }
+HitboxIdResult rohr_physics_hitbox_animation_binding_get(Entity entity, AnimationId animation_id, AnimationFrameId frame_id) { return physics_hitbox_animation_binding_get(entity, animation_id, frame_id); }
+EngineResult rohr_physics_hitbox_animation_binding_at_set(Entity entity, size_t frame_index, size_t hitbox_index) { return physics_hitbox_animation_binding_at_set(entity, frame_index, hitbox_index); }
+EngineResult rohr_physics_hitbox_animation_binding_at_remove(Entity entity, size_t frame_index) { return physics_hitbox_animation_binding_at_remove(entity, frame_index); }
+HitboxIndexResult rohr_physics_hitbox_animation_binding_at_get(Entity entity, size_t frame_index) { return physics_hitbox_animation_binding_at_get(entity, frame_index); }
+void rohr_physics_hitbox_animation_bindings_update(void) { physics_hitbox_animation_bindings_update(); }
 CollisionFilterConfig rohr_physics_collision_filter_config_default_get(void) { return physics_collision_filter_config_default_get(); }
 EngineResult rohr_physics_collision_filter_set(Entity entity, CollisionFilterConfig config) { return physics_collision_filter_set(entity, config); }
 CollisionFilterConfigResult rohr_physics_collision_filter_get(Entity entity) { return physics_collision_filter_get(entity); }
@@ -342,6 +356,8 @@ void rohr_graphics_sprites_draw(void) { graphics_sprites_draw(); }
 bool rohr_graphics_animated_sprite_draw(Entity entity) { return graphics_animated_sprite_draw(entity); }
 void rohr_graphics_animated_sprites_draw(void) { graphics_animated_sprites_draw(); }
 void rohr_graphics_sprite_frames_update(Tick current_tick, Time current_time) { graphics_sprite_frames_update(current_tick, current_time); }
+EngineResult rohr_graphics_animated_sprite_frame_index_set(Entity entity, size_t frame_index) { return graphics_animated_sprite_frame_index_set(entity, frame_index); }
+AnimationFrameIndexResult rohr_graphics_animated_sprite_frame_index_get(Entity entity) { return graphics_animated_sprite_frame_index_get(entity); }
 void rohr_graphics_textures_scale(Entity entity, Scale scale) { graphics_textures_scale(entity, scale); }
 void rohr_graphics_camera_move(Vec2D translation) { graphics_camera_move(translation); }
 void rohr_graphics_camera_rotate(Orientation radians) { graphics_camera_rotate(radians); }

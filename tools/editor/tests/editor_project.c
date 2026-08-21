@@ -253,6 +253,10 @@ int main(void) {
                 (void)editor_project_animation_frame_add(&loaded_project,
                     generated_animation, "first_frame", "assets/box.png",
                     generated_sprite->size);
+                (void)editor_project_hitbox_animation_binding_set(
+                    &generated_object->rigid_bodies[2], generated_animation->id,
+                    generated_animation->frames[0].id,
+                    generated_object->rigid_bodies[2].hitboxes[0].id, true);
             }
             if(generated_beam != NULL) generated_beam->damping = 0.3f;
             if(generated_node_a != NULL) {
@@ -317,6 +321,9 @@ int main(void) {
                 !file_contains(path, "rohr_graphics_soft_body_node_color_set") ||
                 !file_contains(path, "rohr_graphics_soft_body_area_color_set") ||
                 !file_contains(path, "rohr_graphics_animation_load") ||
+                !file_contains(path,
+                    "rohr_physics_hitbox_animation_binding_set") ||
+                !file_contains(path, "loaded.result.value.id = UINT32_C(") ||
                 !file_contains(path, "assets/fly frame.png") ||
                 !file_contains(path, "animated.follow_entity_rotation = false") ||
                 !file_contains(path, "animated.body_offset = (Position){6.00000000f, 7.00000000f}") ||

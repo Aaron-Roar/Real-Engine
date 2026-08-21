@@ -762,6 +762,11 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 particle_radius,
                 (unsigned long long)body->collision_category,
                 (unsigned long long)body->collision_with);
+            if(initial_hitbox != NULL)
+                fprintf(source,
+                    "    result = rohr_physics_hitbox_id_at_set(object->%s, 0, UINT32_C(%u));\n"
+                    "    if(rohr_error_check(result)) goto fail;\n",
+                    body->name, initial_hitbox->id);
             for(size_t hitbox_index = 1; hitbox_index < body->hitbox_count;
                     hitbox_index += 1) {
                 const EditorHitbox *hitbox = &body->hitboxes[hitbox_index];
@@ -775,6 +780,10 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                         hitbox->vertices[vertex].position.y);
                 }
                 fprintf(source, "}});\n    if(rohr_error_check(result)) goto fail;\n");
+                fprintf(source,
+                    "    result = rohr_physics_hitbox_id_at_set(object->%s, %zu, UINT32_C(%u));\n"
+                    "    if(rohr_error_check(result)) goto fail;\n",
+                    body->name, hitbox_index, hitbox->id);
             }
             if(body->hitbox_count > 0 && body->active_hitbox_index != 0)
                 fprintf(source,
@@ -848,6 +857,13 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                 "      AnimatedSprite animated;\n"
                 "      if(rohr_error_check(loaded)) { result = rohr_error_result_error("
                 "loaded.result.error); goto fail; }\n"
+                "      loaded.result.value.id = UINT32_C(%u);\n",
+                sprite->id);
+            for(size_t frame = 0; frame < sprite->frame_count; frame += 1)
+                fprintf(source,
+                    "      loaded.result.value.texture_list.frame_ids[%zu] = UINT32_C(%u);\n",
+                    frame, sprite->frames[frame].id);
+            fprintf(source,
                 "      animated = rohr_graphics_animated_sprite_create(loaded.result.value, "
                 "(Scale){%#.9gf, %#.9gf});\n"
                 "      animated.animation_frame = %u;\n"
@@ -866,6 +882,21 @@ static bool editor_workspace_generated_objects_write(const EditorWorkspace *work
                     "DIRECTION_RIGHT",
                 sprite->follow_body_rotation ? "true" : "false",
                 sprite->visible ? "true" : "false", target);
+            if(body != NULL) {
+                for(size_t binding_index = 0;
+                        binding_index < body->hitbox_animation_binding_count;
+                        binding_index += 1) {
+                    const EditorHitboxAnimationBinding *binding =
+                        &body->hitbox_animation_bindings[binding_index];
+                    if(binding->animation != sprite->id) continue;
+                    fprintf(source,
+                        "    result = rohr_physics_hitbox_animation_binding_set(object->%s, "
+                        "UINT32_C(%u), UINT32_C(%u), UINT32_C(%u));\n"
+                        "    if(rohr_error_check(result)) goto fail;\n",
+                        body->name, binding->animation, binding->frame,
+                        binding->hitbox);
+                }
+            }
         }
         for(size_t anchor_index = 0; anchor_index < object->anchor_count; anchor_index += 1) {
             const EditorAnchor *anchor = &object->anchors[anchor_index];

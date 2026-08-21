@@ -276,6 +276,7 @@ void editor_project_rigid_body_destroy(EditorRigidBody *body) {
     for(size_t i = 0; i < body->hitbox_count; i += 1)
         editor_project_hitbox_destroy(&body->hitboxes[i]);
     free(body->hitboxes);
+    free(body->hitbox_animation_bindings);
     *body = (EditorRigidBody){0};
 }
 
@@ -286,6 +287,9 @@ bool editor_project_rigid_body_clone(EditorRigidBody *destination,
     destination->hitboxes = NULL;
     destination->hitbox_count = 0;
     destination->hitbox_capacity = 0;
+    destination->hitbox_animation_bindings = NULL;
+    destination->hitbox_animation_binding_count = 0;
+    destination->hitbox_animation_binding_capacity = 0;
     if(!EDITOR_ARRAY_RESERVE(destination->hitboxes,
             destination->hitbox_capacity, source->hitbox_count)) return false;
     for(size_t i = 0; i < source->hitbox_count; i += 1) {
@@ -297,6 +301,18 @@ bool editor_project_rigid_body_clone(EditorRigidBody *destination,
         }
         destination->hitbox_count += 1;
     }
+    if(!EDITOR_ARRAY_RESERVE(destination->hitbox_animation_bindings,
+            destination->hitbox_animation_binding_capacity,
+            source->hitbox_animation_binding_count)) {
+        editor_project_rigid_body_destroy(destination);
+        return false;
+    }
+    memcpy(destination->hitbox_animation_bindings,
+        source->hitbox_animation_bindings,
+        source->hitbox_animation_binding_count *
+            sizeof(*source->hitbox_animation_bindings));
+    destination->hitbox_animation_binding_count =
+        source->hitbox_animation_binding_count;
     return true;
 }
 
@@ -306,6 +322,8 @@ bool editor_project_rigid_body_copy_set(EditorRigidBody *destination,
     size_t capacity;
     size_t old_count;
     size_t old_capacity;
+    EditorHitboxAnimationBinding *bindings;
+    size_t binding_capacity;
     if(destination == NULL || source == NULL) return false;
     old_capacity = destination->hitbox_capacity;
     if(!EDITOR_ARRAY_RESERVE(destination->hitboxes,
@@ -317,6 +335,11 @@ bool editor_project_rigid_body_copy_set(EditorRigidBody *destination,
     hitboxes = destination->hitboxes;
     capacity = destination->hitbox_capacity;
     old_count = destination->hitbox_count;
+    if(!EDITOR_ARRAY_RESERVE(destination->hitbox_animation_bindings,
+            destination->hitbox_animation_binding_capacity,
+            source->hitbox_animation_binding_count)) return false;
+    bindings = destination->hitbox_animation_bindings;
+    binding_capacity = destination->hitbox_animation_binding_capacity;
     for(size_t i = 0; i < source->hitbox_count; i += 1)
         if(!editor_project_hitbox_copy_set(&hitboxes[i],
                 &source->hitboxes[i])) return false;
@@ -325,6 +348,13 @@ bool editor_project_rigid_body_copy_set(EditorRigidBody *destination,
     *destination = *source;
     destination->hitboxes = hitboxes;
     destination->hitbox_capacity = capacity;
+    destination->hitbox_animation_bindings = bindings;
+    destination->hitbox_animation_binding_capacity = binding_capacity;
+    if(source->hitbox_animation_binding_count > 0)
+        memcpy(destination->hitbox_animation_bindings,
+            source->hitbox_animation_bindings,
+            source->hitbox_animation_binding_count *
+                sizeof(*source->hitbox_animation_bindings));
     return true;
 }
 
@@ -1251,6 +1281,18 @@ bool editor_project_hitbox_remove(EditorRigidBody *body, EditorHitboxId id) {
     if(body == NULL || id == 0) return false;
     for(size_t i = 0; i < body->hitbox_count; i += 1) {
         if(body->hitboxes[i].id != id) continue;
+        for(size_t binding = 0;
+                binding < body->hitbox_animation_binding_count;) {
+            if(body->hitbox_animation_bindings[binding].hitbox != id) {
+                binding += 1;
+                continue;
+            }
+            for(size_t j = binding + 1;
+                    j < body->hitbox_animation_binding_count; j += 1)
+                body->hitbox_animation_bindings[j - 1] =
+                    body->hitbox_animation_bindings[j];
+            body->hitbox_animation_binding_count -= 1;
+        }
         editor_project_hitbox_destroy(&body->hitboxes[i]);
         for(size_t j = i + 1; j < body->hitbox_count; j += 1) {
             body->hitboxes[j - 1] = body->hitboxes[j];
@@ -1266,6 +1308,46 @@ bool editor_project_hitbox_remove(EditorRigidBody *body, EditorHitboxId id) {
         return true;
     }
     return false;
+}
+
+bool editor_project_hitbox_animation_binding_check(const EditorRigidBody *body,
+        EditorAnimatedSpriteId animation, EditorSpriteId frame,
+        EditorHitboxId hitbox) {
+    if(body == NULL) return false;
+    for(size_t i = 0; i < body->hitbox_animation_binding_count; i += 1) {
+        const EditorHitboxAnimationBinding *binding =
+            &body->hitbox_animation_bindings[i];
+        if(binding->animation == animation && binding->frame == frame &&
+                binding->hitbox == hitbox) return true;
+    }
+    return false;
+}
+
+bool editor_project_hitbox_animation_binding_set(EditorRigidBody *body,
+        EditorAnimatedSpriteId animation, EditorSpriteId frame,
+        EditorHitboxId hitbox, bool enabled) {
+    if(body == NULL || animation == 0 || frame == 0 || hitbox == 0) return false;
+    for(size_t i = 0; i < body->hitbox_animation_binding_count; i += 1) {
+        EditorHitboxAnimationBinding *binding =
+            &body->hitbox_animation_bindings[i];
+        if(binding->animation != animation || binding->frame != frame) continue;
+        if(enabled) {
+            binding->hitbox = hitbox;
+        } else {
+            for(size_t j = i + 1; j < body->hitbox_animation_binding_count; j += 1)
+                body->hitbox_animation_bindings[j - 1] =
+                    body->hitbox_animation_bindings[j];
+            body->hitbox_animation_binding_count -= 1;
+        }
+        return true;
+    }
+    if(!enabled) return true;
+    if(!EDITOR_ARRAY_RESERVE(body->hitbox_animation_bindings,
+            body->hitbox_animation_binding_capacity,
+            body->hitbox_animation_binding_count + 1)) return false;
+    body->hitbox_animation_bindings[body->hitbox_animation_binding_count++] =
+        (EditorHitboxAnimationBinding){animation, frame, hitbox};
+    return true;
 }
 
 bool editor_project_hitbox_vertex_remove(EditorHitbox *hitbox, uint32_t vertex_index) {
@@ -2120,6 +2202,22 @@ bool editor_project_animated_sprite_remove(EditorObject *object,
     if(object == NULL || id == 0) return false;
     for(size_t i = 0; i < object->animated_sprite_count; i += 1) {
         if(object->animated_sprite_items[i].id != id) continue;
+        for(size_t body_index = 0; body_index < object->rigid_body_count;
+                body_index += 1) {
+            EditorRigidBody *body = &object->rigid_bodies[body_index];
+            for(size_t binding = 0;
+                    binding < body->hitbox_animation_binding_count;) {
+                if(body->hitbox_animation_bindings[binding].animation != id) {
+                    binding += 1;
+                    continue;
+                }
+                for(size_t j = binding + 1;
+                        j < body->hitbox_animation_binding_count; j += 1)
+                    body->hitbox_animation_bindings[j - 1] =
+                        body->hitbox_animation_bindings[j];
+                body->hitbox_animation_binding_count -= 1;
+            }
+        }
         editor_project_animated_sprite_destroy(&object->animated_sprite_items[i]);
         for(size_t j = i + 1; j < object->animated_sprite_count; j += 1)
             object->animated_sprite_items[j - 1] = object->animated_sprite_items[j];

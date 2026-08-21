@@ -49,6 +49,24 @@ validates the outline and caches an ear-clipped convex decomposition when the
 polygon is concave. Applications still provide and retrieve one polygon; the
 convex pieces are internal.
 
+An entity may own multiple ordered hitbox variants while only one is active.
+Variants have stable `HitboxId` values so bindings survive reordering. The
+index APIs are convenient for direct list access; the ID APIs are intended for
+persistent references.
+
+Animation binding is a separate physics component. Graphics animations and
+frames contain stable IDs but no hitbox references. The binding stage observes
+the current frame immediately before the normal physics pipeline and selects
+the mapped hitbox:
+
+```c
+rohr_physics_hitbox_animation_binding_set(entity, animation_id, frame_id,
+    hitbox_id);
+```
+
+Several frames may map to one hitbox. One frame maps to at most one hitbox for
+an entity. Removing a hitbox removes bindings that target it.
+
 The broadphase stores active collider bounds in a dynamic AABB tree. Candidate
 pairs pass mutual collision filters before narrow-phase work. Each collider has:
 

@@ -113,6 +113,7 @@ static yyjson_mut_val *editor_json_body_write(yyjson_mut_doc *document,
     const EditorRigidBody *body) {
     yyjson_mut_val *value = yyjson_mut_obj(document);
     yyjson_mut_val *hitboxes = yyjson_mut_arr(document);
+    yyjson_mut_val *bindings = yyjson_mut_arr(document);
     float particle_radius = body->particle_auto_fit ?
         editor_project_particle_auto_radius_get(body) : body->particle_radius;
     yyjson_mut_obj_add_uint(document, value, "id", body->id);
@@ -150,6 +151,16 @@ static yyjson_mut_val *editor_json_body_write(yyjson_mut_doc *document,
             &body->hitboxes[i]));
     }
     yyjson_mut_obj_add_val(document, value, "hitboxes", hitboxes);
+    for(size_t i = 0; i < body->hitbox_animation_binding_count; i += 1) {
+        const EditorHitboxAnimationBinding *binding =
+            &body->hitbox_animation_bindings[i];
+        yyjson_mut_val *item = yyjson_mut_obj(document);
+        yyjson_mut_obj_add_uint(document, item, "animation", binding->animation);
+        yyjson_mut_obj_add_uint(document, item, "frame", binding->frame);
+        yyjson_mut_obj_add_uint(document, item, "hitbox", binding->hitbox);
+        yyjson_mut_arr_add_val(bindings, item);
+    }
+    yyjson_mut_obj_add_val(document, value, "hitbox_animation_bindings", bindings);
     return value;
 }
 
@@ -505,6 +516,7 @@ static bool editor_json_body_read(yyjson_val *value, EditorRigidBody *body,
     yyjson_val *border_color = yyjson_obj_get(value, "border_color");
     yyjson_val *surface_color = yyjson_obj_get(value, "surface_color");
     yyjson_val *active_hitbox_index = yyjson_obj_get(value, "active_hitbox_index");
+    yyjson_val *bindings = yyjson_obj_get(value, "hitbox_animation_bindings");
     uint32_t count;
     *body = editor_project_rigid_body_default_get();
     if(!yyjson_is_obj(value) || !editor_json_uint(value, "id", &body->id) || body->id == 0 ||
@@ -557,6 +569,25 @@ static bool editor_json_body_read(yyjson_val *value, EditorRigidBody *body,
         if(!editor_json_uint(value, "active_hitbox_index", &active) ||
                 (count == 0 ? active != 0 : active >= count)) return false;
         body->active_hitbox_index = active;
+    }
+    if(bindings != NULL) {
+        if(!yyjson_is_arr(bindings) ||
+                !EDITOR_ARRAY_RESERVE(body->hitbox_animation_bindings,
+                    body->hitbox_animation_binding_capacity,
+                    yyjson_arr_size(bindings))) return false;
+        for(size_t i = 0; i < yyjson_arr_size(bindings); i += 1) {
+            yyjson_val *item = yyjson_arr_get(bindings, i);
+            EditorHitboxAnimationBinding binding = {0};
+            if(!yyjson_is_obj(item) ||
+                    !editor_json_uint(item, "animation", &binding.animation) ||
+                    !editor_json_uint(item, "frame", &binding.frame) ||
+                    !editor_json_uint(item, "hitbox", &binding.hitbox) ||
+                    binding.animation == 0 || binding.frame == 0 ||
+                    editor_project_hitbox_get(body, binding.hitbox) == NULL)
+                return false;
+            body->hitbox_animation_bindings[
+                body->hitbox_animation_binding_count++] = binding;
+        }
     }
     if(project->next_rigid_body_id <= body->id) project->next_rigid_body_id = body->id + 1;
     return true;
@@ -877,6 +908,29 @@ static bool editor_json_references_valid(EditorProject *project) {
                 if(sprite->rigid_body != 0 &&
                         object->animated_sprite_items[other].rigid_body ==
                             sprite->rigid_body) return false;
+        }
+        for(size_t j = 0; j < object->rigid_body_count; j += 1) {
+            EditorRigidBody *body = &object->rigid_bodies[j];
+            for(size_t k = 0; k < body->hitbox_animation_binding_count; k += 1) {
+                EditorHitboxAnimationBinding *binding =
+                    &body->hitbox_animation_bindings[k];
+                EditorAnimatedSprite *animation =
+                    editor_project_animated_sprite_get(object,
+                        binding->animation);
+                bool frame_found = false;
+                if(animation == NULL || animation->rigid_body != body->id ||
+                        editor_project_hitbox_get(body, binding->hitbox) == NULL)
+                    return false;
+                for(size_t frame = 0; frame < animation->frame_count; frame += 1)
+                    frame_found = frame_found ||
+                        animation->frames[frame].id == binding->frame;
+                if(!frame_found) return false;
+                for(size_t other = 0; other < k; other += 1)
+                    if(body->hitbox_animation_bindings[other].animation ==
+                            binding->animation &&
+                            body->hitbox_animation_bindings[other].frame ==
+                                binding->frame) return false;
+            }
         }
     }
     return project->selected == 0 || editor_project_selected_get(project) != NULL;
